@@ -1,0 +1,1975 @@
+<!doctype html>
+<html lang="ja" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>案D2 説明資料と同じ顔</title>
+<style>
+/* ============================================================
+   1. トークン — SpecDock 説明資料デザインシステム（ds.css の「D：ビジネス」）をそのまま写す
+   ============================================================ */
+:root {
+  --edge-p2: color-mix(in srgb, var(--ds-accent) 58%, var(--ds-bg));
+  --ds-font-sans: "BIZ UDPGothic", -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic UI", Meiryo, sans-serif;
+  --ds-font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --ds-topbar-h: 56px;
+  --ds-gutter: clamp(16px, 4vw, 48px);
+  --ds-wide-max: 1640px;
+  --ds-radius-s: 4px;
+  --ds-radius: 6px;
+  --ds-radius-l: 8px;
+  --ds-ease: cubic-bezier(.2, .7, .2, 1);
+
+  --ds-bg: #ffffff;
+  --ds-bg-2: #f6f7f9;
+  --ds-surface: #ffffff;
+  --ds-surface-2: #f4f6f8;
+  --ds-surface-3: #e7ebf0;
+  --ds-border: #dfe3e9;
+  --ds-border-2: #848d9c;
+  --ds-text: #1c2230;
+  --ds-text-2: #3a4353;
+  --ds-muted: #5a6372;
+  --ds-faint: #7d8696;
+  --ds-accent: #1a56c4;
+  --ds-accent-strong: #1546a3;
+  --ds-accent-soft: #eef3fd;
+  --ds-accent-line: #c6d6f6;
+  --ds-on-accent: #ffffff;
+  --ds-link: #1a56c4;
+  --ds-focus: #1a56c4;
+  --ds-highlight: #fff1b8;
+
+  --ds-note: #1a56c4;  --ds-note-bg: #eef3fd;  --ds-note-line: #c6d6f6;  --ds-note-ink: #1546a3;
+  --ds-tip: #4a5466;   --ds-tip-bg: #f3f5f8;   --ds-tip-line: #d6dbe3;   --ds-tip-ink: #343c4a;
+  --ds-warn: #a87400;  --ds-warn-bg: #fff7e0;  --ds-warn-line: #f0d9a0;  --ds-warn-ink: #7a5300;
+  --ds-danger: #c21f4d; --ds-danger-bg: #fdeff3; --ds-danger-line: #f5c8d5; --ds-danger-ink: #a3173f;
+  --ds-ok: #0f8466;    --ds-ok-bg: #eaf7f2;    --ds-ok-line: #bfe5d6;    --ds-ok-ink: #0b6650;
+  --ds-syn-keyword: #6d28d9;
+
+  --ds-shadow-s: 0 1px 2px rgb(16 24 40 / 5%);
+  --ds-shadow: 0 1px 2px rgb(16 24 40 / 6%), 0 8px 24px -14px rgb(16 24 40 / 18%);
+  --ds-shadow-l: 0 24px 64px -20px rgb(16 24 40 / 32%);
+  --ds-series-1: #2a78d6; --ds-series-3: #1baf7a;
+  --ds-chart-grid: #e6e9ee; --ds-chart-axis: #b9c0cb;
+
+  /* ダッシュボードで足すもの（DS の値から作る） */
+  --pr-merged: var(--ds-syn-keyword);
+  --cmp-bg: #e7ebf0;
+}
+:root[data-theme="dark"] {
+  --ds-bg: #111318;
+  --ds-bg-2: #15181e;
+  --ds-surface: #171a21;
+  --ds-surface-2: #1d212a;
+  --ds-surface-3: #272c37;
+  --ds-border: #2b313c;
+  --ds-border-2: #6f7889;
+  --ds-text: #e6e9ef;
+  --ds-text-2: #c4cad5;
+  --ds-muted: #98a1b2;
+  --ds-faint: #7f889a;
+  --ds-accent: #7eaaff;
+  --ds-accent-strong: #a9c4ff;
+  --ds-accent-soft: rgb(126 170 255 / 12%);
+  --ds-accent-line: rgb(126 170 255 / 32%);
+  --ds-on-accent: #0b0d12;
+  --ds-link: #8fb4ff;
+  --ds-focus: #8fb4ff;
+  --ds-highlight: rgb(250 204 21 / 24%);
+
+  --ds-note: #7eaaff;  --ds-note-bg: rgb(126 170 255 / 10%);  --ds-note-line: rgb(126 170 255 / 28%);  --ds-note-ink: #a9c4ff;
+  --ds-tip: #a3acbb;   --ds-tip-bg: rgb(163 172 187 / 9%);    --ds-tip-line: rgb(163 172 187 / 26%);    --ds-tip-ink: #d0d6df;
+  --ds-warn: #e0a83a;  --ds-warn-bg: rgb(224 168 58 / 10%);   --ds-warn-line: rgb(224 168 58 / 28%);   --ds-warn-ink: #f5c46b;
+  --ds-danger: #ff7a99; --ds-danger-bg: rgb(255 122 153 / 10%); --ds-danger-line: rgb(255 122 153 / 28%); --ds-danger-ink: #ffadc0;
+  --ds-ok: #4fd1a5;    --ds-ok-bg: rgb(79 209 165 / 9%);      --ds-ok-line: rgb(79 209 165 / 26%);      --ds-ok-ink: #7ddcbc;
+  --ds-syn-keyword: #c4a5ff;
+
+  --ds-shadow-s: 0 1px 2px rgb(0 0 0 / 40%);
+  --ds-shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 12px 32px -16px rgb(0 0 0 / 70%);
+  --ds-shadow-l: 0 30px 80px -20px rgb(0 0 0 / 80%);
+  --ds-series-1: #3987e5; --ds-series-3: #199e70;
+  --ds-chart-grid: #252a34; --ds-chart-axis: #4a5262;
+  --cmp-bg: #0b0d11;
+}
+
+/* 5つの状態 → DS の意味の色の系統 */
+[data-st="done"]    { --st: var(--ds-faint);  --st-bg: var(--ds-tip-bg);    --st-line: var(--ds-tip-line);    --st-ink: var(--ds-tip-ink); }
+[data-st="doing"]   { --st: var(--ds-accent); --st-bg: var(--ds-accent-soft); --st-line: var(--ds-accent-line); --st-ink: var(--ds-accent-strong); }
+[data-st="ready"]   { --st: var(--ds-ok);     --st-bg: var(--ds-ok-bg);     --st-line: var(--ds-ok-line);     --st-ink: var(--ds-ok-ink); }
+[data-st="blocked"] { --st: var(--ds-danger); --st-bg: var(--ds-danger-bg); --st-line: var(--ds-danger-line); --st-ink: var(--ds-danger-ink); }
+[data-st="unknown"] { --st: var(--ds-warn);   --st-bg: var(--ds-warn-bg);   --st-line: var(--ds-warn-line);   --st-ink: var(--ds-warn-ink); }
+[data-st="merge"]   { --st: var(--ds-accent); --st-bg: var(--ds-accent-soft); --st-line: var(--ds-accent-line); --st-ink: var(--ds-accent-strong); }
+
+/* ============================================================
+   2. 基本
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; background: var(--cmp-bg); color-scheme: light; }
+html[data-theme="dark"] { color-scheme: dark; }
+body {
+  margin: 0; height: 100vh; height: 100dvh; overflow: hidden;
+  display: grid; grid-template-rows: auto minmax(0, 1fr);
+  background: var(--cmp-bg); color: var(--ds-text);
+  font-family: var(--ds-font-sans); font-size: 14px; line-height: 1.6; letter-spacing: .01em;
+  -webkit-font-smoothing: antialiased; line-break: strict; overflow-wrap: break-word;
+}
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--ds-focus); outline-offset: 2px; border-radius: 4px; }
+svg.ds-icon { width: 1em; height: 1em; flex: none; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.vh { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@keyframes ds-pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+
+/* ---------- 見比べ用の帯（製品の UI ではない） ---------- */
+.cmp {
+  display: flex; align-items: center; gap: 10px; min-height: 34px; padding: 4px 12px;
+  background: repeating-linear-gradient(135deg, var(--cmp-bg) 0 10px, color-mix(in srgb, var(--cmp-bg) 88%, var(--ds-text)) 10px 11px);
+  border-bottom: 1px dashed var(--ds-border-2); font-size: 12px; color: var(--ds-text-2); overflow: hidden;
+}
+.cmp__name { font-weight: 700; white-space: nowrap; color: var(--ds-text); }
+.cmp__name b { display: inline-grid; place-items: center; width: 20px; height: 20px; margin-right: 6px; border-radius: 4px; background: var(--ds-accent); color: var(--ds-on-accent); font-size: 11px; }
+.cmp__note { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ds-muted); }
+.cmp__ctl { margin-left: auto; display: flex; gap: 8px; flex: none; }
+.seg { display: inline-flex; padding: 2px; border: 1px solid var(--ds-border); border-radius: 6px; background: var(--ds-surface); }
+.seg button { border: 0; background: none; padding: 2px 9px; border-radius: 4px; font-size: 12px; font-weight: 650; color: var(--ds-muted); cursor: pointer; white-space: nowrap; }
+.seg button[aria-pressed="true"] { background: var(--ds-accent); color: var(--ds-on-accent); }
+@media (max-width: 720px) { .cmp__note { display: none; } }
+
+/* ---------- 舞台：PC は全面、スマートフォンは 390px の枠 ---------- */
+.stage { min-height: 0; display: grid; }
+.device { width: 100%; height: 100%; min-height: 0; }
+body[data-device="phone"] .stage { place-items: center; padding: 12px; overflow: auto; }
+body[data-device="phone"] .device {
+  width: 410px; height: min(864px, calc(100dvh - 34px - 24px));
+  border: 10px solid #1c2230; border-radius: 40px; overflow: hidden; box-shadow: var(--ds-shadow-l);
+}
+.app { position: relative; width: 100%; height: 100%; overflow: hidden; background: var(--ds-bg); container: app / inline-size; }
+.app-in { height: 100%; display: grid; grid-template-rows: var(--ds-topbar-h) auto minmax(0, 1fr); }
+.app-in > .top { grid-row: 1; } .app-in > .mtabs { grid-row: 2; } .app-in > .main { grid-row: 3; }
+
+/* ============================================================
+   3. 上の帯（DS の .ds-topbar）
+   ============================================================ */
+.top {
+  position: relative; z-index: 30; display: flex; align-items: center; gap: 12px; height: var(--ds-topbar-h);
+  padding: 0 16px; border-bottom: 1px solid var(--ds-border);
+  background: color-mix(in srgb, var(--ds-bg) 92%, transparent);
+  -webkit-backdrop-filter: saturate(1.6) blur(14px); backdrop-filter: saturate(1.6) blur(14px);
+}
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; white-space: nowrap; }
+.brand__mark { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; background: var(--ds-accent); color: var(--ds-on-accent); font-size: 12px; font-weight: 700; }
+.repo-btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 8px 0 10px; border: 1px solid var(--ds-border); border-radius: 8px; background: var(--ds-surface); color: var(--ds-text); font-size: 13px; font-weight: 650; cursor: pointer; max-width: 200px; }
+.repo-btn:hover { border-color: var(--ds-border-2); background: var(--ds-surface-2); }
+.repo-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.repo-btn .ds-icon { color: var(--ds-muted); font-size: 15px; }
+.tabs { display: flex; align-self: stretch; gap: 2px; margin-left: 6px; }
+.tab { position: relative; display: inline-flex; align-items: center; gap: 6px; padding: 0 12px; border: 0; background: none; color: var(--ds-muted); font-size: 14.5px; font-weight: 650; cursor: pointer; white-space: nowrap; }
+.tab .ds-icon { font-size: 16px; }
+.tab:hover { color: var(--ds-text); }
+.tab[aria-selected="true"] { color: var(--ds-accent-strong); }
+.tab[aria-selected="true"]::after { content: ""; position: absolute; left: 10px; right: 10px; bottom: -1px; height: 3px; border-radius: 2px; background: var(--ds-accent); }
+.top__right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.search { position: relative; display: flex; align-items: center; }
+.search .ds-icon { position: absolute; left: 9px; color: var(--ds-muted); font-size: 15px; pointer-events: none; }
+.search input { width: 220px; height: 32px; padding: 0 10px 0 30px; border: 1px solid var(--ds-border); border-radius: 8px; background: var(--ds-surface-2); color: var(--ds-text); font: inherit; font-size: 13px; }
+.search input::placeholder { color: var(--ds-faint); }
+.search input:focus { outline: 2px solid var(--ds-focus); outline-offset: 0; background: var(--ds-surface); }
+.iconbtn { position: relative; display: inline-grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 1px solid transparent; border-radius: 9px; background: transparent; color: var(--ds-text-2); cursor: pointer; font-size: 18px; }
+.iconbtn:hover { background: var(--ds-surface-2); color: var(--ds-text); }
+.iconbtn .num { position: absolute; top: 2px; right: 0; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px; background: var(--ds-accent); color: var(--ds-on-accent); font-size: 10.5px; font-weight: 700; line-height: 17px; box-shadow: 0 0 0 2px var(--ds-bg); }
+.status { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid var(--ds-border); border-radius: 999px; font-size: 12px; font-weight: 600; color: var(--ds-muted); white-space: nowrap; }
+.status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ds-ok); }
+.status[data-state="stale"]::before { background: var(--ds-warn); }
+.mtabs { display: none; }
+.msearch { display: none; }
+
+/* ============================================================
+   4. 部品（DS の部品を写したもの）
+   ============================================================ */
+.ds-docid { display: inline-block; font-family: var(--ds-font-mono); font-size: 11.5px; font-weight: 700; letter-spacing: .02em; padding: 1px 7px; border-radius: 4px; color: var(--ds-accent-strong); background: var(--ds-accent-soft); border: 1px solid var(--ds-accent-line); white-space: nowrap; line-height: 1.5; }
+.ds-badge { --tone-bg: var(--ds-surface-2); --tone-line: var(--ds-border); --tone-ink: var(--ds-text-2); display: inline-flex; align-items: center; gap: .3em; padding: .1em .6em; border-radius: 4px; border: 1px solid var(--tone-line); background: var(--tone-bg); color: var(--tone-ink); font-size: .75rem; font-weight: 650; line-height: 1.55; white-space: nowrap; }
+.ds-badge[data-tone="accent"] { --tone-bg: var(--ds-accent-soft); --tone-line: var(--ds-accent-line); --tone-ink: var(--ds-accent-strong); }
+.ds-badge[data-tone="warning"] { --tone-bg: var(--ds-warn-bg); --tone-line: var(--ds-warn-line); --tone-ink: var(--ds-warn-ink); }
+.ds-badge[data-tone="danger"] { --tone-bg: var(--ds-danger-bg); --tone-line: var(--ds-danger-line); --tone-ink: var(--ds-danger-ink); }
+.ds-badge .ds-icon { font-size: 1.05em; }
+.chip { display: inline-flex; align-items: center; gap: .35em; padding: .08em .55em .08em .4em; border-radius: 4px; background: var(--st-bg); color: var(--st-ink); border: 1px solid var(--st-line); font-size: 12.5px; font-weight: 700; line-height: 1.6; white-space: nowrap; }
+.chip .st-ico { width: 13px; height: 13px; }
+.ds-btn { display: inline-flex; align-items: center; gap: .45em; height: 32px; padding: 0 12px; border: 1px solid var(--ds-border); border-radius: 8px; background: var(--ds-surface); color: var(--ds-text-2); font-size: 13px; font-weight: 600; line-height: 1; cursor: pointer; white-space: nowrap; text-decoration: none; }
+.ds-btn:hover { border-color: var(--ds-border-2); color: var(--ds-text); background: var(--ds-surface-2); }
+.ds-btn .ds-icon { font-size: 15px; }
+.ds-btn.is-primary { background: var(--ds-accent); border-color: var(--ds-accent); color: var(--ds-on-accent); }
+.ds-btn.is-primary:hover { background: var(--ds-accent-strong); }
+.ds-callout { --tone: var(--ds-note); --tone-bg: var(--ds-note-bg); --tone-line: var(--ds-note-line); --tone-ink: var(--ds-note-ink); display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 12px; padding: 12px 16px 13px 12px; border: 1px solid var(--tone-line); border-left: 4px solid var(--tone); border-radius: var(--ds-radius); background: var(--tone-bg); }
+.ds-callout[data-tone="warning"] { --tone: var(--ds-warn); --tone-bg: var(--ds-warn-bg); --tone-line: var(--ds-warn-line); --tone-ink: var(--ds-warn-ink); }
+.ds-callout[data-tone="tip"] { --tone: var(--ds-tip); --tone-bg: var(--ds-tip-bg); --tone-line: var(--ds-tip-line); --tone-ink: var(--ds-tip-ink); }
+.ds-callout__icon { grid-row: span 2; padding-top: .2em; color: var(--tone); font-size: 18px; line-height: 1; }
+.ds-callout__title { margin: 0; font-weight: 700; color: var(--tone-ink); font-size: .95em; }
+.ds-callout__body { margin: 0; font-size: .92em; color: var(--ds-text); }
+.ds-tabs__list { display: flex; gap: 2px; overflow-x: auto; border-bottom: 1px solid var(--ds-border); scrollbar-width: none; }
+.ds-tabs__tab { position: relative; flex: none; padding: 9px 14px 10px; border: 0; background: none; color: var(--ds-muted); font-size: 14.5px; font-weight: 650; cursor: pointer; white-space: nowrap; }
+.ds-tabs__tab:hover { color: var(--ds-text); }
+.ds-tabs__tab[aria-selected="true"] { color: var(--ds-accent-strong); }
+.ds-tabs__tab[aria-selected="true"]::after { content: ""; position: absolute; left: 10px; right: 10px; bottom: -1px; height: 3px; border-radius: 2px; background: var(--ds-accent); }
+.ds-tabs__tab small { margin-left: 4px; color: var(--ds-faint); font-weight: 600; }
+.ds-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr)); gap: 10px; }
+.ds-metric { padding: 12px 14px; border: 1px solid var(--ds-border); border-radius: var(--ds-radius-l); background: var(--ds-surface); text-align: left; }
+.ds-metric__label { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 650; color: var(--ds-muted); }
+.ds-metric__value { margin-top: 2px; font-size: 1.7rem; line-height: 1.2; font-weight: 750; letter-spacing: -.01em; color: var(--ds-text); font-variant-numeric: tabular-nums; }
+.ds-metric__unit { margin-left: 2px; font-size: .5em; font-weight: 650; color: var(--ds-muted); }
+.ds-metric[data-st] { border-top: 3px solid var(--st); }
+button.ds-metric { font: inherit; color: inherit; cursor: pointer; }
+button.ds-metric:hover { border-color: var(--ds-border-2); }
+.ds-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; line-height: 1.6; border: 1px solid var(--ds-border); border-radius: var(--ds-radius); overflow: hidden; }
+.ds-table th, .ds-table td { padding: .6em .9em; text-align: left; vertical-align: top; border-bottom: 1px solid var(--ds-border); }
+.ds-table th { background: var(--ds-surface-2); color: var(--ds-text); font-size: .9em; font-weight: 700; white-space: nowrap; }
+.ds-table tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--ds-surface-2) 55%, transparent); }
+.ds-table tbody tr:last-child td { border-bottom: 0; }
+h2.sec { display: flex; align-items: center; gap: .6em; margin: 28px 0 12px; padding-bottom: .5em; border-bottom: 1px solid var(--ds-border); font-size: 1.15rem; line-height: 1.45; font-weight: 700; }
+h2.sec .n { flex: none; display: inline-grid; place-items: center; min-width: 1.75em; height: 1.75em; padding: 0 .3em; border-radius: 6px; background: var(--ds-accent); color: var(--ds-on-accent); font-size: .78em; font-weight: 700; font-variant-numeric: tabular-nums; }
+h2.sec .aside { margin-left: auto; font-size: 12.5px; font-weight: 600; color: var(--ds-muted); }
+a.lnk { color: var(--ds-link); text-decoration: underline; text-decoration-thickness: 1px; text-decoration-color: color-mix(in srgb, currentColor 35%, transparent); text-underline-offset: .22em; }
+.mono { font-family: var(--ds-font-mono); font-size: .92em; }
+
+/* ============================================================
+   5. 状態などの印（ダッシュボードで足す部品）
+   ============================================================ */
+.st-ico { width: 15px; height: 15px; flex: none; color: var(--st); }
+.st-ico .on { stroke: var(--ds-bg); fill: none; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.as { display: inline-flex; align-items: flex-end; gap: 1.5px; height: 11px; }
+.as i { width: 3px; border-radius: 1px; background: var(--ds-surface-3); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ds-border-2) 45%, transparent); }
+.as i:nth-child(1) { height: 4px; } .as i:nth-child(2) { height: 6.5px; } .as i:nth-child(3) { height: 9px; } .as i:nth-child(4) { height: 11px; }
+.as i.f { background: var(--ds-text-2); box-shadow: none; }
+.as[data-lv="4"] i.f { background: var(--ds-danger); }
+.pr { display: inline-flex; align-items: center; gap: 3px; }
+.pr .ds-icon { font-size: 13px; stroke-width: 2.2; }
+.pr[data-pr="open"] .ds-icon { color: var(--ds-ok); }
+.pr[data-pr="draft"] .ds-icon { color: var(--ds-muted); stroke-dasharray: 2.4 2.2; }
+.pr[data-pr="merged"] .ds-icon { color: var(--pr-merged); }
+.pr[data-pr="closed"] .ds-icon { color: var(--ds-danger); }
+.ci { display: inline-block; width: 8px; height: 8px; flex: none; }
+.ci[data-ci="success"] { border-radius: 50%; background: var(--ds-ok); }
+.ci[data-ci="failure"] { border-radius: 1.5px; background: var(--ds-danger); }
+.ci[data-ci="running"] { border-radius: 50%; border: 2px solid var(--ds-warn); animation: ds-pulse 1.1s infinite; }
+.mg { display: inline-flex; font-size: 12px; }
+.mg[data-mg="ok"] { color: var(--ds-ok); }
+.mg[data-mg="conflict"] { color: var(--ds-danger); }
+.mg .ds-icon { stroke-width: 2.4; }
+.wt { display: inline-flex; color: var(--ds-muted); font-size: 13px; }
+.stg { display: inline-grid; place-items: center; min-width: 17px; height: 17px; padding: 0 3px; border-radius: 4px; border: 1.5px solid var(--ds-border-2); color: var(--ds-text-2); font-size: 10.5px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.chg { position: absolute; top: -5px; right: -5px; width: 11px; height: 11px; border-radius: 50%; background: var(--ds-accent); box-shadow: 0 0 0 2.5px var(--ds-bg); }
+.cln { display: inline-flex; color: var(--ds-warn); font-size: 14px; }
+.sbar { display: inline-flex; height: 6px; border-radius: 999px; overflow: hidden; background: var(--ds-surface-3); flex: none; }
+.sbar > i { display: block; height: 100%; background: var(--st); }
+.sbar > i[data-st="done"] { background: var(--ds-tip); }
+.cnts { display: inline-flex; gap: 8px; align-items: center; }
+.cnt { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; font-weight: 700; color: var(--st-ink); font-variant-numeric: tabular-nums; }
+.cnt .st-ico { width: 12px; height: 12px; }
+.frac { font-size: 12px; font-weight: 700; color: var(--ds-text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.frac small { font-weight: 600; color: var(--ds-faint); }
+.ring { --p: 0; width: 46px; height: 46px; border-radius: 50%; background: conic-gradient(var(--ds-tip) calc(var(--p) * 1%), var(--ds-surface-3) 0); display: grid; place-items: center; flex: none; }
+.ring::after { content: attr(data-label); display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--ds-surface); font-size: 11px; font-weight: 700; color: var(--ds-text-2); font-variant-numeric: tabular-nums; }
+
+/* ============================================================
+   6. 構造の図
+   ============================================================ */
+.main { position: relative; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.main.is-graph { overflow: hidden; }
+.gx-view { position: absolute; inset: 0; overflow: hidden; touch-action: none; cursor: grab; background-color: var(--ds-bg-2);
+  background-image: radial-gradient(color-mix(in srgb, var(--ds-border-2) 28%, transparent) 1px, transparent 1.2px); background-size: 22px 22px; }
+.gx-view.is-drag { cursor: grabbing; }
+.gx-world { position: absolute; left: 0; top: 0; transform-origin: 0 0; display: flex; flex-direction: column; gap: 28px; padding: 64px 24px 24px; width: max-content; }
+.gx-edges { position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible; z-index: 5; }
+/* 依存の線：水平と垂直の線分、角は小さな R。交差は下の線を背景色で切る */
+.gx-edges .e { --ln: var(--ds-border-2); }
+.gx-edges .e .ln { fill: none; stroke: var(--ln); stroke-width: 1.6; stroke-linecap: butt; }
+.gx-edges .e .ah { fill: var(--ln); stroke: none; }
+.gx-edges .e.is-done { --ln: var(--ds-faint); }
+.gx-edges .e.is-done .ln { stroke-width: 1.2; stroke-dasharray: 4 3; }
+.gx-edges .e.is-p1 { --ln: var(--ds-accent); }
+.gx-edges .e.is-p1 .ln { stroke-width: 3; }
+.gx-edges .e.is-p2 { --ln: var(--edge-p2); }
+.gx-edges .e.is-p2 .ln { stroke-width: 2; }
+.gx-edges .e.is-off { opacity: .16; }
+.gx-edges.is-hl .e { opacity: .35; }
+.gx-edges .cut { fill: var(--ds-bg-2); }
+.gx-edges .cut.is-epic { fill: var(--ds-surface); }
+.gx-edges .cut.is-ini { fill: color-mix(in srgb, var(--ds-surface) 55%, var(--ds-bg-2)); }
+.gx-edges .cut.is-done { fill: var(--ds-surface-2); }
+
+.gx-frame { position: relative; border: 1px solid var(--ds-border); border-radius: var(--ds-radius-l); }
+.gx-ini { border-top: 4px solid var(--ds-accent); background: color-mix(in srgb, var(--ds-surface) 55%, var(--ds-bg-2)); padding: 12px 16px 16px; }
+.gx-epic { background: var(--ds-surface); padding: 9px 12px 12px; box-shadow: var(--ds-shadow-s); }
+.gx-epic.is-compact { width: 236px; }
+.gx-frame[data-st="done"] { background: var(--ds-surface-2); }
+.gx-fh { display: flex; align-items: center; gap: 7px; min-width: 0; cursor: pointer; }
+.gx-kicker { font-size: 11.5px; font-weight: 700; color: var(--ds-accent-strong); letter-spacing: .04em; }
+.gx-fttl { min-width: 0; font-weight: 700; color: var(--ds-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gx-ini > .gx-fh .gx-fttl { font-size: 16px; max-width: 46ch; }
+.gx-epic > .gx-fh .gx-fttl { font-size: 13.5px; max-width: 34ch; }
+.gx-epic.is-compact > .gx-fh { align-items: flex-start; }
+.gx-epic.is-compact > .gx-fh .gx-fttl { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.45; }
+.gx-fm { display: flex; align-items: center; gap: 10px; margin-top: 6px; min-height: 18px; }
+.gx-body { margin-top: 12px; }
+.gx-wrap { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; max-width: 1240px; }
+.gx-cols { display: flex; gap: 44px; align-items: flex-start; }
+.gx-col { display: flex; flex-direction: column; gap: 12px; }
+.gx-frame.is-sel { box-shadow: 0 0 0 3px var(--ds-accent), 0 0 0 8px color-mix(in srgb, var(--ds-accent) 20%, transparent), var(--ds-shadow-l); }
+.gx-frame.is-dim > .gx-fh, .gx-frame.is-dim > .gx-fm { opacity: .3; }
+
+.gx-box {
+  position: relative; width: 178px; padding: 7px 10px 8px 11px;
+  border: 1px solid var(--ds-border); border-left: 4px solid var(--st); border-radius: var(--ds-radius);
+  background: var(--ds-surface); cursor: pointer; box-shadow: var(--ds-shadow-s);
+  transition: box-shadow .15s, opacity .2s, transform .15s var(--ds-ease);
+}
+.gx-box:hover { box-shadow: var(--ds-shadow); }
+.gx-box[data-st="doing"] { background: var(--ds-accent-soft); border-color: var(--ds-accent-line); border-left-color: var(--st); }
+.gx-box[data-st="blocked"], .card[data-st="blocked"] { border-left-color: transparent; }
+.gx-box[data-st="blocked"] { background: var(--ds-surface-2); }
+.gx-box[data-st="blocked"]::before, .card[data-st="blocked"]::before { content: ""; position: absolute; left: -4px; top: -1px; bottom: -1px; width: 4px; border-radius: 6px 0 0 6px; background: repeating-linear-gradient(-45deg, color-mix(in srgb, var(--st) 80%, transparent) 0 3px, color-mix(in srgb, var(--st) 22%, transparent) 3px 6px); }
+.gx-box[data-st="unknown"] { background: var(--ds-warn-bg); border-style: dashed; border-color: var(--ds-warn-line); border-left: 4px solid var(--st); }
+.gx-box[data-st="done"] { background: var(--ds-surface-2); }
+.gx-box[data-st="done"] .gx-ttl { color: var(--ds-muted); }
+.gx-box.is-sel, .gx-box.is-sel:hover { box-shadow: 0 0 0 3px var(--ds-accent), 0 0 0 8px color-mix(in srgb, var(--ds-accent) 20%, transparent), var(--ds-shadow-l); }
+.gx-box.is-dim { opacity: .26; }
+.gx-box.is-hl { box-shadow: 0 0 0 2px var(--st), var(--ds-shadow); }
+/* 選んだ箱の依存の道筋：箱は「選んだもの」だけを縁と影で際立たせる。関係する箱は普段のまま、関係のない箱は淡く。
+   上流・下流と、直接・間接は線の太さと濃さで示す。状態の印の目立たせより、選んだときの見え方を先にする */
+.gx-world.has-path .gx-box.is-dim, .gx-world.has-path .gx-clean { opacity: 1; }
+.gx-world.has-path .gx-frame.is-dim > .gx-fh, .gx-world.has-path .gx-frame.is-dim > .gx-fm { opacity: 1; }
+.gx-world.has-path .gx-box.is-hl:not(.is-sel) { box-shadow: var(--ds-shadow-s); }
+.gx-world.has-path .gx-box.is-poff, .gx-world.has-path .gx-clean.is-poff { opacity: .3; }
+.gx-world.has-path .gx-frame.is-poff > .gx-fh, .gx-world.has-path .gx-frame.is-poff > .gx-fm { opacity: .35; }
+.rt { display: none; position: absolute; z-index: 2; top: -9px; left: -9px; height: 18px; padding: 0 6px 0 4px; gap: 3px; align-items: center; border-radius: 999px; background: var(--ds-text); color: var(--ds-bg); font-size: 10.5px; font-weight: 700; line-height: 1; white-space: nowrap; box-shadow: 0 0 0 2px var(--ds-bg); }
+.rt .ds-icon { font-size: 12px; }
+.rt .ds-icon { stroke-width: 2.4; }
+.is-root > .rt { display: inline-flex; }
+.gx-frame > .rt { top: -10px; left: -10px; }
+.lg-rt { position: static; display: inline-flex; box-shadow: none; }
+/* 後に続く数 */
+.dn { display: inline-flex; align-items: center; gap: 2px; padding: 0 5px 0 3px; height: 17px; border-radius: 4px; background: var(--ds-surface-2); border: 1px solid var(--ds-border); color: var(--ds-text-2); font-size: 11px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dn .ds-icon { font-size: 12px; stroke-width: 2.2; color: var(--ds-muted); }
+.gx-marks .dn { margin-left: auto; }
+/* 畳んだ片付けの候補 */
+.gx-clean { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px 0 8px; border: 1px dashed var(--ds-warn-line); border-radius: 6px; background: var(--ds-warn-bg); color: var(--ds-warn-ink); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; align-self: flex-start; }
+.gx-clean .ds-icon { font-size: 14px; color: var(--ds-warn); }
+.gx-clean b { font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.gx-clean:hover { border-style: solid; }
+.gx-r1 { display: flex; align-items: center; gap: 5px; min-height: 18px; }
+.gx-id { font-family: var(--ds-font-mono); font-size: 11px; font-weight: 700; color: var(--ds-text-2); }
+.gx-no { font-size: 11px; color: var(--ds-faint); font-variant-numeric: tabular-nums; }
+.gx-r1 .stg { margin-left: auto; }
+.gx-ttl { margin-top: 3px; font-size: 12.5px; font-weight: 650; line-height: 1.45; color: var(--ds-text); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: auto-phrase; }
+.gx-marks { display: flex; align-items: center; gap: 9px; margin-top: 6px; min-height: 13px; }
+
+.gx-bar { position: absolute; top: 12px; left: 12px; right: 12px; z-index: 10; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 8px 16px; pointer-events: none; }
+.gx-bar > * { pointer-events: auto; }
+.gx-tools { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; margin-left: auto; }
+.tool { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border: 1px solid var(--ds-border); border-radius: 8px; background: color-mix(in srgb, var(--ds-surface) 92%, transparent); color: var(--ds-text-2); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); font-size: 12.5px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px rgb(16 24 40 / 8%); white-space: nowrap; }
+.tool:hover { color: var(--ds-text); border-color: var(--ds-border-2); }
+.tool .ds-icon { font-size: 15px; }
+.tool[aria-pressed="true"] { background: var(--ds-accent-soft); border-color: var(--ds-accent-line); color: var(--ds-accent-strong); }
+.tool.is-icon { width: 32px; padding: 0; justify-content: center; }
+.tool-group { display: inline-flex; }
+.tool-group .tool { border-radius: 0; margin-left: -1px; }
+.tool-group .tool:first-child { border-radius: 8px 0 0 8px; margin-left: 0; }
+.tool-group .tool:last-child { border-radius: 0 8px 8px 0; }
+.zoomval { min-width: 46px; justify-content: center; font-variant-numeric: tabular-nums; }
+
+.gx-next { display: flex; gap: 6px; flex-wrap: wrap; }
+.nx { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 11px 0 9px; border: 1px solid var(--st-line); border-left: 4px solid var(--st); border-radius: 6px; background: color-mix(in srgb, var(--ds-surface) 94%, transparent); color: var(--ds-text); font-size: 12.5px; font-weight: 650; cursor: pointer; white-space: nowrap; box-shadow: 0 2px 8px rgb(16 24 40 / 6%); }
+.nx b { font-size: 15px; font-variant-numeric: tabular-nums; color: var(--st-ink); }
+.nx[aria-pressed="true"] { background: var(--st-bg); box-shadow: 0 0 0 2px var(--st); }
+.nx .ds-icon { font-size: 14px; stroke-width: 2.4; }
+.nx[data-hl="ok"] .ds-icon { color: var(--ds-ok); }
+.nx[data-hl="fix"] .ds-icon { color: var(--ds-danger); }
+.nx-grp { display: inline-flex; align-items: center; gap: 4px; padding: 0 3px 0 8px; height: 32px; border: 1px solid var(--ds-accent-line); border-left: 4px solid var(--ds-accent); border-radius: 6px; background: color-mix(in srgb, var(--ds-surface) 94%, transparent); box-shadow: 0 2px 8px rgb(16 24 40 / 6%); }
+.nx-grp__lab { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 700; color: var(--ds-accent-strong); white-space: nowrap; margin-right: 2px; }
+.nx-grp__lab .ds-icon { font-size: 14px; color: var(--ds-ok); stroke-width: 2.2; }
+.nx-grp .nx { height: 24px; border: 1px solid var(--ds-border); border-radius: 4px; padding: 0 8px 0 6px; box-shadow: none; font-size: 12px; }
+.nx-grp .nx[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--ds-accent); background: var(--ds-accent-soft); }
+
+.legend { position: absolute; left: 12px; bottom: 12px; z-index: 10; display: flex; align-items: flex-start; max-width: calc(100% - 24px); border: 1px solid var(--ds-border); border-radius: var(--ds-radius-l); background: color-mix(in srgb, var(--ds-surface) 95%, transparent); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); box-shadow: var(--ds-shadow); font-size: 12px; }
+.legend__head { flex: none; display: flex; align-items: center; gap: 6px; padding: 8px 12px; border: 0; background: none; font-weight: 700; font-size: 12.5px; color: var(--ds-text); cursor: pointer; text-align: left; white-space: nowrap; }
+.legend__head .ds-icon:last-child { color: var(--ds-muted); transition: transform .2s; transform: rotate(90deg); }
+.legend[data-open="false"] .legend__head .ds-icon:last-child { transform: rotate(-90deg); }
+.legend[data-open="false"] .legend__body { display: none; }
+.legend__body { display: flex; flex-wrap: wrap; gap: 4px 0; padding: 6px 12px 7px 0; min-width: 0; }
+.lg-grp { display: flex; align-items: center; gap: 4px 10px; flex-wrap: wrap; padding: 0 12px; border-left: 1px solid var(--ds-border); }
+.legend h4 { margin: 0; font-size: 11px; font-weight: 700; color: var(--ds-muted); letter-spacing: .04em; white-space: nowrap; }
+.legend ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 2px 10px; }
+.legend li { display: flex; align-items: center; gap: 5px; min-height: 20px; color: var(--ds-text-2); white-space: nowrap; }
+.legend li > :first-child { flex: none; display: inline-flex; align-items: center; justify-content: center; min-width: 16px; gap: 2px; }
+.lg-line { width: 26px; height: 0; border-top: 1.6px solid var(--ds-border-2); position: relative; }
+.lg-line.is-done { border-top: 1.2px dashed var(--ds-faint); }
+.lg-line.is-p1 { border-top: 3px solid var(--ds-accent); }
+.lg-line.is-p2 { border-top: 2px solid var(--edge-p2); }
+.lg-line.is-off { border-top-color: var(--ds-border-2); opacity: .3; }
+.lg-box { width: 18px; height: 12px; margin: 0 3px; border-radius: 3px; background: var(--ds-surface); border: 1px solid var(--ds-border); }
+.lg-box.is-sel { box-shadow: 0 0 0 2px var(--ds-accent), 0 0 0 4px color-mix(in srgb, var(--ds-accent) 20%, transparent); }
+.lg-box.is-off { opacity: .35; }
+.lg-chg { position: relative; width: 11px; height: 11px; border-radius: 50%; background: var(--ds-accent); }
+
+/* ============================================================
+   7. 要点の欄（PC は右、スマートフォンは下から）
+   ============================================================ */
+.panel { position: absolute; z-index: 25; top: calc(var(--ds-topbar-h) + 10px); right: 10px; bottom: 10px; width: 372px; display: flex; flex-direction: column; border: 1px solid var(--ds-border); border-top: 4px solid var(--st, var(--ds-accent)); border-radius: var(--ds-radius-l); background: var(--ds-surface); box-shadow: var(--ds-shadow-l); transform: translateX(calc(100% + 24px)); transition: transform .26s var(--ds-ease); }
+.panel.is-open { transform: none; }
+.pn-grab { display: none; }
+.pn-head { display: flex; align-items: center; gap: 8px; padding: 12px 10px 0 16px; }
+.pn-head .iconbtn { margin-left: auto; width: 32px; height: 32px; font-size: 16px; }
+.pn-body { padding: 8px 16px 16px; overflow: auto; flex: 1; }
+.pn-kicker { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 0; font-size: 12.5px; color: var(--ds-muted); }
+.pn-title { margin: 6px 0 0; font-size: 17px; line-height: 1.5; font-weight: 700; word-break: auto-phrase; text-wrap: pretty; }
+.pn-why { display: flex; gap: 8px; align-items: flex-start; margin: 10px 0 0; padding: 8px 12px; border-left: 4px solid var(--st); border-radius: 6px; background: var(--st-bg); color: var(--ds-text); font-size: 13px; font-weight: 600; }
+.pn-why .st-ico { margin-top: 3px; }
+.path { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 4px; margin: 12px 0 0; font-size: 12.5px; color: var(--ds-muted); }
+.path button { border: 0; background: none; padding: 1px 4px; border-radius: 4px; color: var(--ds-link); cursor: pointer; font-size: 12.5px; text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 35%, transparent); text-underline-offset: .2em; max-width: 22ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.path .ds-icon { font-size: 12px; color: var(--ds-faint); }
+.kv { margin: 14px 0 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 14px; font-size: 13px; line-height: 1.55; padding: 12px 14px; border-radius: var(--ds-radius); background: var(--ds-bg-2); border: 1px solid var(--ds-border); }
+.kv dt { color: var(--ds-muted); white-space: nowrap; }
+.kv dd { margin: 0; color: var(--ds-text); font-weight: 650; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; min-width: 0; }
+.kv dd .mono { font-weight: 600; overflow-wrap: anywhere; }
+.pn-stats { margin-top: 14px; }
+.pn-stats .sbar { width: 100%; height: 8px; }
+.pn-stats ul { list-style: none; margin: 10px 0 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; }
+.pn-stats li { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ds-text-2); }
+.pn-stats li b { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--ds-text); }
+.pn-foot { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--ds-border); }
+.pn-foot .is-primary { flex: 1; justify-content: center; }
+
+/* ============================================================
+   8. 本文の画面（ボード・時間の軸・詳しい画面・概況）
+   ============================================================ */
+.page { max-width: var(--ds-wide-max); margin: 0 auto; padding: 20px 24px 64px; }
+.page-head { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 14px; }
+.page-head h1 { margin: 0; font-size: 1.35rem; line-height: 1.4; font-weight: 700; }
+.page-head p { margin: 0; color: var(--ds-muted); font-size: 13px; }
+.ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 16px 0 14px; }
+.ctl label.tg { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--ds-text-2); cursor: pointer; }
+.ctl input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--ds-accent); margin: 0; }
+.seg2 { display: inline-flex; border: 1px solid var(--ds-border); border-radius: 8px; overflow: hidden; background: var(--ds-surface); }
+.seg2 button { border: 0; border-left: 1px solid var(--ds-border); background: none; padding: 5px 12px; font-size: 13px; font-weight: 600; color: var(--ds-muted); cursor: pointer; }
+.seg2 button:first-child { border-left: 0; }
+.seg2 button[aria-pressed="true"] { background: var(--ds-accent-soft); color: var(--ds-accent-strong); box-shadow: inset 0 -3px 0 var(--ds-accent); }
+.board-top { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: stretch; }
+.cleanup { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 1px solid var(--ds-warn-line); border-left: 4px solid var(--ds-warn); border-radius: var(--ds-radius); background: var(--ds-warn-bg); color: var(--ds-warn-ink); cursor: pointer; font-size: 13px; font-weight: 700; text-align: left; }
+.cleanup b { font-size: 1.5rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.cleanup .ds-icon { font-size: 20px; }
+.cleanup small { display: block; font-weight: 600; color: var(--ds-text-2); font-size: 11.5px; }
+.ratio { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid var(--ds-border); border-radius: var(--ds-radius-l); background: var(--ds-surface); }
+.ratio p { margin: 0; font-size: 12.5px; color: var(--ds-muted); font-weight: 650; }
+.ratio p b { display: block; font-size: 1.1rem; color: var(--ds-text); }
+.cols { display: grid; grid-template-columns: repeat(var(--ncol, 4), minmax(0, 1fr)); gap: 12px; align-items: start; }
+.col { border: 1px solid var(--ds-border); border-top: 3px solid var(--st); border-radius: var(--ds-radius-l); background: var(--ds-bg-2); padding: 0 10px 10px; min-width: 0; }
+.col[data-st="merge"] { background: var(--ds-accent-soft); border-color: var(--ds-accent-line); border-top-color: var(--ds-accent); }
+.col__head { display: flex; align-items: center; gap: 7px; padding: 10px 2px 2px; font-size: 14px; font-weight: 700; }
+.col__head .st-ico, .col__head > .ds-icon { width: 16px; height: 16px; }
+.col__head > .ds-icon { color: var(--ds-ok); stroke-width: 2.2; }
+.col__head b { margin-left: auto; min-width: 24px; padding: 0 7px; border-radius: 999px; background: var(--ds-surface); border: 1px solid var(--ds-border); font-size: 12px; text-align: center; font-variant-numeric: tabular-nums; }
+.col__desc { margin: 0 2px 8px; font-size: 11.5px; color: var(--ds-muted); line-height: 1.5; }
+.col__list { display: grid; gap: 8px; }
+.col__grp { margin: 6px 2px 0; padding-top: 6px; border-top: 1px dashed var(--ds-border); font-size: 11.5px; font-weight: 700; color: var(--ds-muted); display: flex; gap: 6px; align-items: center; min-width: 0; }
+.col__grp span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.col__grp span:first-of-type { flex: none; font-family: var(--ds-font-mono); }
+.col__grp .st-ico { width: 12px; height: 12px; }
+.col__empty { margin: 4px 2px; font-size: 12.5px; color: var(--ds-faint); }
+.rec-note { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin: 0 0 10px; font-size: 12px; color: var(--ds-muted); }
+.rec-note .ds-icon { font-size: 13px; }
+.col__sub { display: flex; align-items: center; gap: 6px; margin: 4px 2px 0; padding: 6px 8px; border-radius: 6px; font-size: 12.5px; font-weight: 700; background: var(--ds-surface); border: 1px solid var(--ds-border); }
+.col__sub .ds-icon { font-size: 14px; stroke-width: 2.4; }
+.col__sub[data-mg="ok"] { color: var(--ds-ok-ink); border-color: var(--ds-ok-line); background: var(--ds-ok-bg); }
+.col__sub[data-mg="ok"] .ds-icon { color: var(--ds-ok); }
+.col__sub[data-mg="fix"] { color: var(--ds-danger-ink); border-color: var(--ds-danger-line); background: var(--ds-danger-bg); }
+.col__sub[data-mg="fix"] .ds-icon { color: var(--ds-danger); }
+.col__sub small { font-weight: 600; color: var(--ds-muted); font-size: 11px; }
+.col__sub b { margin-left: auto; font-variant-numeric: tabular-nums; }
+.ds-metric__sub { margin-top: 2px; display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: 11.5px; font-weight: 650; color: var(--ds-muted); }
+.ds-metric__sub span { display: inline-flex; align-items: center; gap: 3px; }
+.ds-metric__sub .ds-icon { stroke-width: 2.4; }
+.ds-metric__sub [data-mg="ok"] .ds-icon { color: var(--ds-ok); }
+.ds-metric__sub [data-mg="fix"] .ds-icon { color: var(--ds-danger); }
+.card { position: relative; display: flex; flex-direction: column; justify-content: flex-start; align-self: start; width: 100%; padding: 9px 11px 10px 12px; border: 1px solid var(--ds-border); border-left: 4px solid var(--st); border-radius: var(--ds-radius); background: var(--ds-surface); text-align: left; cursor: pointer; font: inherit; color: inherit; box-shadow: var(--ds-shadow-s); }
+.card:hover { border-color: var(--ds-border-2); border-left-color: var(--st); box-shadow: var(--ds-shadow); }
+.card[data-st="blocked"]:hover { border-left-color: transparent; }
+.card.is-sel { box-shadow: 0 0 0 2px var(--ds-focus); }
+.card__r1 { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.card__r1 .ds-badge { margin-left: auto; }
+.card__ttl { margin: 4px 0 0; font-size: 13.5px; font-weight: 700; line-height: 1.5; color: var(--ds-text); word-break: auto-phrase; }
+.card__why { margin: 3px 0 0; font-size: 12px; color: var(--st-ink); font-weight: 650; }
+.card__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 6px; font-size: 12px; color: var(--ds-text-2); }
+.card__meta > span { display: inline-flex; align-items: center; gap: 4px; }
+.card__meta .mono { color: var(--ds-muted); font-size: 11.5px; }
+
+.chart-card { border: 1px solid var(--ds-border); border-radius: var(--ds-radius-l); background: var(--ds-surface); padding: 14px 16px 10px; }
+.chart-card h3 { margin: 0; font-size: 15.5px; font-weight: 700; }
+.chart-card p { margin: 2px 0 0; font-size: 12.5px; color: var(--ds-muted); }
+.chart-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 8px 0 0; font-size: 12.5px; color: var(--ds-text-2); }
+.chart-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.chart-legend i { width: 18px; height: 3px; border-radius: 2px; }
+.chart { position: relative; margin-top: 6px; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart .grid { stroke: var(--ds-chart-grid); }
+.chart .axis { stroke: var(--ds-chart-axis); }
+.chart text { fill: var(--ds-muted); font-size: 11px; font-family: var(--ds-font-sans); }
+.chart .lbl { font-size: 12px; font-weight: 700; }
+.chart-tip { position: absolute; pointer-events: none; padding: 6px 10px; border-radius: 6px; background: var(--ds-text); color: var(--ds-bg); font-size: 12px; line-height: 1.5; white-space: nowrap; transform: translate(-50%, -110%); opacity: 0; transition: opacity .12s; }
+.feed { list-style: none; margin: 0; padding: 0; }
+.feed__day { margin: 16px 0 6px; font-size: 12.5px; font-weight: 700; color: var(--ds-muted); }
+.feed li.ev { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 8px 10px; border-radius: 6px; cursor: pointer; }
+.feed li.ev:hover { background: var(--ds-surface-2); }
+.ev__ic { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; font-size: 14px; background: var(--ds-surface-2); color: var(--ds-text-2); box-shadow: inset 0 0 0 1px var(--ds-border); }
+.ev__ic[data-k="closed"] { background: var(--ds-tip-bg); color: var(--ds-tip); }
+.ev__ic[data-k="created"] { background: var(--ds-accent-soft); color: var(--ds-accent); box-shadow: inset 0 0 0 1px var(--ds-accent-line); }
+.ev__ic[data-k="pr_open"] { background: var(--ds-ok-bg); color: var(--ds-ok); box-shadow: inset 0 0 0 1px var(--ds-ok-line); }
+.ev__ic[data-k="pr_merged"] { background: color-mix(in srgb, var(--pr-merged) 10%, transparent); color: var(--pr-merged); }
+.ev__txt { font-size: 13px; line-height: 1.55; min-width: 0; }
+.ev__txt b { font-weight: 700; }
+.ev__txt small { display: block; color: var(--ds-muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ev__time { font-size: 12px; color: var(--ds-faint); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.time-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+
+.back { display: inline-flex; align-items: center; gap: 4px; margin-bottom: 12px; border: 0; background: none; padding: 4px 0; color: var(--ds-link); font-size: 13px; font-weight: 600; cursor: pointer; }
+.cover { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(16rem, 1fr); border: 1px solid var(--ds-border); border-top: 4px solid var(--st); border-radius: var(--ds-radius-l); background: var(--ds-surface); overflow: hidden; }
+.cover__main { padding: clamp(18px, 3vw, 30px); min-width: 0; }
+.cover__side { padding: clamp(16px, 2.4vw, 24px); background: var(--ds-bg-2); border-left: 1px solid var(--ds-border); min-width: 0; }
+.cover__kicker { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 10px; font-size: 13px; font-weight: 700; color: var(--ds-accent-strong); }
+.cover__title { margin: 0; font-size: clamp(1.35rem, 1.1rem + 1vw, 1.9rem); line-height: 1.4; font-weight: 700; word-break: auto-phrase; text-wrap: balance; }
+.cover__tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.cover__side dl { margin: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px 16px; font-size: 13.5px; line-height: 1.6; }
+.cover__side dt { color: var(--ds-muted); white-space: nowrap; }
+.cover__side dd { margin: 0; color: var(--ds-text); font-weight: 700; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; min-width: 0; }
+.cover .path { margin-top: 0; }
+.tabpanel { padding-top: 18px; }
+.lane { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr)); gap: 10px; align-items: start; }
+.stages { display: grid; gap: 4px; }
+.stage-row { display: grid; grid-template-columns: 4.5rem minmax(0, 1fr); gap: 12px; align-items: start; }
+.stage-row__n { position: relative; display: grid; justify-items: center; gap: 2px; padding-top: 6px; font-size: 11.5px; font-weight: 700; color: var(--ds-muted); }
+.stage-row__n b { display: inline-grid; place-items: center; min-width: 2.1rem; height: 2.1rem; border-radius: 6px; background: var(--ds-accent); color: var(--ds-on-accent); font-size: 1rem; font-variant-numeric: tabular-nums; }
+.stage-row + .stage-row { position: relative; }
+.stage-arrow { display: grid; grid-template-columns: 4.5rem 1fr; color: var(--ds-border-2); font-size: 18px; }
+.stage-arrow span { display: grid; place-items: center; }
+.chain { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.chain .card { width: min(100%, 16rem); }
+.chain__arrow { color: var(--ds-border-2); font-size: 20px; display: inline-flex; }
+.chain__me { padding: 10px 14px; border-radius: var(--ds-radius); border: 2px solid var(--st); background: var(--st-bg); font-weight: 700; font-size: 13.5px; max-width: 16rem; }
+.docs { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr)); gap: 12px; }
+.doc { display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; border: 1px solid var(--ds-border); border-radius: var(--ds-radius-l); background: var(--ds-surface); }
+.doc__head { display: flex; align-items: flex-start; gap: 10px; }
+.doc__icon { display: grid; place-items: center; flex: none; width: 34px; height: 34px; border-radius: 6px; background: var(--ds-accent-soft); color: var(--ds-accent); font-size: 18px; }
+.doc[data-has="false"] .doc__icon { background: var(--ds-surface-2); color: var(--ds-faint); }
+.doc__title { margin: 0; font-weight: 700; font-size: 14.5px; line-height: 1.5; }
+.doc p { margin: 0; font-size: 12.5px; color: var(--ds-muted); }
+
+.ov-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr)); gap: 14px; }
+.ov { display: flex; flex-direction: column; gap: 12px; padding: 16px 18px; border: 1px solid var(--ds-border); border-top: 4px solid var(--ds-accent); border-radius: var(--ds-radius-l); background: var(--ds-surface); text-align: left; cursor: pointer; font: inherit; color: inherit; transition: border-color .15s, box-shadow .2s, transform .2s var(--ds-ease); }
+.ov:hover { border-color: var(--ds-accent-line); border-top-color: var(--ds-accent); box-shadow: var(--ds-shadow); transform: translateY(-2px); }
+.ov__head { display: flex; align-items: center; gap: 10px; }
+.ov__icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 6px; background: var(--ds-accent-soft); color: var(--ds-accent); font-size: 18px; flex: none; }
+.ov__name { margin: 0; font-size: 16px; font-weight: 700; }
+.ov__head .status { margin-left: auto; }
+.ov > * { min-width: 0; }
+.ov__next { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.ov__sec ul { min-width: 0; }
+.ov__sec h4 { display: flex; align-items: center; gap: 6px; margin: 0 0 3px; font-size: 12px; font-weight: 700; color: var(--st-ink); }
+.ov__sec h4 b { font-variant-numeric: tabular-nums; }
+.ov__sec h4 .ds-icon { color: var(--ds-ok); font-size: 13px; stroke-width: 2.2; }
+.ov__sec ul { list-style: none; margin: 0; padding: 0 0 0 4px; border-left: 3px solid var(--st-line); }
+.ov__sec li { padding: 2px 0 2px 8px; font-size: 13.5px; font-weight: 650; line-height: 1.5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ov__sec li small { color: var(--ds-faint); font-family: var(--ds-font-mono); font-size: 11px; margin-right: 6px; font-weight: 600; }
+.ov__sec .none { color: var(--ds-faint); font-weight: 500; font-size: 12.5px; }
+.ov__counts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding-top: 10px; border-top: 1px solid var(--ds-border); }
+.ov__flags { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* 浮かぶ欄・重ねる欄 */
+.pop { position: absolute; z-index: 40; min-width: 240px; max-width: min(360px, calc(100% - 20px)); padding: 6px; border: 1px solid var(--ds-border); border-radius: var(--ds-radius-l); background: var(--ds-surface); box-shadow: var(--ds-shadow-l); display: none; }
+.pop.is-open { display: block; }
+.pop h5 { margin: 6px 10px 4px; font-size: 11.5px; font-weight: 700; color: var(--ds-muted); letter-spacing: .04em; }
+.pop button.it { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 10px; border: 0; border-radius: 6px; background: none; text-align: left; cursor: pointer; font-size: 13px; color: var(--ds-text); }
+.pop button.it:hover, .pop button.it[aria-current="true"] { background: var(--ds-accent-soft); }
+.pop button.it[aria-current="true"] { color: var(--ds-accent-strong); font-weight: 700; }
+.pop button.it .ds-icon { color: var(--ds-muted); font-size: 15px; }
+.pop .it__sub { margin-left: auto; font-size: 11.5px; color: var(--ds-faint); white-space: nowrap; }
+.pop .it__t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pop hr { border: 0; height: 1px; background: var(--ds-border); margin: 4px 6px; }
+.sheet { position: absolute; inset: 0; z-index: 45; display: none; place-items: center; background: rgb(5 10 20 / 45%); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); padding: 16px; }
+.sheet.is-open { display: grid; }
+.sheet__card { width: min(560px, 100%); max-height: 86%; overflow: auto; border: 1px solid var(--ds-border); border-top: 4px solid var(--ds-warn); border-radius: var(--ds-radius-l); background: var(--ds-surface); box-shadow: var(--ds-shadow-l); }
+.sheet__head { display: flex; align-items: center; gap: 8px; padding: 12px 10px 10px 18px; border-bottom: 1px solid var(--ds-border); font-weight: 700; }
+.sheet__head .iconbtn { margin-left: auto; width: 32px; height: 32px; font-size: 16px; }
+.sheet__body { padding: 14px 18px 18px; display: grid; gap: 10px; }
+.sheet__body > p { margin: 0; font-size: 13px; color: var(--ds-text-2); }
+
+/* ============================================================
+   9. スマートフォンの幅（枠の幅で切り替える）
+   ============================================================ */
+@container app (max-width: 900px) {
+  .search input { width: 150px; }
+  .tab .ds-icon { display: none; }
+  .cols { --ncol: 2 !important; }
+  .time-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@container app (max-width: 640px) {
+  .top { gap: 8px; padding: 0 10px 0 12px; }
+  .brand__name, .tabs, .search, .top .ov-btn, .status__w { display: none; }
+  .repo-btn { max-width: 150px; }
+  .status { padding: 0 8px; gap: 5px; }
+  .top__right { gap: 2px; }
+  .msearch-btn { display: inline-grid; }
+  .mtabs { display: flex; border-bottom: 1px solid var(--ds-border); background: var(--ds-bg); }
+  .mtabs .tab { flex: 1; justify-content: center; height: 42px; font-size: 13.5px; padding: 0 6px; }
+  .msearch.is-open { display: flex; position: absolute; z-index: 35; left: 0; right: 0; top: var(--ds-topbar-h); padding: 8px 10px; background: var(--ds-bg); border-bottom: 1px solid var(--ds-border); }
+  .msearch input { flex: 1; height: 38px; padding: 0 12px; border: 1px solid var(--ds-border); border-radius: 8px; background: var(--ds-surface-2); color: var(--ds-text); font: inherit; font-size: 15px; }
+  .gx-bar { display: contents; }
+  .gx-bar .gx-next { position: absolute; z-index: 10; top: 8px; left: 8px; right: 8px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+  .nx { height: 30px; padding: 0 9px 0 7px; font-size: 12px; }
+  .nx span.lab, .nx-grp__lab .lab { display: none; }
+  .nx-grp { height: 30px; flex: none; }
+  .gx-bar .gx-tools { position: absolute; z-index: 10; top: auto; bottom: 12px; right: 10px; flex-direction: column; align-items: flex-end; flex-wrap: nowrap; }
+  .gx-tools .tool:not(.is-icon) .lab { display: none; }
+  .gx-tools .tool:not(.is-icon) { width: 32px; padding: 0; justify-content: center; }
+  .gx-tools .zoomval { display: none; }
+  .tool-group { flex-direction: column; }
+  .tool-group .tool { margin: -1px 0 0; border-radius: 0; }
+  .tool-group .tool:first-child { border-radius: 8px 8px 0 0; margin-top: 0; }
+  .tool-group .tool:last-child { border-radius: 0 0 8px 8px; }
+  .legend { left: 8px; bottom: 12px; max-width: calc(100% - 64px); flex-direction: column; }
+  .legend__body { flex-direction: column; gap: 8px; padding: 0 12px 10px; max-height: 46vh; overflow: auto; }
+  .lg-grp { flex-direction: column; align-items: flex-start; border-left: 0; padding: 0; }
+  .legend ul { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px; }
+  .panel { top: auto; left: 0; right: 0; bottom: 0; width: auto; max-height: 74%; border-radius: 14px 14px 0 0; border-left: 0; border-right: 0; border-bottom: 0; transform: translateY(105%); }
+  .panel.is-open { transform: none; }
+  .pn-grab { display: block; width: 40px; height: 5px; margin: 8px auto 0; border-radius: 99px; background: var(--ds-border-2); opacity: .5; }
+  .pn-head { padding-top: 6px; }
+  .page { padding: 14px 12px 56px; }
+  .page-head h1 { font-size: 1.15rem; }
+  .board-top { grid-template-columns: minmax(0, 1fr); }
+  .ds-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .ds-metric { padding: 8px 9px; }
+  .ds-metric__label { font-size: 11px; gap: 4px; }
+  .ds-metric__value { font-size: 1.3rem; }
+  .ratio { grid-column: 1 / -1; }
+  .cols { --ncol: 1 !important; }
+  .cover { grid-template-columns: minmax(0, 1fr); }
+  .cover__side { border-left: 0; border-top: 1px solid var(--ds-border); }
+  .stage-row { grid-template-columns: 3.2rem minmax(0, 1fr); gap: 8px; }
+  .stage-arrow { grid-template-columns: 3.2rem 1fr; }
+  .ov-grid { grid-template-columns: minmax(0, 1fr); }
+  .sheet { place-items: end stretch; padding: 0; }
+  .sheet__card { width: 100%; max-height: 80%; border-radius: 14px 14px 0 0; }
+  .ds-table { font-size: 12px; }
+  .ds-table th, .ds-table td { padding: .5em .6em; }
+  .card__ttl { font-size: 13.5px; }
+}
+.msearch-btn { display: none; }
+</style>
+</head>
+<body data-device="pc">
+<div class="cmp" role="region" aria-label="見比べ用の帯">
+  <span class="cmp__name"><b>D2</b>案D 説明資料と同じ顔（直し）</span>
+  <span class="cmp__note">SpecDock の説明資料のデザインシステム（D：ビジネス）の色・文字・部品をそのまま使う。構造・状態・題名・依存・日付は spec-dock の本物のスナップショット。線は直交の経路（曲がりの罰則つき A* と車線の振り分け）。作業中の Issue、PR と CI、保証レベル、前回からの変化、worktree のブランチ、不明の1件、ほかの4つのリポジトリの中身は見本。</span>
+  <span class="cmp__ctl">
+    <span class="seg" role="group" aria-label="表示の幅"><button type="button" data-device="pc" aria-pressed="true">PC</button><button type="button" data-device="phone" aria-pressed="false">スマートフォン（390px）</button></span>
+    <span class="seg" role="group" aria-label="明るさ"><button type="button" data-theme-set="light" aria-pressed="true">明るい</button><button type="button" data-theme-set="dark" aria-pressed="false">暗い</button></span>
+  </span>
+</div>
+<div class="stage" id="stage"><div class="device"><div class="app" id="app"><div class="app-in">
+  <header class="top" id="top"></header>
+  <nav class="mtabs" id="mtabs" aria-label="画面の切り替え"></nav>
+  <main class="main" id="main"></main>
+</div>
+  <div class="msearch" id="msearch"><input type="search" id="mq" placeholder="ID・番号・題名で探す" aria-label="検索"></div>
+  <aside class="panel" id="panel" aria-label="要点" aria-hidden="true"></aside>
+  <div class="pop" id="pop" role="menu"></div>
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="片付けの候補"></div>
+</div></div></div>
+
+<script>
+"use strict";
+const RAW = {"repo":"github.com/chemitaro/spec-dock","fetched":"2026-11-03T10:42:57Z","nodes":[{"n":1,"id":"epic-00001","k":"epi","t":"多層構成の仕様書","closed":true,"p":468,"bb":[],"ca":"2026-02-04T23:41","xa":"2026-02-10T08:16","om":1},{"n":23,"id":"epic-00023","k":"epi","t":"runtime CLI の責務分割と sync 状態導出をリファクタリングする","closed":true,"p":468,"bb":[],"ca":"2026-03-10T15:53","xa":"2026-03-11T00:27","om":2},{"n":33,"id":"epic-00033","k":"epi","t":"GitHub backed identity and ADR mirror workflow","closed":true,"p":468,"bb":[],"ca":"2026-03-27T11:08","xa":"2026-03-30T08:09","om":10},{"n":39,"id":"init-00039","k":"ini","t":"Prototype Feature Expansion","closed":false,"p":null,"bb":[],"ca":"2026-03-28T11:12","xa":null,"om":20},{"n":48,"id":"epic-00048","k":"epi","t":"Agent facing interface hardening and host adapter scaffolding","closed":false,"p":39,"bb":[],"ca":"2026-04-02T04:51","xa":null,"om":2},{"n":51,"id":"iss-00051","k":"iss","t":"Host native shim deployment and validation closure","closed":true,"p":48,"bb":[],"ca":"2026-04-06T00:21","xa":"2026-05-27T23:41","om":0},{"n":52,"id":"iss-00052","k":"iss","t":"Reject Non Canonical Git Issue Targets","closed":true,"p":48,"bb":[],"ca":"2026-04-07T04:04","xa":"2026-05-27T23:41","om":0},{"n":54,"id":"epic-00054","k":"epi","t":"GitHub lifecycle command expansion","closed":true,"p":39,"bb":[],"ca":"2026-04-08T09:28","xa":"2026-04-09T15:11","om":5},{"n":59,"id":"epic-00059","k":"epi","t":"Dependency metadata unification and command mutation","closed":false,"p":468,"bb":[],"ca":"2026-04-10T00:33","xa":null,"om":19},{"n":67,"id":"epic-00067","k":"epi","t":"Installed layout aligned asset source structure for agent tooling","closed":false,"p":468,"bb":[],"ca":"2026-04-12T08:50","xa":null,"om":18},{"n":74,"id":"epic-00074","k":"epi","t":"Multi host agent and config asset expansion","closed":false,"p":39,"bb":[],"ca":"2026-04-14T08:33","xa":null,"om":0},{"n":75,"id":"iss-00075","k":"iss","t":"Multi host agent and config asset install","closed":true,"p":74,"bb":[],"ca":"2026-04-14T15:34","xa":"2026-04-15T07:00","om":0},{"n":77,"id":"epic-00077","k":"epi","t":"Legacy hidden workspace coexistence and migration","closed":false,"p":468,"bb":[],"ca":"2026-04-15T13:26","xa":null,"om":0},{"n":78,"id":"iss-00078","k":"iss","t":"Installer coexistence contract and migration flow","closed":true,"p":77,"bb":[],"ca":"2026-04-15T13:29","xa":"2026-04-16T02:18","om":0},{"n":79,"id":"init-00079","k":"ini","t":"minor bugfix maintenance","closed":false,"p":null,"bb":[],"ca":"2026-04-15T22:30","xa":null,"om":8},{"n":80,"id":"epic-00080","k":"epi","t":"minor bug fixes","closed":false,"p":79,"bb":[],"ca":"2026-04-15T22:30","xa":null,"om":8},{"n":90,"id":"epic-00090","k":"epi","t":"Github Default Sync Contract","closed":false,"p":468,"bb":[],"ca":"2026-05-11T07:44","xa":null,"om":0},{"n":91,"id":"iss-00091","k":"iss","t":"Default Github State Commands","closed":true,"p":90,"bb":[],"ca":"2026-05-11T07:45","xa":"2026-05-11T12:05","om":0},{"n":93,"id":"iss-00093","k":"iss","t":"Automatic Sync After State Mutations","closed":true,"p":90,"bb":[],"ca":"2026-05-13T10:01","xa":"2026-05-14T01:13","om":0},{"n":107,"id":"epic-00107","k":"epi","t":"Worktree Provisioning","closed":true,"p":39,"bb":[],"ca":"2026-05-22T00:37","xa":"2026-05-22T10:44","om":10},{"n":112,"id":"epic-00112","k":"epi","t":"Delegated Authoring Architecture for Spec Workflow","closed":false,"p":468,"bb":[],"ca":"2026-05-22T12:04","xa":null,"om":14},{"n":126,"id":"iss-00126","k":"iss","t":"Write Capable Delegated Draft Authoring Correction","closed":true,"p":112,"bb":[],"ca":"2026-05-24T01:24","xa":"2026-05-27T23:41","om":0},{"n":138,"id":"iss-00138","k":"iss","t":"Split Issue Planning and Execution Skills","closed":true,"p":112,"bb":[],"ca":"2026-05-29T00:09","xa":"2026-05-29T04:33","om":0},{"n":158,"id":"epic-00158","k":"epi","t":"Agent Workflow PDCA Hardening","closed":false,"p":468,"bb":[],"ca":"2026-06-05T00:37","xa":null,"om":19},{"n":182,"id":"iss-00182","k":"iss","t":"Limit PR observation final status to current trigger boundary","closed":true,"p":67,"bb":[],"ca":"2026-06-12T01:15","xa":"2026-06-12T04:33","om":0},{"n":209,"id":"iss-00209","k":"iss","t":"Improve dependency PlantUML view rendering","closed":true,"p":59,"bb":[],"ca":"2026-06-19T00:15","xa":"2026-06-19T06:00","om":0},{"n":211,"id":"iss-00211","k":"iss","t":"Epic execution skill should coordinate issue planning, execution, finish, and merge-ready PR preparation","closed":true,"p":158,"bb":[],"ca":"2026-06-19T01:24","xa":"2026-06-19T13:28","om":0},{"n":214,"id":"iss-00214","k":"iss","t":"PR observation progressのreview状態を監視対象基準で表示する","closed":true,"p":158,"bb":[],"ca":"2026-06-19T06:08","xa":"2026-06-19T13:10","om":0},{"n":215,"id":"iss-00215","k":"iss","t":"fix(pr-observation): Codex review trigger comment posting hangs without diagnostics","closed":false,"p":158,"bb":[],"ca":"2026-06-19T07:51","xa":null,"om":0},{"n":218,"id":"iss-00218","k":"iss","t":"Codex Review Fallback Signal Semantics","closed":true,"p":158,"bb":[],"ca":"2026-06-19T13:13","xa":"2026-06-20T04:24","om":0},{"n":219,"id":"iss-00219","k":"iss","t":"fix(pr-observation): carryover unresolved threads prematurely stop current review observation","closed":true,"p":158,"bb":[],"ca":"2026-06-19T16:26","xa":"2026-06-20T13:07","om":0},{"n":222,"id":"iss-00222","k":"iss","t":"GitHub PR観測でChecks APIを完全に使用禁止にする","closed":true,"p":158,"bb":[],"ca":"2026-06-20T13:48","xa":"2026-06-21T09:26","om":0},{"n":224,"id":"epic-00224","k":"epi","t":"Dynamic Workflow Resource Allocation","closed":true,"p":468,"bb":[],"ca":"2026-06-23T00:54","xa":"2026-06-29T02:37","om":20},{"n":235,"id":"iss-00235","k":"iss","t":"High-level dependencies are persisted but not surfaced by deps check or generated projections","closed":true,"p":59,"bb":[],"ca":"2026-06-23T13:34","xa":"2026-06-30T05:09","om":0},{"n":246,"id":"iss-00246","k":"iss","t":"dogfooding repoでspec-dock updateがruntime mirrorを更新できない","closed":true,"p":67,"bb":[],"ca":"2026-06-28T04:00","xa":"2026-06-30T11:16","om":0},{"n":250,"id":"iss-00250","k":"iss","t":"Route Issue Draft Design And Plan Through Profile Templates","closed":false,"p":224,"bb":[],"ca":"2026-06-30T12:36","xa":null,"om":0},{"n":259,"id":"epic-00259","k":"epi","t":"Artifacts Directory Future Only Adoption","closed":true,"p":468,"bb":[],"ca":"2026-07-01T04:22","xa":"2026-07-02T00:05","om":7},{"n":270,"id":"epic-00270","k":"epi","t":"Upstream Planning Governance And Templates","closed":false,"p":468,"bb":[],"ca":"2026-07-02T01:15","xa":null,"om":3},{"n":274,"id":"iss-00274","k":"iss","t":"Update Epic Execution Handoff And Issue Readiness Workflow","closed":true,"p":270,"bb":[273],"ca":"2026-07-02T04:32","xa":"2026-07-02T11:43","om":0},{"n":275,"id":"iss-00275","k":"iss","t":"Add Upstream Planning Smoke Tests And Template Validation","closed":true,"p":270,"bb":[274],"ca":"2026-07-02T04:33","xa":"2026-07-02T12:22","om":0},{"n":276,"id":"iss-00276","k":"iss","t":"Epic Quality Gate Manual Tests And PR Delivery","closed":true,"p":270,"bb":[275],"ca":"2026-07-02T04:33","xa":"2026-07-02T17:33","om":0},{"n":283,"id":"epic-00283","k":"epi","t":"ChatGPT Zip Authoring Pack Automation","closed":false,"p":468,"bb":[],"ca":"2026-07-06T13:44","xa":null,"om":8},{"n":292,"id":"iss-00292","k":"iss","t":"Evaluate Dogfood Metrics And Runtime Promotion Criteria","closed":true,"p":283,"bb":[],"ca":"2026-07-06T15:06","xa":"2026-07-07T03:30","om":0},{"n":293,"id":"iss-00293","k":"iss","t":"Final Epic Quality Gate And Mergeable Pull Request","closed":true,"p":283,"bb":[],"ca":"2026-07-06T15:56","xa":"2026-07-07T06:44","om":0},{"n":295,"id":"epic-00295","k":"epi","t":"ChatGPT Authoring Pack Installed Runtime","closed":false,"p":468,"bb":[],"ca":"2026-07-07T14:00","xa":null,"om":11},{"n":306,"id":"iss-00306","k":"iss","t":"Runtime Workflow Guidance","closed":true,"p":295,"bb":[305],"ca":"2026-07-07T17:13","xa":"2026-07-08T09:02","om":0},{"n":309,"id":"iss-00309","k":"iss","t":"ChatGPT First Planning Skills And Fallback Route Redesign","closed":true,"p":295,"bb":[306],"ca":"2026-07-08T15:01","xa":"2026-07-12T14:45","om":0},{"n":312,"id":"epic-00312","k":"epi","t":"Experimental Local Workbench And Worktree Handoff","closed":false,"p":468,"bb":[],"ca":"2026-07-12T23:55","xa":null,"om":0},{"n":313,"id":"iss-00313","k":"iss","t":"Remove PR Merge Preparer Repair Attempt Limits","closed":true,"p":158,"bb":[],"ca":"2026-07-13T00:39","xa":"2026-07-13T13:56","om":0},{"n":314,"id":"iss-00314","k":"iss","t":"Harden GitHub Sync Preflight Fetch And Receipt Contract","closed":true,"p":295,"bb":[],"ca":"2026-07-13T01:37","xa":"2026-07-13T14:41","om":0},{"n":315,"id":"iss-00315","k":"iss","t":"Experimental Workbench Ignore And Opaque Traversal Foundation","closed":true,"p":312,"bb":[],"ca":"2026-07-13T03:40","xa":"2026-07-13T07:20","om":0},{"n":316,"id":"iss-00316","k":"iss","t":"Experimental Scoped Workbench Copy And Source Wins Merge","closed":true,"p":312,"bb":[315],"ca":"2026-07-13T03:40","xa":"2026-07-13T12:15","om":0},{"n":317,"id":"iss-00317","k":"iss","t":"Byte Preserving ChatGPT Output Artifact Import","closed":true,"p":312,"bb":[315],"ca":"2026-07-13T03:40","xa":"2026-07-13T17:18","om":0},{"n":318,"id":"iss-00318","k":"iss","t":"ChatGPT First Preservation Workflow And Skill Integration","closed":true,"p":312,"bb":[317],"ca":"2026-07-13T03:40","xa":"2026-07-14T10:35","om":0},{"n":319,"id":"iss-00319","k":"iss","t":"Installed Runtime Dogfood Parity Final Quality And Mergeable PR","closed":true,"p":312,"bb":[315,316,317,318],"ca":"2026-07-13T03:40","xa":"2026-07-15T03:32","om":0},{"n":343,"id":"epic-00343","k":"epi","t":"Workbench Shell And Explicit File Artifact Import","closed":true,"p":39,"bb":[],"ca":"2026-07-28T08:10","xa":"2026-08-02T11:20","om":3},{"n":356,"id":"epic-00356","k":"epi","t":"SpecDock Core Simplification and External Intelligence Boundary","closed":false,"p":468,"bb":[],"ca":"2026-08-07T11:39","xa":null,"om":0},{"n":357,"id":"iss-00357","k":"iss","t":"Reduce Runtime to Storage Core","closed":true,"p":356,"bb":[],"ca":"2026-08-07T13:11","xa":"2026-08-11T16:59","om":0},{"n":358,"id":"iss-00358","k":"iss","t":"Simplify Authoring Kit and Document Contracts","closed":true,"p":356,"bb":[],"ca":"2026-08-07T13:11","xa":"2026-08-11T11:28","om":0},{"n":359,"id":"iss-00359","k":"iss","t":"Replace Managed Workflow Skills with SpecDock Skills","closed":true,"p":356,"bb":[357,358],"ca":"2026-08-07T13:11","xa":"2026-08-12T17:23","om":0},{"n":360,"id":"iss-00360","k":"iss","t":"Cut Over Distribution and Retire Legacy Workflow Surfaces","closed":true,"p":356,"bb":[357,358,359],"ca":"2026-08-07T13:11","xa":"2026-08-17T08:26","om":0},{"n":365,"id":"epic-00365","k":"epi","t":"SpecDock Structural Integrity Rearchitecture and Regression Baseline Recovery","closed":false,"p":468,"bb":[],"ca":"2026-08-17T06:59","xa":null,"om":0},{"n":368,"id":"iss-00368","k":"iss","t":"Recognized Workspace Reconciliation","closed":true,"p":365,"bb":[],"ca":"2026-08-18T03:13","xa":"2026-08-18T11:59","om":0},{"n":369,"id":"iss-00369","k":"iss","t":"Fresh Distribution Provisioning","closed":true,"p":365,"bb":[368],"ca":"2026-08-18T03:13","xa":"2026-08-24T17:07","om":0},{"n":370,"id":"iss-00370","k":"iss","t":"Managed Distribution Deprovision","closed":true,"p":365,"bb":[369],"ca":"2026-08-18T03:13","xa":"2026-08-27T23:36","om":0},{"n":371,"id":"iss-00371","k":"iss","t":"Explicit Spec History Purge","closed":true,"p":365,"bb":[370],"ca":"2026-08-18T03:14","xa":"2026-08-29T15:58","om":0},{"n":372,"id":"iss-00372","k":"iss","t":"Distribution Hard Cutover And Parity","closed":true,"p":365,"bb":[368,369,370,371,382],"ca":"2026-08-18T03:14","xa":"2026-08-31T05:55","om":0},{"n":382,"id":"iss-00382","k":"iss","t":"Full Regression Baseline Lifecycle And Successor Evidence","closed":true,"p":365,"bb":[],"ca":"2026-08-30T08:50","xa":"2026-08-30T23:06","om":0},{"n":384,"id":"epic-00384","k":"epi","t":"Provider Test Strategy Simplification and Execution Cost Reduction","closed":true,"p":468,"bb":[387],"ca":"2026-08-30T23:34","xa":"2026-09-21T10:26","om":7},{"n":387,"id":"iss-00387","k":"iss","t":"Current Surface Workflow Residue Cleanup","closed":true,"p":356,"bb":[357,358,359,360],"ca":"2026-08-31T07:34","xa":"2026-09-02T04:41","om":0},{"n":407,"id":"iss-00407","k":"iss","t":"Fix Workbench Readme Only Git Ignore Contract","closed":false,"p":80,"bb":[],"ca":"2026-09-23T23:51","xa":null,"om":0},{"n":409,"id":"iss-00409","k":"iss","t":"SpecDock CLI Scope Active Work Redesign","closed":false,"p":356,"bb":[],"ca":"2026-09-24T09:58","xa":null,"om":0},{"n":411,"id":"iss-00411","k":"iss","t":"Remove retired SpecDock CLI surfaces after scope active work cutover","closed":false,"p":80,"bb":[],"ca":"2026-09-27T09:59","xa":null,"om":0},{"n":416,"id":"iss-00416","k":"iss","t":"Restore Active Scope Links For Human Navigation","closed":true,"p":80,"bb":[],"ca":"2026-10-13T07:50","xa":"2026-10-14T13:12","om":0},{"n":418,"id":"iss-00418","k":"iss","t":"Fix Claude Code discovery of installed SpecDock skills","closed":true,"p":80,"bb":[],"ca":"2026-10-14T07:13","xa":"2026-10-14T11:29","om":0},{"n":421,"id":"iss-00421","k":"iss","t":"Retire the Claude Code skill projection","closed":true,"p":80,"bb":[],"ca":"2026-10-22T10:39","xa":"2026-10-22T15:07","om":0},{"n":423,"id":"init-00423","k":"ini","t":"Canonical Spec Storage Architecture","closed":false,"p":null,"bb":[],"ca":"2026-10-25T08:01","xa":null,"om":32},{"n":424,"id":"epic-00424","k":"epi","t":"Centralize Specs On Canonical Branch And GitHub Issues","closed":true,"p":423,"bb":[],"ca":"2026-10-25T08:01","xa":"2026-11-03T00:41","om":23},{"n":425,"id":"epic-00425","k":"epi","t":"Switch Spec Documents To CUE And HTML Explanations","closed":true,"p":423,"bb":[],"ca":"2026-10-25T13:32","xa":"2026-11-01T03:51","om":9},{"n":427,"id":"epic-00427","k":"epi","t":"Build Html Spec Dashboard","closed":false,"p":423,"bb":[425],"ca":"2026-10-25T14:46","xa":null,"om":0},{"n":454,"id":"iss-00454","k":"iss","t":"Run Spec Dock CI On Local Mac Mini Runner","closed":true,"p":80,"bb":[],"ca":"2026-10-26T07:15","xa":"2026-10-29T15:02","om":0},{"n":463,"id":"iss-00463","k":"iss","t":"Run macOS CI On Local Mac Mini VM","closed":false,"p":80,"bb":[],"ca":"2026-10-29T15:15","xa":null,"om":0},{"n":468,"id":"init-00468","k":"ini","t":"Architecture Maintenance and Hardening","closed":false,"p":null,"bb":[],"ca":"2026-10-30T01:15","xa":null,"om":141},{"n":471,"id":"epic-00471","k":"epi","t":"Integrate Orca Agents Into Spec Dashboard","closed":false,"p":423,"bb":[427],"ca":"2026-10-30T08:08","xa":null,"om":0},{"n":496,"id":"iss-00496","k":"iss","t":"Warn When Retired Claude Skill Copies Leave No Skill Link","closed":true,"p":80,"bb":[],"ca":"2026-11-01T12:54","xa":"2026-11-02T04:59","om":0},{"n":497,"id":"iss-00497","k":"iss","t":"Keep Template Workbench Readmes Committable Under A Root Workbench Ignore","closed":true,"p":80,"bb":[],"ca":"2026-11-01T12:54","xa":"2026-11-02T04:23","om":0},{"n":506,"id":"iss-00506","k":"iss","t":"Re-Read Selection And Origin After Confirmation In Scope Commands","closed":true,"p":512,"bb":[],"ca":"2026-11-02T08:35","xa":"2026-11-02T13:16","om":0},{"n":507,"id":"iss-00507","k":"iss","t":"Report Effects Accurately When Scope Delete And Artifact Create Fail Midway","closed":true,"p":512,"bb":[],"ca":"2026-11-02T08:35","xa":"2026-11-02T13:17","om":0},{"n":510,"id":"iss-00510","k":"iss","t":"Harden Workspace Declaration And Observed Worktree Reading","closed":true,"p":512,"bb":[],"ca":"2026-11-02T08:36","xa":"2026-11-02T11:54","om":0},{"n":511,"id":"iss-00511","k":"iss","t":"Clean Up Documentation And Test Gaps Left After 0.5.0","closed":true,"p":512,"bb":[],"ca":"2026-11-02T08:36","xa":"2026-11-02T22:13","om":0},{"n":512,"id":"epic-00512","k":"epi","t":"Harden Canonical Commands And Ship 0.5.1","closed":false,"p":468,"bb":[],"ca":"2026-11-02T10:07","xa":null,"om":2},{"n":513,"id":"iss-00513","k":"iss","t":"Release 0.5.1 And Roll It Out To All Repositories","closed":true,"p":512,"bb":[],"ca":"2026-11-02T10:08","xa":"2026-11-03T01:43","om":0},{"n":514,"id":"iss-00514","k":"iss","t":"Retire Migration Backups And Legacy Worktrees","closed":false,"p":512,"bb":[],"ca":"2026-11-02T10:08","xa":null,"om":0},{"n":515,"id":"iss-00515","k":"iss","t":"Verify Canonical Sync On Linux And Codex Sessions","closed":false,"p":80,"bb":[],"ca":"2026-11-02T10:14","xa":null,"om":0},{"n":520,"id":"iss-00520","k":"iss","t":"Let Not-Planned Descendants Allow Completing A Parent Scope","closed":true,"p":512,"bb":[],"ca":"2026-11-02T11:55","xa":"2026-11-02T13:33","om":0},{"n":526,"id":"epic-00526","k":"epi","t":"Operate Agents From Spec Dashboard","closed":false,"p":423,"bb":[471],"ca":"2026-11-03T07:40","xa":null,"om":0},{"n":527,"id":"iss-00527","k":"iss","t":"Prototype Dashboard Embedding And Touch On iPhone Safari","closed":false,"p":427,"bb":[],"ca":"2026-11-03T08:40","xa":null,"om":0},{"n":528,"id":"iss-00528","k":"iss","t":"Build Dashboard Model And Summary Command","closed":false,"p":427,"bb":[],"ca":"2026-11-03T08:40","xa":null,"om":0},{"n":529,"id":"iss-00529","k":"iss","t":"Serve Multi-Repository Dashboard Locally","closed":false,"p":427,"bb":[528],"ca":"2026-11-03T08:40","xa":null,"om":0},{"n":530,"id":"iss-00530","k":"iss","t":"Install Dashboard As Opt-In Login Service","closed":false,"p":427,"bb":[529],"ca":"2026-11-03T08:41","xa":null,"om":0},{"n":531,"id":"iss-00531","k":"iss","t":"Build Dashboard Board List And Scope Details","closed":false,"p":427,"bb":[527,529],"ca":"2026-11-03T08:41","xa":null,"om":0},{"n":532,"id":"iss-00532","k":"iss","t":"Build Dashboard Structure Graph And Timeline","closed":false,"p":427,"bb":[527,529],"ca":"2026-11-03T08:41","xa":null,"om":0},{"n":533,"id":"iss-00533","k":"iss","t":"Remove Markdown And PlantUML Dashboard Generation","closed":false,"p":427,"bb":[529],"ca":"2026-11-03T08:41","xa":null,"om":0},{"n":534,"id":"iss-00534","k":"iss","t":"Release 0.6.0 With Html Dashboard","closed":false,"p":427,"bb":[530,531,532,533],"ca":"2026-11-03T08:42","xa":null,"om":0},{"n":535,"id":"iss-00535","k":"iss","t":"Render Scope Documents In Dashboard","closed":false,"p":427,"bb":[534],"ca":"2026-11-03T08:42","xa":null,"om":0},{"n":536,"id":"iss-00536","k":"iss","t":"Release 0.7.0 With Dashboard Documents","closed":false,"p":427,"bb":[535],"ca":"2026-11-03T08:42","xa":null,"om":0}],"weeks":[["2026-02-02",1,0],["2026-02-09",4,3],["2026-02-16",4,4],["2026-02-23",6,4],["2026-03-02",9,8],["2026-03-09",14,14],["2026-03-16",15,14],["2026-03-23",23,19],["2026-03-30",26,23],["2026-04-06",45,32],["2026-04-13",52,40],["2026-04-20",53,42],["2026-04-27",53,42],["2026-05-04",54,43],["2026-05-11",60,48],["2026-05-18",82,67],["2026-05-25",91,81],["2026-06-01",108,96],["2026-06-08",115,103],["2026-06-15",137,125],["2026-06-22",154,139],["2026-06-29",177,163],["2026-07-06",203,186],["2026-07-13",210,193],["2026-07-20",210,193],["2026-07-27",215,198],["2026-08-03",220,198],["2026-08-10",220,201],["2026-08-17",226,203],["2026-08-24",228,207],["2026-08-31",235,212],["2026-09-07",235,212],["2026-09-14",236,215],["2026-09-21",239,217],["2026-09-28",239,217],["2026-10-05",240,218],["2026-10-12",242,220],["2026-10-19",260,223],["2026-10-26",285,252],["2026-11-02",307,266]],"events":[["2026-11-03T08:42","created",536],["2026-11-03T08:42","created",535],["2026-11-03T08:42","created",534],["2026-11-03T08:41","created",533],["2026-11-03T08:41","created",532],["2026-11-03T08:41","created",531],["2026-11-03T08:41","created",530],["2026-11-03T08:40","created",529],["2026-11-03T08:40","created",528],["2026-11-03T08:40","created",527],["2026-11-03T07:40","created",526],["2026-11-03T01:43","closed",513],["2026-11-03T00:41","closed",424],["2026-11-02T22:13","closed",511],["2026-11-02T13:33","closed",520],["2026-11-02T13:17","closed",507],["2026-11-02T13:16","closed",506],["2026-11-02T11:55","created",520],["2026-11-02T11:54","closed",510],["2026-11-02T11:53","closed",509],["2026-11-02T11:51","closed",508],["2026-11-02T10:14","created",515],["2026-11-02T10:13","closed",437],["2026-11-02T10:08","created",514],["2026-11-02T10:08","created",513],["2026-11-02T10:07","created",512],["2026-11-02T08:36","created",511],["2026-11-02T08:36","created",510]],"evt":{"536":["iss-00536","Release 0.7.0 With Dashboard Documents"],"535":["iss-00535","Render Scope Documents In Dashboard"],"534":["iss-00534","Release 0.6.0 With Html Dashboard"],"533":["iss-00533","Remove Markdown And PlantUML Dashboard Generation"],"532":["iss-00532","Build Dashboard Structure Graph And Timeline"],"531":["iss-00531","Build Dashboard Board List And Scope Details"],"530":["iss-00530","Install Dashboard As Opt-In Login Service"],"529":["iss-00529","Serve Multi-Repository Dashboard Locally"],"528":["iss-00528","Build Dashboard Model And Summary Command"],"527":["iss-00527","Prototype Dashboard Embedding And Touch On iPhone Safari"],"526":["epic-00526","Operate Agents From Spec Dashboard"],"513":["iss-00513","Release 0.5.1 And Roll It Out To All Repositories"],"424":["epic-00424","Centralize Specs On Canonical Branch And GitHub Issues"],"511":["iss-00511","Clean Up Documentation And Test Gaps Left After 0.5.0"],"520":["iss-00520","Let Not-Planned Descendants Allow Completing A Parent Scope"],"507":["iss-00507","Report Effects Accurately When Scope Delete And Artifact Create Fail Midway"],"506":["iss-00506","Re-Read Selection And Origin After Confirmation In Scope Commands"],"510":["iss-00510","Harden Workspace Declaration And Observed Worktree Reading"],"509":["iss-00509","Allow Grill Finalize Artifact Through The Canonical Initiatives Link"],"508":["iss-00508","Keep Ignored Files Created After Unlock In Worktree Remove"],"515":["iss-00515","Verify Canonical Sync On Linux And Codex Sessions"],"437":["iss-00437","Migrate Spec Dock To Canonical Storage"],"514":["iss-00514","Retire Migration Backups And Legacy Worktrees"],"512":["epic-00512","Harden Canonical Commands And Ship 0.5.1"]},"total":307,"closedTotal":266};
+
+/* ------------------------------------------------------------
+   アイコン（DS の ds.js と同じ 24×24 の線のアイコン。足りないものだけ同じ描き方で足す）
+   ------------------------------------------------------------ */
+const ICONS = {
+  search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+  chevronDown: '<path d="m6 9 6 6 6-6"/>',
+  chevronRight: '<path d="m9 6 6 6-6 6"/>',
+  chevronLeft: '<path d="m15 6-6 6 6 6"/>',
+  x: '<path d="M6 6l12 12M18 6 6 18"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  minus: '<path d="M5 12h14"/>',
+  fit: '<path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4"/><rect x="8" y="8" width="8" height="8" rx="1"/>',
+  layers: '<path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/>',
+  table: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16"/>',
+  history: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/>',
+  bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8M10 20a2 2 0 0 0 4 0"/>',
+  folder: '<path d="M3 6a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/>',
+  globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
+  branch: '<circle cx="6" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="8" r="2"/><path d="M6 8v8M18 10c0 4-6 3-11.5 6.5"/>',
+  merge: '<circle cx="6" cy="5.5" r="2"/><circle cx="6" cy="18.5" r="2"/><circle cx="18" cy="12" r="2"/><path d="M6 7.5v9M6 7.5c0 3.5 4 4.5 10 4.5"/>',
+  prClosed: '<circle cx="6" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><path d="M6 8v8M15 5l5 5M20 5l-5 5M17.5 13v3"/><circle cx="17.5" cy="18" r="2"/>',
+  check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+  checkCircle: '<circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 5-5.5"/>',
+  zap: '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
+  box: '<path d="m12 3 8 4.5v9L12 21l-8-4.5v-9z"/><path d="m4 7.5 8 4.5 8-4.5M12 12v9"/>',
+  sparkle: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/>',
+  external: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
+  arrowRight: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  arrowDown: '<path d="M12 5v14M6 13l6 6 6-6"/>',
+  file: '<path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5"/>',
+  book: '<path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H20v16H5.5A1.5 1.5 0 0 0 4 20.5zM4 20.5A1.5 1.5 0 0 0 5.5 22H20"/>',
+  target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+  list: '<path d="M9 6h12M9 12h12M9 18h12M4 6h.01M4 12h.01M4 18h.01"/>',
+  eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  down: '<rect x="2.5" y="7.5" width="8" height="9" rx="1.5"/><path d="M10.5 12h10M16.5 8l4 4-4 4"/>',
+  link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>'
+};
+const ic = (n, cls = "") => `<svg class="ds-icon${cls ? " " + cls : ""}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${ICONS[n] || ""}</svg>`;
+
+/* 状態の形：▶ 着手できる、◐ 作業中、八角形 止められている、◆ 不明、✓ 終わった */
+const ST = {
+  ready:   { label: "着手できる",     shape: '<path d="M7 4.2 20.2 12 7 19.8z" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>' },
+  doing:   { label: "作業中",         shape: '<circle cx="12" cy="12" r="8.6" fill="none" stroke="currentColor" stroke-width="2.6"/><path d="M12 6.2a5.8 5.8 0 0 1 0 11.6z" fill="currentColor"/>' },
+  blocked: { label: "止められている", shape: '<path d="M8.1 2.6h7.8l5.5 5.5v7.8l-5.5 5.5H8.1l-5.5-5.5V8.1z" fill="currentColor"/><path class="on" d="M7.6 12h8.8"/>' },
+  unknown: { label: "不明",           shape: '<path d="M12 1.8 22.2 12 12 22.2 1.8 12z" fill="currentColor"/><path class="on" style="stroke-width:2.2" d="M9.9 9.7a2.2 2.2 0 1 1 3.1 2c-.6.3-1 .8-1 1.4v.3M12 16.4v.1"/>' },
+  done:    { label: "終わった",       shape: '<circle cx="12" cy="12" r="10" fill="currentColor"/><path class="on" d="m7.6 12.3 3 3 5.8-6.2"/>' }
+};
+/* 段階の順（左から右へ進む）：止められている → 着手できる → 作業中 →（マージ待ち）。不明は流れの外 */
+const ORDER = ["blocked", "ready", "doing", "unknown", "done"];
+const BAR_ORDER = ["done", "doing", "ready", "blocked", "unknown"];
+const stIco = (st, label = true) => `<svg class="st-ico" data-st="${st}" viewBox="0 0 24 24" ${label ? `role="img" aria-label="${ST[st].label}"` : 'aria-hidden="true"'}>${ST[st].shape}</svg>`;
+const KIND = { ini: "Initiative", epi: "Epic", iss: "Issue" };
+const AS = { light: 1, standard: 2, strict: 3, critical: 4 };
+const PRW = { open: "開いている", draft: "下書き", merged: "マージ済み", closed: "閉じた" };
+const CIW = { success: "成功", failure: "失敗", running: "実行中" };
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+/* ------------------------------------------------------------
+   見本（スナップショットにまだない情報）
+   ------------------------------------------------------------ */
+const SD_SAMPLE = {
+  ip: [527, 528, 514, 515, 409, 411],
+  anom: { 463: "GitHub の親子の記録と、カタログの記録が食い違っている" },
+  pr: {
+    528: { no: 541, st: "open", ci: "success", mg: "ok" },
+    527: { no: 540, st: "draft", ci: "running" },
+    514: { no: 539, st: "open", ci: "failure", mg: "ok" },
+    515: { no: 538, st: "open", ci: "success", mg: "ok" },
+    409: { no: 452, st: "open", ci: "success", mg: "conflict" },
+    513: { no: 525, st: "merged", ci: "success" },
+    511: { no: 524, st: "merged", ci: "success" },
+    510: { no: 523, st: "merged", ci: "success" },
+    407: { no: 448, st: "closed", ci: "failure" }
+  },
+  as: { 79: "light", 39: "light", 80: "light", 407: "light", 411: "light", 463: "light", 215: "light", 250: "light",
+        423: "strict", 512: "strict", 514: "strict", 515: "strict", 529: "strict", 534: "strict", 536: "strict",
+        530: "critical", 513: "critical" },
+  chg: { 534: ["new", "新しく作られた"], 535: ["new", "新しく作られた"], 536: ["new", "新しく作られた"],
+         528: ["state", "着手できる → 作業中"], 514: ["pr", "CI が 実行中 → 失敗"] },
+  lastSeen: "11月3日 17:42",
+  ago: "2分前",
+  prEvents: [["2026-11-03T10:20", "pr_open", 528, 541], ["2026-11-03T09:55", "pr_open", 514, 539], ["2026-11-03T09:31", "pr_open", 409, 452],
+             ["2026-11-03T01:40", "pr_merged", 513, 525], ["2026-11-02T22:12", "pr_merged", 511, 524], ["2026-11-02T11:53", "pr_merged", 510, 523]],
+  docs: { 427: { req: 1, des: 1, plan: 1, exp: 1, rep: 1 } },
+  arts: { 427: [["20261025t220347z--dashboard-mock.html", "HTML", "10月26日"], ["rules.md", "Markdown", "10月26日"]] }
+};
+
+/* ほかのリポジトリ（見本）。[番号, 種類, 題名, 親, 閉じたか, 待つもの] */
+const OTHER = {
+  "input-devices": { ago: "2分前", nodes: [
+    [1, "ini", "入力機器の製品ライン", null], [2, "epi", "キーボードのファームウェア 2.0", 1], [3, "iss", "キー配列の設定を本体に保存する", 2, 1],
+    [4, "iss", "Bluetooth の再接続を速くする", 2], [5, "iss", "打鍵の遅れを測る道具を作る", 2], [6, "iss", "ファームウェアの更新を署名で守る", 2, 0, [4]],
+    [7, "iss", "ファームウェア 2.0 を出す", 2, 0, [5, 6]], [8, "epi", "トラックボールの試作", 1], [9, "iss", "センサーの候補を比べる", 8, 1],
+    [10, "iss", "筐体の3Dデータを直す", 8], [11, "iss", "試作の評価の基準を決める", 8], [12, "epi", "販売ページの準備", 1, 0, [2]]],
+    ip: [4, 10], pr: { 4: { no: 31, st: "open", ci: "success", mg: "ok" }, 10: { no: 30, st: "draft", ci: "running" } }, chg: { 4: ["pr", "PR が開いた"] } },
+  "company-os": { ago: "3分前", nodes: [
+    [1, "ini", "会社の運営の仕組み", null], [2, "epi", "統括の台帳", 1], [3, "iss", "台帳の項目を決める", 2, 1], [4, "iss", "作業者への依頼の書式をそろえる", 2],
+    [5, "iss", "週の振り返りを自動で集める", 2], [6, "iss", "依頼の履歴を検索できるようにする", 2, 0, [4]], [7, "epi", "ダッシュボードの埋め込み", 1],
+    [8, "iss", "SpecDock の概況を埋め込む", 7], [9, "iss", "埋め込みの高さを合わせる", 7, 0, [8]], [13, "iss", "事業ごとの入口を作る", 7],
+    [10, "epi", "事業ごとの予算の記録", 1], [11, "iss", "予算の表の形を決める", 10, 1], [12, "iss", "月ごとの集計", 10, 1]],
+    ip: [4], pr: { 4: { no: 88, st: "open", ci: "success", mg: "ok" } }, chg: { 8: ["new", "新しく作られた"], 13: ["new", "新しく作られた"], 4: ["state", "着手できる → 作業中"] } },
+  "housing-lifecycle": { ago: "2分前", nodes: [
+    [1, "ini", "住まいの一生の記録", null], [2, "epi", "点検の記録", 1], [3, "iss", "点検の項目の表を作る", 2, 1], [4, "iss", "写真を点検に結び付ける", 2],
+    [5, "iss", "次の点検の時期を知らせる", 2, 0, [4]], [10, "iss", "古い記録を移す", 2], [6, "epi", "修繕の見積もりの比較", 1], [7, "iss", "見積もりの読み取りを試す", 6],
+    [8, "iss", "業者ごとの比較の表", 6], [9, "iss", "比較の結果を家族と共有する", 6, 0, [7, 8]]],
+    ip: [4], anom: { 10: "種類のラベルが2つ付いている" }, pr: { 4: { no: 17, st: "open", ci: "failure", mg: "ok" } }, chg: { 4: ["pr", "CI が失敗した"] } },
+  "taikyohiyou_project": { ago: "14分前", stale: true, nodes: [
+    [1, "ini", "退去費用の見積もり", null], [2, "epi", "原状回復の基準", 1], [3, "iss", "ガイドラインの要点をまとめる", 2, 1], [4, "iss", "経過年数の計算を作る", 2, 1],
+    [5, "iss", "特約の読み取り", 2], [6, "epi", "見積もりの画面", 1, 0, [2]], [7, "iss", "部屋ごとの入力", 6], [8, "iss", "結果を PDF にする", 6, 0, [7]]],
+    ip: [5], pr: {}, chg: {} }
+};
+
+/* ------------------------------------------------------------
+   モデル：状態の導き方は brief の順（終わった → 不明 → 作業中 → 止められている → 着手できる）
+   ------------------------------------------------------------ */
+const pad = n => String(n).padStart(5, "0");
+const KPRE = { ini: "init", epi: "epic", iss: "iss" };
+function fmtDay(iso) { const d = new Date(iso + (iso.length === 16 ? ":00Z" : "")); return `${d.getMonth() + 1}月${d.getDate()}日`; }
+function fmtTime(iso) { const d = new Date(iso + (iso.length === 16 ? ":00Z" : "")); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; }
+
+function build(name, raw, smp) {
+  const M = new Map();
+  raw.forEach(r => M.set(r.n, Object.assign({}, r, {
+    kids: [], ip: (smp.ip || []).includes(r.n), anom: (smp.anom || {})[r.n] || null,
+    pr: (smp.pr || {})[r.n] || null, as: (smp.as || {})[r.n] || "standard", chg: (smp.chg || {})[r.n] || null
+  })));
+  M.forEach(x => { if (x.p && M.has(x.p)) M.get(x.p).kids.push(x.n); else x.p = null; });
+  const get = n => M.get(n);
+  const isOpen = n => M.has(n) && !M.get(n).closed;
+  M.forEach(x => { x.anc = []; let p = x.p; while (p) { const y = get(p); x.anc.push(y); p = y.p; } });
+  const desc = x => x.kids.flatMap(k => [get(k), ...desc(get(k))]);
+  M.forEach(x => { x.desc = desc(x); });
+  M.forEach(x => {
+    x.waits = x.bb.filter(isOpen);
+    const doingKids = x.desc.filter(d => d.ip && !d.closed);
+    if (x.closed) { x.st = "done"; x.why = x.xa ? `${fmtDay(x.xa)}に終わった` : "終わった"; }
+    else if (x.anom) { x.st = "unknown"; x.why = x.anom; }
+    else if (x.ip || doingKids.length) {
+      x.st = "doing";
+      x.why = x.ip ? (x.pr ? `PR #${x.pr.no} が${PRW[x.pr.st]}` : "worktree で作業している（PR はまだない）") : `配下の ${doingKids.length}件が作業中`;
+    } else {
+      const cl = x.anc.find(a => a.closed);
+      const ad = x.anc.find(a => a.bb.some(isOpen));
+      if (cl) { x.st = "blocked"; x.why = `親 ${cl.id} が閉じている`; }
+      else if (x.waits.length) { x.st = "blocked"; x.why = x.waits.map(n => "#" + n).join("・") + " を待つ"; }
+      else if (ad) { x.st = "blocked"; x.why = `上位の ${ad.id} が ${ad.bb.filter(isOpen).map(n => "#" + n).join("・")} を待つ`; }
+      else { x.st = "ready"; x.why = "待っているものはない"; }
+    }
+    // マージ待ち：作業中で、下書きでない PR が開いている。CI の失敗か衝突があれば「直す必要あり」、なければ「マージできる」
+    x.merge = x.k === "iss" && x.st === "doing" && x.pr && x.pr.st === "open" ? (x.pr.ci === "failure" || x.pr.mg === "conflict" ? "fix" : "ok") : null;
+    if (x.merge === "fix") x.why = `PR #${x.pr.no} を直す必要がある（${[x.pr.ci === "failure" ? "CI が失敗" : "", x.pr.mg === "conflict" ? "衝突" : ""].filter(Boolean).join("・")}）`;
+    else if (x.merge === "ok") x.why = `PR #${x.pr.no} をマージできる${x.pr.ci === "running" ? "（CI は実行中）" : ""}`;
+    x.branch = x.ip ? `chemitaro/${x.id}` : null;
+  });
+  // 配下の数（埋め込みで省いた終わったものも足す）
+  M.forEach(x => {
+    const c = { done: x.om || 0, doing: 0, ready: 0, blocked: 0, unknown: 0 };
+    x.desc.forEach(d => c[d.st]++);
+    x.cnt = c; x.total = x.desc.length + (x.om || 0);
+  });
+  // 段（同じ親の中の作業の順番）
+  const sib = x => (x.p ? get(x.p).kids : [...M.keys()].filter(n => !get(n).p));
+  const memo = new Map(), memoO = new Map();
+  const stage = (x, openOnly) => {
+    const m = openOnly ? memoO : memo; if (m.has(x.n)) return m.get(x.n);
+    m.set(x.n, 1);
+    const s = sib(x);
+    const deps = x.bb.filter(b => s.includes(b) && M.has(b) && (!openOnly || isOpen(b)));
+    const v = 1 + Math.max(0, ...deps.map(b => stage(get(b), openOnly)));
+    m.set(x.n, v); return v;
+  };
+  M.forEach(x => { x.stage = stage(x, false); x.ostage = x.closed ? 1 : stage(x, true); });
+  M.forEach(x => {
+    const ks = x.kids.map(get).filter(k => !k.closed);
+    x.maxO = Math.max(1, ...ks.map(k => k.ostage));
+  });
+  M.forEach(x => { x.blocking = [...M.values()].filter(y => y.bb.includes(x.n)).map(y => y.n); });
+  // まだ終わっていない待ち先（自分と祖先の blocked_by の先で開いているもの）
+  M.forEach(x => { x.blk = [...new Set([x, ...x.anc].flatMap(a => a.bb.filter(isOpen)))]; });
+  // 後に続く数：x を直接・間接に待っている開いた Scope の数。
+  //   y.bb に u があれば y は u を待つ。y の配下も y と一緒に待つ。祖先は子より後に終わるので、祖先を待つものも子を待つ。
+  M.forEach(x => {
+    if (x.closed) { x.down = 0; return; }
+    const seen = new Set(), out = new Set(), q = [];
+    const pass = u => { if (u.closed || seen.has(u.n)) return; seen.add(u.n); q.push(u); };
+    pass(x); x.anc.forEach(pass);
+    while (q.length) {
+      const u = q.pop();
+      u.blocking.forEach(m => { const y = get(m); [y, ...y.desc].forEach(z => { if (z.closed) return; out.add(z.n); pass(z); z.anc.forEach(pass); }); });
+    }
+    out.delete(x.n); x.anc.forEach(a => out.delete(a.n));
+    x.down = out.size;
+  });
+  // 片付けの候補
+  const cleanup = [];
+  M.forEach(x => {
+    if (x.closed) return;
+    if (x.k !== "iss" && x.total > 0 && x.cnt.done === x.total) cleanup.push({ x, why: `配下の ${x.total}件がすべて終わったのに、開いたまま` });
+    const cp = x.p && get(x.p).closed ? get(x.p) : null;
+    if (cp) cleanup.push({ x, why: `閉じた親 ${cp.id} の下で開いている` });
+  });
+  const list = [...M.values()];
+  return { name, M, get, list, cleanup, cleanSet: new Set(cleanup.map(c => c.x.n)), changes: list.filter(x => x.chg),
+    roots: list.filter(x => !x.p).sort((a, b) => act(b) - act(a)) };
+}
+/* 推奨順：マージできる → 直す必要あり → 作業中 → 着手できる → 止められている → 不明 → 終わった。
+   作業中・着手できる・マージ待ちは「後に続く」数の多い順、同じなら番号の小さい順。
+   止められている は、まだ終わっていない待ち先の数が少ない順（同じなら後に続く数の多い順、番号の小さい順）。 */
+const CAT = x => (x.merge === "ok" ? 0 : x.merge === "fix" ? 1 : x.st === "doing" ? 2 : x.st === "ready" ? 3 : x.st === "blocked" ? 4 : x.st === "unknown" ? 5 : 6);
+function recCmp(a, b) {
+  const ca = CAT(a), cb = CAT(b); if (ca !== cb) return ca - cb;
+  if (ca === 4) return a.blk.length - b.blk.length || b.down - a.down || a.n - b.n;
+  if (ca === 6) return (b.xa || "").localeCompare(a.xa || "") || a.n - b.n;
+  return b.down - a.down || a.n - b.n;
+}
+function act(x) { const oi = x.desc.filter(d => d.k === "iss" && !d.closed).length; return (x.k === "ini" ? 1e6 : 0) + oi * 1000 + x.cnt.doing * 10 + (x.closed ? 0 : 1); }
+
+function synth(name, o) {
+  const base = Date.parse("2026-07-06T09:00:00Z");
+  const raw = o.nodes.map(([n, k, t, p, c, bb], i) => {
+    const ca = new Date(base + i * 6.5 * 864e5).toISOString().slice(0, 16);
+    return { n, id: `${KPRE[k]}-${pad(n)}`, k, t, closed: !!c, p: p || null, bb: bb || [], ca, xa: c ? new Date(base + (i * 6.5 + 9) * 864e5).toISOString().slice(0, 16) : null, om: 0 };
+  });
+  return raw;
+}
+function weeksFrom(list) {
+  const wk = iso => { const d = new Date(iso + ":00Z"); const day = (d.getUTCDay() + 6) % 7; return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - day); };
+  const cr = list.map(x => wk(x.ca)), cl = list.filter(x => x.xa).map(x => wk(x.xa));
+  const out = []; const end = wk("2026-11-03T10:00");
+  for (let w = Math.min(...cr); w <= end; w += 7 * 864e5) out.push([new Date(w).toISOString().slice(0, 10), cr.filter(c => c <= w).length, cl.filter(c => c <= w).length]);
+  return out;
+}
+
+const REPOS = {};
+(function init() {
+  const sd = build("spec-dock", RAW.nodes, SD_SAMPLE);
+  const ev = RAW.events.map(([t, k, n]) => ({ t, k, n, id: RAW.evt[n][0], title: RAW.evt[n][1] }));
+  SD_SAMPLE.prEvents.forEach(([t, k, n, no]) => { const x = sd.get(n); if (x) ev.push({ t, k, n, id: x.id, title: x.t, no }); });
+  ev.sort((a, b) => (a.t < b.t ? 1 : -1));
+  Object.assign(sd, { ago: SD_SAMPLE.ago, weeks: RAW.weeks, events: ev.slice(0, 26), total: RAW.total, closedTotal: RAW.closedTotal, docs: SD_SAMPLE.docs, arts: SD_SAMPLE.arts, real: true });
+  REPOS["spec-dock"] = sd;
+  for (const [name, o] of Object.entries(OTHER)) {
+    const raw = synth(name, o);
+    const r = build(name, raw, o);
+    const ev2 = [];
+    r.list.forEach(x => { ev2.push({ t: x.ca, k: "created", n: x.n, id: x.id, title: x.t }); if (x.xa) ev2.push({ t: x.xa, k: "closed", n: x.n, id: x.id, title: x.t }); });
+    ev2.sort((a, b) => (a.t < b.t ? 1 : -1));
+    Object.assign(r, { ago: o.ago, stale: !!o.stale, weeks: weeksFrom(r.list), events: ev2.slice(0, 14), total: r.list.length, closedTotal: r.list.filter(x => x.closed).length, docs: {}, arts: {} });
+    REPOS[name] = r;
+  }
+})();
+
+/* ------------------------------------------------------------
+   画面の状態
+   ------------------------------------------------------------ */
+const S = { repo: "spec-dock", view: "graph", sel: null, detail: null, tab: "summary", showDone: false, showDoneDeps: false, fold: true, gap: {},
+  q: "", hl: null, kind: "iss", group: true, boardDone: false, legend: true, s: 1, tx: 0, ty: 0, fitted: false };
+const R = () => REPOS[S.repo];
+const $ = s => document.querySelector(s);
+const app = $("#app"), main = $("#main"), panel = $("#panel"), pop = $("#pop"), sheet = $("#sheet");
+const isPhone = () => app.clientWidth <= 640;
+
+/* ------------------------------------------------------------
+   小さな部品
+   ------------------------------------------------------------ */
+const asMark = lv => { const n = AS[lv]; return `<span class="as" data-lv="${n}" role="img" aria-label="保証 ${lv}" title="保証レベル ${lv}">${[1, 2, 3, 4].map(i => `<i class="${i <= n ? "f" : ""}"></i>`).join("")}</span>`; };
+const prIconName = st => (st === "merged" ? "merge" : st === "closed" ? "prClosed" : "branch");
+function prMark(pr, words = false) {
+  if (!pr) return "";
+  const t = `PR #${pr.no} ${PRW[pr.st]}${pr.ci ? `・CI ${CIW[pr.ci]}` : ""}${pr.mg ? `・${pr.mg === "ok" ? "マージできる" : "衝突"}` : ""}`;
+  const ci = pr.ci ? `<span class="ci" data-ci="${pr.ci}"></span>` : "";
+  const mg = pr.st === "open" && pr.mg ? `<span class="mg" data-mg="${pr.mg}">${ic(pr.mg === "ok" ? "check" : "zap")}</span>` : "";
+  if (!words) return `<span class="pr" data-pr="${pr.st}" role="img" aria-label="${t}" title="${t}">${ic(prIconName(pr.st))}${ci}${mg}</span>`;
+  return `<span class="pr" data-pr="${pr.st}">${ic(prIconName(pr.st))}#${pr.no} ${PRW[pr.st]}</span>` +
+    (pr.ci ? `<span>${ci} CI ${CIW[pr.ci]}</span>` : "") + (pr.st === "open" && pr.mg ? `<span>${mg}${pr.mg === "ok" ? "マージできる" : "衝突している"}</span>` : "");
+}
+function sbar(x, w) {
+  if (!x.total) return `<span class="sbar" style="width:${w}px"></span>`;
+  return `<span class="sbar" style="width:${w}px" role="img" aria-label="終わった ${x.cnt.done}／${x.total}">${BAR_ORDER.map(s => x.cnt[s] ? `<i data-st="${s}" style="width:${(x.cnt[s] / x.total * 100).toFixed(2)}%"></i>` : "").join("")}</span>`;
+}
+const counts = x => `<span class="cnts">${ORDER.filter(s => s !== "done" && x.cnt[s]).map(s => `<span class="cnt" data-st="${s}" title="${ST[s].label} ${x.cnt[s]}">${stIco(s, false)}${x.cnt[s]}</span>`).join("")}</span>`;
+const frac = x => `<span class="frac">${x.cnt.done}<small>／${x.total}</small></span>`;
+const chip = x => `<span class="chip" data-st="${x.st}">${stIco(x.st, false)}${ST[x.st].label}</span>`;
+const matches = x => { if (!S.q) return true; const q = S.q.toLowerCase(); return x.id.includes(q) || String(x.n) === q.replace(/^#/, "") || x.t.toLowerCase().includes(q); };
+const inHl = x => !S.hl || (S.hl === "ok" || S.hl === "fix" ? x.merge === S.hl : x.st === S.hl && !(S.hl === "doing" && x.merge));
+const dnMark = x => (x.down ? `<span class="dn" title="後に続く ${x.down}件（これを直接・間接に待っている開いた Scope）" role="img" aria-label="後に続く ${x.down}件">${ic("down")}${x.down}</span>` : "");
+
+/* ------------------------------------------------------------
+   上の帯
+   ------------------------------------------------------------ */
+const VIEWS = [["graph", "構造の図", "layers"], ["board", "ボード", "table"], ["time", "時間の軸", "history"]];
+function renderTop() {
+  const r = R();
+  const cur = S.view === "detail" ? "" : S.view;
+  const tabs = VIEWS.map(([v, l, i]) => `<button type="button" class="tab" role="tab" data-view="${v}" aria-selected="${cur === v}">${ic(i)}${l}</button>`).join("");
+  $("#top").innerHTML =
+    `<span class="brand"><span class="brand__mark">S</span><span class="brand__name">SpecDock</span></span>` +
+    (S.view === "overview"
+      ? `<button type="button" class="repo-btn" data-act="repos" aria-haspopup="menu">${ic("globe")}<span>すべてのリポジトリ</span>${ic("chevronDown")}</button>`
+      : `<button type="button" class="repo-btn" data-act="repos" aria-haspopup="menu">${ic("folder")}<span>${esc(r.name)}</span>${ic("chevronDown")}</button>` +
+        `<nav class="tabs" role="tablist" aria-label="画面の切り替え">${tabs}</nav>`) +
+    `<div class="top__right">` +
+      (S.view === "overview" ? "" : `<label class="search">${ic("search")}<input type="search" id="q" placeholder="ID・番号・題名で探す" value="${esc(S.q)}" aria-label="検索"></label>` +
+      `<button type="button" class="iconbtn msearch-btn" data-act="msearch" aria-label="検索">${ic("search")}</button>` +
+      `<button type="button" class="iconbtn" data-act="changes" aria-label="前回から変化 ${r.changes.length}件" title="前回見たときからの変化">${ic("bell")}${r.changes.length ? `<span class="num">${r.changes.length}</span>` : ""}</button>`) +
+      `<button type="button" class="iconbtn ov-btn" data-act="overview" aria-label="横断の概況" title="すべてのリポジトリの概況">${ic("globe")}</button>` +
+      `<span class="status"${r.stale && S.view !== "overview" ? ' data-state="stale"' : ""} title="GitHub から取得した時刻"><span>${S.view === "overview" ? "2分前" : esc(r.ago)}<span class="status__w">に取得</span></span></span>` +
+    `</div>`;
+  $("#mtabs").innerHTML = S.view === "overview" ? "" : tabs;
+  $("#mtabs").style.display = S.view === "overview" ? "none" : "";
+  const qi = $("#q"); if (qi) qi.addEventListener("input", e => { S.q = e.target.value.trim(); $("#mq").value = e.target.value; onSearch(); });
+}
+
+/* ------------------------------------------------------------
+   構造の図
+   ------------------------------------------------------------ */
+function vis(x) { const r = R(); return S.showDone || x.st !== "done" || x.kids.some(k => vis(r.get(k))); }
+/* 配置の隙間：線の車線が足りないときに広げた分（配置の条件ごとに覚える） */
+const layoutKey = () => `${S.repo}|${S.showDone ? 1 : 0}|${S.showDoneDeps ? 1 : 0}|${S.fold ? 1 : 0}`;
+const GA = () => (S.gap[layoutKey()] = S.gap[layoutKey()] || {});
+const gpx = (k, base) => base + (GA()[k] || 0);
+function gBox(x) {
+  const r = R(); const par = x.p ? r.get(x.p) : null;
+  const stg = !x.closed && par && par.maxO >= 2 ? `<span class="stg" title="段${x.ostage}（同じ親の中で ${x.ostage} 番目に進める）">${x.ostage}</span>` : "";
+  const label = `${x.id} ${x.t}。${ST[x.st].label}（${x.why}）${x.down ? `。後に続く ${x.down}件` : ""}`;
+  return `<div class="gx-box${S.sel === x.n ? " is-sel" : ""}${matches(x) && inHl(x) ? "" : " is-dim"}${S.hl && inHl(x) && matches(x) ? " is-hl" : ""}" data-n="${x.n}" data-st="${x.st}" role="button" tabindex="0" aria-label="${esc(label)}">` +
+    (x.chg ? `<span class="chg" title="前回から変化：${esc(x.chg[1])}"></span>` : "") +
+    `<span class="rt" title="大もとの待ち先：ここが進めば、選んだ箱へ続く待ちがほどける" role="img" aria-label="大もとの待ち先">${ic("target")}大もと</span>` +
+    `<div class="gx-r1">${stIco(x.st)}<span class="gx-id">${x.id}</span><span class="gx-no">#${x.n}</span>${stg}</div>` +
+    `<div class="gx-ttl">${esc(x.t)}</div>` +
+    `<div class="gx-marks">${asMark(x.as)}${prMark(x.pr)}${x.branch ? `<span class="wt" title="worktree：${x.branch}" role="img" aria-label="worktree ${x.branch}">${ic("folder")}</span>` : ""}${dnMark(x)}</div>` +
+  `</div>`;
+}
+function gFrame(x) {
+  const r = R();
+  const kids = x.kids.map(r.get).filter(vis);
+  const isIni = x.k === "ini";
+  const cl = r.cleanSet.has(x.n);
+  const dim = !(matches(x) && inHl(x));
+  const head = `<div class="gx-fh" role="button" tabindex="0" aria-label="${esc(`${x.id} ${x.t}。${ST[x.st].label}`)}">${stIco(x.st)}` +
+    (isIni ? `<span class="gx-kicker">Initiative</span>` : "") + `<span class="ds-docid">${x.id}</span><span class="gx-fttl" title="${esc(x.t)}">${esc(x.t)}</span></div>`;
+  const meta = `<div class="gx-fm">${sbar(x, isIni ? 150 : 84)}${frac(x)}${counts(x)}${asMark(x.as)}${cl ? `<span class="cln" title="片付けの候補" role="img" aria-label="片付けの候補">${ic("box")}</span>` : ""}${dnMark(x)}</div>`;
+  const body = kids.length ? `<div class="gx-body" style="margin-top:${gpx("b" + x.n, 12)}px">${layoutKids(x, kids)}</div>` : "";
+  return `<section class="gx-frame ${isIni ? "gx-ini" : "gx-epic"}${kids.length || isIni ? "" : " is-compact"}${S.sel === x.n ? " is-sel" : ""}${dim ? " is-dim" : ""}" data-n="${x.n}" data-st="${x.st}">` +
+    (x.chg ? `<span class="chg" title="前回から変化：${esc(x.chg[1])}"></span>` : "") +
+    `<span class="rt" title="大もとの待ち先" role="img" aria-label="大もとの待ち先">${ic("target")}大もと</span>` + head + meta + body + `</section>`;
+}
+const gNode = x => (x.k === "iss" && !x.kids.length ? gBox(x) : gFrame(x));
+/* 片付けの候補を畳む：同じ親・同じ段の候補を、数と印だけの小さなまとまりにする */
+function cleanChip(key, xs) {
+  return `<button type="button" class="gx-clean" data-clean="${key}" data-ns="${xs.map(x => x.n).join(",")}" title="片付けの候補：${esc(xs.map(x => `${x.id} ${x.t}`).join("、"))}" aria-label="片付けの候補 ${xs.length}件（押すと一覧）">${ic("box")}<b>${xs.length}</b><span>片付けの候補</span></button>`;
+}
+function stackHtml(key, xs) {
+  const r = R();
+  const fold = S.fold ? xs.filter(k => r.cleanSet.has(k.n)) : [];
+  return xs.filter(k => !fold.includes(k)).map(gNode).join("") + (fold.length ? cleanChip(key, fold) : "");
+}
+function layoutKids(par, kids) {
+  const stg = k => (S.showDone ? k.stage : k.ostage);
+  const max = Math.max(...kids.map(stg));
+  const cols = Array.from({ length: max }, () => []);
+  kids.slice().sort(recCmp).forEach(k => cols[stg(k) - 1].push(k));   // 同じ段の中は推奨順
+  if (max <= 1) return `<div class="gx-wrap" data-gk="w${par.n}" style="row-gap:${gpx("wr" + par.n, 14)}px;column-gap:${gpx("wc" + par.n, 14)}px">${stackHtml(par.n + ".0", cols[0])}</div>`;
+  return `<div class="gx-cols" data-gk="c${par.n}" style="column-gap:${gpx("c" + par.n, 44)}px">${cols.map((c, i) => `<div class="gx-col" data-gk="k${par.n}.${i}" style="row-gap:${gpx(`k${par.n}.${i}`, 12)}px">${stackHtml(par.n + "." + i, c)}</div>`).join("")}</div>`;
+}
+/* 状態の印：押すと図の中でその状態の Issue の箱だけを目立たせる（もう一度押すと解除）。並びはボードの列と同じ */
+function nextChips() {
+  const r = R(); const open = r.list.filter(x => x.k === "iss" && !x.closed);
+  const n = { ok: open.filter(x => x.merge === "ok").length, fix: open.filter(x => x.merge === "fix").length };
+  ORDER.forEach(s => (n[s] = open.filter(x => x.st === s && !(s === "doing" && x.merge)).length));
+  const b = (k, st, label, extra = "") => `<button type="button" class="nx" data-st="${st}" data-hl="${k}" aria-pressed="${S.hl === k}" title="${label}の Issue を図の中で目立たせる">${extra || stIco(st, false)}<span class="lab">${label}</span><b>${n[k]}</b></button>`;
+  return `<div class="gx-next" role="group" aria-label="状態で目立たせる">${b("blocked", "blocked", "止められている")}${b("ready", "ready", "着手できる")}${b("doing", "doing", "作業中")}` +
+    `<span class="nx-grp" role="group" aria-label="マージ待ち"><span class="nx-grp__lab">${ic("branch")}<span class="lab">マージ待ち</span></span>${b("fix", "merge", "直す必要あり", ic("zap"))}${b("ok", "merge", "マージできる", ic("check"))}</span>` +
+    `${n.unknown ? b("unknown", "unknown", "不明") : ""}</div>`;
+}
+function legend() {
+  const li = (a, b, w) => `<li${w ? ' class="wide"' : ""}><span>${a}</span>${b}</li>`;
+  return `<div class="legend" data-open="${S.legend}"><button type="button" class="legend__head" data-act="legend" aria-expanded="${S.legend}">${ic("info")}凡例${ic("chevronRight")}</button><div class="legend__body">` +
+    `<div class="lg-grp"><h4>状態</h4><ul>${["blocked", "ready", "doing", "unknown", "done"].map(s => li(stIco(s, false), ST[s].label)).join("")}${li('<span class="sbar" style="width:26px"><i data-st="done" style="width:60%"></i><i data-st="doing" style="width:20%"></i><i data-st="ready" style="width:20%"></i></span>', "配下の内訳")}</ul></div>` +
+    `<div class="lg-grp"><h4>PR と CI</h4><ul>${li(`<span class="pr" data-pr="open">${ic("branch")}</span>`, "開いている")}${li(`<span class="pr" data-pr="draft">${ic("branch")}</span>`, "下書き")}${li(`<span class="pr" data-pr="merged">${ic("merge")}</span>`, "マージ済み")}${li(`<span class="pr" data-pr="closed">${ic("prClosed")}</span>`, "閉じた")}` +
+    `${li('<span class="ci" data-ci="success"></span>', "CI 成功")}${li('<span class="ci" data-ci="failure"></span>', "CI 失敗")}${li('<span class="ci" data-ci="running"></span>', "CI 実行中")}${li(`<span class="mg" data-mg="ok">${ic("check")}</span>`, "マージできる")}${li(`<span class="mg" data-mg="conflict">${ic("zap")}</span>`, "衝突")}</ul></div>` +
+    `<div class="lg-grp"><h4>保証</h4><ul>${Object.keys(AS).map(l => li(asMark(l), l)).join("")}</ul></div>` +
+    `<div class="lg-grp"><h4>そのほか</h4><ul>${li('<span class="lg-chg"></span>', "前回から変化")}${li(`<span class="wt">${ic("folder")}</span>`, "worktree あり")}${li('<span class="stg">2</span>', "進める段")}${li(`<span class="dn">${ic("down")}3</span>`, "後に続く数")}${li(`<span class="cln">${ic("box")}</span>`, "片付けの候補")}${li('<span class="lg-line"></span>', "待っている依存", 1)}${li('<span class="lg-line is-done"></span>', "終わった依存", 1)}</ul></div>` +
+    `<div class="lg-grp"><h4>箱を選んだとき</h4><ul>${li('<span class="lg-box is-sel"></span>', "選んだ箱（1つだけ）")}${li('<span class="lg-line is-p1"></span>', "直接の依存", 1)}${li('<span class="lg-line is-p2"></span>', "間接（2段目より先）", 1)}${li('<span class="lg-line is-off"></span><span class="lg-box is-off"></span>', "関係ない")}${li(`<span class="rt lg-rt">${ic("target")}大もと</span>`, "大もとの待ち先")}${li(`<span class="ds-icon-wrap">${ic("arrowRight")}</span>`, "矢印：選んだ箱へ入る線＝待ち先、出る線＝後に続く", 1)}</ul></div>` +
+  `</div></div>`;
+}
+function worldHtml() {
+  const r = R();
+  return `<svg class="gx-edges" id="edges" aria-hidden="true"></svg>${stackHtml("root", r.roots.filter(vis))}`;
+}
+function renderGraph() {
+  main.className = "main is-graph";
+  main.innerHTML = `<div class="gx-view" id="view"><div class="gx-world" id="world" style="gap:${gpx("world", 28)}px">${worldHtml()}</div></div>` +
+    `<div class="gx-bar">` + nextChips() +
+    `<div class="gx-tools"><span class="tool-group"><button type="button" class="tool is-icon" data-act="zout" aria-label="縮小">${ic("minus")}</button><button type="button" class="tool zoomval" data-act="z100" title="100% に戻す">${Math.round(S.s * 100)}%</button><button type="button" class="tool is-icon" data-act="zin" aria-label="拡大">${ic("plus")}</button></span>` +
+    `<button type="button" class="tool" data-act="fit" aria-label="全体を収める">${ic("fit")}<span class="lab">全体</span></button>` +
+    `<button type="button" class="tool" data-act="done" aria-pressed="${S.showDone}" aria-label="終わったものも表示">${ic("checkCircle")}<span class="lab">終わったものも</span></button>` +
+    `<button type="button" class="tool" data-act="ddeps" aria-pressed="${S.showDoneDeps}" aria-label="終わった依存も表示">${ic("arrowRight")}<span class="lab">終わった依存も</span></button>` +
+    `<button type="button" class="tool" data-act="fold" aria-pressed="${S.fold}" aria-label="片付けの候補を畳む" title="片付けの候補（配下が終わったのに開いている Epic など）を、数と印の小さなまとまりにする">${ic("box")}<span class="lab">片付けの候補を畳む</span></button></div></div>` +
+    legend();
+  bindView(); applyT();
+  requestAnimationFrame(() => { drawEdges(); if (!S.fitted) { initialView(); S.fitted = true; applyT(); } });
+}
+/* 図の中身だけを描き直す（隙間を広げたとき）。見る位置と倍率はそのまま */
+function rebuildWorld() {
+  const w = $("#world"); if (!w) return;
+  w.style.gap = gpx("world", 28) + "px";
+  w.innerHTML = worldHtml();
+}
+
+/* ------------------------------------------------------------
+   依存の線（DOM との受け渡し）。経路の計算そのものは下の ROUTER（DOM を知らない）
+   ------------------------------------------------------------ */
+let EG = null;   // 最後に引いた線：{ G, routes, widen, ms, iters }
+function collectGraph() {
+  const world = $("#world"); const r = R(); const wb = world.getBoundingClientRect(); const s = S.s;
+  const rect = el => { const b = el.getBoundingClientRect(); return { x1: (b.left - wb.left) / s, y1: (b.top - wb.top) / s, x2: (b.right - wb.left) / s, y2: (b.bottom - wb.top) / s }; };
+  const obs = [], frames = [], byN = new Map();
+  world.querySelectorAll(".gx-box").forEach(el => {
+    const o = Object.assign(rect(el), { el, key: "n" + el.dataset.n }); o.p1 = o.y1 + 12; o.p2 = o.y2 - 12;
+    byN.set(+el.dataset.n, obs.length); obs.push(o);
+  });
+  world.querySelectorAll(".gx-frame").forEach(el => {
+    const f = rect(el), fh = rect(el.querySelector(":scope > .gx-fh")), fm = rect(el.querySelector(":scope > .gx-fm"));
+    // 枠の見出しと要点の行（枠の幅いっぱい）を障害物にする。中身のない枠は全体
+    const o = { x1: f.x1, y1: f.y1, x2: f.x2, y2: el.classList.contains("is-compact") ? f.y2 : fm.y2 + 3, el, key: "n" + el.dataset.n };
+    o.p1 = fh.y1 + 2; o.p2 = el.classList.contains("is-compact") ? f.y2 - 8 : fm.y2 - 2;
+    byN.set(+el.dataset.n, obs.length); obs.push(o);
+    frames.push(Object.assign(f, { el, cls: el.classList.contains("gx-ini") ? "ini" : el.dataset.st === "done" ? "done" : "epic" }));
+  });
+  world.querySelectorAll(".gx-clean").forEach(el => {
+    const o = Object.assign(rect(el), { el, key: "c" + el.dataset.clean }); o.p1 = o.y1 + 9; o.p2 = o.y2 - 9;
+    const i = obs.length; obs.push(o); el.dataset.ns.split(",").forEach(n => byN.set(+n, i));
+  });
+  const edges = [], idx = new Map();
+  r.list.forEach(x => x.bb.forEach(b => {
+    const src = r.get(b); if (!src) return; const done = src.closed; if (done && !S.showDoneDeps) return;
+    const a = byN.get(b), z = byN.get(x.n); if (a == null || z == null || a === z) return;
+    if (obs[a].el.contains(obs[z].el) || obs[z].el.contains(obs[a].el)) return;   // 親子の間の依存は線にしない
+    const key = a + ">" + z;
+    if (idx.has(key)) { const e = edges[idx.get(key)]; e.pairs.push([b, x.n]); e.done = e.done && done; return; }
+    idx.set(key, edges.length); edges.push({ a, z, done, pairs: [[b, x.n]] });
+  }));
+  return { obs, frames, edges, bounds: { x1: 0, y1: 0, x2: world.offsetWidth, y2: world.offsetHeight } };
+}
+/* 車線が足りない通り道を、DOM の入れ物の隙間に結び付ける（axis "x" は左右の幅、"y" は上下の高さ） */
+function gapKeyFor(axis, elA, elB) {
+  const anc = new Set(); for (let e = elA; e; e = e.parentElement) anc.add(e);
+  let L = elB; while (L && !anc.has(L)) L = L.parentElement;
+  for (let e = L; e && e.id !== "view"; e = e.parentElement) {
+    const k = e.dataset ? e.dataset.gk : null;
+    if (e.classList.contains("gx-cols") && axis === "x") return k;
+    if (e.classList.contains("gx-col") && axis === "y") return k;
+    if (e.classList.contains("gx-wrap")) return (axis === "x" ? "wc" : "wr") + k.slice(1);
+    if (e.id === "world" && axis === "y") return "world";
+    if (e.classList.contains("gx-frame") && axis === "y" && (e === elA || e === elB)) return "b" + e.dataset.n;
+  }
+  return null;
+}
+function drawEdges() {
+  const world = $("#world"); if (!world || !$("#edges")) return;
+  const t0 = performance.now(); let G, res, it = 0, unmapped = 0;
+  for (; it < 8; it++) {
+    G = collectGraph(); res = ROUTER.route(G);
+    if (!res.widen.length) break;
+    const add = {};
+    res.widen.forEach(w => { const k = gapKeyFor(w.axis, G.obs[w.oa].el, G.obs[w.ob].el); if (k) add[k] = Math.max(add[k] || 0, Math.ceil(w.amount) + 2); else unmapped++; });
+    if (!Object.keys(add).length) break;
+    const ga = GA(); Object.entries(add).forEach(([k, v]) => (ga[k] = (ga[k] || 0) + v));
+    rebuildWorld();
+  }
+  EG = { G, routes: res.routes, widen: res.widen, unmapped, iters: it, ms: Math.round(performance.now() - t0) };
+  paintEdges();
+}
+/* 選んだ箱の上流（待ち先）と下流（それを待つもの）。直接は 1、2段目より先は 2 */
+function pathOf(n) {
+  const r = R(); const x = r.get(n); if (!x) return null;
+  const node = new Map(), edge = new Map(), up = new Set();
+  const mark = (m, k, v) => { if (!m.has(k) || m.get(k) > v) m.set(k, v); };
+  const walk = (dirUp) => {
+    const seen = new Set([x.n]), q = [x];
+    const pass = u => { if (seen.has(u.n) || u.closed) return; seen.add(u.n); q.push(u); };
+    x.anc.forEach(pass);                    // 祖先の依存は自分にも効く（上流）／祖先は自分より後に終わる（下流）
+    if (dirUp) x.desc.forEach(pass);       // 枠を選んだときは、配下の待ち先も上流
+    while (q.length) {
+      const u = q.shift();
+      const nbr = dirUp ? u.bb : u.blocking;
+      nbr.forEach(m => {
+        const v = r.get(m); if (!v) return;
+        if (v.closed && !S.showDoneDeps) return;
+        const lv = u === x ? 1 : 2;
+        mark(edge, dirUp ? m + ">" + u.n : u.n + ">" + m, lv); mark(node, v.n, lv);
+        if (dirUp) up.add(v.n);
+        if (v.closed) return;
+        if (!seen.has(v.n)) { seen.add(v.n); q.push(v); }
+        v.anc.forEach(pass); v.desc.forEach(d => { pass(d); if (!d.closed && !node.has(d.n)) { mark(node, d.n, 2); if (dirUp) up.add(d.n); } });
+      });
+    }
+  };
+  walk(true); walk(false);
+  x.anc.forEach(a => node.delete(a.n)); node.delete(x.n);
+  // 大もとの待ち先：止められている箱を選んだとき、上流の端にある、止められていない開いた Scope（配下に開いたものがない）
+  const roots = new Set();
+  if (x.st === "blocked") up.forEach(m => { const v = r.get(m); if (!v.closed && v.st !== "blocked" && !v.desc.some(d => !d.closed)) roots.add(m); });
+  return { node, edge, roots };
+}
+function paintEdges() {
+  const svg = $("#edges"), world = $("#world"); if (!svg || !EG) return;
+  const P = S.sel ? pathOf(S.sel) : null;
+  const cls = e => {
+    const base = e.done ? "is-done" : "is-wait";
+    if (!P) return base;
+    let lv = 9; e.pairs.forEach(([b, n]) => { const k = P.edge.get(b + ">" + n); if (k && k < lv) lv = k; });
+    return lv === 1 ? base + " is-p1" : lv === 2 ? base + " is-p2" : base + " is-off";
+  };
+  svg.setAttribute("width", EG.G.bounds.x2); svg.setAttribute("height", EG.G.bounds.y2);
+  svg.classList.toggle("is-hl", !!S.hl && !P);
+  svg.innerHTML = ROUTER.svg(EG.G, EG.routes, EG.routes.map(rt => cls(EG.G.edges[rt.ei])));
+  // 箱の印
+  world.classList.toggle("has-path", !!P);
+  world.querySelectorAll("[data-n]").forEach(el => {
+    const n = +el.dataset.n; const lv = P ? P.node.get(n) : null;
+    el.classList.toggle("is-p1", lv === 1); el.classList.toggle("is-p2", lv === 2);
+    el.classList.toggle("is-root", !!P && P.roots.has(n));
+    const x = R().get(n);
+    el.classList.toggle("is-poff", !!P && !lv && n !== S.sel && !R().get(S.sel).anc.includes(x));
+  });
+  world.querySelectorAll(".gx-clean").forEach(el => {
+    const ns = el.dataset.ns.split(",").map(Number); const lv = P ? Math.min(9, ...ns.map(n => P.node.get(n) || 9)) : 9;
+    el.classList.toggle("is-p1", lv === 1); el.classList.toggle("is-p2", lv === 2); el.classList.toggle("is-poff", !!P && lv === 9);
+  });
+}
+/* 機械の検査：引いた線を、いまの DOM の箱で確かめる */
+function edgeAudit(opt = {}) {
+  if (!EG || !$("#world")) return null;
+  const G = collectGraph();
+  const res = ROUTER.audit(EG.routes.map(rt => ({ pts: rt.pts, failed: rt.failed, ka: EG.G.obs[EG.G.edges[rt.ei].a].key, kz: EG.G.obs[EG.G.edges[rt.ei].z].key })), G.obs, opt);
+  return Object.assign(res, { edges: EG.routes.length, iters: EG.iters, ms: EG.ms, unmapped: EG.unmapped, widenLeft: EG.widen.length });
+}
+window.edgeAudit = edgeAudit;
+function applyT() {
+  const w = $("#world"); if (w) w.style.transform = `translate(${S.tx}px, ${S.ty}px) scale(${S.s})`;
+  const z = main.querySelector(".zoomval"); if (z) z.textContent = Math.round(S.s * 100) + "%";
+}
+function initialView() {
+  const v = $("#view"), w = $("#world"); if (!v || !w) return;
+  if (isPhone()) { S.s = .74; S.tx = 4; S.ty = 0; return; }
+  const s = Math.min(1, Math.max(.88, (v.clientWidth - 16) / w.offsetWidth));
+  const bar = main.querySelector(".gx-bar");   // 上の印と道具が2段になったら、そのぶん下げる
+  S.s = s; S.tx = Math.max(0, (v.clientWidth - w.offsetWidth * s) / 2); S.ty = bar ? Math.max(0, bar.offsetTop + bar.offsetHeight + 14 - 64 * s) : 0;
+}
+function fit() {
+  const v = $("#view"), w = $("#world"); if (!v || !w) return;
+  const s = Math.min(1, (v.clientWidth - 16) / w.offsetWidth, (v.clientHeight - 16) / w.offsetHeight);
+  S.s = Math.max(.12, s); S.tx = (v.clientWidth - w.offsetWidth * S.s) / 2; S.ty = Math.max(0, (v.clientHeight - w.offsetHeight * S.s) / 2);
+  applyT();
+}
+function zoomAt(f, cx, cy) {
+  const ns = Math.min(2, Math.max(.12, S.s * f));
+  S.tx = cx - (cx - S.tx) * (ns / S.s); S.ty = cy - (cy - S.ty) * (ns / S.s); S.s = ns; applyT();
+}
+function centerOn(n) {
+  const v = $("#view"), el = $("#world") && $("#world").querySelector(`[data-n="${n}"]`); if (!v || !el) return;
+  const vb = v.getBoundingClientRect(), b = el.getBoundingClientRect();
+  const off = isPhone() ? 0 : (panel.classList.contains("is-open") ? 190 : 0);
+  S.tx += (vb.left + vb.width / 2 - off) - (b.left + b.width / 2);
+  S.ty += (vb.top + (isPhone() ? vb.height * .3 : vb.height / 2)) - (b.top + b.height / 2);
+  applyT();
+}
+function bindView() {
+  const v = $("#view"); let st = null;
+  v.addEventListener("pointerdown", e => { if (e.button !== 0) return; st = { x: e.clientX, y: e.clientY, tx: S.tx, ty: S.ty, moved: false, id: e.pointerId }; });
+  v.addEventListener("pointermove", e => {
+    if (!st) return; const dx = e.clientX - st.x, dy = e.clientY - st.y;
+    if (!st.moved && Math.hypot(dx, dy) > 4) { st.moved = true; v.classList.add("is-drag"); try { v.setPointerCapture(st.id); } catch (_) {} }
+    if (st.moved) { S.tx = st.tx + dx; S.ty = st.ty + dy; applyT(); }
+  });
+  const end = () => { if (st && st.moved) { v.dataset.justDragged = "1"; setTimeout(() => delete v.dataset.justDragged, 0); } st = null; v.classList.remove("is-drag"); };
+  v.addEventListener("pointerup", end); v.addEventListener("pointercancel", end);
+  v.addEventListener("wheel", e => {
+    e.preventDefault(); const b = v.getBoundingClientRect();
+    if (e.ctrlKey || e.metaKey) zoomAt(Math.exp(-e.deltaY * .01), e.clientX - b.left, e.clientY - b.top);
+    else { S.tx -= e.deltaX; S.ty -= e.deltaY; applyT(); }
+  }, { passive: false });
+  v.addEventListener("click", e => {
+    if (v.dataset.justDragged) return;
+    if (e.target.closest(".gx-clean")) { openCleanup(); return; }
+    const t = e.target.closest(".gx-box, .gx-fh"); if (!t) { if (S.sel) select(null); return; }
+    const n = +(t.closest("[data-n]").dataset.n); select(n);
+  });
+  v.addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target.closest(".gx-box, .gx-fh")) { e.preventDefault(); select(+e.target.closest("[data-n]").dataset.n); } });
+}
+
+/* ------------------------------------------------------------
+   要点の欄
+   ------------------------------------------------------------ */
+function pathHtml(x) {
+  if (!x.anc.length) return `<p class="path">${ic("layers")}最上位</p>`;
+  return `<nav class="path" aria-label="親の道筋">${x.anc.slice().reverse().map(a => `<button type="button" data-goto="${a.n}" title="${esc(a.t)}">${a.id}</button>${ic("chevronRight")}`).join("")}<span>${x.id}</span></nav>`;
+}
+function kvHtml(x, full = false) {
+  const r = R(); const par = x.p ? r.get(x.p) : null;
+  let h = `<dt>種類</dt><dd>${KIND[x.k]}</dd><dt>保証レベル</dt><dd>${asMark(x.as)}${x.as}</dd>`;
+  if (x.pr) h += `<dt>PR</dt><dd>${prMark(x.pr, true)}</dd>`;
+  else if (x.k === "iss" && !x.closed) h += `<dt>PR</dt><dd style="color:var(--ds-muted);font-weight:500">まだない</dd>`;
+  if (x.branch) h += `<dt>ブランチ</dt><dd><span class="wt">${ic("folder")}</span><span class="mono">${x.branch}</span></dd>`;
+  if (!x.closed && par && par.maxO >= 2) h += `<dt>段</dt><dd><span class="stg">${x.ostage}</span>${par.maxO}段のうち ${x.ostage}段目</dd>`;
+  if (x.chg) h += `<dt>変化</dt><dd><span class="lg-chg"></span>${esc(x.chg[1])}</dd>`;
+  if (full) h += `<dt>作られた</dt><dd>${fmtDay(x.ca)}</dd>` + (x.xa ? `<dt>終わった</dt><dd>${fmtDay(x.xa)}</dd>` : "");
+  return h;
+}
+function statsHtml(x) {
+  if (x.k === "iss" && !x.kids.length) return "";
+  return `<div class="pn-stats"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px"><b style="font-size:13px">配下の進み具合</b>${frac(x)}</div>${sbar(x, 300)}` +
+    `<ul>${BAR_ORDER.map(s => `<li data-st="${s}">${stIco(s, false)}${ST[s].label}<b>${x.cnt[s]}</b></li>`).join("")}</ul></div>`;
+}
+const ghUrl = x => `https://github.com/chemitaro/${S.repo}/issues/${x.n}`;
+function renderPanel() {
+  const r = R(); const x = S.sel ? r.get(S.sel) : null;
+  if (!x || S.view === "detail" || S.view === "overview") { panel.classList.remove("is-open"); panel.setAttribute("aria-hidden", "true"); return; }
+  panel.dataset.st = x.st;
+  panel.innerHTML = `<div class="pn-grab"></div><div class="pn-head">${chip(x)}${mergeBadge(x)}<button type="button" class="iconbtn" data-act="close" aria-label="閉じる">${ic("x")}</button></div>` +
+    `<div class="pn-body"><p class="pn-kicker"><span class="ds-docid">${x.id}</span>#${x.n}・${KIND[x.k]}</p><h2 class="pn-title">${esc(x.t)}</h2>` +
+    `<p class="pn-why" data-st="${x.st}">${stIco(x.st, false)}<span>${esc(x.why)}</span></p>${pathHtml(x)}<dl class="kv">${kvHtml(x)}</dl>${statsHtml(x)}</div>` +
+    `<div class="pn-foot"><button type="button" class="ds-btn is-primary" data-act="detail">詳しく${ic("arrowRight")}</button><a class="ds-btn" href="${ghUrl(x)}" target="_blank" rel="noopener">${ic("external")}GitHub</a></div>`;
+  panel.classList.add("is-open"); panel.setAttribute("aria-hidden", "false");
+}
+function select(n) {
+  S.sel = n;
+  if (S.view === "graph") {
+    $("#world").querySelectorAll(".is-sel").forEach(e => e.classList.remove("is-sel"));
+    if (n) { const el = $("#world").querySelector(`[data-n="${n}"]`); if (el) el.classList.add("is-sel"); }
+    paintEdges();
+    renderPanel();
+    // スマートフォン：下から出る要点の欄に隠れるなら、選んだ箱を欄の上の見える所へ動かす
+    if (n && isPhone()) {
+      const el = $("#world").querySelector(`[data-n="${n}"]`), v = $("#view");
+      if (el && v) {
+        const vb = v.getBoundingClientRect(), b = el.getBoundingClientRect(), top = app.getBoundingClientRect().bottom - panel.offsetHeight;
+        if (b.bottom > top - 12 || b.top < vb.top + 44) { S.ty += (vb.top + 44 + (top - vb.top - 44) / 2) - (b.top + b.height / 2); applyT(); }
+      }
+    }
+    return;
+  } else if (S.view === "board") {
+    main.querySelectorAll(".card.is-sel").forEach(e => e.classList.remove("is-sel"));
+    if (n) main.querySelectorAll(`.card[data-n="${n}"]`).forEach(e => e.classList.add("is-sel"));
+  }
+  renderPanel();
+}
+
+/* ------------------------------------------------------------
+   ボード
+   ------------------------------------------------------------ */
+const mergeBadge = x => (x.merge ? `<span class="ds-badge" data-tone="${x.merge === "fix" ? "danger" : "accent"}">${ic(x.merge === "fix" ? "zap" : "branch")}${x.merge === "fix" ? "マージ待ち・直す必要あり" : "マージ待ち・マージできる"}</span>` : "");
+function card(x) {
+  const r = R(); const par = x.p ? r.get(x.p) : null;
+  return `<button type="button" class="card${S.sel === x.n ? " is-sel" : ""}" data-n="${x.n}" data-st="${x.st}">` +
+    (x.chg ? `<span class="chg" title="前回から変化"></span>` : "") +
+    `<div class="card__r1">${stIco(x.st)}<span class="ds-docid">${x.id}</span><span class="gx-no">#${x.n}</span>${x.chg ? `<span class="ds-badge" data-tone="accent">${x.chg[0] === "new" ? "新しい" : x.chg[0] === "pr" ? "PR が変わった" : "状態が変わった"}</span>` : x.k !== "iss" ? `<span class="ds-badge">${KIND[x.k]}</span>` : ""}</div>` +
+    `<p class="card__ttl">${esc(x.t)}</p><p class="card__why">${esc(x.why)}</p>` +
+    `<div class="card__meta"><span>${asMark(x.as)}${x.as}</span>${x.pr ? prMark(x.pr, true) : ""}${x.branch ? `<span><span class="wt">${ic("folder")}</span><span class="mono">${x.branch}</span></span>` : ""}${x.k !== "iss" ? `<span>${sbar(x, 60)}${frac(x)}</span>` : ""}${x.down ? `<span>${dnMark(x)}</span>` : ""}</div>` +
+  `</button>`;
+}
+/* ボード：列は左から右へ進む順（止められている → 着手できる → 作業中 → マージ待ち）。列の中は推奨順 */
+function renderBoard() {
+  main.className = "main";
+  const r = R();
+  const pool = r.list.filter(x => (S.kind === "all" || x.k === S.kind) && matches(x));
+  const issues = r.list.filter(x => x.k === "iss");
+  const cnt = {}; ORDER.forEach(s => (cnt[s] = issues.filter(x => x.st === s && !(s === "doing" && x.merge)).length));
+  const doneAll = r.closedTotal, all = r.total; const pct = Math.round(doneAll / all * 100);
+  const COLS = [["blocked", "止められている", "依存の先か、上位が終わっていない。待ち先の少ない順"], ["ready", "着手できる", "待っているものがない。後に続く数の多い順"],
+    ["doing", "作業中", "worktree や下書きの PR で進めている"], ["merge", "マージ待ち", "作業中で、下書きでない PR が開いている"]];
+  if (S.boardDone) COLS.push(["done", "終わった", "閉じた Scope（新しい順）"]);
+  const inCol = (k, x) => (k === "merge" ? !!x.merge : k === "doing" ? x.st === "doing" && !x.merge : x.st === k);
+  const unk = pool.filter(x => x.st === "unknown");
+  const listHtml = items => {
+    if (!S.group) return items.map(card).join("");
+    const g = new Map(); items.forEach(x => { const key = x.p || 0; if (!g.has(key)) g.set(key, []); g.get(key).push(x); });   // 親の並びは、いちばん推奨の高い子の順
+    return [...g.entries()].map(([p, xs]) => `<div class="col__grp">${p ? stIco(r.get(p).st, false) + `<span>${r.get(p).id}</span><span>${esc(r.get(p).t)}</span>` : "<span>最上位</span>"}</div>${xs.map(card).join("")}`).join("");
+  };
+  const colHtml = ([k, label, desc]) => {
+    let items = pool.filter(x => inCol(k, x)).sort(recCmp);
+    if (k === "done") items = items.slice(0, 12);
+    let body;
+    if (!items.length) body = `<p class="col__empty">ない</p>`;
+    else if (k === "merge") {
+      const ok = items.filter(x => x.merge === "ok"), fix = items.filter(x => x.merge === "fix");
+      body = `<div class="col__sub" data-mg="ok">${ic("check")}マージできる<small>CI 成功・衝突なし</small><b>${ok.length}</b></div>${ok.length ? listHtml(ok) : '<p class="col__empty">ない</p>'}` +
+        `<div class="col__sub" data-mg="fix">${ic("zap")}直す必要あり<small>CI の失敗・衝突</small><b>${fix.length}</b></div>${fix.length ? listHtml(fix) : '<p class="col__empty">ない</p>'}`;
+    } else body = listHtml(items);
+    return `<section class="col" data-st="${k}"><div class="col__head">${k === "merge" ? ic("branch") : stIco(k, false)}${label}<b>${items.length}</b></div><p class="col__desc">${desc}</p><div class="col__list">${body}</div></section>`;
+  };
+  const mOk = issues.filter(x => x.merge === "ok").length, mFix = issues.filter(x => x.merge === "fix").length;
+  main.innerHTML = `<div class="page">` +
+    `<div class="page-head"><h1>ボード</h1><p>${esc(r.name)}・Issue ${issues.length}件のうち開いている ${issues.filter(x => !x.closed).length}件${S.q ? `・「${esc(S.q)}」で絞り込み中` : ""}</p></div>` +
+    `<div class="board-top"><div class="ds-metrics">` +
+      ["blocked", "ready", "doing"].map(s => `<div class="ds-metric" data-st="${s}"><div class="ds-metric__label">${stIco(s, false)}${ST[s].label}</div><div class="ds-metric__value">${cnt[s]}</div></div>`).join("") +
+      `<div class="ds-metric" data-st="merge"><div class="ds-metric__label">${ic("branch")}マージ待ち</div><div class="ds-metric__value">${mOk + mFix}</div><div class="ds-metric__sub"><span data-mg="fix">${ic("zap")}直す ${mFix}</span><span data-mg="ok">${ic("check")}できる ${mOk}</span></div></div>` +
+      (cnt.unknown ? `<div class="ds-metric" data-st="unknown"><div class="ds-metric__label">${stIco("unknown", false)}${ST.unknown.label}</div><div class="ds-metric__value">${cnt.unknown}</div></div>` : "") +
+      `<div class="ratio"><span class="ring" style="--p:${pct}" data-label="${pct}%"></span><p>終わった割合<b>${doneAll}<span class="ds-metric__unit">／${all}</span></b></p></div>` +
+    `</div><button type="button" class="cleanup" data-act="cleanup">${ic("box")}<span><b>${r.cleanup.length}</b> 片付けの候補<small>配下が終わったのに開いている、など</small></span>${ic("chevronRight")}</button></div>` +
+    `<div class="ctl"><span class="seg2" role="group" aria-label="種類">${[["all", "すべて"], ["ini", "Initiative"], ["epi", "Epic"], ["iss", "Issue"]].map(([k, l]) => `<button type="button" data-kind="${k}" aria-pressed="${S.kind === k}">${l}</button>`).join("")}</span>` +
+      `<label class="tg"><input type="checkbox" data-tg="group"${S.group ? " checked" : ""}>親ごとにまとめる</label><label class="tg"><input type="checkbox" data-tg="boardDone"${S.boardDone ? " checked" : ""}>終わったものも（列を足す）</label></div>` +
+    (unk.length ? `<div class="ds-callout" data-tone="warning" style="margin-bottom:12px"><span class="ds-callout__icon">${stIco("unknown", false)}</span><p class="ds-callout__title">不明 ${unk.length}件：記録の食い違いを直すまで、どの列にも入れない</p><p class="ds-callout__body">${unk.map(x => `<button type="button" class="path" style="display:inline;border:0;background:none;padding:0;margin:0;cursor:pointer;color:var(--ds-link)" data-goto="${x.n}">${x.id} ${esc(x.t)}</button>（${esc(x.why)}）`).join("、")}</p></div>` : "") +
+    `<p class="rec-note">${ic("info")}列の中は推奨順：着手できる・作業中は「後に続く」数（${ic("down")}）の多い順、マージ待ちは「マージできる」を先に、止められている は待ち先の少ない順。</p>` +
+    `<div class="cols" style="--ncol:${COLS.length}">${COLS.map(colHtml).join("")}</div></div>`;
+}
+
+/* ------------------------------------------------------------
+   時間の軸
+   ------------------------------------------------------------ */
+function chartSvg(weeks, W) {
+  const H = Math.round(Math.min(300, Math.max(200, W * .42))), L = 38, Rr = 70, T = 14, B = 26;
+  const iw = W - L - Rr, ih = H - T - B;
+  const max = Math.max(...weeks.map(w => w[1])); const step = max > 200 ? 100 : max > 60 ? 20 : max > 20 ? 5 : 2;
+  const ymax = Math.ceil(max / step) * step;
+  const X = i => L + (weeks.length > 1 ? i / (weeks.length - 1) * iw : 0), Y = v => T + ih - v / ymax * ih;
+  let g = "";
+  for (let v = 0; v <= ymax; v += step) g += `<line class="grid" x1="${L}" x2="${L + iw}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${L - 6}" y="${Y(v) + 4}" text-anchor="end">${v}</text>`;
+  let lastM = -1;
+  weeks.forEach((w, i) => { const m = +w[0].slice(5, 7); if (m !== lastM) { lastM = m; g += `<line class="axis" x1="${X(i)}" x2="${X(i)}" y1="${T + ih}" y2="${T + ih + 4}"/><text x="${X(i)}" y="${H - 6}" text-anchor="middle">${m}月</text>`; } });
+  const line = k => weeks.map((w, i) => `${i ? "L" : "M"}${X(i).toFixed(1)} ${Y(w[k]).toFixed(1)}`).join("");
+  const area = weeks.map((w, i) => `${i ? "L" : "M"}${X(i).toFixed(1)} ${Y(w[1]).toFixed(1)}`).join("") + weeks.slice().reverse().map((w, j) => `L${X(weeks.length - 1 - j).toFixed(1)} ${Y(w[2]).toFixed(1)}`).join("") + "Z";
+  const last = weeks[weeks.length - 1]; const lx = X(weeks.length - 1);
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="週ごとの作成と完了の累計。最新の週は作成 ${last[1]}、完了 ${last[2]}">` +
+    `<line class="axis" x1="${L}" x2="${L + iw}" y1="${T + ih}" y2="${T + ih}"/>${g}` +
+    `<path d="${area}" style="fill:color-mix(in srgb, var(--ds-series-1) 9%, transparent)"/>` +
+    `<path d="${line(1)}" style="fill:none;stroke:var(--ds-series-1)" stroke-width="2.2" stroke-linejoin="round"/>` +
+    `<path d="${line(2)}" style="fill:none;stroke:var(--ds-series-3)" stroke-width="2.2" stroke-linejoin="round"/>` +
+    `<circle cx="${lx}" cy="${Y(last[1])}" r="3.5" style="fill:var(--ds-series-1)"/><circle cx="${lx}" cy="${Y(last[2])}" r="3.5" style="fill:var(--ds-series-3)"/>` +
+    `<text class="lbl" x="${lx + 8}" y="${Y(last[1]) + 4}" style="fill:var(--ds-text)">作成 ${last[1]}</text>` +
+    `<text class="lbl" x="${lx + 8}" y="${Math.max(Y(last[2]) + 4, Y(last[1]) + 20)}" style="fill:var(--ds-text)">完了 ${last[2]}</text>` +
+    `<line id="hair" class="axis" x1="0" x2="0" y1="${T}" y2="${T + ih}" style="opacity:0"/>` +
+    `<rect id="hov" x="${L}" y="${T}" width="${iw}" height="${ih}" fill="transparent"/></svg>`;
+}
+const EVW = { created: ["sparkle", "が作られた"], closed: ["check", "が終わった"], pr_open: ["branch", "の PR が開いた"], pr_merged: ["merge", "の PR がマージされた"] };
+function renderTime() {
+  main.className = "main";
+  const r = R(); const wks = r.weeks; const last = wks[wks.length - 1], prev4 = wks[Math.max(0, wks.length - 5)];
+  let feed = "", day = "";
+  r.events.forEach(e => {
+    const d = fmtDay(e.t); if (d !== day) { day = d; feed += `<li class="feed__day">${d}</li>`; }
+    const [i, w] = EVW[e.k];
+    feed += `<li class="ev" data-goto="${e.n}"><span class="ev__ic" data-k="${e.k}">${ic(i)}</span><span class="ev__txt"><b>${e.id}</b>${w}${e.no ? `（#${e.no}）` : ""}<small>${esc(e.title)}</small></span><span class="ev__time">${fmtTime(e.t)}</span></li>`;
+  });
+  main.innerHTML = `<div class="page"><div class="page-head"><h1>時間の軸</h1><p>${esc(r.name)}・週ごとの累計と、最近の動き</p></div>` +
+    `<div class="ds-metrics" style="margin-bottom:14px">` +
+      `<div class="ds-metric"><div class="ds-metric__label">${ic("sparkle")}作られた（累計）</div><div class="ds-metric__value">${last[1]}</div></div>` +
+      `<div class="ds-metric"><div class="ds-metric__label">${stIco("done", false)}終わった（累計）</div><div class="ds-metric__value">${last[2]}</div></div>` +
+      `<div class="ds-metric"><div class="ds-metric__label">${ic("layers")}開いている</div><div class="ds-metric__value">${last[1] - last[2]}</div></div>` +
+      `<div class="ds-metric"><div class="ds-metric__label">${ic("history")}直近4週の完了</div><div class="ds-metric__value">${last[2] - prev4[2]}</div></div></div>` +
+    `<div class="time-grid"><section class="chart-card"><h3>作成と完了の累計（週ごと）</h3><p>2本の線の間の幅が、開いている Scope の数。${r.real ? "スナップショットの全 " + r.total + " 件から数えた。" : "見本の数。"}</p>` +
+      `<div class="chart-legend"><span><i style="background:var(--ds-series-1)"></i>作られた</span><span><i style="background:var(--ds-series-3)"></i>終わった</span></div>` +
+      `<div class="chart" id="chart"></div></section>` +
+    `<section class="chart-card"><h3>最近の動き</h3><p>新しい順。PR の動きは見本。</p><ul class="feed">${feed}</ul></section></div></div>`;
+  drawChart();
+}
+function drawChart() {
+  const el = $("#chart"); if (!el) return; const wks = R().weeks;
+  el.innerHTML = chartSvg(wks, Math.max(280, Math.floor(el.clientWidth))) + `<div class="chart-tip" id="ctip"></div>`;
+  const svg = el.querySelector("svg"), hov = el.querySelector("#hov"), hair = el.querySelector("#hair"), tip = el.querySelector("#ctip");
+  hov.addEventListener("pointermove", e => {
+    const b = svg.getBoundingClientRect(); const sc = svg.viewBox.baseVal.width / b.width;
+    const x = (e.clientX - b.left) * sc; const L = 38, iw = svg.viewBox.baseVal.width - 38 - 70;
+    const i = Math.max(0, Math.min(wks.length - 1, Math.round((x - L) / iw * (wks.length - 1))));
+    const X = L + i / (wks.length - 1) * iw; hair.setAttribute("x1", X); hair.setAttribute("x2", X); hair.style.opacity = 1;
+    const w = wks[i]; tip.innerHTML = `${+w[0].slice(5, 7)}月${+w[0].slice(8)}日の週<br>作成 ${w[1]}・完了 ${w[2]}・開いている ${w[1] - w[2]}`;
+    tip.style.left = X / sc + "px"; tip.style.top = "40px"; tip.style.opacity = 1;
+  });
+  hov.addEventListener("pointerleave", () => { hair.style.opacity = 0; tip.style.opacity = 0; });
+}
+
+/* ------------------------------------------------------------
+   詳しい画面
+   ------------------------------------------------------------ */
+function renderDetail() {
+  main.className = "main";
+  const r = R(); const x = r.get(S.detail); if (!x) { go("graph"); return; }
+  const kids = x.kids.map(r.get);
+  const TABS = [["summary", "概要"], ["deps", "依存", x.bb.length + x.blocking.length], ["kids", "配下", x.total], ["docs", "文書"], ["arts", "Artifact", (r.arts[x.n] || []).length]];
+  if (x.k === "iss" && !x.kids.length) TABS.splice(2, 1);
+  if (!TABS.some(t => t[0] === S.tab)) S.tab = "summary";
+  let body = "";
+  if (S.tab === "summary") {
+    body = `<div class="ds-callout" data-tone="${x.st === "blocked" ? "warning" : x.st === "ready" ? "tip" : "note"}" style="--tone:var(--st);--tone-bg:var(--st-bg);--tone-line:var(--st-line);--tone-ink:var(--st-ink)" data-st="${x.st}"><span class="ds-callout__icon">${stIco(x.st, false)}</span><p class="ds-callout__title">${ST[x.st].label}</p><p class="ds-callout__body">${esc(x.why)}${x.merge === "ok" ? "。マージすると、後に続く Scope が進められる。" : x.merge === "fix" ? "。直してから、マージする。" : x.st === "ready" ? "。いつでも始められる。" : ""}</p></div>`;
+    if (x.k !== "iss" || x.kids.length) body += `<h2 class="sec"><span class="n">1</span>配下の進み具合<span class="aside">${x.cnt.done}／${x.total} 終わった</span></h2>${statsHtml(x).replace('class="pn-stats"', 'class="pn-stats" style="max-width:520px"').replace('width:300px', 'width:100%')}`;
+    body += `<h2 class="sec"><span class="n">${x.k !== "iss" || x.kids.length ? 2 : 1}</span>記録</h2><dl class="kv" style="max-width:620px">${kvHtml(x, true)}</dl>`;
+  } else if (S.tab === "deps") {
+    const waits = x.bb.map(r.get).filter(Boolean), blk = x.blocking.map(r.get);
+    body = `<h2 class="sec"><span class="n">1</span>この Scope が待つもの<span class="aside">${waits.filter(w => !w.closed).length}件が未完了</span></h2>` +
+      `<div class="chain">${waits.length ? waits.map(card).join("") : '<p class="col__empty">待つものはない</p>'}<span class="chain__arrow">${ic("arrowRight")}</span><span class="chain__me" data-st="${x.st}">${x.id}<br><span style="font-weight:600;font-size:12.5px">${esc(x.t)}</span></span>` +
+      (blk.length ? `<span class="chain__arrow">${ic("arrowRight")}</span>${blk.map(card).join("")}` : "") + `</div>` +
+      `<h2 class="sec"><span class="n">2</span>この Scope を待つもの<span class="aside">${blk.length}件</span></h2>${blk.length ? `<div class="lane">${blk.map(card).join("")}</div>` : '<p class="col__empty">ない</p>'}`;
+  } else if (S.tab === "kids") {
+    const open = kids.filter(k => !k.closed), done = kids.filter(k => k.closed);
+    const max = Math.max(1, ...open.map(k => k.ostage));
+    body = `<p style="margin:0 0 12px;color:var(--ds-muted);font-size:13px">開いている ${open.length}件を、同じ親の中の作業の順番で段に分ける。段1 から順に進める。</p><div class="stages">` +
+      Array.from({ length: max }, (_, i) => i + 1).map(s => `${s > 1 ? `<div class="stage-arrow"><span>${ic("arrowDown")}</span></div>` : ""}<div class="stage-row"><div class="stage-row__n"><b>${s}</b>段${s}</div><div class="lane">${open.filter(k => k.ostage === s).sort(recCmp).map(card).join("")}</div></div>`).join("") + `</div>` +
+      `<h2 class="sec"><span class="n">${ic("check")}</span>終わった<span class="aside">${done.length + (x.om || 0)}件</span></h2>` +
+      (done.length ? `<div class="lane">${done.map(card).join("")}</div>` : "") + (x.om ? `<p class="col__empty">ほかに終わった ${x.om}件（見本では省いた）</p>` : "");
+  } else if (S.tab === "docs") {
+    const d = r.docs[x.n] || (x.k === "iss" ? { req: 1, plan: 1 } : { req: 1, des: 1, plan: 1 });
+    const D = [["req", "要件", "requirement.cue", "何を満たすか"], ["des", "設計", "design.cue", "どう作るか"], ["plan", "計画", "plan.cue", "どの順で進めるか"], ["exp", "説明資料", "explanation.html", "人が読む説明"], ["rep", "報告", "report.md", "実装の記録"]];
+    body = `<div class="docs">${D.map(([k, l, f, s]) => `<div class="doc" data-has="${!!d[k]}"><div class="doc__head"><span class="doc__icon">${ic(k === "exp" ? "book" : "file")}</span><div><p class="doc__title">${l}</p><p class="mono">${f}</p></div></div><p>${s}</p><p>${d[k] ? `<a class="lnk" href="#" onclick="return false">開く（文書の画面は 0.7.0）</a>` : "まだない"}</p></div>`).join("")}</div>` +
+      (r.docs[x.n] ? "" : `<p class="col__empty" style="margin-top:10px">${x.n === 427 ? "" : "文書のありなしは見本。"}</p>`);
+  } else {
+    const a = r.arts[x.n] || [];
+    body = a.length ? `<table class="ds-table"><thead><tr><th>名前</th><th>形式</th><th>作った日</th></tr></thead><tbody>${a.map(([n, k, d]) => `<tr><td class="mono">${esc(n)}</td><td>${k}</td><td>${d}</td></tr>`).join("")}</tbody></table>`
+      : `<div class="ds-callout" data-tone="tip"><span class="ds-callout__icon">${ic("info")}</span><p class="ds-callout__title">Artifact はまだない</p><p class="ds-callout__body">試作や調べた結果をこの Scope に結び付けると、ここに並ぶ。</p></div>`;
+  }
+  main.innerHTML = `<div class="page"><button type="button" class="back" data-act="back">${ic("chevronLeft")}構造の図へ戻る</button>` +
+    `<header class="cover" data-st="${x.st}"><div class="cover__main"><p class="cover__kicker">${KIND[x.k]}<span class="ds-docid">${x.id}</span><span style="color:var(--ds-muted);font-weight:600">#${x.n}</span></p>` +
+      `<h1 class="cover__title">${esc(x.t)}</h1><div class="cover__tags">${chip(x)}<span class="ds-badge" data-tone="${x.st === "blocked" ? "danger" : "accent"}">${esc(x.why)}</span>${mergeBadge(x)}${x.chg ? `<span class="ds-badge" data-tone="accent">${esc(x.chg[1])}</span>` : ""}</div></div>` +
+      `<div class="cover__side"><dl><dt>親の道筋</dt><dd>${pathHtml(x)}</dd><dt>保証レベル</dt><dd>${asMark(x.as)}${x.as}</dd>` +
+      `<dt>GitHub</dt><dd><a class="lnk" href="${ghUrl(x)}" target="_blank" rel="noopener">Issue #${x.n}</a></dd>` +
+      (x.pr ? `<dt>PR</dt><dd>${prMark(x.pr)}<a class="lnk" href="https://github.com/chemitaro/${S.repo}/pull/${x.pr.no}" target="_blank" rel="noopener">#${x.pr.no}</a>${PRW[x.pr.st]}</dd>` : "") +
+      (x.branch ? `<dt>ブランチ</dt><dd><span class="mono">${x.branch}</span></dd>` : "") + `</dl></div></header>` +
+    `<div class="ds-tabs__list" role="tablist" style="margin-top:18px">${TABS.map(([k, l, n]) => `<button type="button" class="ds-tabs__tab" role="tab" data-tab="${k}" aria-selected="${S.tab === k}">${l}${n != null ? `<small>${n}</small>` : ""}</button>`).join("")}</div>` +
+    `<div class="tabpanel">${body}</div></div>`;
+}
+
+/* ------------------------------------------------------------
+   横断の概況
+   ------------------------------------------------------------ */
+function renderOverview() {
+  main.className = "main";
+  const cards = Object.values(REPOS).map(r => {
+    const iss = r.list.filter(x => x.k === "iss" && !x.closed);
+    const sec = (st, label, xs, icon) => `<div class="ov__sec" data-st="${st}"><h4>${icon || stIco(st, false)}${label}<b>${xs.length}</b></h4><ul>${xs.length ? xs.slice(0, 3).map(x => `<li><small>#${x.n}</small>${esc(x.t)}</li>`).join("") + (xs.length > 3 ? `<li class="none">ほか ${xs.length - 3}件</li>` : "") : '<li class="none">ない</li>'}</ul></div>`;
+    const c = {}; ORDER.forEach(s => (c[s] = iss.filter(x => x.st === s && !(s === "doing" && x.merge)).length));
+    return `<button type="button" class="ov" data-repo="${r.name}"><div class="ov__head"><span class="ov__icon">${ic("folder")}</span><p class="ov__name">${esc(r.name)}</p><span class="status"${r.stale ? ' data-state="stale"' : ""}>${r.ago}</span></div>` +
+      `<div class="ov__next">${sec("merge", "マージ待ち", iss.filter(x => x.merge).sort(recCmp), ic("branch"))}${sec("doing", "作業中", iss.filter(x => x.st === "doing" && !x.merge).sort(recCmp))}${sec("ready", "着手できる", iss.filter(x => x.st === "ready").sort(recCmp))}</div>` +
+      `<div class="ov__counts">${ORDER.filter(s => s !== "done").map(s => `<span class="cnt" data-st="${s}" title="${ST[s].label}">${stIco(s, false)}${c[s]}</span>`).join("")}<span class="cnt" data-st="merge" title="マージ待ち">${ic("branch")}${iss.filter(x => x.merge).length}</span><span class="frac" style="margin-left:auto">${r.closedTotal}<small>／${r.total} 終わった</small></span></div>` +
+      `<div class="ov__flags"><span class="ds-badge" data-tone="${c.blocked ? "danger" : ""}">${stIco("blocked", false)}止められている ${c.blocked}</span><span class="ds-badge" data-tone="${r.cleanup.length ? "warning" : ""}">${ic("box")}片付けの候補 ${r.cleanup.length}</span><span class="ds-badge" data-tone="${r.changes.length ? "accent" : ""}">${ic("bell")}変化 ${r.changes.length}</span></div></button>`;
+  }).join("");
+  main.innerHTML = `<div class="page"><div class="page-head"><h1>横断の概況</h1><p>このPCの5つのリポジトリ。札を押すと、そのリポジトリの構造の図へ。spec-dock 以外の中身は見本。</p></div><div class="ov-grid">${cards}</div></div>`;
+}
+
+/* ------------------------------------------------------------
+   浮かぶ欄
+   ------------------------------------------------------------ */
+function openPop(anchor, html) {
+  pop.innerHTML = html; pop.classList.add("is-open");
+  const a = anchor.getBoundingClientRect(), b = app.getBoundingClientRect();
+  const w = Math.min(pop.offsetWidth, b.width - 20);
+  let left = a.left - b.left; if (left + w > b.width - 10) left = b.width - 10 - w;
+  pop.style.left = Math.max(10, left) + "px"; pop.style.top = (a.bottom - b.top + 6) + "px";
+}
+function closePop() { pop.classList.remove("is-open"); }
+function reposMenu(anchor) {
+  openPop(anchor, `<h5>リポジトリ</h5>` + Object.values(REPOS).map(r => `<button type="button" class="it" data-repo="${r.name}" aria-current="${S.view !== "overview" && S.repo === r.name}">${ic("folder")}<span class="it__t">${esc(r.name)}</span><span class="it__sub">開いている ${r.list.filter(x => !x.closed).length}</span></button>`).join("") +
+    `<hr><button type="button" class="it" data-act="overview" aria-current="${S.view === "overview"}">${ic("globe")}<span class="it__t">すべてのリポジトリ（概況）</span></button>`);
+}
+function changesMenu(anchor) {
+  const r = R();
+  openPop(anchor, `<h5>前回（${SD_SAMPLE.lastSeen}）から変化 ${r.changes.length}件</h5>` + r.changes.map(x => `<button type="button" class="it" data-goto="${x.n}">${stIco(x.st)}<span class="it__t"><b class="mono" style="font-size:11.5px">${x.id}</b> ${esc(x.t)}</span><span class="it__sub">${esc(x.chg[1])}</span></button>`).join("") +
+    `<hr><button type="button" class="it" data-act="seen">${ic("check")}<span class="it__t">すべて見た（印を消す）</span></button>`);
+}
+function openCleanup() {
+  const r = R();
+  sheet.innerHTML = `<div class="sheet__card"><div class="sheet__head">${ic("box")}片付けの候補 ${r.cleanup.length}件<button type="button" class="iconbtn" data-act="sheetclose" aria-label="閉じる">${ic("x")}</button></div>` +
+    `<div class="sheet__body"><p>閉じ忘れや、置き場所の誤りかもしれないもの。閉じるかどうかは GitHub か SpecDock のコマンドで決める（この画面は見るだけ）。</p>` +
+    (r.cleanup.length ? `<table class="ds-table"><thead><tr><th>Scope</th><th>理由</th></tr></thead><tbody>${r.cleanup.map(c => `<tr><td><button type="button" class="path" style="margin:0;border:0;background:none;padding:0;cursor:pointer;color:var(--ds-link);display:inline-flex;gap:6px;align-items:center" data-goto="${c.x.n}">${stIco(c.x.st, false)}<span class="mono">${c.x.id}</span></button><div style="font-size:12px;color:var(--ds-muted)">${esc(c.x.t)}</div></td><td>${esc(c.why)}</td></tr>`).join("")}</tbody></table>` : `<p>ない</p>`) + `</div></div>`;
+  sheet.classList.add("is-open");
+}
+
+/* ------------------------------------------------------------
+   切り替え
+   ------------------------------------------------------------ */
+function render() {
+  renderTop();
+  if (S.view === "graph") renderGraph();
+  else if (S.view === "board") renderBoard();
+  else if (S.view === "time") renderTime();
+  else if (S.view === "detail") renderDetail();
+  else renderOverview();
+  renderPanel();
+}
+function go(view) { S.view = view; if (view !== "board" && view !== "graph") S.sel = view === "detail" ? S.sel : null; main.scrollTop = 0; render(); }
+function goto(n) {
+  closePop(); sheet.classList.remove("is-open");
+  const x = R().get(n); if (!x) return;
+  if (S.view === "graph") {
+    if (!vis(x)) { S.showDone = true; }
+    S.sel = n; render(); requestAnimationFrame(() => centerOn(n));
+  } else if (S.view === "board") { S.sel = n; renderPanel(); select(n); }
+  else { S.detail = n; S.sel = n; S.tab = "summary"; S.view = "detail"; main.scrollTop = 0; render(); }
+}
+function onSearch() {
+  if (S.view === "graph") {
+    $("#world").querySelectorAll(".gx-box").forEach(el => { const x = R().get(+el.dataset.n); el.classList.toggle("is-dim", !(matches(x) && inHl(x))); el.classList.toggle("is-hl", !!S.hl && matches(x) && inHl(x)); });
+    const sv = $("#edges"); if (sv) sv.classList.toggle("is-hl", !!S.hl && !S.sel);
+    $("#world").querySelectorAll(".gx-frame").forEach(el => { const x = R().get(+el.dataset.n); el.classList.toggle("is-dim", !(matches(x) && inHl(x))); });
+  } else if (S.view === "board") renderBoard();
+}
+
+app.addEventListener("click", e => {
+  const t = e.target;
+  if (!t.closest("#pop") && !t.closest('[data-act="repos"]') && !t.closest('[data-act="changes"]')) closePop();
+  const v = t.closest("[data-view]"); if (v) { go(v.dataset.view); return; }
+  const rp = t.closest("[data-repo]"); if (rp) { S.repo = rp.dataset.repo; S.sel = null; S.q = ""; S.hl = null; S.fitted = false; closePop(); go("graph"); return; }
+  const gt = t.closest("[data-goto]"); if (gt) { goto(+gt.dataset.goto); return; }
+  const hl = t.closest("[data-hl]"); if (hl) { if (S.sel && S.view === "graph") select(null); S.hl = S.hl === hl.dataset.hl ? null : hl.dataset.hl; main.querySelectorAll(".nx").forEach(b => b.setAttribute("aria-pressed", b.dataset.hl === S.hl)); onSearch(); return; }
+  const kd = t.closest("[data-kind]"); if (kd) { S.kind = kd.dataset.kind; renderBoard(); return; }
+  const tb = t.closest("[data-tab]"); if (tb) { S.tab = tb.dataset.tab; renderDetail(); return; }
+  const cd = t.closest(".card[data-n]"); if (cd && S.view === "board") { select(+cd.dataset.n); return; }
+  if (cd && S.view === "detail") { goto(+cd.dataset.n); return; }
+  const a = t.closest("[data-act]"); if (!a) return;
+  switch (a.dataset.act) {
+    case "repos": pop.classList.contains("is-open") ? closePop() : reposMenu(a); break;
+    case "changes": pop.classList.contains("is-open") ? closePop() : changesMenu(a); break;
+    case "overview": closePop(); S.sel = null; go("overview"); break;
+    case "seen": R().changes.forEach(x => (x.chg = null)); R().changes = []; closePop(); render(); break;
+    case "msearch": { const m = $("#msearch"); m.classList.toggle("is-open"); if (m.classList.contains("is-open")) $("#mq").focus(); break; }
+    case "close": select(null); break;
+    case "detail": S.detail = S.sel; S.tab = "summary"; go("detail"); break;
+    case "back": go("graph"); break;
+    case "zin": { const v2 = $("#view"); zoomAt(1.2, v2.clientWidth / 2, v2.clientHeight / 2); break; }
+    case "zout": { const v2 = $("#view"); zoomAt(1 / 1.2, v2.clientWidth / 2, v2.clientHeight / 2); break; }
+    case "z100": { const v2 = $("#view"); zoomAt(1 / S.s, v2.clientWidth / 2, v2.clientHeight / 2); break; }
+    case "fit": fit(); break;
+    case "done": S.showDone = !S.showDone; renderGraph(); break;
+    case "ddeps": S.showDoneDeps = !S.showDoneDeps; a.setAttribute("aria-pressed", S.showDoneDeps); rebuildWorld(); drawEdges(); break;
+    case "fold": S.fold = !S.fold; renderGraph(); break;
+    case "legend": S.legend = !S.legend; a.closest(".legend").dataset.open = S.legend; a.setAttribute("aria-expanded", S.legend); break;
+    case "cleanup": openCleanup(); break;
+    case "sheetclose": sheet.classList.remove("is-open"); break;
+  }
+});
+sheet.addEventListener("click", e => { if (e.target === sheet) sheet.classList.remove("is-open"); });
+app.addEventListener("change", e => { const tg = e.target.dataset.tg; if (tg) { S[tg] = e.target.checked; renderBoard(); } });
+$("#mq").addEventListener("input", e => { S.q = e.target.value.trim(); const q = $("#q"); if (q) q.value = e.target.value; onSearch(); });
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") { closePop(); sheet.classList.remove("is-open"); $("#msearch").classList.remove("is-open"); if (S.sel) select(null); }
+  if (e.key === "Enter" && (e.target.id === "q" || e.target.id === "mq") && S.q) { const hit = R().list.find(x => matches(x) && (S.showDone || x.st !== "done")); if (hit) goto(hit.n); }
+});
+
+/* ============================================================
+   ROUTER：依存の線の直交の経路（DOM を知らない、純粋な計算。製品の静的 JS にそのまま移せる形）
+   入力 G = { obs:[{x1,y1,x2,y2,p1,p2,key}], frames:[{x1,y1,x2,y2,cls}], edges:[{a,z}], bounds }
+     obs   … 線が通ってはいけない矩形（Issue の箱、枠の見出しと要点の行、畳んだまとまり）。p1–p2 は辺の上で線が出入りしてよい範囲
+     edges … a の右の辺から出て、z の左の辺へ入る
+   手順（libavoid の考え方を小さくしたもの）
+     1. 出入りの位置：1つの辺の線を、相手の高さの順に並べて間隔をあけて割り振る
+     2. 直交の可視グラフ：障害物を M0 ふくらませた矩形の辺の座標と出入りの高さで疎な格子を作り、矩形の内側を通る点と辺を除く
+     3. A*：長さ＋曲がりの罰則＋枠の出入りの罰則＋既に引いた線との共有・交差の罰則。状態は（点、向き）
+     4. nudging：同じ向きの線分のうち、範囲が重なり同じ通り道にあるものを束にし、交差が少なくなる順に並べ、
+        車線の間隔 S で通り道の中央に並べる。通り道が狭いときは、広げる量と、その両側の障害物を返す
+     5. 描画：角を小さな R で丸め、交差は下の線を背景色で切る
+   ============================================================ */
+const ROUTER = (() => {
+  const C = { M0: 4, M: 10, S: 8, PORT: 10, R: 7, AH: 7, BEND: 40, FRAME: 30, SHARE: 0.6, CROSS: 12, MINSEG: 2 };
+  const EPS = 0.01;
+  const uniq = a => { a.sort((p, q) => p - q); const o = []; for (const v of a) if (!o.length || v - o[o.length - 1] > EPS) o.push(v); return o; };
+  const lb = (arr, v) => { let lo = 0, hi = arr.length; while (lo < hi) { const m = (lo + hi) >> 1; if (arr[m] < v - EPS) lo = m + 1; else hi = m; } return lo; };
+
+  /* 1. 出入りの位置 */
+  function assignPorts(G) {
+    const sides = new Map();
+    const add = (k, it) => { if (!sides.has(k)) sides.set(k, []); sides.get(k).push(it); };
+    G.edges.forEach(e => { add(e.a + "R", { e, end: 0 }); add(e.z + "L", { e, end: 1 }); });
+    const mid = o => (o.p1 + o.p2) / 2;
+    sides.forEach((list, key) => {
+      const o = G.obs[parseInt(key, 10)];
+      const oth = it => G.obs[it.end ? it.e.a : it.e.z];
+      list.sort((p, q) => mid(oth(p)) - mid(oth(q)) || oth(p).x1 - oth(q).x1);
+      const k = list.length, room = Math.max(0, o.p2 - o.p1), sp = k > 1 ? Math.min(C.PORT, room / (k - 1)) : 0;
+      list.forEach((it, i) => { it.e[it.end ? "y2" : "y1"] = mid(o) + (i - (k - 1) / 2) * sp; it.e[it.end ? "k2" : "k1"] = k; });
+    });
+    // その辺に線が1本だけなら、相手の高さにそろえて小さな段差をなくす
+    G.edges.forEach(e => {
+      const A = G.obs[e.a], Z = G.obs[e.z];
+      if (e.k1 === 1 && e.y2 >= A.p1 && e.y2 <= A.p2) e.y1 = e.y2;
+      else if (e.k2 === 1 && e.y1 >= Z.p1 && e.y1 <= Z.p2) e.y2 = e.y1;
+    });
+  }
+
+  /* 2. 疎な直交の格子（可視グラフ） */
+  function buildGrid(G) {
+    const B = G.bounds, M0 = C.M0;
+    const inf = G.obs.map(o => ({ x1: Math.max(B.x1, o.x1 - M0), y1: Math.max(B.y1, o.y1 - M0), x2: Math.min(B.x2, o.x2 + M0), y2: Math.min(B.y2, o.y2 + M0) }));
+    const xs = [B.x1, B.x2], ys = [B.y1, B.y2];
+    inf.forEach(q => { xs.push(q.x1, q.x2); ys.push(q.y1, q.y2); });
+    G.edges.forEach(e => ys.push(e.y1, e.y2));
+    const X = uniq(xs), Y = uniq(ys), nx = X.length, ny = Y.length, N = nx * ny;
+    const vb = new Uint8Array(N), hb = new Uint8Array(N), vl = new Uint8Array(N), fid = new Int16Array(N);
+    const rx = inf.map(q => [lb(X, q.x1), lb(X, q.x2)]);
+    for (let j = 0; j < ny; j++) {
+      const y = Y[j], ym = j < ny - 1 ? (y + Y[j + 1]) / 2 : NaN, row = j * nx;
+      for (let t = 0; t < inf.length; t++) {
+        const q = inf[t], a = rx[t][0], b = rx[t][1];
+        if (q.y1 + EPS < y && y < q.y2 - EPS) { for (let i = a + 1; i < b; i++) vb[row + i] = 1; for (let i = a; i < b; i++) hb[row + i] = 1; }
+        if (q.y1 < ym && ym < q.y2) for (let i = a + 1; i < b; i++) vl[row + i] = 1;
+      }
+    }
+    // 各点がどの枠の中か（いちばん内側）。枠を出入りする線に罰則を付けるため
+    G.frames.map((f, k) => [f, k]).sort((p, q) => (q[0].x2 - q[0].x1) * (q[0].y2 - q[0].y1) - (p[0].x2 - p[0].x1) * (p[0].y2 - p[0].y1)).forEach(([f, k]) => {
+      const a = lb(X, f.x1), b = lb(X, f.x2 + 2 * EPS) - 1, c = lb(Y, f.y1), d = lb(Y, f.y2 + 2 * EPS) - 1;
+      for (let j = c; j <= d; j++) for (let i = a; i <= b; i++) fid[j * nx + i] = k + 1;
+    });
+    return { B, X, Y, nx, ny, N, vb, hb, vl, fid, uh: new Uint16Array(N), uv: new Uint16Array(N), ph: new Uint8Array(N), pv: new Uint8Array(N) };
+  }
+
+  /* 3. A*（向きを状態に持ち、曲がりに罰則） */
+  function heap() {
+    let k = [], v = [];
+    return {
+      get size() { return k.length; },
+      push(key, val) { k.push(key); v.push(val); let i = k.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (k[p] <= k[i]) break; [k[p], k[i]] = [k[i], k[p]]; [v[p], v[i]] = [v[i], v[p]]; i = p; } },
+      pop() {
+        const top = v[0], lk = k.pop(), lv = v.pop();
+        if (k.length) { k[0] = lk; v[0] = lv; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < k.length && k[l] < k[m]) m = l; if (r < k.length && k[r] < k[m]) m = r; if (m === i) break; [k[m], k[i]] = [k[i], k[m]]; [v[m], v[i]] = [v[i], v[m]]; i = m; } }
+        return top;
+      }
+    };
+  }
+  function routeOne(g, G, e) {
+    const A = G.obs[e.a], Z = G.obs[e.z], { X, Y, nx, ny } = g;
+    const s = lb(Y, e.y1) * nx + lb(X, Math.min(g.B.x2, A.x2 + C.M0));
+    const t = lb(Y, e.y2) * nx + lb(X, Math.max(g.B.x1, Z.x1 - C.M0));
+    const NS = g.N * 4;
+    if (!g.gs) { g.gs = new Float64Array(NS); g.pr = new Int32Array(NS); g.st = new Uint32Array(NS); g.cl = new Uint32Array(NS); g.run = 0; }
+    const run = ++g.run, GV = st => (g.st[st] === run ? g.gs[st] : Infinity);
+    const tx = X[t % nx], ty = Y[(t / nx) | 0];
+    const H = v => Math.abs(X[v % nx] - tx) + Math.abs(Y[(v / nx) | 0] - ty);
+    const hp = heap(); const s0 = s * 4;
+    g.st[s0] = run; g.gs[s0] = 0; g.pr[s0] = -1; hp.push(H(s), s0);
+    let best = -1;
+    while (hp.size) {
+      const st = hp.pop(); if (g.cl[st] === run) continue; g.cl[st] = run;
+      const v = st >> 2, d = st & 3;
+      if (v === t) { best = st; break; }
+      const i = v % nx, j = (v / nx) | 0, gv = g.gs[st];
+      for (let nd = 0; nd < 4; nd++) {
+        if (nd === (d ^ 1)) continue;   // 逆戻りはしない（0 東, 1 西, 2 南, 3 北）
+        let w, len, li;
+        if (nd === 0) { if (i >= nx - 1 || g.hb[v]) continue; w = v + 1; len = X[i + 1] - X[i]; li = v; }
+        else if (nd === 1) { if (i === 0 || g.hb[v - 1]) continue; w = v - 1; len = X[i] - X[i - 1]; li = v - 1; }
+        else if (nd === 2) { if (j >= ny - 1 || g.vl[v]) continue; w = v + nx; len = Y[j + 1] - Y[j]; li = v; }
+        else { if (j === 0 || g.vl[v - nx]) continue; w = v - nx; len = Y[j] - Y[j - 1]; li = v - nx; }
+        if (g.vb[w] && w !== t) continue;
+        let c = len + (nd !== d ? C.BEND : 0) + (g.fid[v] !== g.fid[w] ? C.FRAME : 0);
+        c += C.SHARE * len * (nd < 2 ? g.uh[li] : g.uv[li]);
+        if (nd < 2 ? g.pv[w] : g.ph[w]) c += C.CROSS;
+        if (w === t) c += nd === 0 ? 0 : nd === 1 ? 1e6 : C.BEND;   // 終点の辺へは東向きに入る
+        const ns = w * 4 + nd, ng = gv + c;
+        if (ng < GV(ns)) { g.st[ns] = run; g.gs[ns] = ng; g.pr[ns] = st; hp.push(ng + H(w), ns); }
+      }
+    }
+    const P = [{ x: A.x2, y: e.y1 }];
+    if (best < 0) {   // 見つからないとき（検査で数える）
+      const mx = (A.x2 + Z.x1) / 2; P.push({ x: mx, y: e.y1 }, { x: mx, y: e.y2 }, { x: Z.x1, y: e.y2 });
+      return { pts: simplify(P), failed: true };
+    }
+    const vs = []; for (let st = best; st >= 0; st = g.pr[st]) vs.push(st >> 2);
+    vs.reverse();
+    for (let q = 0; q < vs.length; q++) {
+      const v = vs[q]; P.push({ x: X[v % nx], y: Y[(v / nx) | 0] });
+      if (q) { const u = vs[q - 1]; if (Math.abs(u - v) === 1) { g.uh[Math.min(u, v)]++; g.ph[u] = g.ph[v] = 1; } else { g.uv[Math.min(u, v)]++; g.pv[u] = g.pv[v] = 1; } }
+    }
+    P.push({ x: Z.x1, y: e.y2 });
+    return { pts: simplify(P), failed: false };
+  }
+  function simplify(P) {
+    const a = [];
+    for (const p of P) { const l = a[a.length - 1]; if (l && Math.abs(l.x - p.x) < EPS && Math.abs(l.y - p.y) < EPS) continue; a.push({ x: p.x, y: p.y }); }
+    for (let k = a.length - 2; k >= 1; k--) {
+      const p = a[k - 1], q = a[k], r = a[k + 1];
+      if ((Math.abs(p.x - q.x) < EPS && Math.abs(q.x - r.x) < EPS) || (Math.abs(p.y - q.y) < EPS && Math.abs(q.y - r.y) < EPS)) a.splice(k, 1);
+    }
+    return a;
+  }
+
+  /* 4. nudging：重なる線分を車線に分ける */
+  function segs(routes, V) {
+    const out = [], oc = V ? "x" : "y", pc = V ? "y" : "x";
+    routes.forEach((rt, ri) => {
+      const P = rt.pts, n = P.length;
+      for (let k = 0; k < n - 1; k++) {
+        const p = P[k], q = P[k + 1], isV = Math.abs(p.x - q.x) < EPS;
+        if (isV !== V) continue;
+        const pos = p[oc], lowP = p[pc] <= q[pc];
+        const nP = k > 0 ? Math.sign(P[k - 1][oc] - pos) : 0, nQ = k + 2 < n ? Math.sign(P[k + 2][oc] - pos) : 0;
+        out.push({ ri, k, pos, a: Math.min(p[pc], q[pc]), b: Math.max(p[pc], q[pc]), da: lowP ? nP : nQ, db: lowP ? nQ : nP,
+          fars: [k > 0 ? P[k - 1][oc] : null, k + 2 < n ? P[k + 2][oc] : null], movable: k > 0 && k < n - 2 });
+      }
+    });
+    return out;
+  }
+  function range(sg, G, V) {
+    let lo = V ? G.bounds.x1 : G.bounds.y1, hi = V ? G.bounds.x2 : G.bounds.y2, lob = -1, hib = -1;
+    G.obs.forEach((o, i) => {
+      const q1 = (V ? o.y1 : o.x1) - C.M0, q2 = (V ? o.y2 : o.x2) + C.M0;
+      if (!(q1 < sg.b - EPS && q2 > sg.a + EPS)) return;
+      const r1 = (V ? o.x1 : o.y1) - C.M0, r2 = (V ? o.x2 : o.y2) + C.M0;
+      if (r2 <= sg.pos + EPS) { if (r2 > lo) { lo = r2; lob = i; } }
+      else if (r1 >= sg.pos - EPS) { if (r1 < hi) { hi = r1; hib = i; } }
+    });
+    for (const f of sg.fars) {
+      if (f == null) continue;
+      if (f < sg.pos - EPS) { if (f + C.MINSEG > lo) { lo = f + C.MINSEG; lob = -2; } }
+      else if (f > sg.pos + EPS) { if (f - C.MINSEG < hi) { hi = f - C.MINSEG; hib = -2; } }
+    }
+    const pad = C.M - C.M0;
+    return { lo, hi, lob, hib, dlo: lob === -2 ? lo : Math.min(lo + pad, Math.max(lo, sg.pos)), dhi: hib === -2 ? hi : Math.max(hi - pad, Math.min(hi, sg.pos)), dlo0: lob === -2 ? lo : lo + pad, dhi0: hib === -2 ? hi : hi - pad };
+  }
+  function crossCount(A, B) {   // A を B の手前（左・上）に置いたときの交差の数
+    let c = 0;
+    if (A.da > 0 && A.a > B.a + 0.5 && A.a < B.b - 0.5) c++;
+    if (A.db > 0 && A.b > B.a + 0.5 && A.b < B.b - 0.5) c++;
+    if (B.da < 0 && B.a > A.a + 0.5 && B.a < A.b - 0.5) c++;
+    if (B.db < 0 && B.b > A.a + 0.5 && B.b < A.b - 0.5) c++;
+    return c;
+  }
+  function nudgePass(G, routes, V, widen) {
+    const L = segs(routes, V), oc = V ? "x" : "y";
+    L.forEach(sg => Object.assign(sg, sg.movable ? range(sg, G, V) : { lo: sg.pos, hi: sg.pos, dlo: sg.pos, dhi: sg.pos, dlo0: sg.pos, dhi0: sg.pos, lob: -2, hib: -2 }));
+    const conf = (p, q) => p.ri !== q.ri && Math.min(p.b, q.b) - Math.max(p.a, q.a) > -1 && p.lo < q.hi + C.S && q.lo < p.hi + C.S;
+    const par = L.map((_, i) => i), find = i => (par[i] === i ? i : (par[i] = find(par[i])));
+    for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) if (conf(L[i], L[j])) par[find(i)] = find(j);
+    const groups = new Map(); L.forEach((sg, i) => { const r = find(i); if (!groups.has(r)) groups.set(r, []); groups.get(r).push(sg); });
+    groups.forEach(gr => {
+      if (!gr.some(sg => sg.movable)) return;
+      const cmp = (A, B) => {
+        if (!A.movable || !B.movable) return A.pos - B.pos || A.ri - B.ri;
+        const ab = crossCount(A, B), ba = crossCount(B, A);
+        return ab !== ba ? ab - ba : (A.pos - B.pos || A.ri - B.ri);
+      };
+      // 並びの順：重なる組ごとに「交差の少ないほうの前後」を決め、その前後関係で並べる（閉路は位置の小さいものから切る）
+      const m = gr.length, after = gr.map(() => []), indeg = new Array(m).fill(0);
+      for (let i = 0; i < m; i++) for (let j = i + 1; j < m; j++) {
+        if (!conf(gr[i], gr[j])) continue;
+        if (cmp(gr[i], gr[j]) <= 0) { after[i].push(j); indeg[j]++; } else { after[j].push(i); indeg[i]++; }
+      }
+      const ord = [], used = new Array(m).fill(false), byPos = (i, j) => gr[i].pos - gr[j].pos || gr[i].ri - gr[j].ri;
+      while (ord.length < m) {
+        let cand = []; for (let i = 0; i < m; i++) if (!used[i] && indeg[i] === 0) cand.push(i);
+        if (!cand.length) for (let i = 0; i < m; i++) if (!used[i]) cand.push(i);
+        cand.sort(byPos); const i = cand[0]; used[i] = true; ord.push(gr[i]);
+        after[i].forEach(j => indeg[j]--);
+      }
+      // 詰める：手前から、望む範囲の下端と、手前の重なる線分 + S のうち大きいほう
+      const x = new Map(); let over = 0;
+      ord.forEach((sg, i) => {
+        let req = sg.dlo0;
+        for (let t = 0; t < i; t++) if (conf(ord[t], sg)) req = Math.max(req, x.get(ord[t]) + C.S);
+        if (!sg.movable) { if (req > sg.pos + 0.5) over = Math.max(over, req - sg.pos); x.set(sg, sg.pos); }
+        else { x.set(sg, req); over = Math.max(over, req - sg.dhi0); }
+      });
+      // 中央へ寄せる：余りの半分だけ奥へ動かし、奥から順に間隔と上端を守る
+      let slack = Infinity; ord.forEach(sg => { if (sg.movable) slack = Math.min(slack, sg.dhi0 - x.get(sg)); });
+      const sh = slack > 0 && isFinite(slack) ? slack / 2 : 0;
+      for (let i = ord.length - 1; i >= 0; i--) {
+        const sg = ord[i]; if (!sg.movable) continue;
+        let v = x.get(sg) + sh; v = Math.min(v, Math.max(sg.dhi0, sg.lo));
+        for (let t = i + 1; t < ord.length; t++) if (conf(ord[t], sg)) v = Math.min(v, x.get(ord[t]) - C.S);
+        v = Math.max(v, sg.lo); v = Math.min(v, sg.hi);
+        x.set(sg, v);
+      }
+      ord.forEach(sg => { if (!sg.movable) return; const P = routes[sg.ri].pts, v = x.get(sg); P[sg.k][oc] = v; P[sg.k + 1][oc] = v; });
+      if (over > 0.5) {
+        let ma = null, mb = null;
+        ord.forEach(sg => { if (!sg.movable) return; if (sg.lob >= 0 && (!ma || sg.dlo0 > ma.dlo0)) ma = sg; if (sg.hib >= 0 && (!mb || sg.dhi0 < mb.dhi0)) mb = sg; });
+        if (ma && mb) widen.push({ axis: V ? "x" : "y", oa: ma.lob, ob: mb.hib, amount: over });
+      }
+    });
+  }
+  function route(G) {
+    assignPorts(G);
+    const g = buildGrid(G);
+    const order = G.edges.map((e, i) => i).sort((i, j) => {
+      const d = k => { const e = G.edges[k]; return Math.abs(G.obs[e.z].x1 - G.obs[e.a].x2) + Math.abs(e.y2 - e.y1); };
+      return d(i) - d(j);
+    });
+    const routes = new Array(G.edges.length);
+    order.forEach(i => { routes[i] = Object.assign(routeOne(g, G, G.edges[i]), { ei: i }); });
+    let widen = [];
+    for (let round = 0; round < 3; round++) {
+      widen = [];
+      nudgePass(G, routes, true, widen); routes.forEach(rt => (rt.pts = simplify(rt.pts)));
+      nudgePass(G, routes, false, widen); routes.forEach(rt => (rt.pts = simplify(rt.pts)));
+    }
+    return { routes, widen, grid: { nx: g.nx, ny: g.ny } };
+  }
+
+  /* 5. 描画：角を丸め、交差では下の線を背景色で切る */
+  const f1 = v => Math.round(v * 10) / 10;
+  function pathD(P) {
+    const n = P.length, len = k => Math.abs(P[k + 1].x - P[k].x) + Math.abs(P[k + 1].y - P[k].y);
+    const room = k => (k === 0 ? len(k) : k === n - 2 ? len(k) - C.AH - 1 : len(k) / 2);
+    let d = `M${f1(P[0].x)} ${f1(P[0].y)}`;
+    for (let k = 1; k < n - 1; k++) {
+      const a = P[k - 1], b = P[k], c = P[k + 1];
+      const r = Math.max(0, Math.min(C.R, room(k - 1), room(k)));
+      const ux = Math.sign(b.x - a.x), uy = Math.sign(b.y - a.y), vx = Math.sign(c.x - b.x), vy = Math.sign(c.y - b.y);
+      d += ` L${f1(b.x - ux * r)} ${f1(b.y - uy * r)}` + (r > 0 ? ` A${f1(r)} ${f1(r)} 0 0 ${ux * vy - uy * vx > 0 ? 1 : 0} ${f1(b.x + vx * r)} ${f1(b.y + vy * r)}` : "");
+    }
+    const z = P[n - 1]; d += ` L${f1(z.x - C.AH + 1)} ${f1(z.y)}`;
+    return d;
+  }
+  const WID = c => (/is-p1/.test(c) ? 3 : /is-p2/.test(c) ? 2 : /is-done/.test(c) ? 1.2 : 1.6);
+  const RANK = c => (/is-p1/.test(c) ? 3 : /is-p2/.test(c) ? 2 : /is-off/.test(c) ? 0 : 1);
+  function svg(G, routes, classes) {
+    const ord = routes.map((rt, i) => i).sort((i, j) => RANK(classes[i]) - RANK(classes[j]));
+    let lines = "", cuts = "", tops = "";
+    ord.forEach(i => {
+      const P = routes[i].pts, z = P[P.length - 1];
+      lines += `<g class="e ${classes[i]}"><path class="ln" d="${pathD(P)}"/><path class="ah" d="M${f1(z.x)} ${f1(z.y)} l${-C.AH} ${-C.AH / 2 - .5} v${C.AH + 1}z"/></g>`;
+    });
+    // 交差：強調の強いほう、同じなら水平の線を上にする
+    const segL = [];
+    routes.forEach((rt, i) => { const P = rt.pts; for (let k = 0; k < P.length - 1; k++) { const p = P[k], q = P[k + 1]; segL.push({ i, V: Math.abs(p.x - q.x) < EPS, x1: Math.min(p.x, q.x), x2: Math.max(p.x, q.x), y1: Math.min(p.y, q.y), y2: Math.max(p.y, q.y) }); } });
+    const bg = (x, y) => { let best = null; G.frames.forEach(f => { if (x > f.x1 && x < f.x2 && y > f.y1 && y < f.y2 && (!best || (f.x2 - f.x1) * (f.y2 - f.y1) < (best.x2 - best.x1) * (best.y2 - best.y1))) best = f; }); return best ? best.cls : "view"; };
+    segL.forEach(h => { if (h.V) return; segL.forEach(v => {
+      if (!v.V || v.i === h.i) return;
+      const cx = v.x1, cy = h.y1;
+      if (!(cx > h.x1 + C.R && cx < h.x2 - C.R && cy > v.y1 + C.R && cy < v.y2 - C.R)) return;
+      const hUp = RANK(classes[h.i]) > RANK(classes[v.i]) || (RANK(classes[h.i]) === RANK(classes[v.i]));
+      const up = hUp ? h : v, lo = hUp ? v : h, wu = WID(classes[up.i]), wl = WID(classes[lo.i]), gap = 2.5;
+      const along = wu / 2 + gap, across = wl / 2 + 1;
+      cuts += lo.V ? `<rect class="cut is-${bg(cx, cy)}" x="${f1(cx - across)}" y="${f1(cy - along)}" width="${f1(across * 2)}" height="${f1(along * 2)}"/>`
+                   : `<rect class="cut is-${bg(cx, cy)}" x="${f1(cx - along)}" y="${f1(cy - across)}" width="${f1(along * 2)}" height="${f1(across * 2)}"/>`;
+      const L2 = along + 1;
+      tops += `<g class="e ${classes[up.i]}"><path class="ln" d="${up.V ? `M${f1(cx)} ${f1(cy - L2)}V${f1(cy + L2)}` : `M${f1(cx - L2)} ${f1(cy)}H${f1(cx + L2)}`}" style="stroke-dasharray:none"/></g>`;
+    }); });
+    return `<g class="lines">${lines}</g><g class="cuts">${cuts}</g><g class="tops">${tops}</g>`;
+  }
+
+  /* 機械の検査：(1) 始点・終点以外の箱の矩形（余白 margin）と交わる線分、(2) 自分の始点・終点の箱の内側に入る線分、
+     (3) 別の線の、同じ向きで間隔 lane 未満かつ範囲が重なる線分の組、(4) 斜めの線分 */
+  function audit(routes, obs, o = {}) {
+    const m = o.margin == null ? 3 : o.margin, lane = o.lane == null ? C.S : o.lane;
+    const all = []; let diagonal = 0;
+    routes.forEach((rt, ri) => { const P = rt.pts; for (let k = 0; k < P.length - 1; k++) {
+      const p = P[k], q = P[k + 1], V = Math.abs(p.x - q.x) < EPS, Hh = Math.abs(p.y - q.y) < EPS;
+      if (!V && !Hh) diagonal++;
+      all.push({ ri, k, V, x1: Math.min(p.x, q.x), x2: Math.max(p.x, q.x), y1: Math.min(p.y, q.y), y2: Math.max(p.y, q.y) });
+    } });
+    let boxHits = 0, ownHits = 0, overlaps = 0; const list = [];
+    all.forEach(s => obs.forEach(b => {
+      const own = b.key === routes[s.ri].ka || b.key === routes[s.ri].kz, mm = own ? -0.5 : m;
+      if (s.x2 > b.x1 - mm && s.x1 < b.x2 + mm && s.y2 > b.y1 - mm && s.y1 < b.y2 + mm) { if (own) ownHits++; else boxHits++; if (list.length < 20) list.push(`${own ? "own" : "box"} r${s.ri}#${s.k} ${b.key}`); }
+    }));
+    for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) {
+      const s = all[i], t = all[j]; if (s.ri === t.ri || s.V !== t.V) continue;
+      const dist = s.V ? Math.abs(s.x1 - t.x1) : Math.abs(s.y1 - t.y1);
+      const ov = s.V ? Math.min(s.y2, t.y2) - Math.max(s.y1, t.y1) : Math.min(s.x2, t.x2) - Math.max(s.x1, t.x1);
+      if (dist < lane - 0.5 && ov > 0.5) { overlaps++; if (list.length < 40) list.push(`lane r${s.ri}#${s.k}~r${t.ri}#${t.k} d=${dist.toFixed(1)} ov=${ov.toFixed(1)}`); }
+    }
+    // (5) 同じ箱の同じ辺で、出入りの位置が間隔 lane 未満の組
+    let portShare = 0; const ends = [];
+    routes.forEach(rt => { const P = rt.pts; ends.push([rt.ka + "R", P[0].y], [rt.kz + "L", P[P.length - 1].y]); });
+    for (let i = 0; i < ends.length; i++) for (let j = i + 1; j < ends.length; j++) if (ends[i][0] === ends[j][0] && Math.abs(ends[i][1] - ends[j][1]) < lane - 0.5) portShare++;
+    return { segments: all.length, boxHits, ownHits, overlaps, diagonal, portShare, failed: routes.filter(r => r.failed).length, list };
+  }
+  return { C, route, svg, audit };
+})();
+
+/* 見比べ用の帯 */
+function setTheme(t) { document.documentElement.dataset.theme = t; document.querySelectorAll("[data-theme-set]").forEach(b => b.setAttribute("aria-pressed", b.dataset.themeSet === t)); }
+function setDevice(d) {
+  document.body.dataset.device = d; document.querySelectorAll(".cmp [data-device]").forEach(b => b.setAttribute("aria-pressed", b.dataset.device === d));
+  S.fitted = false; S.legend = d !== "phone"; $("#msearch").classList.remove("is-open"); render();
+}
+document.querySelectorAll("[data-theme-set]").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.themeSet)));
+document.querySelectorAll(".cmp [data-device]").forEach(b => b.addEventListener("click", () => setDevice(b.dataset.device)));
+let rz; new ResizeObserver(() => { clearTimeout(rz); rz = setTimeout(() => { if (S.view === "time") drawChart(); }, 120); }).observe(main);
+
+const H = new URLSearchParams(location.hash.slice(1));
+setTheme(H.get("theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
+if (H.get("device") === "phone") { document.body.dataset.device = "phone"; document.querySelectorAll(".cmp [data-device]").forEach(b => b.setAttribute("aria-pressed", b.dataset.device === "phone")); }
+if (H.get("repo") && REPOS[H.get("repo")]) S.repo = H.get("repo");
+if (H.get("view")) S.view = H.get("view");
+if (H.get("done")) S.showDone = true;
+if (H.get("sel")) { S.sel = +H.get("sel"); S.detail = S.sel; }
+if (H.get("tab")) S.tab = H.get("tab");
+if (app.clientWidth <= 640) S.legend = false;
+render();
+</script>
+</body>
+</html>

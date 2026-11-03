@@ -71,7 +71,7 @@ slices: {
 	}
 }
 
-verification: "画面の見た目は、利用者が4つのデザイン案から選んだ案D と、それを直した試作（2026-11-03 の決定。`artifacts/` に置く）に従う。各 Issue の PR で `make lint` と `uv run pytest`（全体）と CI を通す。standard の Issue は、仕様のレビュー（spec-reviewer opus/high）、コードのレビュー（code-reviewer opus/high）、最終品質ゲート（quality-gate-reviewer opus/high、1人）を通す。light の Issue は、仕様のレビュー opus/medium、コードのレビュー sonnet/high、最終品質ゲート opus/high（1人）。画面の Issue（#531、#532）は、PC のブラウザーでの確かめを報告に残し、iPhone の Safari の確かめは利用者に頼む。0.6.0 と 0.7.0 の配布の後、5つのリポジトリで `canonical status` と、`dashboard serve` での各リポジトリの表示を確かめる。"
+verification: "画面の見た目は、利用者が4つのデザイン案から選んだ案D と、それを直した試作（2026-11-04 の決定。`artifacts/20261103t150110z--dashboard-design-d2.html`）に従う。#532 は試作の線の検査（`edgeAudit`）をテストに持ち込む。各 Issue の PR で `make lint` と `uv run pytest`（全体）と CI を通す。standard の Issue は、仕様のレビュー（spec-reviewer opus/high）、コードのレビュー（code-reviewer opus/high）、最終品質ゲート（quality-gate-reviewer opus/high、1人）を通す。light の Issue は、仕様のレビュー opus/medium、コードのレビュー sonnet/high、最終品質ゲート opus/high（1人）。画面の Issue（#531、#532）は、PC のブラウザーでの確かめを報告に残し、iPhone の Safari の確かめは利用者に頼む。0.6.0 と 0.7.0 の配布の後、5つのリポジトリで `canonical status` と、`dashboard serve` での各リポジトリの表示を確かめる。"
 rollback: "マージの前なら PR を閉じる。マージの後で配る前なら `git revert`。配った後なら、常駐を入れていれば `dashboard service uninstall` を先に行い、パッケージを前の版に戻し、各リポジトリの配布の PR を `git revert` する。"
 exit: "#527〜#537 が閉じ、5つのリポジトリが 0.7.0 で、利用者の PC と iPhone から全リポジトリのダッシュボードが開け、company-os の試しの親の画面に埋め込めることを確かめ、この Epic の report.md に結果をまとめた。"
 
