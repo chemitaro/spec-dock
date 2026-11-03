@@ -34,7 +34,7 @@ excludes: [
 	"PR の取得とスナップショットの書き手（#537）。`canonical_sync` と `SnapshotStore` の書き手は変えない",
 	"構造の図の配置と依存の線の経路（#532）",
 	"`dashboard serve`、`service`、`hide`、`show`、`list` のコマンド（#529、#530）",
-	"版の番号、`migration.md`、`static-inventory.json`（#534）",
+	"版の番号、`migration.md`（#534）。`static-inventory.json` は、この Issue で変えた配布文書の行の sha256 と known_old_sha256 だけを変える（統括の決定）",
 ]
 
 requirements: {
@@ -74,8 +74,8 @@ requirements: {
 	}
 	"R-04": {
 		title: "片付けの候補と、終わったものを隠すときに残す Scope を挙げる"
-		text: "片付けの候補は2つの種類：配下がすべて閉じたのに開いている Epic と Initiative（配下が1つ以上あるとき）と、閉じたのに開いた配下がある親。それぞれ理由を付ける。開いた子孫を持つ閉じた Scope には「隠すときも残す」の印を付ける。見るだけで、直さない。（Epic R-12、R-14、R-20）"
-		acceptance: ["見本で、片付けの候補の2つの種類が理由つきで挙がり、開いた子孫を持つ閉じた親に残す印が付く"]
+		text: "片付けの候補は、Epic R-20 の2つの種類：配下がすべて閉じたのに開いている Epic と Initiative（配下が1つ以上あるとき）と、閉じたのに開いた配下がある親。加えて、Epic R-10 のとおり、閉じた祖先のために止められている開いた Scope も挙げる。それぞれ理由を付ける。開いた子孫を持つ閉じた Scope には「隠すときも残す」の印を付ける。見るだけで、直さない。（Epic R-12、R-14、R-20）"
+		acceptance: ["見本で、片付けの候補の2つの種類と、閉じた親の下の開いた Scope が、理由つきで挙がり、開いた子孫を持つ閉じた親に残す印が付く"]
 	}
 	"R-05": {
 		title: "配下の実行の順番を段に分け、依存の道筋をたどれる"
@@ -107,11 +107,11 @@ requirements: {
 		text: """
 			構造はスナップショットの版1と版2から、PR の欄（`pull_requests`、`pull_requests_error`、`pull_requests_fetched_at`）は版2から読む。PR は、そのブランチの名前が Scope を名指すとき（`branch_names_scope`）に、その Scope に対応づける。同じ Scope に複数あれば、開いているものを先に、次に作られた時刻の新しいものを選ぶ。
 
-			PR の状態の確かさは3つ：版1か `pull_requests_fetched_at` が null なら「分からない」（`unknown`。PR を使わない）。PR の取得が失敗している（`pull_requests_error` がある）か、`pull_requests_fetched_at` が30分を超えて古ければ「古い」（`stale`。前回の値を使い、印を付ける）。ほかは「新しい」（`fresh`）。GitHub に問い合わせない。（Epic R-07、R-30）
+			PR の状態の確かさは3つ（Epic D-19）：版1か、`pull_requests_fetched_at` が null か30分を超えて古ければ「分からない」（`unknown`。PR を使わない）。取得の時刻は新しいが、最後の取得が失敗している（`pull_requests_error` がある）なら「古い」（`stale`。前回の値を使い、「分からない／古い」の印を付ける）。ほかは「新しい」（`fresh`）。GitHub に問い合わせない。（Epic R-07、R-30）
 			"""
 		acceptance: [
 			"見本の版2のスナップショットから、PR がブランチの名前で Scope に対応づき、版1のスナップショットも読めて PR の状態が「分からない」になる",
-			"PR の取得の失敗か古い取得の時刻で、PR の状態が「古い」になり、前回の値が使われる",
+			"30分を超えて古い取得の時刻で PR の状態が「分からない」になり、新しい取得の時刻と失敗の記録で「古い」になって前回の値が使われる",
 		]
 	}
 	"R-09": {
@@ -129,7 +129,7 @@ requirements: {
 	}
 	"R-11": {
 		title: "`spec-dock dashboard summary` が、ネットワークに触れずに要約を返す"
-		text: "`spec-dock dashboard summary [REPOSITORY] [--json]` は、チェックアウトの中では REPOSITORY を省ける（`origin` から決める）。外では `owner/name` か `host/owner/name` で指す。サーバーが動いていなくても、隠したリポジトリでも動く。GitHub にもサーバーにも要求を送らず、在りかの記録の `pid` が生きているかだけを見る。`--json` は `specdock.cli/v2` の封筒の `data` に要約を入れる。（Epic R-21、D-01）"
+		text: "`spec-dock dashboard summary [REPOSITORY] [--json]` は、チェックアウトの中では REPOSITORY を省ける（`origin` から決める）。外では `owner/name` か `host/owner/name` で指す。サーバーが動いていなくても、隠したリポジトリでも動く。GitHub にもサーバーにも要求を送らず、在りかの記録の `pid` が生きているかだけを見る。`--json` は `specdock.cli/v2` の封筒の `data.result` に要約を入れる（`data.kind` は `dashboard`。ほかのコマンドと同じ形）。（Epic R-21、D-01）"
 		acceptance: [
 			"見本のスナップショットで、チェックアウトの中と外（REPOSITORY を指定）の両方から要約が返り、GitHub への要求がない",
 			"在りかの記録の `pid` が生きていれば `server` にその URL が、生きていなければ null が出る。隠す印があれば `hidden` が真になる",
@@ -169,14 +169,15 @@ constraints: [
 	"ダッシュボードとその CLI は GitHub に要求を送らない（Epic の制約）",
 	"状態の判定を別に書かない。`evaluate_readiness`／`evaluate_all` を写す",
 	"同期（`canonical_sync`）とスナップショットの書き手は変えない（#537 の範囲）",
-	"版の番号、`migration.md`、`static-inventory.json` は変えない（#534）",
+	"版の番号と `migration.md` は変えない（#534）。`static-inventory.json` は、変えた配布文書の行の sha256 と known_old_sha256 だけを更新する",
 ]
 
 decisions: [
 	"2026-11-04（統括、#537 と合意）：スナップショットの版2の PR の欄は `pull_requests: {\"<番号>\": {number, state: open|closed|merged, is_draft, head_ref_name, mergeable: mergeable|conflicting|unknown, checks: success|failure|pending|none, created_at, merged_at|null, closed_at|null, url}}` と `pull_requests_error: null|{code, message, at}`。鍵は snake_case、値は小文字、時刻は UTC の Z 形式。Scope との対応はスナップショットに持たず、読む側が `branch_names_scope` で求める（open を先、次に created_at の新しい順）",
-	"2026-11-04（統括、#537 から）：版2に `pull_requests_fetched_at: null|\"<UTC Z>\"` がある。null か版1なら PR の状態は分からない。`pull_requests` が {} で取得の時刻が新しければ PR は0件。`pull_requests_error` があっても前回の値を表示に使ってよいが、「分からない／古い」の印を付ける。この Issue は、30分を超えて古いときも同じ「古い」（値を使い、印を付ける）に入れた",
+	"2026-11-04（統括、#537 から）：版2に `pull_requests_fetched_at: null|\"<UTC Z>\"` がある。null か版1なら PR の状態は分からない。`pull_requests` が {} で取得の時刻が新しければ PR は0件。`pull_requests_error` があっても前回の値を表示に使ってよいが、「分からない／古い」の印を付ける。30分を超えて古いときは「分からない」とする（Epic D-19）",
 	"2026-11-04（統括）：当面、#528 は自分の領域で PR の欄を解析する。後にマージするほうが、もう一方の部品に寄せて重複を消す",
 	"2026-11-04（この Issue の判断）：`dashboard summary` は、リポジトリごとのファイル（スナップショット、隠す印、在りかの記録）だけを読み、クローンの選択に関わらないので、同じリポジトリのクローンが2つ登録されていても曖昧にしない（`DASHBOARD_REPOSITORY_AMBIGUOUS` は、クローンを選ぶ必要のある #529 のコマンドに残す）",
 	"2026-11-04（この Issue の判断）：Epic と Initiative を作業中にする子孫の作業中の印は、開いた子孫のものだけを数える（閉じた Scope に残った印で作業中にしない）",
-	"2026-11-04（この Issue の判断）：片付けの候補の「閉じたのに開いた配下がある親」は、Epic R-20 のとおり閉じた親そのものを挙げる（試作は開いた子の側を挙げていた）",
+	"2026-11-04（この Issue の判断）：片付けの候補には、Epic R-20 の「閉じたのに開いた配下がある親」として閉じた親そのものを挙げ、Epic R-10 のとおり、閉じた祖先のために止められている開いた Scope も挙げる（試作は開いた子の側だけを挙げていた）",
+	"2026-11-04（統括）：コマンドの一覧の配布文書を変えるので、`static-inventory.json` の、その文書の行の sha256 を更新し、前の sha256 を known_old_sha256 に足す。版の番号、`migration.md`、ほかの行は変えない。#530・#533 と重なったら、後にマージするほうが取り込み直す",
 ]
