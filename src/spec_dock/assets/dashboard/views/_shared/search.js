@@ -43,7 +43,8 @@ function build() {
   input.addEventListener("select", remember);
   input.addEventListener("focus", () => {
     hadFocus = true;
-    update(element);
+    // keep: attach() gives the focus back after a redraw, and that must not move the arrow-key choice.
+    update(element, { keep: true });
   });
   input.addEventListener("blur", () => {
     // A blur from the user leaves the element in the document; a removal by the redraw does not.
