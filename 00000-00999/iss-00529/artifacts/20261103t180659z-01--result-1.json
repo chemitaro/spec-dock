@@ -1,0 +1,143 @@
+{
+ "shell": {
+  "title": "ボード · o/r · SpecDock",
+  "brand": true,
+  "tabs": [
+   "構造の図",
+   "ボード*",
+   "時間の軸"
+  ],
+  "status": "2分前に取得",
+  "changes": "前回から変化 0件",
+  "slot": "board",
+  "slotText": "このリポジトリの Scope：3件",
+  "notices": [
+   "PULL_REQUESTS_UNKNOWN"
+  ]
+ },
+ "inPage": {
+  "path": "/r/github.com/o/r/",
+  "marker": true,
+  "slot": "graph"
+ },
+ "seenAfterInPage": 1,
+ "refresh": {
+  "marker": true,
+  "slotText": "このリポジトリの Scope：4件",
+  "changes": "前回から変化 1件",
+  "status": "2分前に取得",
+  "notices": []
+ },
+ "menu": [
+  "すべてのリポジトリ",
+  "o/r",
+  "o/s"
+ ],
+ "switched": {
+  "path": "/r/github.com/o/s/",
+  "marker": false,
+  "notices": [
+   "SNAPSHOT_STALE:構造が3時間前から更新されていません（定期の同期を確かめてください）。 次の1手",
+   "PULL_REQUESTS_UNKNOWN:PR の状態が分かりません。 次の1手：spec-dock canonical "
+  ]
+ },
+ "materialTop": {
+  "origin": "null",
+  "parentDom": "material",
+  "localStorage": "BLOCKED SecurityError",
+  "cookieOk": "BLOCKED SecurityError",
+  "dsLoaded": "#1a56c4",
+  "fetchApi": "BLOCKED TypeError",
+  "postSeen": "BLOCKED TypeError",
+  "fetchDs": "OK 200"
+ },
+ "materialFramed": "opaque (contentDocument null)",
+ "embedHandshake": [
+  ">hello",
+  "<ready /r/github.com/o/r/scopes/iss-00002?embed=1",
+  "<navigated /r/github.com/o/r/scopes/iss-00002?embed=1 scope=iss-00002"
+ ],
+ "embedChild": {
+  "brandHidden": "none",
+  "repoHidden": "none",
+  "tabs": 3,
+  "tabHref": "/r/github.com/o/r/?embed=1",
+  "embed": "1"
+ },
+ "embedNavigate": {
+  "last": {
+   "k": "recv",
+   "source": "specdock",
+   "v": 1,
+   "type": "navigated",
+   "path": "/r/github.com/o/r/board?embed=1",
+   "title": "ボード · o/r · SpecDock",
+   "scope": null
+  },
+  "parentUrl": "?p=%2Fr%2Fgithub.com%2Fo%2Fr%2Fboard%3Fembed%3D1"
+ },
+ "embedChildAfter": {
+  "path": "/r/github.com/o/r/board?embed=1",
+  "slot": "board"
+ },
+ "embedTheme": "dark",
+ "embedRogue": {
+  "recvBefore": 3,
+  "recvAfter": 3
+ },
+ "noHello": {
+  "recvWithoutHello": 0,
+  "recvAfterHello": [
+   "ready",
+   "navigated"
+  ]
+ },
+ "strictFrame": {
+  "recv": 0,
+  "frameSessions": 2
+ },
+ "hideOverview": [
+  "o/r"
+ ],
+ "hiddenPage": "このリポジトリの表示は止めてあります\n\n表示に戻すには、次のコマンドを実行します。\n\nspec-dock dashboard show o/s",
+ "showOverview": [
+  "o/r",
+  "o/s"
+ ],
+ "phone /": {
+  "scrollWidth": 390,
+  "innerWidth": 390,
+  "mtabs": "none",
+  "bg": "rgb(17, 19, 24)"
+ },
+ "phone /r/github.com/o/r/": {
+  "scrollWidth": 390,
+  "innerWidth": 390,
+  "mtabs": "flex",
+  "bg": "rgb(17, 19, 24)"
+ },
+ "phone /r/github.com/o/r/board": {
+  "scrollWidth": 390,
+  "innerWidth": 390,
+  "mtabs": "flex",
+  "bg": "rgb(17, 19, 24)"
+ },
+ "phone /r/github.com/o/r/timeline": {
+  "scrollWidth": 390,
+  "innerWidth": 390,
+  "mtabs": "flex",
+  "bg": "rgb(17, 19, 24)"
+ },
+ "phone /r/github.com/o/r/scopes/iss-00002": {
+  "scrollWidth": 390,
+  "innerWidth": 390,
+  "mtabs": "flex",
+  "bg": "rgb(17, 19, 24)"
+ },
+ "phone /r/github.com/o/s/": {
+  "scrollWidth": 390,
+  "innerWidth": 390,
+  "mtabs": "flex",
+  "bg": "rgb(17, 19, 24)"
+ }
+}
