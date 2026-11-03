@@ -9,7 +9,7 @@ import json
 import re
 import subprocess
 import time
-from typing import TYPE_CHECKING, Literal, Protocol, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Literal, Protocol, TypeVar, cast
 from urllib.parse import quote
 
 from spec_dock.runtime.domain.canonical_structure import (
@@ -18,8 +18,10 @@ from spec_dock.runtime.domain.canonical_structure import (
     FetchedIssue,
     IssueFacts,
     LabelDefinition,
+    PullRequest,
     RelatedIssue,
     format_timestamp,
+    parse_timestamp,
 )
 
 if TYPE_CHECKING:
@@ -162,7 +164,9 @@ class GithubApi:
         ok: frozenset[int] = frozenset({200}),
         headers: Mapping[str, str] | None = None,
         write: bool | None = None,
+        wait_rate_limit: bool = True,
     ) -> GithubResponse:
+        """`wait_rate_limit=False` turns a rate limit into GITHUB_RATE_LIMITED at once (the optional PR read)."""
         mutation = (method != "GET" and endpoint != "graphql") if write is None else write
         rate_retries = server_retries = 0
         while True:
@@ -178,7 +182,7 @@ class GithubApi:
             wait = _rate_limit_wait(response, self._clock.now())
             if wait is not None:
                 retry_at = format_timestamp(self._clock.now() + timedelta(seconds=wait))
-                if mutation or wait > MAX_RATE_LIMIT_WAIT or rate_retries >= READ_RETRIES:
+                if mutation or not wait_rate_limit or wait > MAX_RATE_LIMIT_WAIT or rate_retries >= READ_RETRIES:
                     raise GithubStructureError(
                         GITHUB_RATE_LIMITED,
                         f"GitHub rate limit; retry after {retry_at}",
@@ -323,6 +327,33 @@ FULL_READ_QUERY = f"""query($owner: String!, $name: String!, $after: String) {{
     }}
   }}
 }}"""
+_PULL_REQUEST_FIELDS = """number state isDraft headRefName mergeable createdAt mergedAt closedAt url
+        commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }"""
+OPEN_PULL_REQUEST_LIMIT = 100
+CLOSED_PULL_REQUEST_LIMIT = 50
+# iss-00537 (Epic D-19): one query, no paging, so its cost stays about 3 points.
+PULL_REQUESTS_QUERY = f"""query($owner: String!, $name: String!) {{
+  rateLimit {{ cost remaining resetAt }}
+  repository(owner: $owner, name: $name) {{
+    open: pullRequests(first: {OPEN_PULL_REQUEST_LIMIT}, states: [OPEN],
+                       orderBy: {{field: UPDATED_AT, direction: DESC}}) {{
+      nodes {{ {_PULL_REQUEST_FIELDS} }}
+    }}
+    closed: pullRequests(first: {CLOSED_PULL_REQUEST_LIMIT}, states: [CLOSED, MERGED],
+                         orderBy: {{field: UPDATED_AT, direction: DESC}}) {{
+      nodes {{ {_PULL_REQUEST_FIELDS} }}
+    }}
+  }}
+}}"""
+_PULL_STATES: dict[str, str] = {"OPEN": "open", "CLOSED": "closed", "MERGED": "merged"}
+_MERGEABLE: dict[str, str] = {"MERGEABLE": "mergeable", "CONFLICTING": "conflicting", "UNKNOWN": "unknown"}
+_CHECKS: dict[str, str] = {
+    "SUCCESS": "success",
+    "FAILURE": "failure",
+    "ERROR": "failure",
+    "PENDING": "pending",
+    "EXPECTED": "pending",
+}
 REST_PAGE_SIZE = 100
 _T = TypeVar("_T")
 
@@ -423,14 +454,41 @@ class GithubStructureClient:
         self.last_graphql_cost = cost
         return tuple(fetched)
 
-    def graphql(self, query: str, variables: Mapping[str, object]) -> dict[str, object]:
+    def fetch_pull_requests(self) -> tuple[PullRequest, ...]:
+        """Open pull requests (100) and recently closed or merged ones (50), newest update first, in one query.
+
+        A rate limit fails at once: the pull request state is optional and must not delay the sync.
+        """
+        data = self.graphql(
+            PULL_REQUESTS_QUERY,
+            {"owner": self.repository.owner, "name": self.repository.name},
+            wait_rate_limit=False,
+        )
+        repository = _dict(data.get("repository"), "repository", "graphql")
+        items: dict[int, PullRequest] = {}
+        for alias in ("open", "closed"):
+            block = _dict(repository.get(alias), f"{alias} pull requests", "graphql")
+            for node in _list(block.get("nodes"), f"{alias} pull request nodes", "graphql"):
+                item = _pull_request_from_graphql(_dict(node, "pull request", "graphql"))
+                if item.number in items:
+                    raise _invalid(f"GitHub listed pull request #{item.number} twice", "graphql")
+                items[item.number] = item
+        return tuple(items[number] for number in sorted(items))
+
+    def graphql(
+        self, query: str, variables: Mapping[str, object], *, wait_rate_limit: bool = True
+    ) -> dict[str, object]:
         """Send one read-only GraphQL query; it is retried like any read, so mutations are refused."""
         if query.lstrip().lower().startswith("mutation"):
             raise ValueError("GithubStructureClient.graphql sends queries only")
         retries = 0
         while True:
             response = self.api.request(
-                "POST", "graphql", payload={"query": query, "variables": dict(variables)}, write=False
+                "POST",
+                "graphql",
+                payload={"query": query, "variables": dict(variables)},
+                write=False,
+                wait_rate_limit=wait_rate_limit,
             )
             body = _dict(response.body, "GraphQL response", "graphql")
             errors = body.get("errors")
@@ -442,7 +500,7 @@ class GithubStructureClient:
             if "RATE_LIMITED" in types:
                 limited = _rate_limit_wait(GithubResponse(429, response.headers, body), self.api.clock.now())
                 wait = 60.0 if limited is None else limited
-                if wait > MAX_RATE_LIMIT_WAIT or retries >= READ_RETRIES:
+                if not wait_rate_limit or wait > MAX_RATE_LIMIT_WAIT or retries >= READ_RETRIES:
                     retry_at = format_timestamp(self.api.clock.now() + timedelta(seconds=wait))
                     raise GithubStructureError(
                         GITHUB_RATE_LIMITED, f"GitHub GraphQL rate limit; retry after {retry_at}", retry_at=retry_at
@@ -452,7 +510,7 @@ class GithubStructureClient:
                 continue
             if "NOT_FOUND" in types:
                 raise GithubStructureError(GITHUB_ACCESS_DENIED, "GitHub GraphQL could not read the repository")
-            raise GithubStructureError(GITHUB_REQUEST_REJECTED, "GitHub GraphQL rejected the structure query")
+            raise GithubStructureError(GITHUB_REQUEST_REJECTED, "GitHub GraphQL rejected the query")
 
     def probe(self, etags: Mapping[str, str | None]) -> ProbeResult:
         """One conditional list request per kind label; a 304 does not use the primary rate limit."""
@@ -809,6 +867,53 @@ class GithubStructureClient:
             _optional_text(item.get("title"), "title", "graphql"),
             None if state is None else _state(state, "state", "graphql"),
         )
+
+
+def _enum(value: object, table: Mapping[str, str], what: str) -> str:
+    if not isinstance(value, str) or value not in table:
+        raise _invalid(f"GitHub {what} is not one of {sorted(table)}", "graphql")
+    return table[value]
+
+
+def _graphql_time(value: object, what: str, *, optional: bool = False) -> str | None:
+    if optional and value is None:
+        return None
+    text = _text(value, what, "graphql")
+    try:
+        parse_timestamp(text)
+    except ValueError as error:
+        raise _invalid(f"GitHub {what} is not a timestamp", "graphql") from error
+    return text
+
+
+def _checks_of(node: Mapping[str, object]) -> str:
+    """The rollup of the last commit; no commit or no rollup is `none`."""
+    commits = _list(_dict(node.get("commits"), "commits", "graphql").get("nodes"), "commit nodes", "graphql")
+    if not commits:
+        return "none"
+    commit = _dict(_dict(commits[-1], "commit node", "graphql").get("commit"), "commit", "graphql")
+    rollup = commit.get("statusCheckRollup")
+    if rollup is None:
+        return "none"
+    return _enum(_dict(rollup, "statusCheckRollup", "graphql").get("state"), _CHECKS, "statusCheckRollup.state")
+
+
+def _pull_request_from_graphql(node: Mapping[str, object]) -> PullRequest:
+    draft = node.get("isDraft")
+    if not isinstance(draft, bool):
+        raise _invalid("GitHub isDraft is not a boolean", "graphql")
+    return PullRequest(
+        number=_int(node.get("number"), "pull request number", "graphql"),
+        state=cast("Any", _enum(node.get("state"), _PULL_STATES, "pull request state")),
+        is_draft=draft,
+        head_ref_name=_text(node.get("headRefName"), "headRefName", "graphql"),
+        mergeable=cast("Any", _enum(node.get("mergeable"), _MERGEABLE, "mergeable")),
+        checks=cast("Any", _checks_of(node)),
+        created_at=cast("str", _graphql_time(node.get("createdAt"), "createdAt")),
+        merged_at=_graphql_time(node.get("mergedAt"), "mergedAt", optional=True),
+        closed_at=_graphql_time(node.get("closedAt"), "closedAt", optional=True),
+        url=_text(node.get("url"), "url", "graphql"),
+    )
 
 
 def _done(_response: GithubResponse) -> bool:
