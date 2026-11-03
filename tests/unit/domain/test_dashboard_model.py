@@ -404,6 +404,26 @@ def test_recent_events_mix_scope_and_pr_events_newest_first() -> None:
     assert len(recent_events(model, limit=2)) == 2
 
 
+def test_recent_events_include_every_mapped_pull_request_and_none_while_unknown() -> None:
+    structure = snapshot(node(5, "issue", created_at="2026-10-01T00:00:00Z", in_progress=True))
+    pulls = prs(
+        pr(10, "iss-00005", state="merged", created_at="2026-10-02T00:00:00Z", merged_at="2026-10-03T00:00:00Z"),
+        pr(12, "iss-00005-fix", created_at="2026-10-04T00:00:00Z"),
+        pr(13, "feature/other", created_at="2026-10-05T00:00:00Z"),
+    )
+    model = build_model(structure, pulls, now=NOW)
+    chosen = model.scope("iss-00005").pr
+    assert chosen is not None and chosen.number == 12
+    assert [(e.kind, e.number, e.scope_id) for e in recent_events(model)] == [
+        ("pr_opened", 12, "iss-00005"),
+        ("pr_merged", 10, "iss-00005"),
+        ("pr_opened", 10, "iss-00005"),
+        ("created", 5, "iss-00005"),
+    ]
+    unknown = build_model(structure, prs(pr(12, "iss-00005"), fetched_at=None), now=NOW)
+    assert [e.kind for e in recent_events(unknown)] == ["created"]
+
+
 # T-09 -----------------------------------------------------------------------------------------------------
 
 

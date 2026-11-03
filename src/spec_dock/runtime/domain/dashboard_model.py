@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Final, Literal
 
 from spec_dock.runtime.domain.canonical_readiness import evaluate_all
-from spec_dock.runtime.domain.canonical_structure import parse_timestamp
+from spec_dock.runtime.domain.canonical_structure import branch_names_scope, parse_timestamp
 from spec_dock.runtime.domain.dashboard_snapshot import NO_PULL_REQUESTS
 
 if TYPE_CHECKING:
@@ -639,15 +639,20 @@ def weekly_totals(model: DashboardModel, *, now: datetime, kinds: Iterable[Scope
 
 
 def recent_events(model: DashboardModel, *, limit: int | None = None) -> tuple[TimelineEvent, ...]:
-    """Scope creation and completion and PR opening and merging, newest first."""
+    """Scope creation and completion, and the opening and merging of every pull request whose branch names a
+    Scope (not only the one chosen for the Scope), newest first. Pull requests are left out while unknown."""
     events: list[TimelineEvent] = []
     for scope in model.scopes.values():
         events.append(TimelineEvent(scope.created_at, "created", scope.id, scope.number))
         if scope.closed_at:
             events.append(TimelineEvent(scope.closed_at, "closed", scope.id, scope.number))
-        if scope.pr is not None:
-            events.append(TimelineEvent(scope.pr.created_at, "pr_opened", scope.id, scope.pr.number))
-            if scope.pr.merged_at:
-                events.append(TimelineEvent(scope.pr.merged_at, "pr_merged", scope.id, scope.pr.number))
+    if model.pull_request_status != "unknown":
+        for pr in model.pull_requests.items.values():
+            owner = next((item for item in model.scopes if branch_names_scope(pr.head_ref_name, item)), None)
+            if owner is None:
+                continue
+            events.append(TimelineEvent(pr.created_at, "pr_opened", owner, pr.number))
+            if pr.merged_at:
+                events.append(TimelineEvent(pr.merged_at, "pr_merged", owner, pr.number))
     events.sort(key=lambda item: (-parse_timestamp(item.at).timestamp(), item.number, item.kind))
     return tuple(events if limit is None else events[:limit])
