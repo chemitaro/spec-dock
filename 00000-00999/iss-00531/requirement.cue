@@ -28,6 +28,7 @@ includes: [
 	"`runtime/presentation/dashboard_api.py` の構造と Scope の JSON への項目の追加",
 	"新しい `runtime/application/dashboard_scope_details.py`（詳しい画面のためのカタログと worktree の読み取り）と、`application/dashboard_http.py` の `scopes/<ID>` の分岐の1か所（統括が許した）",
 	"骨組みの `app.js` に、検索を上の帯に付ける1行（統括が許した）",
+	"#529 のサーバーの待ち受け（`runtime/infra/dashboard_server.py` の `_Listener`）の待ち行列を 5 から 128 に広げる1行（統括が許した）",
 ]
 
 excludes: [
@@ -201,6 +202,7 @@ constraints: [
 decisions: [
 	"2026-11-04（統括）：検索は `views/_shared/search.js` に作り、骨組みの `app.js` に import と `mountSearch` の1行だけを足す（#532 は `app.js` を触らない）",
 	"2026-11-04（統括）：詳しい画面の読み取り（文書、Artifact、保証レベル、worktree）は新しい `application/dashboard_scope_details.py` に置き、`application/dashboard_http.py` は `scopes/<ID>` の分岐の1か所だけを変える。外の処理（`cue`、`git worktree list`）には時間の上限を付け、失敗してもその欄を「読めない」にして画面を開く",
+	"2026-11-04（統括）：画面のモジュールが増えて、同時の接続が待ち行列（標準の 5）をあふれ、macOS で接続が切られて画面が出ないことがあった（64本の同時の要求で 11〜19本）。この PR で `_Listener` に `request_queue_size = 128` を足し、同時の要求が切られないテストを足す。#530 と重なったら、後にマージするほうが合わせる",
 	"2026-11-04（作業者）：列の中の並びは、サーバーが構造の JSON に足す `rank`（モデルの `recommended_key` の順位）で決め、JavaScript で推奨順を作り直さない",
 	"2026-11-04（作業者）：横断の概況の札は、リポジトリごとに構造の API（`structure`）を読んで作る。要約の API は、ない・読めないときに 503 で中身を返さないため、札の警告の帯に使えない",
 	"2026-11-04（作業者）：画面の CSS は、ほかの画面に漏れないよう `[data-view=…]` の下に書く。検索の CSS だけは上の帯に出るので `.sd-search` の名前で書く",

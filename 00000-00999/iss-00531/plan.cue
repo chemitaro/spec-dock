@@ -13,7 +13,7 @@ steps: {
 	"S-05": {title: "状態のボード（`views/board.js`）を作る", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06", "R-14", "R-15"], status: "done", after: ["S-02", "S-04"], session: "impl"}
 	"S-06": {title: "Scope の詳しい画面（`views/scope.js`）を作る", realizes: ["R-07", "R-08", "R-09", "R-11", "R-14", "R-15"], status: "done", after: ["S-03", "S-04"], session: "impl"}
 	"S-07": {title: "横断の概況（`views/overview.js`）を作る", realizes: ["R-12", "R-13", "R-14", "R-15"], status: "done", after: ["S-02", "S-04"], session: "impl"}
-	"S-08": {title: "PC のヘッドレスの Chrome で、PC の幅と 390px、明るい表示と暗い表示、JavaScript のエラーなしを確かめ、report.md と Artifact に残す", realizes: ["R-01", "R-02", "R-03", "R-05", "R-10", "R-11", "R-12", "R-13", "R-14", "R-15"], status: "doing", after: ["S-05", "S-06", "S-07"], session: "impl"}
+	"S-08": {title: "PC のヘッドレスの Chrome で、PC の幅と 390px、明るい表示と暗い表示、JavaScript のエラーなしを確かめ、report.md と Artifact に残す", realizes: ["R-01", "R-02", "R-03", "R-05", "R-10", "R-11", "R-12", "R-13", "R-14", "R-15"], status: "done", after: ["S-05", "S-06", "S-07"], session: "impl"}
 	"S-09": {title: "コードのレビュー、最終品質ゲート、PR、CI", realizes: ["R-01", "R-15"], status: "doing", after: ["S-08"], session: "impl"}
 }
 
@@ -25,6 +25,7 @@ tests: {
 	"T-05": {title: "API：`scopes/<ID>` が `dependencies` と `details` を返し、知らない ID は読み取りを走らせずに 404。カタログもリポジトリも書かれない", verifies: ["R-07", "R-09", "F-02"]}
 	"T-06": {title: "画面の資源：3つの画面が差し込み口の形（`id`、`title`、`icon`、`styles`、`render`）を持ち、`views/_shared/` の部品を読み、外の URL を読まず、`innerHTML` に入れる利用者の文字を `esc` で逃がす。`app.js` の追加が import の行と `mountSearch` の呼び出しの1行だけ", verifies: ["R-15", "F-04"]}
 	"T-07": {title: "JavaScript の単体（`node` があるとき）：ボードの列の振り分けと並び、問い合わせの文字列の切り替え、検索の一致（ID、0埋めなし、番号、`#番号`、題名）、変化と PR の印の言葉、概況の警告の帯の理由", verifies: ["R-01", "R-02", "R-05", "R-06", "R-10", "R-13"]}
+	"T-09": {title: "サーバーの待ち受けが、画面の読み込みの同時の要求（64本×3回）を切らずに返し、待ち行列が 64 以上", verifies: ["R-15"]}
 	"T-08": {title: "ヘッドレスの Chrome：ボードの列と順、片付けの候補の一覧、種類と親と終わったものの切り替えと URL、開いた子孫を持つ閉じた親の帯、250件の構造でボードが2秒以内、3つの画面の凡例、詳しい画面の見出しと5つのタブと段、PR が分からないときの表示、カタログのない Scope、検索から詳しい画面へ、上の帯の5秒ごとの描き直しの後も検索の欄と入力が残る、概況の札と古いときの警告の帯、埋め込みの逃げ道、PC と 390px と暗い表示ではみ出さずエラーなし、概況で `seen` が増えない（report.md）", verifies: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06", "R-07", "R-08", "R-09", "R-10", "R-11", "R-12", "R-13", "R-14", "R-15", "F-01"]}
 }
 
