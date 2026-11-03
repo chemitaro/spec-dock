@@ -653,3 +653,11 @@ def test_the_pull_request_read_does_not_wait_for_a_rate_limit(
         _client(fake).fetch_pull_requests()
     assert caught.value.code == "GITHUB_RATE_LIMITED"
     assert fake.clock.sleeps == [] and len(fake.requests) == 1
+
+
+def test_a_rejected_pull_request_query_is_not_described_as_the_structure_query() -> None:
+    fake = FakeGithub()
+    fake.inject(status=200, body={"data": None, "errors": [{"type": "FORBIDDEN", "message": "no"}]})
+    with pytest.raises(GithubStructureError) as caught:
+        _client(fake).fetch_pull_requests()
+    assert caught.value.code == "GITHUB_REQUEST_REJECTED" and "structure" not in caught.value.message

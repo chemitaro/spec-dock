@@ -510,7 +510,7 @@ class GithubStructureClient:
                 continue
             if "NOT_FOUND" in types:
                 raise GithubStructureError(GITHUB_ACCESS_DENIED, "GitHub GraphQL could not read the repository")
-            raise GithubStructureError(GITHUB_REQUEST_REJECTED, "GitHub GraphQL rejected the structure query")
+            raise GithubStructureError(GITHUB_REQUEST_REJECTED, "GitHub GraphQL rejected the query")
 
     def probe(self, etags: Mapping[str, str | None]) -> ProbeResult:
         """One conditional list request per kind label; a 304 does not use the primary rate limit."""
