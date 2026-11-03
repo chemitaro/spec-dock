@@ -203,3 +203,20 @@ def test_the_input_hash_follows_anomalies_the_format_and_the_snapshot_path() -> 
     assert input_hash(changed) != input_hash(snapshot)
     assert dashboard_inputs(changed).index_nodes["iss-00003"]["board_state"] == "UNKNOWN"  # type: ignore[index]
     assert input_hash(snapshot, snapshot_path="/a/snapshot.json") != input_hash(snapshot, snapshot_path="/b")
+
+
+def test_pull_request_changes_alone_do_not_change_the_dashboard_input_hash() -> None:
+    """iss-00537: the version-2 pull request fields never redraw the Markdown dashboard."""
+    from spec_dock.runtime.domain.canonical_dashboard import input_hash
+    from spec_dock.runtime.domain.canonical_structure import (
+        PullRequest,
+        PullRequestsError,
+        with_pull_requests,
+        with_pull_requests_error,
+    )
+
+    snapshot = world()
+    item = PullRequest(9, "open", False, "iss-00003", "mergeable", "failure", "2026-10-25T00:00:00Z", None, None, "u")
+    pulled = with_pull_requests(snapshot, [item], fetched_at="2026-10-26T00:20:00Z")
+    failed = with_pull_requests_error(pulled, PullRequestsError("GITHUB_UNAVAILABLE", "x", "2026-10-26T00:22:00Z"))
+    assert input_hash(snapshot) == input_hash(pulled) == input_hash(failed)

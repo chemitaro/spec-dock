@@ -517,3 +517,139 @@ def test_an_unanswered_close_is_confirmed_only_when_the_state_reason_also_matche
     fake.inject(timeout=True, method="PATCH", apply=True)
     closed = client.update_issue(issue.number, state="closed", state_reason="completed")
     assert (closed.state, closed.state_reason) == ("closed", "completed")
+
+
+# iss-00537: the pull request read of the periodic sync (Epic D-19).
+
+
+@pytest.mark.parametrize(
+    ("rollup", "checks"),
+    [
+        ("SUCCESS", "success"),
+        ("FAILURE", "failure"),
+        ("ERROR", "failure"),
+        ("PENDING", "pending"),
+        ("EXPECTED", "pending"),
+        (None, "none"),
+    ],
+)
+def test_pull_request_checks_map_the_rollup_state(rollup: str | None, checks: str) -> None:
+    fake = FakeGithub()
+    fake.add_pull_request(7, "iss-00003", checks=rollup)
+    (item,) = _client(fake).fetch_pull_requests()
+    assert item.checks == checks
+
+
+def test_pull_requests_come_from_one_query_with_open_and_recent_closed_limits() -> None:
+    from spec_dock.runtime.domain.canonical_structure import PullRequest
+
+    fake = FakeGithub()
+    fake.add_pull_request(
+        7, "chemitaro/iss-00003", is_draft=True, mergeable="CONFLICTING", created_at="2026-10-20T00:00:00Z"
+    )
+    fake.add_pull_request(
+        8,
+        "iss-00004",
+        state="MERGED",
+        mergeable="UNKNOWN",
+        checks=None,
+        merged_at="2026-10-21T00:00:00Z",
+        closed_at="2026-10-21T00:00:00Z",
+    )
+    fake.add_pull_request(9, "iss-00005", state="CLOSED", closed_at="2026-10-22T00:00:00Z")
+    items = _client(fake).fetch_pull_requests()
+    assert len(fake.graphql_requests()) == 1
+    query = fake.graphql_requests()[0].payload["query"]  # type: ignore[index]
+    assert "pullRequests(first: 100, states: [OPEN]" in query
+    assert "pullRequests(first: 50, states: [CLOSED, MERGED]" in query
+    by_number = {item.number: item for item in items}
+    assert by_number[7] == PullRequest(
+        number=7,
+        state="open",
+        is_draft=True,
+        head_ref_name="chemitaro/iss-00003",
+        mergeable="conflicting",
+        checks="success",
+        created_at="2026-10-20T00:00:00Z",
+        merged_at=None,
+        closed_at=None,
+        url="https://github.com/example/repo/pull/7",
+    )
+    assert (by_number[8].state, by_number[8].mergeable, by_number[8].checks) == ("merged", "unknown", "none")
+    assert by_number[8].merged_at == "2026-10-21T00:00:00Z"
+    assert by_number[9].state == "closed"
+
+
+def test_pull_requests_beyond_the_limits_are_not_kept() -> None:
+    fake = FakeGithub()
+    for number in range(1, 106):
+        fake.add_pull_request(
+            number, f"iss-{number:05d}", updated_at=f"2026-10-25T00:{number // 60:02d}:{number % 60:02d}Z"
+        )
+    for number in range(200, 260):
+        fake.add_pull_request(
+            number,
+            "x",
+            state="MERGED",
+            updated_at=f"2026-10-24T00:{(number - 200) // 60:02d}:{(number - 200) % 60:02d}Z",
+            merged_at="2026-10-24T00:00:00Z",
+            closed_at="2026-10-24T00:00:00Z",
+        )
+    numbers = {item.number for item in _client(fake).fetch_pull_requests()}
+    assert len(numbers) == 150
+    assert set(range(6, 106)) <= numbers and not numbers & set(range(1, 6))
+    assert not numbers & set(range(200, 210)) and set(range(210, 260)) <= numbers
+
+
+@pytest.mark.parametrize(
+    "node_change",
+    [
+        {"state": "DRAFT"},
+        {"mergeable": "MAYBE"},
+        {"isDraft": "no"},
+        {"commits": {"nodes": [{"commit": {"statusCheckRollup": {"state": "SKIPPED"}}}]}},
+        {"createdAt": None},
+        {"number": 0},
+    ],
+)
+def test_malformed_pull_requests_are_an_invalid_response(node_change: dict[str, object]) -> None:
+    fake = FakeGithub()
+    fake.add_pull_request(7, "iss-00003")
+    node = {**fake._graphql_pull_request(fake.pull_requests[7]), **node_change}
+    fake.inject(status=200, body={"data": {"repository": {"open": {"nodes": [node]}, "closed": {"nodes": []}}}})
+    with pytest.raises(GithubStructureError) as caught:
+        _client(fake).fetch_pull_requests()
+    assert caught.value.code == "GITHUB_RESPONSE_INVALID"
+
+
+def test_a_pull_request_listed_twice_is_an_invalid_response() -> None:
+    fake = FakeGithub()
+    fake.add_pull_request(7, "iss-00003")
+    node = fake._graphql_pull_request(fake.pull_requests[7])
+    fake.inject(status=200, body={"data": {"repository": {"open": {"nodes": [node]}, "closed": {"nodes": [node]}}}})
+    with pytest.raises(GithubStructureError) as caught:
+        _client(fake).fetch_pull_requests()
+    assert caught.value.code == "GITHUB_RESPONSE_INVALID"
+
+
+SECONDARY_LIMIT = {"message": "You have exceeded a secondary rate limit"}
+
+
+@pytest.mark.parametrize(
+    ("status", "headers", "body"),
+    [
+        (200, {}, {"data": None, "errors": [{"type": "RATE_LIMITED", "message": "API rate limit exceeded"}]}),
+        (403, {"retry-after": "5"}, SECONDARY_LIMIT),
+        (429, {"x-ratelimit-remaining": "0", "x-ratelimit-reset": "1792972830"}, {"message": "rate limit"}),
+    ],
+)
+def test_the_pull_request_read_does_not_wait_for_a_rate_limit(
+    status: int, headers: dict[str, str], body: object
+) -> None:
+    fake = FakeGithub()
+    fake.add_pull_request(7, "iss-00003")
+    fake.inject(status=status, headers=headers, body=body)
+    with pytest.raises(GithubStructureError) as caught:
+        _client(fake).fetch_pull_requests()
+    assert caught.value.code == "GITHUB_RATE_LIMITED"
+    assert fake.clock.sleeps == [] and len(fake.requests) == 1

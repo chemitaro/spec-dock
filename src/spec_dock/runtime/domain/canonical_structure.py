@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
+import re
 from typing import TYPE_CHECKING, Final, Literal, cast
 
 from spec_dock.runtime.domain.dependency_vnext import dependency_listing, validate_dependency_graph
@@ -24,7 +25,9 @@ IN_PROGRESS_LABEL: Final = "spec-dock:in-progress"
 ID_PREFIXES: Final[Mapping[ScopeKind, str]] = {"initiative": "init", "epic": "epic", "issue": "iss"}
 PARENT_KINDS: Final[Mapping[ScopeKind, ScopeKind | None]] = {"initiative": None, "epic": "initiative", "issue": "epic"}
 
-SNAPSHOT_VERSION: Final = 1
+SNAPSHOT_VERSION: Final = 2
+# Version 1 has no pull request fields; it still reads, as pull requests not yet fetched (iss-00537).
+READABLE_SNAPSHOT_VERSIONS: Final = frozenset({1, 2})
 GITHUB_HOST: Final = "github.com"
 
 KIND_LABEL_MULTIPLE = "KIND_LABEL_MULTIPLE"
@@ -200,7 +203,40 @@ class KindChange:
 
 
 class SnapshotFormatError(ValueError):
-    """The stored snapshot is not a known version-1 document; callers refetch."""
+    """The stored snapshot is not a known version-1 or version-2 document; callers refetch."""
+
+
+PullRequestState = Literal["open", "closed", "merged"]
+Mergeable = Literal["mergeable", "conflicting", "unknown"]
+Checks = Literal["success", "failure", "pending", "none"]
+PULL_REQUEST_STATES: Final = frozenset({"open", "closed", "merged"})
+MERGEABLE_VALUES: Final = frozenset({"mergeable", "conflicting", "unknown"})
+CHECKS_VALUES: Final = frozenset({"success", "failure", "pending", "none"})
+
+
+@dataclass(frozen=True)
+class PullRequest:
+    """One pull request as the periodic sync last read it (Epic D-19); values are lowercase."""
+
+    number: int
+    state: PullRequestState
+    is_draft: bool
+    head_ref_name: str
+    mergeable: Mergeable
+    checks: Checks
+    created_at: str
+    merged_at: str | None
+    closed_at: str | None
+    url: str
+
+
+@dataclass(frozen=True)
+class PullRequestsError:
+    """Why the last pull request read failed; the previous pull requests stay."""
+
+    code: str
+    message: str
+    at: str
 
 
 @dataclass(frozen=True)
@@ -212,6 +248,10 @@ class StructureSnapshot:
     external: Mapping[int, ExternalIssue]
     anomalies: tuple[StructureAnomaly, ...]
     local_writes: tuple[LocalWrite, ...]
+    # iss-00537: None means never fetched, so readers show the pull request state as unknown.
+    pull_requests: Mapping[int, PullRequest] = field(default_factory=dict)
+    pull_requests_fetched_at: str | None = None
+    pull_requests_error: PullRequestsError | None = None
 
     @property
     def scopes(self) -> tuple[ScopeNode, ...]:
@@ -245,11 +285,24 @@ class StructureSnapshot:
             "local_writes": [
                 {"at": item.at, "command": item.command, "numbers": list(item.numbers)} for item in self.local_writes
             ],
+            "pull_requests": {
+                str(number): _pull_request_json(self.pull_requests[number]) for number in sorted(self.pull_requests)
+            },
+            "pull_requests_fetched_at": self.pull_requests_fetched_at,
+            "pull_requests_error": (
+                None
+                if self.pull_requests_error is None
+                else {
+                    "code": self.pull_requests_error.code,
+                    "message": self.pull_requests_error.message,
+                    "at": self.pull_requests_error.at,
+                }
+            ),
         }
 
     @classmethod
     def from_json(cls, payload: object) -> StructureSnapshot:
-        """Load only a well-formed version-1 document; anything else means refetch."""
+        """Load only a well-formed version-1 or version-2 document; anything else means refetch."""
         try:
             return _snapshot_from_json(payload)
         except (KeyError, TypeError, ValueError) as error:
@@ -267,6 +320,23 @@ _SNAPSHOT_KEYS: Final = frozenset({
     "external",
     "anomalies",
     "local_writes",
+})
+_PULL_REQUEST_FIELDS: Final = frozenset({"pull_requests", "pull_requests_fetched_at", "pull_requests_error"})
+_SNAPSHOT_KEYS_BY_VERSION: Final[Mapping[int, frozenset[str]]] = {
+    1: _SNAPSHOT_KEYS,
+    2: _SNAPSHOT_KEYS | _PULL_REQUEST_FIELDS,
+}
+_PULL_REQUEST_KEYS: Final = frozenset({
+    "number",
+    "state",
+    "is_draft",
+    "head_ref_name",
+    "mergeable",
+    "checks",
+    "created_at",
+    "merged_at",
+    "closed_at",
+    "url",
 })
 _NODE_KEYS: Final = frozenset({
     "number",
@@ -335,8 +405,10 @@ def _optional_time(value: object, what: str) -> str | None:
 
 
 def _snapshot_from_json(payload: object) -> StructureSnapshot:
-    document = _object(payload, _SNAPSHOT_KEYS, "snapshot")
-    _require(type(document["version"]) is int and document["version"] == SNAPSHOT_VERSION, "unknown snapshot version")
+    _require(isinstance(payload, dict), "snapshot is not an object")
+    version = cast("dict[str, object]", payload).get("version")
+    _require(type(version) is int and version in READABLE_SNAPSHOT_VERSIONS, "unknown snapshot version")
+    document = _object(payload, _SNAPSHOT_KEYS_BY_VERSION[cast("int", version)], "snapshot")
     repository = cast("str", _text(document["repository"], "repository"))
     _own_slug(repository)
     issues: dict[int, ScopeNode] = {}
@@ -378,7 +450,7 @@ def _snapshot_from_json(payload: object) -> StructureSnapshot:
         )
     for name in ("fetched_at", "fetch_started_at"):
         parse_timestamp(cast("str", _text(document[name], name)))
-    return StructureSnapshot(
+    snapshot = StructureSnapshot(
         repository=repository,
         fetched_at=cast("str", document["fetched_at"]),
         fetch_started_at=cast("str", document["fetch_started_at"]),
@@ -387,6 +459,130 @@ def _snapshot_from_json(payload: object) -> StructureSnapshot:
         anomalies=tuple(anomalies),
         local_writes=tuple(writes),
     )
+    if version == 1:
+        return snapshot
+    return _pull_request_fields_from_json(snapshot, document)
+
+
+def _pull_request_fields_from_json(snapshot: StructureSnapshot, document: Mapping[str, object]) -> StructureSnapshot:
+    raw_pulls = document["pull_requests"]
+    _require(isinstance(raw_pulls, dict), "pull_requests must be an object")
+    pulls: dict[int, PullRequest] = {}
+    for key, raw in cast("dict[str, object]", raw_pulls).items():
+        item = _pull_request_from_json(raw)
+        _require(key == str(item.number), "pull request key does not match its number")
+        pulls[item.number] = item
+    raw_error = document["pull_requests_error"]
+    error = None
+    if raw_error is not None:
+        fields = _object(raw_error, frozenset({"code", "message", "at"}), "pull_requests_error")
+        error = PullRequestsError(
+            cast("str", _text(fields["code"], "error code")),
+            cast("str", _text(fields["message"], "error message")),
+            _time(fields["at"], "error time"),
+        )
+    return replace(
+        snapshot,
+        pull_requests=pulls,
+        pull_requests_fetched_at=_optional_time(document["pull_requests_fetched_at"], "pull_requests_fetched_at"),
+        pull_requests_error=error,
+    )
+
+
+def _choice(value: object, allowed: frozenset[str], what: str) -> str:
+    _require(isinstance(value, str) and value in allowed, f"{what} is not one of {sorted(allowed)}")
+    return cast("str", value)
+
+
+def _pull_request_from_json(raw: object) -> PullRequest:
+    item = _object(raw, _PULL_REQUEST_KEYS, "pull request")
+    _require(isinstance(item["is_draft"], bool), "is_draft must be a boolean")
+    return PullRequest(
+        number=cast("int", _integer(item["number"], "pull request number")),
+        state=cast("PullRequestState", _choice(item["state"], PULL_REQUEST_STATES, "pull request state")),
+        is_draft=cast("bool", item["is_draft"]),
+        head_ref_name=cast("str", _text(item["head_ref_name"], "head_ref_name")),
+        mergeable=cast("Mergeable", _choice(item["mergeable"], MERGEABLE_VALUES, "mergeable")),
+        checks=cast("Checks", _choice(item["checks"], CHECKS_VALUES, "checks")),
+        created_at=_time(item["created_at"], "created_at"),
+        merged_at=_optional_time(item["merged_at"], "merged_at"),
+        closed_at=_optional_time(item["closed_at"], "closed_at"),
+        url=cast("str", _text(item["url"], "url")),
+    )
+
+
+def _pull_request_json(item: PullRequest) -> dict[str, object]:
+    return {
+        "number": item.number,
+        "state": item.state,
+        "is_draft": item.is_draft,
+        "head_ref_name": item.head_ref_name,
+        "mergeable": item.mergeable,
+        "checks": item.checks,
+        "created_at": item.created_at,
+        "merged_at": item.merged_at,
+        "closed_at": item.closed_at,
+        "url": item.url,
+    }
+
+
+def with_pull_requests(
+    snapshot: StructureSnapshot, items: Iterable[PullRequest], *, fetched_at: str
+) -> StructureSnapshot:
+    """Replace the pull requests after a successful read; the error clears."""
+    parse_timestamp(fetched_at)
+    pulls: dict[int, PullRequest] = {}
+    for item in items:
+        if item.number in pulls:
+            raise ValueError(f"pull request #{item.number} appears twice")
+        pulls[item.number] = item
+    return replace(
+        snapshot,
+        pull_requests=dict(sorted(pulls.items())),
+        pull_requests_fetched_at=fetched_at,
+        pull_requests_error=None,
+    )
+
+
+def with_pull_requests_error(snapshot: StructureSnapshot, error: PullRequestsError) -> StructureSnapshot:
+    """Record a failed read; the previous pull requests and their fetch time stay (Epic D-19)."""
+    parse_timestamp(error.at)
+    return replace(snapshot, pull_requests_error=error)
+
+
+def _keep_pull_requests(source: StructureSnapshot, target: StructureSnapshot) -> StructureSnapshot:
+    return replace(
+        target,
+        pull_requests=source.pull_requests,
+        pull_requests_fetched_at=source.pull_requests_fetched_at,
+        pull_requests_error=source.pull_requests_error,
+    )
+
+
+_BRANCH_SCOPE: Final = re.compile(r"^((?:init|epic|iss)-(?:[0-9]{5}|[1-9][0-9]{5,}))(?:-|$)")
+
+
+def pull_requests_by_scope(snapshot: StructureSnapshot) -> Mapping[str, PullRequest]:
+    """The pull request of each Scope its head branch names (`branch_names_scope`).
+
+    Several for one Scope: an open one first, then the latest `created_at`, then the higher number.
+    """
+    chosen: dict[str, PullRequest] = {}
+    for item in snapshot.pull_requests.values():
+        matched = _BRANCH_SCOPE.match(item.head_ref_name.rpartition("/")[2])
+        if matched is None:
+            continue
+        scope = matched.group(1)
+        if snapshot.find(scope) is None or not branch_names_scope(item.head_ref_name, scope):
+            continue
+        previous = chosen.get(scope)
+        if previous is None or _pull_rank(item) > _pull_rank(previous):
+            chosen[scope] = item
+    return dict(sorted(chosen.items()))
+
+
+def _pull_rank(item: PullRequest) -> tuple[bool, datetime, int]:
+    return item.state == "open", parse_timestamp(item.created_at), item.number
 
 
 def _state_value(value: object) -> IssueState:
@@ -818,7 +1014,7 @@ def _apply(
     finished = _finish(
         snapshot.repository, snapshot.fetched_at, snapshot.fetch_started_at, issues, external, element, writes
     )
-    return finished, tuple(skipped)
+    return _keep_pull_requests(snapshot, finished), tuple(skipped)
 
 
 def _node_for_change(issues: Mapping[int, ScopeNode], number: int) -> ScopeNode:
@@ -878,7 +1074,7 @@ def _set_parent(
 def merge_refresh(current: StructureSnapshot | None, fresh: StructureSnapshot) -> StructureSnapshot:
     """Overlay writes reflected at or after the refetch started, so a refresh never erases them."""
     if current is None or current.repository != fresh.repository:
-        return fresh
+        return fresh  # a refetch carries no pull requests; the periodic sync adds them (iss-00537)
     started = parse_timestamp(fresh.fetch_started_at)
     recent = tuple(item for item in current.local_writes if parse_timestamp(item.at) >= started)
     issues = dict(fresh.issues)
@@ -893,7 +1089,8 @@ def merge_refresh(current: StructureSnapshot | None, fresh: StructureSnapshot) -
             element.pop(number, None)
         if number in current.external:
             external[number] = current.external[number]
-    return _finish(fresh.repository, fresh.fetched_at, fresh.fetch_started_at, issues, external, element, recent)
+    finished = _finish(fresh.repository, fresh.fetched_at, fresh.fetch_started_at, issues, external, element, recent)
+    return _keep_pull_requests(current, finished)
 
 
 def kind_changes(snapshot: StructureSnapshot, directory_ids: Iterable[str]) -> Mapping[int, KindChange]:
