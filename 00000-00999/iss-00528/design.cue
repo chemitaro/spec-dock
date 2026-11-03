@@ -61,7 +61,7 @@ design: {
 			- `child_stages(model, parent_id, *, open_only)`：`parent_id` が None なら親のない Scope を、ほかはその直下の子を並べる。子 a が子 b を待つのは、a の部分木のどれかの `blocked_by` が b の部分木の番号を指すとき（a ≠ b）。部分木の外を指すものは `external`（子の ID と番号）に入れる。最長の道で段を決め、循環に入る子は段に入れず `cyclic` に入れる。`open_only` では閉じた子と、閉じた先への依存を除く。各段の中は推奨順。返り値は `ChildStages(stages, external, cyclic)`。
 			- `downstream_ids(model, id, *, open_only=True)`：D-03 の後に続く数と同じ広げ方（x と x の祖先を待つもの、その子孫、それらの祖先を待つもの）で求めた集合を返す。`open_only` のときの大きさは `downstream` と一致する。直接は、x 自身の番号を `blocked_by` に持つ Scope、ほかは間接。
 			- `upstream(model, id, *, open_only=False)`：直接は自分の `blocked_by` の先（Scope だけ）。間接は、祖先から引き継いだ依存の先と、たどり着いたものの子孫とその依存の先（自分と祖先の分）を、再帰に集めたもの。
-			- `root_waits(model, id)`：止められている Scope の上流のうち、それ自身が止められていない開いた Scope と、開いている Scope でない Issue の番号。
+			- `root_waits(model, id)`：止められている Scope の上流の端（開いた依存の先を自分と祖先に持たず、開いた子孫も持たない開いた Scope）のうち、止められていないものと、上流がたどる開いている Scope でない Issue の番号。
 			"""
 		satisfies: ["R-05"]
 	}
