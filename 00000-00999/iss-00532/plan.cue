@@ -14,7 +14,7 @@ steps: {
 	"S-06": {title: "拡大・縮小・移動と2本指のつまみ、gesturestart の抑止、帯の下の余白", realizes: ["R-08"], status: "done", after: ["S-05"], session: "impl"}
 	"S-07": {title: "時間の軸 views/timeline.js、timeline.css、timeline/series.js", realizes: ["R-11", "R-12", "F-01"], status: "done", after: ["S-01"], session: "impl"}
 	"S-08": {title: "PC のヘッドレスの Chrome での確かめ（PC と 390px、明暗、JS のエラー、edgeAudit、速さ、指の操作）と Artifact", realizes: ["R-07", "R-08", "R-12", "R-13"], status: "done", after: ["S-06", "S-07"], session: "impl"}
-	"S-09": {title: "コードのレビュー、最終品質ゲート、report.md、PR", realizes: ["R-02"], status: "doing", after: ["S-04", "S-08"], session: "impl"}
+	"S-09": {title: "コードのレビュー、最終品質ゲート、report.md、PR", realizes: ["R-02"], status: "done", after: ["S-04", "S-08"], session: "impl"}
 }
 
 tests: {

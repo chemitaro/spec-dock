@@ -89,7 +89,7 @@ ID: "iss-00532"
 
 ## Pull Request
 
-（PR の URL と CI の結果を書く）
+- PR #543（https://github.com/chemitaro/spec-dock/pull/543）、head `e23291cf4844af72eae6d8b1f7b8768d4ffc3dda`（`Refs #532`、`Refs #427`）。CI は観測できた範囲（Actions と Commit Status）で PASS：Provider CI、SpecDock check、Commit identity。GitHub のマージの可否は READY（2026-11-03T21:38:04Z の観測）。マージと `work finish` は統括が行う。
 
 ## Residual Risks / Follow-ups
 
