@@ -9,6 +9,7 @@ let box = null; // the persistent search element
 let current = { data: null, navigate: null, repository: null };
 let results = [];
 let active = -1;
+let listOpen = false; // the candidate list is open (closed by Escape, a choice or a click outside)
 let hadFocus = false; // survives the blur caused by the top band removing the element
 let selection = [0, 0];
 let observer = null;
@@ -87,6 +88,7 @@ function build() {
 function close(element, clear) {
   const input = element.querySelector("input");
   if (clear) input.value = "";
+  listOpen = false;
   results = [];
   active = -1;
   paint(element);
@@ -99,10 +101,14 @@ function go(element, scope) {
   current.navigate?.(scope.path);
 }
 
-function update(element) {
+// keep: a redraw recomputes the same query; the arrow-key choice stays on the same Scope when it is still there.
+function update(element, { keep = false } = {}) {
   const input = element.querySelector("input");
+  const chosen = keep && active >= 0 ? results[active]?.id : null;
   results = searchScopes(current.data?.scopes || [], input.value);
-  active = results.length ? 0 : -1;
+  const kept = chosen ? results.findIndex((item) => item.id === chosen) : -1;
+  active = kept >= 0 ? kept : results.length ? 0 : -1;
+  listOpen = input.value.trim().length > 0;
   paint(element);
 }
 
@@ -110,7 +116,7 @@ function paint(element) {
   const input = element.querySelector("input");
   const list = element.querySelector("ul");
   const query = input.value.trim();
-  const open = query.length > 0;
+  const open = listOpen && query.length > 0;
   list.hidden = !open;
   input.setAttribute("aria-expanded", String(open));
   if (!open) {
@@ -142,7 +148,7 @@ function attach(slot) {
       // type=search may refuse a selection in some browsers; the value is kept either way
     }
   }
-  if (input.value.trim()) update(box);
+  if (listOpen) update(box, { keep: true }); // a list the user closed stays closed
 }
 
 // Re-attach after the shell redraws the top band without calling mountSearch (its 5-second refresh).

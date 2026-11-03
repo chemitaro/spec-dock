@@ -87,9 +87,17 @@ function depsTab(ctx, scope, doc, byId) {
   const open = waits.filter((item) => item.open).length;
   const waitedBy = (doc.dependencies?.waited_by || []).map((id) => byId.get(id)).filter(Boolean).sort(byRank);
   const indirect = doc.downstream?.indirect?.length || 0;
+  // Roots reached only through other Scopes (e.g. an open child of an Epic this Scope waits for) are not rows of
+  // waits_for; list them separately so the mark always has a place to stand (Epic R-18).
+  const listed = new Set(waits.map((item) => item.scope_id ?? `#${item.number}`));
+  const deepRoots = [
+    ...[...roots].filter((id) => !listed.has(id)).map((id) => byId.get(id)).filter(Boolean).sort(byRank).map((item) => `<li>${link(ctx, item)} <span>${esc(item.title)}</span> <span class="sd-muted">${esc(STATES[item.state]?.label ?? item.state)}</span></li>`),
+    ...[...rootExternal].filter((number) => !listed.has(`#${number}`)).map((number) => `<li>${stateIcon("unknown", false)}<span class="sd-muted">Scope でない Issue</span> #${esc(number)}</li>`),
+  ];
   return (
     section(1, "この Scope が待つもの", `${open}件が未完了`) +
     (scope.state === "blocked" && roots.size + rootExternal.size ? `<p class="sd-note">${icon("target")}「大もと」は、上流の端で止められていない待ち先。そこから進めると、この Scope が動き出す。</p>` : "") +
+    (deepRoots.length ? `<h3 class="sd-sub">${icon("target")}間接の大もとの待ち先（ここから進めると動き出す）</h3><ul class="sd-list" data-code="deep-roots">${deepRoots.join("")}</ul>` : "") +
     `<h3 class="sd-sub">自分で持つ依存</h3>${table(own)}` +
     `<h3 class="sd-sub">親から引き継いだ依存</h3>${table(inherited)}` +
     section(2, "この Scope を待つもの", `直接 ${waitedBy.length}件・間接 ${indirect}件`) +
