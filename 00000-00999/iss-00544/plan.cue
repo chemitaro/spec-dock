@@ -18,8 +18,8 @@ tests: {
 	"T-02": {title: "CUE・Markdown の Scope と worktree のあるカタログで、構造の API の `assurance` と `branch`、詳しい画面の `scope` の同じ項目", verifies: ["R-02"]}
 	"T-03": {title: "2回目の要求は `cue` を走らせず、`git worktree list` は要求ごとに1回。1つのファイルを書き換えるとその Scope だけ読み直す。見なかった Scope の分を捨てる", verifies: ["R-03"]}
 	"T-04": {title: "読み取りの例外、`git worktree list` の失敗、`cue` がない、カタログがない・決まらないときに、構造の API が 200 でその項目だけ `null`", verifies: ["F-01"]}
-	"T-05": {title: "締め切りの後の Scope は `null` で覚えず、次の要求で読む（時計を差し替える）", verifies: ["F-02"]}
-	"T-06": {title: "`parts.js`・`logic.js`・`marks.js` に値の表の定義がなく、印の関数の HTML が直す前と同じ（node）", verifies: ["R-04"]}
+	"T-05": {title: "締め切りの後の Scope と、締め切りをまたいで読めなかった Scope は `null` で覚えず、次の要求で読む（時計を差し替える）", verifies: ["F-02"]}
+	"T-06": {title: "`parts.js`・`logic.js`・`marks.js`・`timeline.js` に値の表の定義がなく、印の関数の HTML が直す前と同じ（node）。箱の worktree の印は作業中だけ（静的とブラウザー）", verifies: ["R-04"]}
 	"T-07": {title: "`app.js` が `snapshot.fetched_at` のあるときだけ `markSeen` を呼ぶ（静的）。スナップショットのないリポジトリでエラー0件・`POST` なし（ヘッドレスの Chrome、report.md に記録）", verifies: ["R-05"]}
 	"T-08": {title: "線の検査の代表のデータ（spec-dock、種 532・15・18）のすべての表し方で問題0件。種 532 が1秒以内", verifies: ["R-06"]}
 }

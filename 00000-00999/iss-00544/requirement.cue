@@ -83,6 +83,7 @@ requirements: {
 		acceptance: [
 			"`parts.js`、`logic.js`、`marks.js` に、アイコンの SVG の形、状態の言葉の表、種類の名前の表、保証レベルの段の表、PR の状態の言葉の表の定義がない",
 			"直す前と後で、`parts.js` と `marks.js` の印の関数が同じ入力に同じ HTML を返す（node のテスト）",
+			"構造の図の箱の worktree の印は、`branch` があり状態が作業中の箱だけに出る（decisions）",
 		]
 	}
 	"R-05": {

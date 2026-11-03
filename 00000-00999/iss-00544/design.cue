@@ -23,11 +23,11 @@ design: {
 	"D-02": {
 		title: "構造の一覧の読み取り `read_structure_facts`（`application/dashboard_scope_details.py`）"
 		text: """
-			- `StructureFactsCache`：カタログのパスごとに `{Scope ID: (requirement.cue の st_mtime_ns, st_size, level)}` を持つ。サーバーの1つの `DashboardHttp` が1つ持つ（プロセスの間だけ。ファイルに書かない）。
+			- `StructureFactsCache`：カタログのパスごとに `{Scope ID: (requirement.cue の st_mtime_ns, st_size, level)}` を持つ。サーバーの1つの `DashboardHttp` が1つ持つ（プロセスの間だけ。ファイルに書かない）。サーバーは要求を並んで処理するので、カタログごとの表の読みと差し替えを1つのロックで守る（外の処理はロックの外で走らせ、最後に差し替える。後に終わった要求の結果が残ってよい）。
 			- `read_structure_facts(site, scope_ids, cache, *, timeout=3.0, clock, assurance_reader, worktree_lister, cue_locator) -> {ID: {"assurance": str|None, "branch": str|None}}`。
 			  1. 締め切り = 今 + timeout。カタログが `None` か、ディレクトリでなければ、全 Scope を `null` で返す（覚えたものも捨てない）。
 			  2. `git worktree list` を1回（上限は締め切りまでの残り）。失敗すれば全 `branch` を `null`。成功すれば、各 Scope について `branch_names_scope` が真の最初のブランチ。
-			  3. 各 Scope の `<カタログ>/<区切り>/<ID>/requirement.cue` を `lstat`。通常のファイルでなければ `null`（Markdown の Scope など）。覚えた (時刻, 大きさ) が同じなら、覚えた値。違えば、締め切りの前なら `read_assurance(directory, timeout=残り, tool=…)` で読む。読めた値（`light` など）か、読めなかったときの `null` を覚える（壊れたファイルを毎回読み直さないため。時刻か大きさが変われば読み直す）。締め切りの後は `null` を返し、覚えない（F-02）。例外は、その Scope の `null` にする（F-01）。
+			  3. 各 Scope の `<カタログ>/<区切り>/<ID>/requirement.cue` を `lstat`。通常のファイルでなければ `null`（Markdown の Scope など）。覚えた (時刻, 大きさ) が同じなら、覚えた値。違えば、締め切りの前なら `read_assurance(directory, timeout=残り, tool=…)` で読む。読めた値（`light` など）か、読めなかったときの `null` を覚える（壊れたファイルを毎回読み直さないため。時刻か大きさが変われば読み直す）。ただし、読み終えたときに締め切りを過ぎていて読めなかった（時間切れの見込み）ものは覚えない。締め切りの後は `null` を返し、覚えない（F-02）。例外は、その Scope の `null` にする（F-01）。
 			  4. `cue` の在りか（`locate_cue`）は、読む必要のある Scope が出たときに1回だけ探す。見つからなければ、残りの読み直しは `null`（覚えない）。
 			  5. その要求で見なかった Scope の分を、覚えたものから捨てる。
 			- `DashboardHttp._repository_api` の `structure` で `read_structure_facts` を呼び、`structure_document(..., facts=…)` に渡す。`scopes/<ID>` では、今までの `read_scope_details` の結果から、その Scope の `assurance`（`details.assurance.level`）と `branch`（`details.worktrees.items` の最初）を作って渡す。
@@ -45,7 +45,7 @@ design: {
 			- `core/ui.js` に足す：`ICONS` に、`parts.js` の `MORE_ICONS` と `marks.js` の `GRAPH_ICONS` の和（同じ名前は同じ形なので1つに）。`KIND_LABEL`、`ASSURANCE_LEVELS`（`{light: 1, …}`）、`PR_STATE_WORDS`、`STATE_WORDS`（`STATES` の label から作る）。
 			- `parts.js`：`MORE_ICONS` を消し、`icon` は `ic` の別名にする。`LEVELS` を `ASSURANCE_LEVELS` に。
 			- `logic.js`：`KIND_LABEL`、`STATE_WORDS`、`PR_STATE_WORDS` を `core/ui.js` から読み直して書き出す（今の import 先を変えない）。
-			- `marks.js`：`GRAPH_ICONS` を消し、`ic` は `core/ui.js` の `ic`。`KIND`、`AS`、`PRW` を `core/ui.js` の値に。
+			- `marks.js`：`GRAPH_ICONS` を消し、`ic` は `core/ui.js` の `ic`。`views/timeline.js` の `GRAPH_ICONS` の import と自前の `ic` は、`core/ui.js` の `ic` に置き換える。`KIND`、`AS`、`PRW` を `core/ui.js` の値に。
 			- `logic.js` は DOM を使わないまま（`core/ui.js` も DOM を使わない）。
 			- 見た目：印の HTML の文字列は変えない（R-04 のテスト）。構造の図の箱の worktree の印だけ、状態が作業中の箱に限る（requirement の decisions）。
 			"""
@@ -68,7 +68,7 @@ design: {
 	}
 }
 
-compatibility: "構造の API の `assurance` と `branch` に値が入る（項目と意味は #532 のまま）。画面の道、コマンド、状態の置き場、配布資産の文書は変えない。0.6.0 の移行の注記には「構造の図とボードに保証レベルとブランチの印が出るようになった」とだけ書けばよい。"
+compatibility: "構造の API の `assurance` と `branch` に値が入る（項目と意味は #532 のまま）。画面の道、コマンド、状態の置き場、配布資産の文書は変えない。0.6.0 の移行の注記には「構造の図（と、その要点の欄）に保証レベルとブランチの印が出るようになった」とだけ書けばよい。"
 
 risks: [
 	"CUE の Scope が多いカタログでは、サーバーを立てた後の最初の構造の要求で `cue` を Scope の数だけ走らせる（spec-dock では35件、1件 約10ms）。3秒の上限で切り、残りは次の要求で読む",
