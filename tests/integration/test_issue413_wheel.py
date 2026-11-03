@@ -128,6 +128,11 @@ def test_fresh_wheel_contains_one_normal_runtime_and_context_free_utilities(tmp_
             "spec_dock/runtime/commands/workspace_migrate_vnext.py",
             "spec_dock/runtime/commands/workspace_sync_vnext.py",
             "spec_dock/runtime/commands/worktree_vnext.py",
+            # iss-00533: the Markdown and PlantUML dashboard
+            "spec_dock/runtime/application/canonical_dashboard.py",
+            "spec_dock/runtime/domain/canonical_dashboard.py",
+            "spec_dock/runtime/presentation/markdown.py",
+            "spec_dock/runtime/presentation/puml.py",
         }
         included_retired = retired_entrypoints.intersection(names)
         assert included_retired == set(), sorted(included_retired)

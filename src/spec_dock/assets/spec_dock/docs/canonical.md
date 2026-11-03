@@ -32,7 +32,7 @@ spec-dock canonical status --structure   # 上に加えて、Scope のディレ�
 - `canonical link` はクローンごとに1回で足ります。何度実行しても同じ結果です。`spec-dock worktree create` と `spec-dock work start` で作ったworktreeには、自動でリンクを置きます。`git worktree add` で作ったworktreeと新しいクローンでは、`canonical link` を1回実行します。
 - `canonical link` が書くもの：カタログのworktree（lock 付き）、`.git/info/exclude` の無視の3行、`.git/config` の取得の対象（`git remote set-branches --add origin spec-dock/canonical`）、手元のブランチ `spec-dock/canonical` の付け替え（`update-ref`）、リンク、状態の置き場の登録簿と基準、定期の実行（macOS は launchd、systemd の Linux はユーザーのタイマー、ほかは常駐のプロセス）。
 - `canonical link --no-schedule` は、登録簿に載せず、定期の実行も作りません（予行演習で使う）。基準は記録します。登録済みのカタログに `--no-schedule` を付けても登録は外れません。外すのは `canonical remove` です。
-- `canonical status` の項目：`catalog`、`link`、`exclude`、`access`、`tools`、`sync`、`changes`、`format`、`git`、`snapshot`、`dashboard`、`structure`。問題ごとに `next_step` を示します。読むだけなので、問題があっても終了コード0です。
+- `canonical status` の項目：`catalog`、`link`、`exclude`、`access`、`tools`、`sync`、`changes`、`format`、`git`、`snapshot`、`structure`。問題ごとに `next_step` を示します。読むだけなので、問題があっても終了コード0です。
 - `structure` の形は `{status: ok / problem / unavailable, next_step, snapshot, anomalies: [{code, severity, message, details}]}` です（最初の版の `misplaced` は `anomalies` に置き換わりました）。`--structure` を付けたときだけ埋まります（`SCOPE_DIRECTORY_MISSING`、`SCOPE_ISSUE_MISSING`、`SCOPE_KIND_CHANGED`、`SCOPE_DIRECTORY_MISPLACED`）。
 - 取り外しは `spec-dock canonical remove --yes`（このクローンのリンク、カタログ、除外、登録を外す。未保存か未pushがあれば止まる。ブランチは消さない）。破壊的な操作なので、対象と結果を明示して指示します。
 
@@ -101,7 +101,7 @@ spec-dock canonical status --structure   # 上に加えて、Scope のディレ�
 - systemd のない Linux（Docker などのコンテナ）では、SpecDock の常駐のプロセス（`spec-dock canonical sync --registered --loop`）が同期します。`canonical link` が起動します。コンテナを起動し直すと止まるので、`canonical link` が示す起動し直しの1行を、devcontainer の `postStartCommand` か起動のスクリプトに足します（足さなくても、次の `spec-dock canonical link` で動き直します）。
 - コンテナでは、リポジトリをコンテナの中でクローンして `canonical link` します。ホストのチェックアウトをマウントしたコンテナでは、Git の記録がホストのパスを指すので、`canonical link` は `repair` も `prune` もせずに `CANONICAL_FOREIGN_CHECKOUT` で止まります（ホストの記録を壊さないため）。保存と同期はホストで行われ、コンテナでは仕様のファイルを読み書きするだけにします。
 
-## 構造のスナップショットとダッシュボード
+## 構造のスナップショット
 
 - SpecDock は、GitHub の構造（Scope の Issue の番号、種類、題名、状態、ラベル、担当者、親子、依存）を、リポジトリごとに一括で読んで `<状態の置き場>/github/<host>/<owner>/<repo>/snapshot.json` に持ち、表示に使い回します（書けない環境ではメモリーの上だけ）。変わったかの確かめは条件付きの要求（304）なので、GitHub の主のレート制限を消費しません。
 - 新しさ：題名や状態などの変化は、定期の同期の確かめで1〜2分のうちに表示に出ます。親子と依存だけの変更は、Issue の更新の時刻が変わらないことがあるので、最大30分（全体の取り直しの間隔）かかります。SpecDock のコマンドで書いた変更は、次の表示にすぐ出ます。書くコマンドは、書く前に GitHub で確かめ直します。
@@ -109,7 +109,6 @@ spec-dock canonical status --structure   # 上に加えて、Scope のディレ�
 - `dependency check` と `workspace sync` の `--source`：引数なしはスナップショットで判定し、`--source github` は全体を取り直してから判定します（`--source` が受け付けるのは `github` だけです）。
 - `--offline` を付けた読むコマンドは、GitHub に何も送らず、保存したスナップショットを古いもの（警告 `GITHUB_SNAPSHOT_STALE`）として示します。`--source github --offline` は止まります。`canonical sync` と `canonical resume` は `--offline` を受け付けません。
 - GitHub につながらないとき、読むコマンドは古いスナップショットで示し、`GITHUB_SNAPSHOT_STALE` を警告に入れます。書くコマンドは書く前に止まります。
-- ダッシュボード：定期の同期が、mainのチェックアウトの `spec-dock/` に、今までと同じ5つのファイル（`dashboard.md`、`tree.puml`、`tree-all.puml`、`deps-issues.puml`、`deps-raw.puml`）を、構造が変わったときだけ作り直します。題名は GitHub の題名、作業中はラベル `spec-dock:in-progress` で示します。書けなかったときは `canonical status` の `dashboard` に `CANONICAL_DASHBOARD_OCCUPIED`（書く場所にディレクトリかシンボリックリンクがある。退避すれば次の同期が書く）か `CANONICAL_DASHBOARD_FAILED`（`snapshot` と `sync` の項目を確かめる）が出ます。
 
 ## 制約
 
@@ -187,8 +186,6 @@ spec-dock canonical status --structure   # 上に加えて、Scope のディレ�
 | `CANONICAL_NOT_RESTORABLE` | 3 | ファイルを自分で直すか消す。保存してよければ `spec-dock canonical accept <パス>` |
 | `CANONICAL_PATH_NOT_FOUND` | 3 | カタログの中の、今あるファイルのパスを指定する |
 | `CANONICAL_CONFLICT_COPY` | 警告（`workspace validate`） | 別名ファイルの中身を元のファイルに統合し、別名ファイルを消す |
-| `CANONICAL_DASHBOARD_OCCUPIED` | 警告（`status` の `dashboard`） | 示したパスを退避する。次の同期が書く |
-| `CANONICAL_DASHBOARD_FAILED` | 警告（同上） | `spec-dock canonical status` の `snapshot` と `sync` を確かめる |
 | `ASSURANCE_REQUIRED` | 2（`scope create`、`scope import github`。何も読まず、何も書かない） | `--assurance <値>`（`light`、`standard`、`strict`、`critical` のどれか）と、空白だけでない `--assurance-reason <理由>` を付けて同じコマンドを実行する |
 | `SCOPE_TEMPLATES_OUTDATED` | 3（同上。GitHub に何も書かない） | `spec-dock installation update` で配布資産を上げ、`spec-dock/templates/cue/<種類>/` を入れてから同じコマンドを実行する |
 | `ASSURANCE_NOT_WRITTEN` | 警告（`scope import github`） | 既にある Scope の文書は書き換えない。CUE の Scope で変えるなら `requirement.cue` の `assurance` を直す（Markdown の Scope は保証レベルを持たない） |

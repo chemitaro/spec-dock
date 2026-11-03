@@ -214,7 +214,6 @@ class CatalogSyncState:
     blocking: tuple[Blocking, ...] = ()
     consumed_changesets: tuple[str, ...] = ()
     push_auth: PushAuth | None = None
-    dashboard: Mapping[str, object] | None = None  # iss-00438 owns its meaning; kept as read
     adopt_remote_pending: bool = False  # resume --adopt-remote: re-adopt on top of R with R as the only parent
     schedule: Literal["none"] | None = None  # canonical link --no-schedule: link_after_command skips step 6
 
@@ -244,7 +243,6 @@ class CatalogSyncState:
             "blocking": [item.to_json() for item in self.blocking],
             "consumed_changesets": list(self.consumed_changesets[-CONSUMED_CHANGESETS_KEPT:]),
             "push_auth": self.push_auth.to_json() if self.push_auth else None,
-            "dashboard": dict(self.dashboard) if self.dashboard is not None else None,
             "adopt_remote_pending": self.adopt_remote_pending,
             "schedule": self.schedule,
         }
@@ -265,7 +263,7 @@ class CatalogSyncState:
         allow = payload.get("adopt_remote_pending", False)
         if not isinstance(allow, bool):
             raise StateFormatError("adopt_remote_pending must be a boolean")
-        dashboard = payload.get("dashboard")
+        # A `dashboard` field written before iss-00533 is ignored, whatever its shape, and dropped on write.
         paused = payload.get("paused")
         schedule = payload.get("schedule")
         if schedule not in (None, "none"):
@@ -289,7 +287,6 @@ class CatalogSyncState:
                 _text(item, "consumed_changesets") for item in _list(payload.get("consumed_changesets", []), "consumed")
             ),
             push_auth=cast("PushAuth | None", optional("push_auth", PushAuth.from_json)),
-            dashboard=None if dashboard is None else _object(dashboard, "dashboard"),
             adopt_remote_pending=allow,
             schedule=cast("Literal['none'] | None", schedule),
         )

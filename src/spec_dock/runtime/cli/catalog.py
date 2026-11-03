@@ -635,14 +635,14 @@ def _help_spec(leaf: str) -> HelpSpec:
         target = "This clone's catalog and the links of the main checkout and this checkout."
         reads = "Git worktree inventory and catalog status with --no-optional-locks, the links, ignore rules and tool settings files; GitHub's structure snapshot only with --structure, never the remote."
         does_not = "Does not write the repository, the catalog, .git or GitHub; --structure may refresh only the structure snapshot in the state root."
-        json_data = "catalog, link, exclude, access, tools, sync, changes, format, git, snapshot, dashboard, structure; each has status and next_step."
+        json_data = "catalog, link, exclude, access, tools, sync, changes, format, git, snapshot, structure; each has status and next_step."
         confirmation = "No final confirmation is required for this read-only leaf."
     elif leaf == "canonical sync":
         target = "This clone's catalog, or with --registered every catalog in the registry of the state root."
         reads = "The registry and each catalog's state.json, the catalog work tree and changesets, origin's spec-dock/canonical, and the GitHub structure probe (conditional requests)."
-        writes = "Catalog commits (save and merge, never forced), the push to origin, state.json and the sync log in the state root, the structure snapshot, and the five dashboard files of each main checkout when the structure changed or a file is missing."
+        writes = "Catalog commits (save and merge, never forced), the push to origin, state.json and the sync log in the state root, and the structure snapshot."
         does_not = "Does not force-push, rebase, leave conflict markers, or save held changes (mass deletions, secrets, files over 10 MiB)."
-        json_data = "catalogs[] (catalog, result, saved_commit, merged, pushed, conflicts, holds, blocking, skipped_reason, paused, error) and repositories[] (repository, probe, refreshed, dashboards_written)."
+        json_data = "catalogs[] (catalog, result, saved_commit, merged, pushed, conflicts, holds, blocking, skipped_reason, paused, error) and repositories[] (repository, probe, refreshed, dashboards_written (always 0; kept for compatibility))."
         confirmation = "No final confirmation is required; the periodic job runs this leaf."
     elif leaf == "canonical accept":
         target = "Held paths of this clone's catalog."
@@ -672,7 +672,7 @@ def _help_spec(leaf: str) -> HelpSpec:
     elif leaf == "canonical remove":
         target = "This clone's catalog, the links of its checkouts and its sync registration."
         reads = "The catalog status and ignored files, Git worktree inventory, info/exclude, the registry and the periodic job."
-        writes = "Removes correct links, the catalog worktree, the dashboard files of the main checkout, the three info/exclude lines, the registry entry and state, and the periodic job when no other catalog is registered."
+        writes = "Removes correct links, the catalog worktree, the three info/exclude lines, the registry entry and state, and the periodic job when no other catalog is registered."
         does_not = "Does not delete the local or GitHub spec-dock/canonical branch, the structure snapshot or a real directory at a link path."
         json_data = "removed effects; without --yes the planned effects."
         confirmation = "Apply requires --yes; without it (or with --dry-run) only the plan is reported."
