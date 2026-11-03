@@ -247,6 +247,7 @@ design: {
 			- 持ち方：構造のスナップショット（C10）の版を2に上げ、`pull_requests: {番号: {...}}` を足す。版1を読む前の版の SpecDock は版2を知らない版として扱い、取り直す（`SnapshotStore._read` はもともと知らない版を「ない」と扱う）。
 			- Scope との対応：PR の `headRefName` を、`canonical_structure.branch_names_scope` で Scope に対応づける（`iss-00528`、`chemitaro/iss-00528` など）。同じ Scope に複数の PR があれば、開いているものを先に、新しいものを先に選ぶ。
 			- 失敗：PR の問い合わせだけが失敗したときは、構造の取得を続け、`pull_requests` を前回の値のまま残し、`pull_requests_error` に理由と時刻を書く。ダッシュボードは「PR の状態が分からない」を示す（R-30）。
+			- 形の細部（2026-11-04、#528 と #537 の調整で統括が決めた）：`pull_requests: {"<番号>": {number, state: open|closed|merged, is_draft, head_ref_name, mergeable: mergeable|conflicting|unknown, checks: success|failure|pending|none, created_at, merged_at, closed_at, url}}`、`pull_requests_error: null|{code, message, at}`、`pull_requests_fetched_at: null|<UTC>`。鍵は snake_case、値は小文字（FAILURE と ERROR は failure、PENDING と EXPECTED は pending）。`pull_requests_fetched_at` が null か30分を超えて古いとき、または版1のファイルのときは、読む側は「PR の状態が分からない」と示す。PR の取得は前回の成功から2分を超えたときだけ行い、`GITHUB_RATE_LIMITED` のときは待たずに `pull_requests_error` を書く。新しい版は版1のファイルも読み、書くときは版2にする。
 			- 費用：問い合わせはリポジトリごとに1回増える。GitHub の制限（1時間に5000点）の中で、今の構造の取得と同じ間隔に収める。
 			"""
 		satisfies: ["R-07", "R-30"]
