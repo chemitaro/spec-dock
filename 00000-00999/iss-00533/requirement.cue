@@ -57,7 +57,7 @@ requirements: {
 		text:  "5つのファイルを作るモジュールと関数、`CatalogSyncState.dashboard`、`CANONICAL_DASHBOARD_*` の定数、5つの名前の定数が、提供側のソースと配布物に残らない。"
 		acceptance: [
 			"`spec_dock.runtime.application.canonical_dashboard`、`spec_dock.runtime.domain.canonical_dashboard`、`spec_dock.runtime.presentation.markdown`、`spec_dock.runtime.presentation.puml` を import できず、新しく作った wheel にも入らない",
-			"`src/spec_dock/` に `_refresh_dashboards`、`CANONICAL_DASHBOARD_`、`dashboard_item`、`canonical.dashboard.remove`、5つのファイルの名前が現れない",
+			"`src/spec_dock/runtime/` と `src/spec_dock/asset_layout.py` と配布する `spec-dock/.gitignore` に `_refresh_dashboards`、`CANONICAL_DASHBOARD_`、`dashboard_item`、`canonical.dashboard.remove`、5つのファイルの名前が現れない（配布する文書は R-05 で確かめる。#534 が `migration.md` に5つの名前を書くので、文書は検索の対象にしない）",
 		]
 	}
 	"R-05": {

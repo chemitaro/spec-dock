@@ -20,7 +20,7 @@ design: {
 	"D-02": {
 		title: "定期の同期の手順7"
 		text: """
-			`canonical_sync.refresh_structures` から、スナップショットのパスの計算と `_refresh_dashboards` の呼び出しを消し、`_refresh_dashboards` を消す。`RepositoryResult` は `dashboards_written: int = 0` の欄と `to_json` の項目を残し、作る側はその値を渡さない（常に0）。docstring は「後の版で消す予定の、常に0の項目」と書く。`_record_state` の `dashboard=latest.dashboard` を消す。
+			`canonical_sync.refresh_structures` から、スナップショットのパスの計算と `_refresh_dashboards` の呼び出しを消し、`_refresh_dashboards` を消す。`RepositoryResult` は `dashboards_written: int = 0` の欄と `to_json` の項目を残し、作る側はその値を渡さない（常に0）。docstring は「後の版で消す予定の、常に0の項目」と書く。`_record` の `dashboard=latest.dashboard` を消す。
 			"""
 		satisfies: ["R-01", "R-04"]
 	}
@@ -60,7 +60,7 @@ design: {
 		title: "テストと fixture"
 		text: """
 			- 消す：`tests/cli_runtime/test_issue438_canonical_dashboard.py`、`tests/unit/application/test_canonical_dashboard_golden.py`、`tests/unit/domain/test_canonical_dashboard.py`、`tests/unit/presentation/test_dashboard_board_state.py`、`tests/unit/presentation/test_deps_raw_puml.py`、そのための fixture（`tests/fixtures/issue438/` などテストからだけ読まれるもの）。
-			- 直す：`test_issue429_canonical_status.py` の項目の一覧、`test_issue430_canonical_sync.py` の `dashboards_written`（0 になる）、`test_issue430_legacy_and_public.py` の `dashboard` の往復。
+			- 直す：`test_issue429_canonical_status.py` の項目の一覧、`test_issue430_canonical_sync.py` の `dashboards_written`（0 になる）、`test_issue430_legacy_and_public.py` の `dashboard` の往復、`tests/unit/domain/test_canonical_sync_state.py` の往復の見本（`dashboard` の欄は読んで捨て、書かない）。
 			- 足す：`tests/cli_runtime/test_issue533_dashboard_removal.py`（R-01〜R-03、F-01、F-02、R-04 の import と `src` の検索、R-05 の配布資産）と、wheel のテストの一覧に4つのモジュール。
 			"""
 		satisfies: ["R-01", "R-02", "R-03", "R-04", "R-05", "F-01", "F-02"]
