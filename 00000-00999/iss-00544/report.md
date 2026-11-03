@@ -61,7 +61,10 @@ ID: "iss-00544"
 
 ## Final Quality Gate
 
-（記入中）
+- 合格のコミット：`25d9d420f329407ba380840ff5e5110cae7434c8`（作業ツリーは clean）。記録は `.workbench/final-quality-gate/iss-00544-g1/`（`campaign.json`、`closure.md`、`attempts/01/`）。試行1回で合格。
+- レビューの側：quality-gate-reviewer（opus/high、1人）。観点は functional-correctness、requirements-closure、test-adequacy。pass（P0 0、P1 0、P2 0、P3 1、網羅は完全）。
+- テストの側：`make lint` 終了コード0（ruff check、ruff format check、mypy すべて pass）、`uv run pytest` 終了コード0（3484 passed、7 skipped、26分26秒）。どちらも同じコミット。
+- P3（情報。直していない）：構造の API を2回読んだとき2回目に `cue` を走らせないこと（R-03）を、HTTP を通して確かめるテストはない（`read_structure_facts` の単位では確かめている）。
 
 ## Pull Request
 
