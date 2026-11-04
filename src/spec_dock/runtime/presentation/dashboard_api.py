@@ -162,6 +162,29 @@ def layout_facts(model: DashboardModel) -> dict[str, dict[str, object]]:
     return facts
 
 
+def _active_at(scope: ScopeModel, updated_at: str | None) -> str:
+    """The Scope's last change (iss-00556 D-04): creation, the Issue's last update, completion, and the chosen pull
+    request's opening, merge and closing; a missing or unreadable time is not used."""
+    pr = scope.pr
+    candidates = (
+        scope.created_at,
+        updated_at,
+        scope.closed_at,
+        *((pr.created_at, pr.merged_at, pr.closed_at) if pr is not None else ()),
+    )
+    latest: tuple[datetime, str] | None = None
+    for text in candidates:
+        if not text:
+            continue
+        try:
+            at = parse_timestamp(text)
+        except (TypeError, ValueError):
+            continue
+        if latest is None or at > latest[0]:
+            latest = (at, text)
+    return scope.created_at if latest is None else latest[1]
+
+
 def scope_item(
     model: DashboardModel,
     scope: ScopeModel,
@@ -189,6 +212,7 @@ def scope_item(
         "keep_visible": scope.keep_visible,
         "created_at": scope.created_at,
         "closed_at": scope.closed_at,
+        "active_at": _active_at(scope, node.updated_at if node is not None else None),
         "url": scope.url,
         "path": scope_path(model.repository, scope.id),
         "pr": _pr(scope.pr),

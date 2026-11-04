@@ -10,9 +10,9 @@ import { chip } from "../core/ui.js";
 import { DEFAULTS, index, routeLayout } from "./graph/layout.js";
 import { audit, svg as edgeSvg } from "./graph/router.js";
 import * as M from "./graph/marks.js";
+import { LEGACY_KEY, PREFS_KEY, restorePrefs } from "./graph/prefs.js";
 
 const { esc, ic, stateIcon, STATES } = M;
-const PREFS = "specdock.graph.v1";
 const PHONE = 640;
 // Why there is no graph (F-01). The reason and the next step are in the shell's notices above.
 export function emptyText(data) {
@@ -54,19 +54,24 @@ const V = {
   lastTap: null,
 };
 
+// The saved choices (iss-00556 D-05): version 2, with only some of version 1 carried over (graph/prefs.js).
 function loadPrefs() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(PREFS) || "{}");
-    for (const key of ["mode", "showDone", "deps", "fold"]) if (key in saved) V.opts[key] = saved[key];
-    V.legend = !!saved.legend;
-  } catch {
-    // private windows and blocked storage: keep the defaults
-  }
+  const read = (key) => {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw == null ? null : JSON.parse(raw);
+    } catch {
+      return null; // private windows, blocked storage and broken values: the defaults
+    }
+  };
+  const { opts, legend } = restorePrefs(read(PREFS_KEY), read(LEGACY_KEY), DEFAULTS);
+  Object.assign(V.opts, opts);
+  V.legend = legend;
 }
 function savePrefs() {
   try {
     const { mode, showDone, deps, fold } = V.opts; // the focus lives in the URL, not in the preferences
-    localStorage.setItem(PREFS, JSON.stringify({ mode, showDone, deps, fold, legend: V.legend }));
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ mode, showDone, deps, fold, legend: V.legend }));
   } catch {
     // ignore
   }
@@ -680,19 +685,28 @@ function initialView() {
   V.ty = top;
 }
 
+// The smallest zoom: 0.12, or less when that is what it takes to show the whole graph. With no wrapping
+// (iss-00556 R-07) a graph can be several thousand pixels wide, wider than 0.12 shows on a phone.
+const fitScale = () => {
+  const v = V.el.view;
+  const L = V.EG.layout;
+  const top = barBottom() + 8;
+  return Math.min(1, (v.clientWidth - 16) / L.width, (v.clientHeight - top - 16) / L.height);
+};
+const minScale = () => Math.max(0.02, Math.min(0.12, fitScale()));
+
 function fit() {
   const v = V.el.view;
   const L = V.EG.layout;
   const top = barBottom() + 8;
-  const s = Math.min(1, (v.clientWidth - 16) / L.width, (v.clientHeight - top - 16) / L.height);
-  V.s = Math.max(0.12, s);
+  V.s = Math.max(minScale(), fitScale());
   V.tx = (v.clientWidth - L.width * V.s) / 2;
   V.ty = top + Math.max(0, (v.clientHeight - top - 8 - L.height * V.s) / 2);
   applyT();
 }
 
 function zoomAt(f, cx, cy) {
-  const ns = Math.min(2, Math.max(0.12, V.s * f));
+  const ns = Math.min(2, Math.max(minScale(), V.s * f));
   V.tx = cx - (cx - V.tx) * (ns / V.s);
   V.ty = cy - (cy - V.ty) * (ns / V.s);
   V.s = ns;
