@@ -15,8 +15,8 @@ assurance: {
 }
 
 // 目的と背景（任意）。
-// purpose:    "この Issue が実現する価値"
-// background: "解く問題と、関係者"
+purpose:    "SpecDock 0.8.0（文書の描画 #535 と人のタスクの画面 #554）を出し、epic-00547 の iss-00555（画面の版のリリース）も兼ねる。"
+background: "0.7.0 の後に #535・#554 が main に入った。リリースは1つにまとめる（統括の決定）。手順は #553（0.7.0）と同じ。マージの後のタグ、導入、配布は統括が行う。"
 
 // 対象と対象外（任意）。
 // includes: ["..."]
@@ -25,11 +25,22 @@ assurance: {
 // 観測できる要件。番号（R-01、R-02、…）をキーにする。
 // title は必須。acceptance（観測できる受け入れの条件）は standard 以上で必須。
 requirements: {
-	// "R-01": {
-	// 	title: "利用者が〜できる"
-	// 	text:  "詳しい説明"
-	// 	acceptance: ["〜が観測できる"]
-	// }
+	"R-01": {
+		title: "版が 0.8.0 になる"
+		text:  "`pyproject.toml`、`uv.lock`、`system/spec-dock-version`（提供側と dogfood の写し）が 0.8.0 になる。"
+	}
+	"R-02": {
+		title: "migration.md が 0.8.0 の変更を説明する"
+		text:  "提供側と dogfood の `migration.md`（バイト一致）に「## 0.8.0 への更新」の節がある。文書の描画（#535）、人のタスクの画面（#554）、常駐の自動の起動し直しを述べ、#567 は main にマージ済みのときだけ書く。"
+	}
+	"R-03": {
+		title: "0.7.0 の配布資産を持つリポジトリが installation update で上がる"
+		text:  "`static-inventory.json` が変わった配布資産（`reference_cli.md`、`migration.md`、版のファイル）の今のハッシュと、0.7.0 のバイトを既知の古い版として持つ。"
+	}
+	"R-04": {
+		title: "タグ・導入・配布は統括が行う"
+		text:  "マージの後のタグ、パッケージの導入、5つのリポジトリへの配布は、この Issue の PR では行わない。"
+	}
 }
 
 // 失敗・境界の条件。番号（F-01、…）をキーにする。
