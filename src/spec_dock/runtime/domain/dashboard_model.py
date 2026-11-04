@@ -279,7 +279,8 @@ class _Graph:
         return out, direct
 
 
-def build_model(snapshot: StructureSnapshot, *, now: datetime) -> DashboardModel:
+def build_model(snapshot: StructureSnapshot, *, now: datetime, confirmed_at: str | None = None) -> DashboardModel:
+    """`confirmed_at` is when the structure was last confirmed (`structure_confirmed_at`); it defaults to `fetched_at`."""
     graph = _Graph(snapshot)
     readiness = evaluate_all(snapshot)
     pull_requests = PullRequestInfo.of(snapshot)
@@ -319,11 +320,12 @@ def build_model(snapshot: StructureSnapshot, *, now: datetime) -> DashboardModel
             url=node.url,
         )
     cleanup = _cleanup(graph, scopes)
+    confirmed = confirmed_at or snapshot.fetched_at
     return DashboardModel(
         snapshot=snapshot,
         repository=snapshot.repository,
-        fetched_at=snapshot.fetched_at,
-        stale=now - parse_timestamp(snapshot.fetched_at) > STALE_AFTER,
+        fetched_at=confirmed,
+        stale=now - parse_timestamp(confirmed) > STALE_AFTER,
         anomalies=snapshot.anomalies,
         pull_requests=pull_requests,
         pull_request_status=pr_status,

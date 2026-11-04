@@ -108,7 +108,7 @@ ARTIFACT_SCOPEの@rootはArtifact所有者だけで、Scope作成/Startの対象
 |---|---|
 | `schema` | `specdock.dashboard-summary/v1` |
 | `repository` | `github.com/<owner>/<name>` |
-| `fetched_at`、`stale` | 構造を取得した時刻（UTC）と、30分を超えて古いか |
+| `fetched_at`、`stale` | 最後に GitHub の構造を確かめた時刻（UTC）と、30分を超えて古いか。時刻は、スナップショットの取得と、定期の同期の確かめ（probe。エラーが記録されていないとき）の新しいほう。構造に変化がなく取り直されない間も新しくなる（意味だけが変わり、欄の名前と型は同じ） |
 | `counts` | `total`、状態ごとの数 `by_state`（`done`、`doing`、`blocked`、`ready`、`unknown`）、種類ごとの数 `by_kind`（`initiative`、`epic`、`issue` の各 `total` と状態ごとの数） |
 | `completion_ratio` | 終わった数／全体の数（Scopeがなければ`null`） |
 | `awaiting_merge`、`in_progress`、`ready`、`blocked` | ボードの列の一覧（推奨順）。各要素は`id`、`number`、`kind`、`title`、`state`、`reason`。`awaiting_merge`は`merge`（`mergeable`か`needs_fix`）を足します。`in_progress`はマージ待ちを除きます |
