@@ -66,9 +66,23 @@ document.addEventListener("click", (event) => {
   }
 });
 
-export function renderNotices(target, data, error) {
+// The foreground `serve` keeps running after a package update (iss-00530); ask for a restart (iss-00535 R-05).
+export function restartNotice(server) {
+  if (!server?.restart_required) return null;
+  const installed = server.installed_version ? ` ${server.installed_version}` : "";
+  return {
+    code: "SERVER_RESTART_REQUIRED",
+    level: "warning",
+    text: `SpecDock が${installed} に更新されました。このサーバーは ${server.version} のまま動いています。前面の serve を止めて起動し直すと、新しい版で表示します。`,
+    next_steps: ["spec-dock dashboard serve"],
+  };
+}
+
+export function renderNotices(target, data, error, server) {
   const notices = [...(data?.notices || [])];
   if (error) notices.unshift({ code: "LOAD_FAILED", level: "error", text: error, next_steps: ["spec-dock dashboard list"] });
+  const restart = restartNotice(server);
+  if (restart) notices.unshift(restart);
   target.innerHTML = notices
     .map(
       (item) =>

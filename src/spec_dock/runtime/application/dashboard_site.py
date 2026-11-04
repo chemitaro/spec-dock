@@ -61,6 +61,7 @@ class SiteRepository:
     catalog: Path | None
     catalogs: tuple[str, ...]
     problem: Problem | None = None
+    checkout: Path | None = None  # the registry's main checkout: where the repository's CUE types live (iss-00535)
 
     @property
     def key(self) -> str:
@@ -142,7 +143,9 @@ class DashboardSite:
         for key, items in groups.items():
             repository = GithubRepository.parse(key)
             if len(items) == 1:
-                served[key] = SiteRepository(repository, Path(items[0].catalog), (items[0].catalog,))
+                served[key] = SiteRepository(
+                    repository, Path(items[0].catalog), (items[0].catalog,), checkout=Path(items[0].main_checkout)
+                )
             else:
                 served[key] = SiteRepository(repository, None, tuple(item.catalog for item in items), "ambiguous")
         # Unreadable marks never unhide (fail closed): keep the last readable marks, and before any readable

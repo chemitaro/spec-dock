@@ -9,6 +9,7 @@ import { VIEWS } from "./views/index.js";
 import { mountSearch } from "./views/_shared/search.js";
 
 const REFRESH_MS = 5000;
+const SERVER_MS = 60000; // the server reads the installed version every 60 seconds (iss-00530)
 const root = document.getElementById("view");
 const top = document.getElementById("top");
 const mobileTabs = document.getElementById("mtabs");
@@ -17,6 +18,7 @@ const noticeArea = document.getElementById("notices");
 const state = {
   route: parseRoute(location.href),
   repositories: [],
+  server: null, // the listing's `server` (version, restart_required)
   data: null, // structure JSON of the current repository
   loadedAt: 0, // performance.now() when data arrived; the band counts the age on from it
   scope: null, // scope JSON on the detail screen
@@ -66,7 +68,7 @@ function render() {
   document.title = title();
   renderTop(top, mobileTabs, state);
   mountSearch(top.querySelector("#search-slot"), { route: state.route, data: state.data, navigate }); // iss-00531
-  renderNotices(noticeArea, state.data, state.error);
+  renderNotices(noticeArea, state.data, state.error, state.server);
   if (state.view !== module) {
     state.view?.dispose?.();
     root.replaceChildren();
@@ -154,6 +156,19 @@ function interceptLinks(event) {
   navigate(url.pathname + url.search);
 }
 
+// Re-read the listing's `server` so a package update shows the restart notice without reloading (iss-00535 R-05).
+async function checkServer() {
+  if (document.hidden) return;
+  try {
+    const listing = await api.repositories();
+    const before = state.server?.restart_required;
+    state.server = listing.server ?? null;
+    if (state.server?.restart_required !== before) renderNotices(noticeArea, state.data, state.error, state.server);
+  } catch {
+    // keep the last answer; the next tick tries again
+  }
+}
+
 async function boot() {
   document.title = title(); // a `hello` answered before the first render still reports the screen's title
   if (state.route.embed) document.documentElement.dataset.embed = "1";
@@ -162,6 +177,7 @@ async function boot() {
   try {
     const listing = await api.repositories();
     state.repositories = listing.repositories;
+    state.server = listing.server ?? null;
     bridge.setAllowedHosts(listing.server?.embed_hosts);
   } catch (error) {
     bridge.setAllowedHosts([]);
@@ -181,6 +197,7 @@ async function boot() {
   }
   render();
   setInterval(refresh, REFRESH_MS);
+  setInterval(checkServer, SERVER_MS);
   document.addEventListener("visibilitychange", refresh);
 }
 

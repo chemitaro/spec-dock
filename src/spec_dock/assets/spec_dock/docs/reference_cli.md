@@ -126,6 +126,7 @@ ARTIFACT_SCOPEの@rootはArtifact所有者だけで、Scope作成/Startの対象
 `dashboard serve`のサーバーが守る約束です。項目を足すのは版を変えずに行い、消すか意味を変えるときは版を上げます。画面の中のJSON（`/api/v1/r/…/structure`と`scopes/<ID>`）と、表示の切り替えの問い合わせは契約にしません。
 
 - **画面の道**：`/`（横断の概況）、`/r/<host>/<owner>/<name>/`（ホーム）、`…/graph`、`…/board`、`…/timeline`、`…/scopes/<ID>`。`/r/<host>/<owner>/<name>/scopes/<ID>`と`?embed=1`は変えません。
+- **文書**：`/r/<host>/<owner>/<name>/scopes/<ID>/doc`は、CUEのScopeの要件・設計・計画を、`scope render`と同じ描画でその場でHTMLにして返します（デザインシステムは`/ds/`、図の部品は`/vendor/`から読み、インターネットは要りません）。評価が通らなければ検査の結果だけのページ、`cue`がないか時間切れなら理由と次の1手のページを503で返します。`…/scopes/<ID>/doc/<道>`は、`requirement.md`、`design.md`、`plan.md`、`report.md`と、`artifacts/`と`discussions/`の直下の、名前に`adr-`を含む`.md`（ADR）を、デザインシステムの薄いページに包んで返します。ほかの道、リンク、ないファイルは404です。どちらも下の資料と同じ見出しで切り離します。結果は、描画が読むファイルの時刻と大きさが変わるまでサーバーのメモリに覚え、何も書きません。
 - **API**：`GET /api/v1/repositories`、`GET /api/v1/r/<host>/<owner>/<name>/{summary|structure|scopes/<ID>|revision}`（`schema: "specdock.dashboard/v1"`）。`summary`は上の`specdock.dashboard-summary/v1`で、`dashboard summary`と同じ内容です（データがなければ同じコードで503）。APIにはCORSの見出しを付けません。
 - **受け付けるもの**：`GET`、`HEAD`と、「見た」の口の`POST`だけ（ほかは405）。`Host`が`127.0.0.1`、`localhost`、TailscaleのIP、MagicDNSの名前と待ち受けの番号の組でなければ421。
 - **資料**：カタログのScopeのディレクトリの通常のファイルを`/r/<host>/<owner>/<name>/files/<ID>/<道>`から配り、すべての応答に`Content-Security-Policy: sandbox allow-scripts allow-popups; frame-ancestors <埋め込みの許可>`と`X-Content-Type-Options: nosniff`を付けます（リンク、`..`、ディレクトリは断ります）。`/ds/`（デザインシステム）と`/vendor/`（図の部品）だけに`Access-Control-Allow-Origin: *`を付けます。
@@ -144,7 +145,7 @@ ARTIFACT_SCOPEの@rootはArtifact所有者だけで、Scope作成/Startの対象
 - **systemd**：`${XDG_CONFIG_HOME:-~/.config}/systemd/user/spec-dock-dashboard.service`、`Type=simple`、`Restart=always`、`RestartSec=10`、`WantedBy=default.target`。出力はjournal（`journalctl --user -u spec-dock-dashboard`）。systemdのユーザーの管理が一時的に応えないときも、単位があれば`status`に見え、`uninstall`で外せます。
 - **前面の`serve`との共存**：`--service`のサーバーは、ほかのサーバーが`dashboard/server.lock`を持っていれば終わらずに30秒ごとに取り直して待ち、そのサーバーが止まれば引き継ぎます。待っている間のSIGTERMでは終了コード0です。前面の`serve`は、常駐が動いていればそのURLを示して終わります。
 - **Tailscale**：`--service --tailscale`で住所が得られなければ`127.0.0.1`だけで起動し、30秒ごとに住所を取り直して、得られたら待ち受けと`Host`の検査と埋め込みの許可と在りかの記録の`urls.tailscale`に足します。
-- **版の更新**：サーバーは60秒ごとに入っているパッケージの版を読み直します。`--service`のサーバーは、版が変わっていれば在りかの記録を消して終了コード75で終わり（CLIのJSONは書きません）、launchdとsystemdが新しい版で起動し直します。前面の`serve`は終わらず、標準エラーに1回知らせ、`/api/v1/repositories`の`server`に`installed_version`と`restart_required: true`を出します。
+- **版の更新**：サーバーは60秒ごとに入っているパッケージの版を読み直します。`--service`のサーバーは、版が変わっていれば在りかの記録を消して終了コード75で終わり（CLIのJSONは書きません）、launchdとsystemdが新しい版で起動し直します。前面の`serve`は終わらず、標準エラーに1回知らせ、`/api/v1/repositories`の`server`に`installed_version`と`restart_required: true`を出します。画面は60秒ごとにこれを読み、上の知らせの帯で起動し直しを促します。
 
 ## 人のタスクの契約（`specdock.todo/v1`、`specdock.todo-list/v1`）
 

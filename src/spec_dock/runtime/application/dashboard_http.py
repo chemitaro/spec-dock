@@ -16,10 +16,18 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import json
 import os
+from pathlib import Path
 import stat
 from typing import TYPE_CHECKING, Final
 from urllib.parse import unquote
 
+from spec_dock.runtime.application.dashboard_documents import (
+    ScopeDocuments,
+    document_details,
+    failure_page,
+    is_cue_scope,
+    markdown_page,
+)
 from spec_dock.runtime.application.dashboard_scope_details import (
     StructureFactsCache,
     read_scope_details,
@@ -42,9 +50,9 @@ from spec_dock.runtime.presentation.dashboard_summary import summary_document
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sequence
-    from pathlib import Path
 
     from spec_dock.runtime.application.dashboard_site import DashboardSite, RepositoryView, SiteRepository
+    from spec_dock.runtime.domain.dashboard_model import ScopeModel
 
 SEEN_HEADER: Final = "x-specdock-dashboard"
 SCREENS: Final = frozenset({"graph", "board", "timeline"})
@@ -112,6 +120,7 @@ class DashboardHttp:
         self.started_at = started_at
         self.now = now
         self.facts = StructureFactsCache()  # iss-00544 D-02: assurance levels remembered across requests
+        self.documents = ScopeDocuments()  # iss-00535 D-01: drawings remembered by their files' times
 
     # --- Headers -----------------------------------------------------------------------------------------------
 
@@ -237,6 +246,8 @@ class DashboardHttp:
             return self._html(404, page, embed=embed)
         if is_files:
             return self._file(site, rest[1:])
+        if len(rest) >= 3 and rest[0] == "scopes" and rest[2] == "doc":
+            return self._document(site, rest[1], rest[3:])
         if not rest or (len(rest) == 1 and rest[0] in SCREENS) or (len(rest) == 2 and rest[0] == "scopes"):
             return self._shell(embed)
         return self._plain(404, "not found")
@@ -263,6 +274,65 @@ class DashboardHttp:
         if body is None:
             return self._material(404, b"not found", "text/plain; charset=utf-8")
         return self._material(200, body, content_type(rest[-1]))
+
+    # --- Documents (iss-00535 D-02) ------------------------------------------------------------------------------
+
+    def _scope_place(self, site: SiteRepository, scope_id: str) -> tuple[Path, Path, ScopeModel] | Response:
+        """The Scope directory, the repository root for the CUE types and the Scope's model, or a refusal."""
+        refused = self._material(404, b"not found", "text/plain; charset=utf-8")
+        if site.catalog is None:
+            return self._file(site, [])  # the same 409 as materials
+        view = self.site.view(site)
+        model = view.model.scopes.get(scope_id) if view.model is not None else None
+        if model is None:
+            return refused
+        try:
+            directory = site.catalog / Path(*scope_relative(scope_id).parts)
+        except ValueError:
+            return refused
+        if not _is_directory(directory):
+            return refused
+        return directory, site.checkout or site.catalog, model
+
+    def _document(self, site: SiteRepository, scope_id: str, parts: list[str]) -> Response:
+        place = self._scope_place(site, scope_id)
+        if isinstance(place, Response):
+            return place
+        directory, root, model = place
+        if parts:
+            page = markdown_page(directory, parts, scope_id=scope_id, title=model.title)
+            if page is None:
+                return self._material(404, b"not found", "text/plain; charset=utf-8")
+            return self._material(200, page.encode("utf-8"), "text/html; charset=utf-8")
+        if not is_cue_scope(directory):
+            return self._material(404, b"not found", "text/plain; charset=utf-8")
+        drawn = self.documents.drawn(
+            scope_id=scope_id, kind=model.kind, title=model.title, directory=directory, repository_root=root
+        )
+        if drawn.html is None:
+            page = failure_page(scope_id, model.title, drawn.check)
+            return self._material(503, page.encode("utf-8"), "text/html; charset=utf-8")
+        return self._material(200, drawn.html.encode("utf-8"), "text/html; charset=utf-8")
+
+    def _document_details(
+        self, site: SiteRepository, model: ScopeModel, details: dict[str, object]
+    ) -> dict[str, object]:
+        directory: Path | None = None
+        if site.catalog is not None:
+            try:
+                directory = site.catalog / Path(*scope_relative(model.id).parts)
+            except ValueError:
+                directory = None
+        return document_details(
+            details,
+            self.documents,
+            base=f"/r/{site.key}/scopes/{model.id}/doc",
+            scope_id=model.id,
+            kind=model.kind,
+            title=model.title,
+            directory=directory,
+            repository_root=site.checkout or site.catalog or Path(),
+        )
 
     # --- API ---------------------------------------------------------------------------------------------------
 
@@ -334,6 +404,8 @@ class DashboardHttp:
             )
             known = view.model is not None and op[1] in view.model.scopes
             details = read_scope_details(site, op[1]) if known else None  # iss-00531 D-04
+            if details is not None and view.model is not None:
+                details = self._document_details(site, view.model.scopes[op[1]], details)  # iss-00535 D-02
             one = {op[1]: scope_facts(details)} if details is not None else None
             scope_json = scope_document(view, op[1], baseline=baseline, details=details, readings=one)
             if scope_json is None:
@@ -389,6 +461,13 @@ def _segments(raw: str) -> list[str] | None:
             return None
         found.append(value)
     return found
+
+
+def _is_directory(path: Path) -> bool:
+    try:
+        return stat.S_ISDIR(os.lstat(path).st_mode)
+    except OSError:
+        return False
 
 
 def _read_regular(root: Path, parts: Sequence[str]) -> bytes | None:

@@ -64,3 +64,17 @@
     & .sd-progress ul { grid-template-columns: 1fr; }
   }
 }
+/* 文書のタブ（iss-00535 D-04）：札、検査の結果、計画の進み具合、文書の枠。 */
+[data-view="scope"] {
+  & .sd-doc[data-current="true"] { border-color: var(--ds-accent); box-shadow: 0 0 0 1px var(--ds-accent) inset; }
+  & .sd-doc__actions { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+  & .sd-doc__actions a[aria-current="true"] { color: var(--ds-text); font-weight: 700; text-decoration: none; }
+  & .sd-docview { margin-top: 14px; }
+  & .sd-docframe { display: block; width: 100%; height: min(78vh, 1100px); min-height: 420px; border: 1px solid var(--ds-border); border-radius: var(--ds-radius-l); background: var(--ds-bg); }
+  & .sd-findings { margin-top: 6px; }
+  & .sd-findings li { overflow-wrap: anywhere; }
+  & .sd-callout > div { min-width: 0; display: grid; gap: 4px; }
+  & .sd-steps { margin-top: 10px; padding-left: 0; list-style: none; }
+  & .sd-steps li { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+  & .sd-tabpanel[data-tab="docs"] > .sd-progress { margin-bottom: 14px; }
+}
