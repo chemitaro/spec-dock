@@ -18,7 +18,7 @@ design: {
 	}
 	"D-02": {
 		title:     "migration.md の節"
-		text:      "提供側 `docs/migration.md` の「## 0.6.0 への更新」の後に「## 0.7.0 への更新」を足す。内容は各 Issue の report.md（#549・#550・#551・#552・#556）と `reference_cli.md` で確かめて書く。dogfood の写しはバイトで一致させる。`git log v0.6.0..HEAD` で、リリースの時点で main に入っているものだけを書く。"
+		text:      "提供側 `docs/migration.md` の「## 0.6.0 への更新」の後に「## 0.7.0 への更新」を足す。内容は各 Issue の report.md（#549・#550・#551・#552・#556・#560）と `reference_cli.md` で確かめて書く。dogfood の写しはバイトで一致させる。`git log v0.6.0..HEAD` で、リリースの時点で main に入っているものだけを書く。"
 		satisfies: ["R-02"]
 	}
 	"D-03": {
