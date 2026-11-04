@@ -17,7 +17,9 @@ design: {
 		title: "可視の判定（`graph/layout.js` の `visibility`）"
 		text: """
 			`visible(s) = showDone || s.state !== "done" || 見える子を持つ || context(s)`。
-			`context(s)` は、親 `p = byId(s.parent_id)` があり（自分でなく）、`p.state !== "done"` か `p.id === focus` のとき真。
+			`context(s)` は、親 `p = byId(s.parent_id)` があり（自分でなく）、`showsDone(p)` のとき真。
+			`showsDone(p) = showDone || p.id === focus || (p.state !== "done" && p が片付けの候補 all_descendants_closed でない)`（片付けの候補は `layout` の `cleanup` の `code` で見る）。D-03 の段の種類も同じ `showsDone` で決める。
+			絞った Scope 自身は、片付けの候補でも畳まない（`folded` で `focus` を除く。畳むと絞った図が空になるため）。
 			- 終わった Epic の子は、親が終わっているので、開いた子孫がなければ出ない。終わった Epic は見える子がなく、今の `frameBlock` の畳んだ枠（`compact`）になり、画面の枠は配下すべての数（`tally`、完了 n/n）を示す（画面のコードは変えない）。
 			- 範囲を絞った Scope の子は `context` が真になる。絞った Scope の孫より下は通常の規則に従う。
 			- 親の循環は今の `seen` の守りで止まる。`index` の `kids` と `byId` を使い、親が構造にない Scope は親のない扱いにする。
@@ -39,7 +41,7 @@ design: {
 			1. 組：開いた枠（`tier` 0〜2）、開いた箱、終わったもの（`tier` 3 の枠と終わった箱）の順。枠は「子を持つか、Issue でない」Scope。
 			2. 開いた枠どうしは `tier`、`recent` の新しい順。開いた箱どうしは `rank`（Epic R-31）。終わったものどうしは、箱は `closed_at`（なければ `active_at`）、枠は `recent` の新しい順。
 			3. 同じなら番号の小さい順。
-			段：`childrenBlock` と木の `walk` は、枠ごとに段の種類を決める。終わった子を出す枠（`showDone`、親が開いている、絞った Scope。D-01 の `context` と同じ条件）では `stage.all`、それ以外（開いた子孫を持つ閉じた親）では `stage.open` を使い、どちらも値がなければ 1。終わった子を出す枠ではすべての子（開いたものと終わったもの）が出るので、`stage.all` の段は、出ている終わった依存を左から右へ並べる（片付けの候補として畳まれた子は、畳んだまとまりがその段に入る）。
+			段：`childrenBlock` と木の `walk` は、枠ごとに段の種類を決める。終わった子を出す枠（D-01 の `showsDone`）では `stage.all`、それ以外（開いた子孫を持つ閉じた親など）では `stage.open` を使い、どちらも値がなければ 1。終わった子を出す枠ではすべての子（開いたものと終わったもの）が出るので、`stage.all` の段は、出ている終わった依存を左から右へ並べる（片付けの候補として畳まれた子は、畳んだまとまりがその段に入る）。
 			`childrenBlock` と木の `walk` は、この段の後にこの比べ方で並べる（`byStageRank` を段と `byActivity` にする）。最上位（`roots`）も `byActivity` で並べ、Initiative を先にする規則はやめる。入れ子の最上位の枠と、親のない箱（`loose`）の分け方は今のまま。
 			"""
 		satisfies: ["R-03", "F-01"]
