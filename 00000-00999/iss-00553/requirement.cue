@@ -31,7 +31,7 @@ requirements: {
 	}
 	"R-02": {
 		title: "上げるときの文書が 0.7.0 の変更を説明する"
-		text:  "`migration.md`（提供側と dogfood の写しはバイト一致）に「## 0.7.0 への更新」の節があり、`todo` の10のコマンド（公開 61 → 71）、記録の置き場（カタログの `todos/`）、集約、`dashboard summary` の `todos`、設定の3段、`todo check` と `cue`、`TODO_*` のコード、スキルの入れ替えに `installation update` が要ること、構造の図の既定の変更と保存のキーの `v2`、最初の1手、戻し方を述べる。"
+		text:  "`migration.md`（提供側と dogfood の写しはバイト一致）に「## 0.7.0 への更新」の節があり、`todo` の10のコマンド（公開 61 → 71）、記録の置き場（カタログの `todos/`）、集約、`dashboard summary` の `todos`、設定の3段、`todo check` と `cue`、`TODO_*` のコード、スキルの入れ替えに `installation update` が要ること、ダッシュボードの表示の設定（#552）、構造の図の既定の変更と保存のキーの `v2`、最初の1手、戻し方を述べる。"
 	}
 	"R-03": {
 		title: "0.6.0 の配布資産を持つリポジトリが `installation update` で上がる"

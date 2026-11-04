@@ -14,9 +14,9 @@ package spec
 // すべての要件に、それを満たす手順が要る（dropped の手順は数えない）。
 // strict 以上では、dropped でない手順のすべてが、いずれかの番号に結び付く。
 steps: {
-	"S-01": {title: "版を 0.7.0 にする", realizes: ["R-01"], status: "doing", session: "impl"}
-	"S-02": {title: "migration.md に 0.7.0 の節を足す", realizes: ["R-02"], status: "doing", after: ["S-01"], session: "impl"}
-	"S-03": {title: "static-inventory.json と fixture とテストを足す", realizes: ["R-03"], status: "todo", after: ["S-02"], session: "impl"}
+	"S-01": {title: "版を 0.7.0 にする", realizes: ["R-01"], status: "done", session: "impl"}
+	"S-02": {title: "migration.md に 0.7.0 の節を足す", realizes: ["R-02"], status: "done", after: ["S-01"], session: "impl"}
+	"S-03": {title: "static-inventory.json と fixture とテストを足す", realizes: ["R-03"], status: "done", after: ["S-02"], session: "impl"}
 	"S-04": {title: "R-04 はマージの後に統括が行う", realizes: ["R-04"], status: "todo", after: ["S-03"]}
 }
 
