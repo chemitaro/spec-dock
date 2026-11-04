@@ -22,7 +22,7 @@ steps: {
 	"S-04": {title: "`todo.md` を足し、`README.md`、`canonical.md` を直す", realizes: ["R-04"], status: "done", after: ["S-02"], session: "impl"}
 	"S-05": {title: "写しと `static-inventory.json` を合わせ、テストを通す（Green）", realizes: ["R-05"], status: "done", after: ["S-03", "S-04"], session: "impl"}
 	"S-06": {title: "候補の wheel と隔離した利用者のリポジトリで、規則のとおりの登録・完了を確かめる", realizes: ["R-05"], status: "done", after: ["S-05"], session: "impl"}
-	"S-07": {title: "コードのレビュー、最終品質ゲート、report.md、PR と CI", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05"], status: "todo", after: ["S-06"], session: "impl"}
+	"S-07": {title: "コードのレビュー、最終品質ゲート、report.md、PR と CI", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05"], status: "done", after: ["S-06"], session: "impl"}
 }
 
 // テスト。番号（T-01、…）をキーにする。title と verifies（確かめる要件・失敗の条件の番号）が必須。
