@@ -1,0 +1,3306 @@
+[
+ {
+  "name": "github.com/chemitaro/generic-mona",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "wait",
+   "fold": true
+  },
+  "edges": 2,
+  "iters": 0,
+  "ms": 2,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/generic-mona",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "wait",
+   "fold": false
+  },
+  "edges": 2,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/generic-mona",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true
+  },
+  "edges": 4,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/generic-mona",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": false
+  },
+  "edges": 4,
+  "iters": 0,
+  "ms": 1,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/generic-mona",
+  "opts": {
+   "mode": "nest",
+   "showDone": true,
+   "deps": "wait",
+   "fold": true
+  },
+  "edges": 2,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/generic-mona",
+  "opts": {
+   "mode": "nest",
+   "showDone": true,
+   "deps": "wait",
+   "fold": false
+  },
+  "edges": 2,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/generic-mona",
+  "opts": {
+   "mode": "nest",
+   "showDone": true,
+   "deps": "all",
+   "fold": true
+  },
+  "edges": 22,
+  "iters": 5,
+  "ms": 22,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/generic-mona",
+  "opts": {
+   "mode": "nest",
+   "showDone": true,
+   "deps": "all",
+   "fold": false
+  },
+  "edges": 22,
+  "iters": 5,
+  "ms": 13,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/generic-mona",
+  "opts": {
+   "mode": "tree",
+   "showDone": false,
+   "deps": "wait",
+   "fold": true
+  },
+  "edges": 2,
+  "iters": 1,
+  "ms": 1,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/generic-mona",
+  "opts": {
+   "mode": "tree",
+   "showDone": false,
+   "deps": "wait",
+   "fold": false
+  },
+  "edges": 2,
+  "iters": 1,
+  "ms": 1,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/generic-mona",
+  "opts": {
+   "mode": "tree",
+   "showDone": false,
+   "deps": "all",
+   "fold": true
+  },
+  "edges": 4,
+  "iters": 1,
+  "ms": 1,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/generic-mona",
+  "opts": {
+   "mode": "tree",
+   "showDone": false,
+   "deps": "all",
+   "fold": false
+  },
+  "edges": 4,
+  "iters": 1,
+  "ms": 1,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/generic-mona",
+  "opts": {
+   "mode": "tree",
+   "showDone": true,
+   "deps": "wait",
+   "fold": true
+  },
+  "edges": 2,
+  "iters": 1,
+  "ms": 1,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/generic-mona",
+  "opts": {
+   "mode": "tree",
+   "showDone": true,
+   "deps": "wait",
+   "fold": false
+  },
+  "edges": 2,
+  "iters": 1,
+  "ms": 1,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/generic-mona",
+  "opts": {
+   "mode": "tree",
+   "showDone": true,
+   "deps": "all",
+   "fold": true
+  },
+  "edges": 22,
+  "iters": 4,
+  "ms": 20,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/generic-mona",
+  "opts": {
+   "mode": "tree",
+   "showDone": true,
+   "deps": "all",
+   "fold": false
+  },
+  "edges": 22,
+  "iters": 4,
+  "ms": 22,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/generic-mona",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "init-00001"
+  },
+  "edges": 4,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/generic-mona",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00017"
+  },
+  "edges": 2,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/generic-mona",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00021"
+  },
+  "edges": 1,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "wait",
+   "fold": true
+  },
+  "edges": 12,
+  "iters": 1,
+  "ms": 4,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "wait",
+   "fold": false
+  },
+  "edges": 12,
+  "iters": 1,
+  "ms": 3,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true
+  },
+  "edges": 50,
+  "iters": 1,
+  "ms": 15,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": false
+  },
+  "edges": 50,
+  "iters": 1,
+  "ms": 14,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "nest",
+   "showDone": true,
+   "deps": "wait",
+   "fold": true
+  },
+  "edges": 12,
+  "iters": 3,
+  "ms": 7,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "nest",
+   "showDone": true,
+   "deps": "wait",
+   "fold": false
+  },
+  "edges": 12,
+  "iters": 2,
+  "ms": 6,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "nest",
+   "showDone": true,
+   "deps": "all",
+   "fold": true
+  },
+  "edges": 142,
+  "iters": 10,
+  "ms": 435,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "nest",
+   "showDone": true,
+   "deps": "all",
+   "fold": false
+  },
+  "edges": 207,
+  "iters": 9,
+  "ms": 708,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "tree",
+   "showDone": false,
+   "deps": "wait",
+   "fold": true
+  },
+  "edges": 12,
+  "iters": 2,
+  "ms": 9,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "tree",
+   "showDone": false,
+   "deps": "wait",
+   "fold": false
+  },
+  "edges": 12,
+  "iters": 2,
+  "ms": 8,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "tree",
+   "showDone": false,
+   "deps": "all",
+   "fold": true
+  },
+  "edges": 50,
+  "iters": 4,
+  "ms": 52,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "tree",
+   "showDone": false,
+   "deps": "all",
+   "fold": false
+  },
+  "edges": 50,
+  "iters": 4,
+  "ms": 52,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "tree",
+   "showDone": true,
+   "deps": "wait",
+   "fold": true
+  },
+  "edges": 12,
+  "iters": 2,
+  "ms": 23,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "tree",
+   "showDone": true,
+   "deps": "wait",
+   "fold": false
+  },
+  "edges": 12,
+  "iters": 2,
+  "ms": 23,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "tree",
+   "showDone": true,
+   "deps": "all",
+   "fold": true
+  },
+  "edges": 207,
+  "iters": 5,
+  "ms": 676,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "tree",
+   "showDone": true,
+   "deps": "all",
+   "fold": false
+  },
+  "edges": 207,
+  "iters": 5,
+  "ms": 775,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "init-00039"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00048"
+  },
+  "edges": 1,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00059"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00067"
+  },
+  "edges": 6,
+  "iters": 1,
+  "ms": 1,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00074"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00077"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "init-00079"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00080"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00090"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00112"
+  },
+  "edges": 25,
+  "iters": 6,
+  "ms": 12,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00158"
+  },
+  "edges": 10,
+  "iters": 1,
+  "ms": 1,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00270"
+  },
+  "edges": 5,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00283"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00295"
+  },
+  "edges": 13,
+  "iters": 1,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00312"
+  },
+  "edges": 7,
+  "iters": 1,
+  "ms": 1,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00356"
+  },
+  "edges": 9,
+  "iters": 1,
+  "ms": 1,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00365"
+  },
+  "edges": 8,
+  "iters": 1,
+  "ms": 1,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "init-00423"
+  },
+  "edges": 30,
+  "iters": 1,
+  "ms": 3,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00427"
+  },
+  "edges": 17,
+  "iters": 1,
+  "ms": 1,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "init-00468"
+  },
+  "edges": 20,
+  "iters": 1,
+  "ms": 3,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00471"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00512"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00526"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/spec-dock",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00547"
+  },
+  "edges": 9,
+  "iters": 1,
+  "ms": 1,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "wait",
+   "fold": true
+  },
+  "edges": 11,
+  "iters": 9,
+  "ms": 22,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "wait",
+   "fold": false
+  },
+  "edges": 11,
+  "iters": 7,
+  "ms": 14,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true
+  },
+  "edges": 24,
+  "iters": 5,
+  "ms": 29,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": false
+  },
+  "edges": 20,
+  "iters": 7,
+  "ms": 16,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "nest",
+   "showDone": true,
+   "deps": "wait",
+   "fold": true
+  },
+  "edges": 11,
+  "iters": 7,
+  "ms": 11,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "nest",
+   "showDone": true,
+   "deps": "wait",
+   "fold": false
+  },
+  "edges": 11,
+  "iters": 6,
+  "ms": 12,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "nest",
+   "showDone": true,
+   "deps": "all",
+   "fold": true
+  },
+  "edges": 43,
+  "iters": 3,
+  "ms": 100,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "nest",
+   "showDone": true,
+   "deps": "all",
+   "fold": false
+  },
+  "edges": 56,
+  "iters": 4,
+  "ms": 424,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "tree",
+   "showDone": false,
+   "deps": "wait",
+   "fold": true
+  },
+  "edges": 11,
+  "iters": 2,
+  "ms": 9,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "tree",
+   "showDone": false,
+   "deps": "wait",
+   "fold": false
+  },
+  "edges": 11,
+  "iters": 2,
+  "ms": 8,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "tree",
+   "showDone": false,
+   "deps": "all",
+   "fold": true
+  },
+  "edges": 20,
+  "iters": 2,
+  "ms": 28,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "tree",
+   "showDone": false,
+   "deps": "all",
+   "fold": false
+  },
+  "edges": 20,
+  "iters": 2,
+  "ms": 22,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "tree",
+   "showDone": true,
+   "deps": "wait",
+   "fold": true
+  },
+  "edges": 11,
+  "iters": 2,
+  "ms": 16,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "tree",
+   "showDone": true,
+   "deps": "wait",
+   "fold": false
+  },
+  "edges": 11,
+  "iters": 2,
+  "ms": 18,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "tree",
+   "showDone": true,
+   "deps": "all",
+   "fold": true
+  },
+  "edges": 56,
+  "iters": 10,
+  "ms": 309,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "tree",
+   "showDone": true,
+   "deps": "all",
+   "fold": false
+  },
+  "edges": 56,
+  "iters": 10,
+  "ms": 300,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "init-00001"
+  },
+  "edges": 2,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "init-00002"
+  },
+  "edges": 5,
+  "iters": 4,
+  "ms": 2,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00003"
+  },
+  "edges": 2,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00004"
+  },
+  "edges": 1,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00005"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00006"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00007"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00008"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00009"
+  },
+  "edges": 3,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00010"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00011"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00012"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00013"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "init-00066"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "init-00067"
+  },
+  "edges": 2,
+  "iters": 1,
+  "ms": 1,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "init-00068"
+  },
+  "edges": 14,
+  "iters": 5,
+  "ms": 4,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "init-00069"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "init-00070"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "init-00071"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "init-00072"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00077"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00078"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00079"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00086"
+  },
+  "edges": 5,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00096"
+  },
+  "edges": 1,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00173"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00180"
+  },
+  "edges": 9,
+  "iters": 1,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00205"
+  },
+  "edges": 2,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/housing-lifecycle",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00206"
+  },
+  "edges": 3,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/input-devices",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "wait",
+   "fold": true
+  },
+  "edges": 13,
+  "iters": 2,
+  "ms": 1,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/input-devices",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "wait",
+   "fold": false
+  },
+  "edges": 13,
+  "iters": 2,
+  "ms": 1,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/input-devices",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true
+  },
+  "edges": 13,
+  "iters": 2,
+  "ms": 1,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/input-devices",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": false
+  },
+  "edges": 13,
+  "iters": 2,
+  "ms": 2,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/input-devices",
+  "opts": {
+   "mode": "nest",
+   "showDone": true,
+   "deps": "wait",
+   "fold": true
+  },
+  "edges": 13,
+  "iters": 2,
+  "ms": 1,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/input-devices",
+  "opts": {
+   "mode": "nest",
+   "showDone": true,
+   "deps": "wait",
+   "fold": false
+  },
+  "edges": 13,
+  "iters": 2,
+  "ms": 1,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/input-devices",
+  "opts": {
+   "mode": "nest",
+   "showDone": true,
+   "deps": "all",
+   "fold": true
+  },
+  "edges": 13,
+  "iters": 2,
+  "ms": 1,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/input-devices",
+  "opts": {
+   "mode": "nest",
+   "showDone": true,
+   "deps": "all",
+   "fold": false
+  },
+  "edges": 13,
+  "iters": 2,
+  "ms": 1,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/input-devices",
+  "opts": {
+   "mode": "tree",
+   "showDone": false,
+   "deps": "wait",
+   "fold": true
+  },
+  "edges": 13,
+  "iters": 2,
+  "ms": 8,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/input-devices",
+  "opts": {
+   "mode": "tree",
+   "showDone": false,
+   "deps": "wait",
+   "fold": false
+  },
+  "edges": 13,
+  "iters": 2,
+  "ms": 8,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/input-devices",
+  "opts": {
+   "mode": "tree",
+   "showDone": false,
+   "deps": "all",
+   "fold": true
+  },
+  "edges": 13,
+  "iters": 2,
+  "ms": 8,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/input-devices",
+  "opts": {
+   "mode": "tree",
+   "showDone": false,
+   "deps": "all",
+   "fold": false
+  },
+  "edges": 13,
+  "iters": 2,
+  "ms": 8,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/input-devices",
+  "opts": {
+   "mode": "tree",
+   "showDone": true,
+   "deps": "wait",
+   "fold": true
+  },
+  "edges": 13,
+  "iters": 2,
+  "ms": 8,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/input-devices",
+  "opts": {
+   "mode": "tree",
+   "showDone": true,
+   "deps": "wait",
+   "fold": false
+  },
+  "edges": 13,
+  "iters": 2,
+  "ms": 8,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/input-devices",
+  "opts": {
+   "mode": "tree",
+   "showDone": true,
+   "deps": "all",
+   "fold": true
+  },
+  "edges": 13,
+  "iters": 2,
+  "ms": 8,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/input-devices",
+  "opts": {
+   "mode": "tree",
+   "showDone": true,
+   "deps": "all",
+   "fold": false
+  },
+  "edges": 13,
+  "iters": 2,
+  "ms": 10,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/input-devices",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "init-00001"
+  },
+  "edges": 13,
+  "iters": 2,
+  "ms": 2,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/input-devices",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00002"
+  },
+  "edges": 1,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/input-devices",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00003"
+  },
+  "edges": 2,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/input-devices",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00004"
+  },
+  "edges": 3,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/taikyohiyou_project",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "wait",
+   "fold": true
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/taikyohiyou_project",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "wait",
+   "fold": false
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 4,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/taikyohiyou_project",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true
+  },
+  "edges": 8,
+  "iters": 2,
+  "ms": 3,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/taikyohiyou_project",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": false
+  },
+  "edges": 8,
+  "iters": 2,
+  "ms": 2,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/taikyohiyou_project",
+  "opts": {
+   "mode": "nest",
+   "showDone": true,
+   "deps": "wait",
+   "fold": true
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 1,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/taikyohiyou_project",
+  "opts": {
+   "mode": "nest",
+   "showDone": true,
+   "deps": "wait",
+   "fold": false
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 1,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/taikyohiyou_project",
+  "opts": {
+   "mode": "nest",
+   "showDone": true,
+   "deps": "all",
+   "fold": true
+  },
+  "edges": 251,
+  "iters": 10,
+  "ms": 1857,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 2,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/taikyohiyou_project",
+  "opts": {
+   "mode": "nest",
+   "showDone": true,
+   "deps": "all",
+   "fold": false
+  },
+  "edges": 284,
+  "iters": 10,
+  "ms": 2373,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 5,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/taikyohiyou_project",
+  "opts": {
+   "mode": "tree",
+   "showDone": false,
+   "deps": "wait",
+   "fold": true
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 1,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/taikyohiyou_project",
+  "opts": {
+   "mode": "tree",
+   "showDone": false,
+   "deps": "wait",
+   "fold": false
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 1,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/taikyohiyou_project",
+  "opts": {
+   "mode": "tree",
+   "showDone": false,
+   "deps": "all",
+   "fold": true
+  },
+  "edges": 8,
+  "iters": 2,
+  "ms": 2,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/taikyohiyou_project",
+  "opts": {
+   "mode": "tree",
+   "showDone": false,
+   "deps": "all",
+   "fold": false
+  },
+  "edges": 8,
+  "iters": 2,
+  "ms": 2,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/taikyohiyou_project",
+  "opts": {
+   "mode": "tree",
+   "showDone": true,
+   "deps": "wait",
+   "fold": true
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 5,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/taikyohiyou_project",
+  "opts": {
+   "mode": "tree",
+   "showDone": true,
+   "deps": "wait",
+   "fold": false
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 4,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/taikyohiyou_project",
+  "opts": {
+   "mode": "tree",
+   "showDone": true,
+   "deps": "all",
+   "fold": true
+  },
+  "edges": 284,
+  "iters": 10,
+  "ms": 4693,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 2,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/taikyohiyou_project",
+  "opts": {
+   "mode": "tree",
+   "showDone": true,
+   "deps": "all",
+   "fold": false
+  },
+  "edges": 284,
+  "iters": 10,
+  "ms": 4828,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 2,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/taikyohiyou_project",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "init-01844"
+  },
+  "edges": 3,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/taikyohiyou_project",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-01845"
+  },
+  "edges": 2,
+  "iters": 0,
+  "ms": 1,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/taikyohiyou_project",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-01876"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/taikyohiyou_project",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "init-01926"
+  },
+  "edges": 5,
+  "iters": 1,
+  "ms": 1,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/taikyohiyou_project",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "init-01927"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/taikyohiyou_project",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-01928"
+  },
+  "edges": 16,
+  "iters": 1,
+  "ms": 3,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/taikyohiyou_project",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-02090"
+  },
+  "edges": 15,
+  "iters": 2,
+  "ms": 4,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/taikyohiyou_project",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-02114"
+  },
+  "edges": 3,
+  "iters": 1,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/taikyohiyou_project",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-02117"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/taikyohiyou_project",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-02127"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/taikyohiyou_project",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-02142"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/taikyohiyou_project",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-02155"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/taikyohiyou_project",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-02161"
+  },
+  "edges": 3,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/taikyohiyou_project",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-02211"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/company-os",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "wait",
+   "fold": true
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/company-os",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "wait",
+   "fold": false
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/company-os",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/company-os",
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": false
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/company-os",
+  "opts": {
+   "mode": "nest",
+   "showDone": true,
+   "deps": "wait",
+   "fold": true
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/company-os",
+  "opts": {
+   "mode": "nest",
+   "showDone": true,
+   "deps": "wait",
+   "fold": false
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/company-os",
+  "opts": {
+   "mode": "nest",
+   "showDone": true,
+   "deps": "all",
+   "fold": true
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/company-os",
+  "opts": {
+   "mode": "nest",
+   "showDone": true,
+   "deps": "all",
+   "fold": false
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/company-os",
+  "opts": {
+   "mode": "tree",
+   "showDone": false,
+   "deps": "wait",
+   "fold": true
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/company-os",
+  "opts": {
+   "mode": "tree",
+   "showDone": false,
+   "deps": "wait",
+   "fold": false
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/company-os",
+  "opts": {
+   "mode": "tree",
+   "showDone": false,
+   "deps": "all",
+   "fold": true
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/company-os",
+  "opts": {
+   "mode": "tree",
+   "showDone": false,
+   "deps": "all",
+   "fold": false
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/company-os",
+  "opts": {
+   "mode": "tree",
+   "showDone": true,
+   "deps": "wait",
+   "fold": true
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/company-os",
+  "opts": {
+   "mode": "tree",
+   "showDone": true,
+   "deps": "wait",
+   "fold": false
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/company-os",
+  "opts": {
+   "mode": "tree",
+   "showDone": true,
+   "deps": "all",
+   "fold": true
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "name": "github.com/chemitaro/company-os",
+  "opts": {
+   "mode": "tree",
+   "showDone": true,
+   "deps": "all",
+   "fold": false
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ }
+]
