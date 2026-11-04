@@ -46,7 +46,7 @@ design: {
 		title: "数え方（`domain/todo_model.tally`）と、リポジトリの行（`presentation/todo_document.repository_row`）"
 		text: """
 			- `tally(records, now) -> {open, blocking, overdue, snoozed}`：親のタスクだけ。`open` は閉じていない（`open` か `snoozed`）、`blocking`・`overdue` は `derived` の値、`snoozed` は `effective_status` が `snoozed`。iss-00549 の `todo_list.repository_row` の数え方をここに移し、チェックアウトの一覧、集約、`dashboard summary` が使う。
-			- `repository_row(*, repository, catalog, main_checkout, hidden, status, problem, counts, invalid_files, conflict_copies)`：`specdock.todo-list/v1` の `repositories[]` の1行。`counts` は `tally` に `agent_parents {count, limit, source}` を足したもの。`unreadable` と `duplicate` の行は `counts: null`、`invalid_files: []`、`conflict_copies: []`。
+			- `repository_row(*, repository, catalog, main_checkout, hidden, status, problem, counts, invalid_files, conflict_copies)`：`specdock.todo-list/v1` の `repositories[]` の1行。`counts` は `tally` に `agent_parents {count, limit, source}` を足したもの。`unreadable` と `duplicate` の行は `counts: null`、`invalid_files: []`、`conflict_copies: []`。`problem` は、`ok` なら null、`unreadable` なら D-02 の形、`duplicate` なら `{code: "TODO_REPOSITORY_DUPLICATE", message（読んだほうのカタログを示す）, next_step: "spec-dock dashboard list"}`。
 			- `hidden` は `read_hidden(state_root, repository)`。`repository` が null なら `false`。
 			"""
 		satisfies: ["R-10", "R-11"]
@@ -58,7 +58,7 @@ design: {
 			- `--repository R`（くり返せる）は `GithubRepository.parse` で鍵にし、形が違えば `TODO_REPOSITORY_INVALID`（終了コード2）。登録簿にない鍵は、警告 `TODO_REPOSITORY_UNKNOWN`（`details.repository`、`next_step: spec-dock dashboard list`）を出して、ほかを返す。`repository` が null の行は、`--repository` があるときは入れない。
 			- 文書：`todo_list_document(mode="all_repositories")`。`filters` に `repositories`（鍵の配列。チェックアウトの道では空の配列）を足す。`repositories` は D-01 の順の全部の行。`items` は全部の `ok` の行の記録を、絞り込み（`matches`）の後に `order` と同じ並びで1つに並べる（同じ組と同じ時刻の間は、リポジトリの鍵、道の順）。
 			- 警告：`TODO_REPOSITORY_UNREADABLE`（行ごと）、`TODO_REPOSITORY_DUPLICATE`（2つ目の行ごと。`details.catalog`、`details.chosen`）、`TODO_RECORD_INVALID` と `TODO_CONFLICT_COPY`（iss-00549 と同じ。`details.repository` を足す）、`TODO_SETTINGS_INVALID`（同じ道は1回だけ）。全体は成功（終了コード0）。
-			- テキストの出力：リポジトリの行は、`unreadable`／`duplicate` なら `<repo>: unreadable [code] message`。タスクの行は、ID の代わりに `ref`（null なら ID）を出す。
+			- テキストの出力：リポジトリの行は、`unreadable` なら `<repo>: unreadable [code] message`、`duplicate` なら `<repo>: duplicate (reads <読んだカタログ>)`。タスクの行は、ID の代わりに `ref`（null なら ID）を出す。
 			"""
 		satisfies: ["R-10", "F-03"]
 	}
@@ -88,8 +88,8 @@ design: {
 		title: "CLI の引数、ヘルプ、文書"
 		text: """
 			- `todo list` に `--all-repositories`（旗）と `--repository REPOSITORY`（くり返し）を足す。`todo show` の引数の表示を `ID|REF` にする。葉の数（71）は変えない。
-			- 葉の要約、`HELP_EFFECTS` の文、`_help_spec` の対象の文（`todo list`、`todo show`）、`_READS_BY_ROOT["todo"]` に登録簿を足す。
-			- `reference_cli.md`（提供側と dogfood の写し）：C54 の説明に `todos`、C63・C64 の引数と説明、人のタスクの契約の節の一覧の説明（`mode: all_repositories`、`hidden`、`status` の3つの値、`filters.repositories`、`--no-schedule` のカタログは集まらないこと）、要約の契約の表に `todos`。`static-inventory.json` の行の sha256 を直し、前の sha256 を `known_old_sha256` に足す。
+			- 葉の要約、`HELP_EFFECTS` の文、`HELP_PRECONDITIONS` の `todo list`・`todo show`（`--all-repositories`／`--repository`／REF ならチェックアウトが要らない）、`_help_spec` の対象の文（`todo list`、`todo show`）、`_READS_BY_ROOT["todo"]` に登録簿を足す。
+			- `reference_cli.md`（提供側と dogfood の写し）：C54 の説明に `todos`、C63・C64 の引数と説明、人のタスクの契約の節の一覧の説明（`mode: all_repositories`、`hidden`、`status` の3つの値、`filters.repositories`、`--no-schedule` のカタログは集まらないこと）、要約の契約の表に `todos`。人のタスクの契約の節の冒頭の「そのチェックアウトのカタログだけを読み書き」を、書くのはそのチェックアウトのカタログだけ、集約と REF は登録簿の全カタログを読む、に直し、エラーと警告の一覧に `TODO_REPOSITORY_INVALID`、`TODO_REPOSITORY_UNKNOWN`、`TODO_REPOSITORY_UNREADABLE`、`TODO_REPOSITORY_DUPLICATE`、`TODO_REGISTRY_UNREADABLE` を足す。`static-inventory.json` の行の sha256 を直し、前の sha256 を `known_old_sha256` に足す。
 			"""
 		satisfies: ["R-20"]
 	}

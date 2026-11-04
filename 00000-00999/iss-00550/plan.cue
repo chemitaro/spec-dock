@@ -6,7 +6,7 @@ package spec
 goal: "全リポジトリの集約の一覧、`todo show <REF>`、`dashboard summary` の `todos` と、その文書を、テスト駆動で作り、iss-00549 のテストの穴を埋め、レビューとゲートを通して main への PR をマージできる状態にする。"
 
 steps: {
-	"S-01": {title: "仕様を書き、仕様のレビューを通す", realizes: ["R-20"], status: "doing", session: "impl"}
+	"S-01": {title: "仕様を書き、仕様のレビューを通す", realizes: ["R-20"], status: "done", session: "impl"}
 	"S-02": {title: "`tally` と `repository_row` に数え方と行を移し、`classify`／`load_record` を `TodoStore` で受ける形に割る", realizes: ["R-10", "R-11"], status: "todo", after: ["S-01"], session: "impl"}
 	"S-03": {title: "`select_catalogs`、`read_catalog`、集約の一覧、`todo show <REF>` とディスパッチ", realizes: ["R-10", "F-03"], status: "todo", after: ["S-02"], session: "impl"}
 	"S-04": {title: "`dashboard summary` とサーバーの summary の `todos`", realizes: ["R-11", "F-03"], status: "todo", after: ["S-03"], session: "impl"}
