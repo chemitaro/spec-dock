@@ -8,6 +8,7 @@ runs along the tree's parent lines. On CI node must exist; elsewhere a missing n
 
 from __future__ import annotations
 
+from itertools import pairwise
 import json
 import os
 from pathlib import Path
@@ -149,17 +150,20 @@ def test_prerequisites_sit_left_and_a_stage_keeps_the_recommended_order(small: d
     assert nodes["iss-00024"]["x1"] == nodes["iss-00025"]["x1"] > nodes["iss-00022"]["x2"]
 
 
-def test_seven_stages_wrap_onto_a_second_row(small: dict[str, Any]) -> None:
+def test_seven_stages_stay_on_one_row(small: dict[str, Any]) -> None:
+    """iss-00556 R-07: the stages no longer wrap after six; they go on to the right."""
     nodes = _nodes(small, "home")
-    assert nodes["iss-00011"]["x1"] < nodes["iss-00016"]["x1"]  # six columns in the first row
-    assert nodes["iss-00017"]["x1"] == nodes["iss-00011"]["x1"]
-    assert nodes["iss-00017"]["y1"] > nodes["iss-00011"]["y2"]
+    chain = [nodes[f"iss-{n:05d}"] for n in range(11, 18)]
+    assert len({box["y1"] for box in chain}) == 1
+    assert all(a["x2"] < b["x1"] for a, b in pairwise(chain))
 
 
 def test_home_hides_done_keeps_closed_parents_and_folds_cleanup(small: dict[str, Any]) -> None:
     home = small["layout"]["small"]["home"]
     nodes = _nodes(small, "home")
-    assert "iss-00005" not in nodes and "iss-00009" not in nodes
+    # iss-00556: a done Issue under an open Epic stays (5); one under an Epic folded as a cleanup candidate (9)
+    # belongs to the folded group's Epic and is not drawn on its own
+    assert "iss-00005" in nodes and "iss-00009" not in nodes
     assert nodes["epic-00006"]["type"] == "frame"  # closed, but its open child keeps it
     folded = {item_id for group in home["groups"] for item_id in group["ids"]}
     assert folded == {"iss-00007", "epic-00008"}
@@ -183,7 +187,7 @@ def test_the_tree_shows_every_scope_as_a_box_with_parent_lines(small: dict[str, 
 def test_focus_shows_only_the_scope_and_its_descendants(small: dict[str, Any]) -> None:
     focus = small["layout"]["small"]["focus"]
     assert focus["focus"] == "epic-00001"
-    assert set(_nodes(small, "focus")) == {"epic-00001", "iss-00002", "iss-00003"}
+    assert set(_nodes(small, "focus")) == {"epic-00001", "iss-00002", "iss-00003", "iss-00005"}
 
 
 def test_the_three_dependency_line_choices(small: dict[str, Any]) -> None:
@@ -217,3 +221,210 @@ def test_recent_events_are_grouped_by_day_newest_first(small: dict[str, Any]) ->
     assert [item["at"] for item in events] == sorted((item["at"] for item in events), reverse=True)
     assert len({group["day"] for group in groups}) == len(groups)
     assert all(item["scope"]["id"] == item["scope_id"] for item in events)
+
+
+# --- iss-00556: the plan's context in the default view, the activity order, the saved choices --------------------
+
+
+def _at(day: str) -> str:
+    return f"2026-{day}T00:00:00Z"
+
+
+def _context() -> dict[str, Any]:
+    return document(
+        snapshot(
+            node(1, "initiative", updated_at=_at("10-26")),
+            node(2, "epic", parent=1),  # doing inside: first among the Initiative's frames
+            closed(3, "issue", parent=2, closed_at=_at("10-28"), updated_at=_at("10-28")),
+            closed(4, "issue", parent=2, closed_at=_at("10-31"), updated_at=_at("10-31")),
+            node(5, "issue", parent=2, blocked_by=(3,)),  # waits for a finished Issue: a done line
+            node(6, "issue", parent=2),
+            node(7, "issue", parent=2, in_progress=True, updated_at=_at("11-03")),
+            closed(8, "epic", parent=1, closed_at=_at("10-29"), updated_at=_at("10-29")),  # a folded frame
+            closed(9, "issue", parent=8, closed_at=_at("10-27")),  # its parent is done: hidden
+            closed(10, "epic", closed_at=_at("11-02")),  # no parent: hidden
+            closed(11, "issue", parent=10, closed_at=_at("11-01")),
+            node(12, "epic", parent=1),
+            node(13, "issue", parent=12, updated_at=_at("10-27")),
+            node(14, "epic", parent=1),  # ready inside, moved later than 12: above 12
+            node(15, "issue", parent=14, updated_at=_at("11-01")),
+            node(20, "epic"),
+            node(21, "issue", parent=20, in_progress=True, updated_at=_at("10-30")),
+            node(30, "epic"),
+            node(31, "issue", parent=30),
+            node(60, "initiative"),  # only a blocked Epic inside
+            node(61, "epic", parent=60, blocked_by=(30,)),
+            node(80, "epic"),  # open with every child closed: a cleanup candidate, not the context of its children
+            closed(81, "issue", parent=80, closed_at=_at("10-20")),
+            closed(82, "issue", parent=80, closed_at=_at("10-21")),
+            closed(90, "epic"),  # closed with open children (Epic R-12): its stages count the open ones only
+            closed(91, "issue", parent=90),
+            node(92, "issue", parent=90, blocked_by=(91,)),
+            node(95, "issue", parent=90),
+            node(96, "issue", parent=90, blocked_by=(95,)),
+        )
+    )
+
+
+def _wide() -> dict[str, Any]:
+    """An Epic of twelve Issues without dependencies, and twelve top-level Issues: wider than 1240px each."""
+    return document(
+        snapshot(
+            node(200, "epic"),
+            *(node(n, "issue", parent=200) for n in range(201, 213)),
+            *(node(n, "issue") for n in range(220, 232)),
+        )
+    )
+
+
+def _missing_times() -> dict[str, Any]:
+    """Scopes without `active_at` (and a done one without `closed_at`): the oldest in the activity order (F-01)."""
+    doc = document(
+        snapshot(
+            node(100, "initiative"),
+            node(101, "epic", parent=100),
+            node(102, "issue", parent=101),
+            node(103, "epic", parent=100),
+            node(104, "issue", parent=103),
+            closed(105, "issue", parent=103),
+            closed(106, "issue", parent=103, closed_at=_at("10-20")),
+        )
+    )
+    for item in doc["scopes"]:
+        if item["id"] in {"epic-00101", "iss-00102", "iss-00105"}:
+            item.pop("active_at")
+        if item["id"] == "iss-00105":
+            item["closed_at"] = None
+    return doc
+
+
+@pytest.fixture(scope="module")
+def context(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
+    layouts = {
+        "home": {},
+        "tree": {"mode": "tree"},
+        "wait": {"deps": "wait"},
+        "done": {"showDone": True},
+        "focus8": {"focus": "epic-00008"},
+        "unfolded": {"fold": False},
+        "focus80": {"focus": "epic-00080"},
+    }
+    return _run(
+        tmp_path_factory.mktemp("context"),
+        {
+            "documents": {"context": _context(), "missing": _missing_times(), "wide": _wide()},
+            "layouts": {"context": layouts, "missing": {"home": {}}, "wide": {"home": {}}},
+            "checks": ["layout", "audit"],
+            "prefs": [
+                {"current": None, "legacy": None},
+                {
+                    "current": None,
+                    "legacy": {"mode": "tree", "showDone": True, "deps": "wait", "fold": False, "legend": True},
+                },
+                {
+                    "current": {"mode": "nest", "showDone": True, "deps": "wait", "fold": True, "legend": False},
+                    "legacy": {"mode": "tree"},
+                },
+                {
+                    "current": {"mode": "box", "showDone": "yes", "deps": "some", "fold": 1, "legend": None},
+                    "legacy": None,
+                },
+                {"current": [1, 2], "legacy": "x"},
+            ],
+        },
+    )
+
+
+def _ids(result: dict[str, Any], key: str) -> dict[str, dict[str, Any]]:
+    return {item["id"]: item for item in result["layout"]["context"][key]["nodes"]}
+
+
+def _top_down(nodes: dict[str, dict[str, Any]], ids: tuple[str, ...]) -> list[str]:
+    return [item["id"] for item in sorted((nodes[i] for i in ids), key=lambda item: item["y1"])]
+
+
+def test_the_default_view_keeps_done_scopes_under_open_parents(context: dict[str, Any]) -> None:
+    for key in ("home", "tree"):
+        nodes = _ids(context, key)
+        assert {"iss-00003", "iss-00004", "epic-00008"} <= nodes.keys(), key
+        assert not {"iss-00009", "epic-00010", "iss-00011"} & nodes.keys(), key
+    home = _ids(context, "home")
+    assert home["epic-00008"]["type"] == "frame"
+    folded = context["layout"]["context"]["home"]
+    assert folded["nodes"] and all(item["id"] != "iss-00009" for item in folded["nodes"])
+    assert {"iss-00009", "epic-00010", "iss-00011"} <= _ids(context, "done").keys()
+    assert "iss-00009" in _ids(context, "focus8")  # narrowed to a done Epic: its children show
+    # the done children of an open Epic whose every child is done (a cleanup candidate) are not shown, folded or not
+    for key in ("tree", "unfolded"):
+        nodes = _ids(context, key)
+        assert "epic-00080" in nodes and not {"iss-00081", "iss-00082"} & nodes.keys(), key
+    assert {"iss-00081", "iss-00082"} <= _ids(context, "focus80").keys()
+
+
+def test_the_default_view_draws_finished_dependencies_between_shown_boxes(context: dict[str, Any]) -> None:
+    def pairs(key: str) -> dict[tuple[str, str], bool]:
+        return {(p[0], p[1]): e["done"] for e in context["layout"]["context"][key]["edges"] for p in e["pairs"]}
+
+    assert pairs("home")["iss-00003", "iss-00005"] is True
+    assert ("iss-00003", "iss-00005") not in pairs("wait")
+    dirty = [run for run in context["audit"] if any(run[key] for key in AUDIT_KEYS)]
+    assert dirty == []
+
+
+def test_frames_follow_activity_and_boxes_put_done_below(context: dict[str, Any]) -> None:
+    home = _ids(context, "home")
+    roots = ("init-00001", "epic-00020", "epic-00030", "init-00060")
+    assert _top_down(home, roots) == ["init-00001", "epic-00020", "epic-00030", "init-00060"]
+    inside = ("epic-00002", "epic-00008", "epic-00012", "epic-00014")
+    order = sorted(inside, key=lambda i: (home[i]["y1"], home[i]["x1"]))
+    assert order == ["epic-00002", "epic-00014", "epic-00012", "epic-00008"]
+    # the finished prerequisite 3 sits in the stage left of 5, which waits for it (stages counting the done ones)
+    assert home["iss-00003"]["x2"] < home["iss-00005"]["x1"]
+    first = ("iss-00003", "iss-00004", "iss-00006", "iss-00007")
+    assert len({home[i]["x1"] for i in first}) == 1
+    assert _top_down(home, first) == ["iss-00007", "iss-00006", "iss-00004", "iss-00003"]
+    tree = _ids(context, "tree")
+    assert _top_down(tree, roots) == ["init-00001", "epic-00020", "epic-00030", "init-00060"]
+    # a closed parent with open children shows no done child: its stages are the open ones, so 92 (waiting only for
+    # the done 91) shares the first stage with 95, and 96 (waiting for 95) is the second (its open children are
+    # cleanup candidates: unfolded)
+    unfolded = _ids(context, "unfolded")
+    assert "iss-00091" not in unfolded
+    assert unfolded["iss-00092"]["x1"] == unfolded["iss-00095"]["x1"] < unfolded["iss-00096"]["x1"]
+
+
+def test_scopes_without_times_are_the_oldest(context: dict[str, Any]) -> None:
+    nodes = {item["id"]: item for item in context["layout"]["missing"]["home"]["nodes"]}
+    # epic 101 and its Issue have no time: after epic 103 of the same tier, against the order of the numbers
+    reading = sorted(("epic-00101", "epic-00103"), key=lambda i: (nodes[i]["y1"], nodes[i]["x1"]))
+    assert reading == ["epic-00103", "epic-00101"]
+    # done 105 has neither completion nor activity time: after 106
+    done = sorted(("iss-00105", "iss-00106"), key=lambda i: (nodes[i]["y1"], nodes[i]["x1"]))
+    assert done == ["iss-00106", "iss-00105"]
+
+
+def test_saved_choices_of_the_old_version_do_not_override_the_new_defaults(context: dict[str, Any]) -> None:
+    empty, legacy, current, broken, junk = context["prefs"]
+    defaults = {"mode": "nest", "showDone": False, "deps": "all", "fold": True}
+    assert empty == {"opts": defaults, "legend": False}
+    assert legacy == {"opts": {**defaults, "mode": "tree", "fold": False}, "legend": True}
+    assert current == {"opts": {**defaults, "showDone": True, "deps": "wait"}, "legend": False}
+    assert broken == {"opts": defaults, "legend": False}
+    assert junk == {"opts": defaults, "legend": False}
+
+
+def test_the_graph_saves_its_choices_under_the_new_key() -> None:
+    source = (ASSETS / "views" / "graph.js").read_text(encoding="utf-8")
+    assert '"specdock.graph.v1"' not in source
+    assert "restorePrefs" in source and "PREFS_KEY" in source and "LEGACY_KEY" in source
+
+
+def test_a_wide_stage_stays_on_one_row_and_grows_to_the_right(context: dict[str, Any]) -> None:
+    """iss-00556 R-07: no wrapping at 1240px; the graph is panned sideways instead."""
+    nodes = {item["id"]: item for item in context["layout"]["wide"]["home"]["nodes"]}
+    for ids in ([f"iss-{n:05d}" for n in range(201, 213)], [f"iss-{n:05d}" for n in range(220, 232)]):
+        boxes = [nodes[i] for i in ids]
+        assert len({box["y1"] for box in boxes}) == 1
+        xs = sorted(box["x1"] for box in boxes)
+        assert xs[-1] - xs[0] > 1240
+    assert not [run for run in context["audit"] if run["name"] == "wide" and any(run[key] for key in AUDIT_KEYS)]

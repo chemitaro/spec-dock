@@ -99,3 +99,26 @@ def test_scope_document_adds_downstream_including_closed_scopes() -> None:
     assert doc["downstream_all"] == {"direct": ["iss-00003"], "indirect": ["iss-00004"]}
     assert doc["scope"]["blocked_by"] == []
     assert doc["scope"]["stage"] == {"all": 1, "open": None}
+
+
+def test_active_at_is_the_latest_change_of_the_scope_and_its_pull_request() -> None:
+    """iss-00556 R-04, F-01: creation, the Issue's last update, completion and the chosen PR's times."""
+    from tests.support.dashboard import pr, prs
+
+    structure = prs(
+        snapshot(
+            node(1, "epic", updated_at="2026-10-01T00:00:00Z", created_at="2026-10-02T00:00:00Z"),
+            node(2, "issue", parent=1, updated_at="2026-11-02T08:00:00Z"),
+            closed(3, "issue", parent=1, closed_at="2026-10-31T00:00:00Z", updated_at="2026-10-31T00:00:00Z"),
+            node(4, "issue", parent=1, in_progress=True),
+            node(5, "issue", parent=1, updated_at="not a time"),
+        ),
+        pr(40, "chemitaro/iss-00004", state="merged", merged_at="2026-11-03T09:00:00Z"),
+    )
+    scopes = _scopes(document(structure))
+    assert scopes["epic-00001"]["active_at"] == "2026-10-02T00:00:00Z"  # only the creation is newer
+    assert scopes["iss-00002"]["active_at"] == "2026-11-02T08:00:00Z"  # the Issue's update
+    assert scopes["iss-00003"]["active_at"] == "2026-10-31T00:00:00Z"  # completion
+    assert scopes["iss-00004"]["active_at"] == "2026-11-03T09:00:00Z"  # the PR's merge
+    assert scopes["iss-00005"]["active_at"] == "2026-10-25T00:00:00Z"  # an unreadable time is not used
+    assert scope_of(structure, "iss-00004")["scope"]["active_at"] == "2026-11-03T09:00:00Z"  # type: ignore[index]

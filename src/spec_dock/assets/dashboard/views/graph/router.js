@@ -285,7 +285,9 @@ function routeOnce(G) {
   const routes = new Array(G.edges.length);
   order.forEach(i => { routes[i] = Object.assign(routeOne(g, G, G.edges[i]), { ei: i }); });
   let widen = [];
-  for (let round = 0; round < 3; round++) {
+  // Four passes (the prototype had three): with every stage on one row (iss-00556), a long line can keep a 2px jog
+  // of its own after three passes, which pins its run next to another line's.
+  for (let round = 0; round < 4; round++) {
     widen = [];
     nudgePass(G, routes, true, widen); routes.forEach(rt => (rt.pts = simplify(rt.pts)));
     nudgePass(G, routes, false, widen); routes.forEach(rt => (rt.pts = simplify(rt.pts)));

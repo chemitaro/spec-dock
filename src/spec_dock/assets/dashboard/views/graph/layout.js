@@ -4,7 +4,9 @@
 // check see the same rectangles in the page and in the node check of the tests.
 //
 // The model decides everything about the Scopes (state, stage, recommended order, cleanup candidates); this module
-// only arranges them: stages left to right, the recommended order (`rank`) top to bottom inside a stage.
+// only arranges them: stages left to right, the activity order top to bottom inside a stage (iss-00556 D-03): open
+// frames by what they hold and how recently they moved, open boxes by the recommended order (`rank`), then what is
+// done, most recent first.
 import { audit, portSpan, route } from "./router.js";
 
 export const SIZE = {
@@ -17,14 +19,13 @@ export const SIZE = {
   head: 46, // the frame's heading row (22) and summary row (6 + 18)
   pad: { initiative: [16, 16, 16], epic: [9, 12, 12], issue: [9, 12, 12] }, // top, sides, bottom
   minFrameW: { initiative: 420, epic: 300, issue: 300 },
-  wrapMax: 1240,
-  bandCols: 6,
   margin: 24,
   indent: 40,
 };
 const BASE = { world: 28, body: 12, wrapRow: 14, wrapCol: 14, cols: 44, col: 12, band: 24, treeRow: 14, treeIndent: 0 };
 
-export const DEFAULTS = { mode: "nest", showDone: false, deps: "wait", fold: true, focus: null };
+// iss-00556: finished dependencies between what is shown are drawn by default (faint), the waiting ones stand out.
+export const DEFAULTS = { mode: "nest", showDone: false, deps: "all", fold: true, focus: null };
 
 // The axis a gap key spreads: x for widths (wrap items, columns, the tree's indent), y for heights.
 const axisOf = (key) => (key.startsWith("wc") || /^c/.test(key) || key === "tree.indent" ? "x" : "y");
@@ -48,26 +49,80 @@ export function index(scopes) {
     }
     return out;
   };
-  return { byId, kids, ancestors };
+  // What a Scope holds (iss-00556 D-03): its tier (0 doing inside, 1 ready inside, 2 only blocked or unknown, 3 all
+  // done; a Scope without children by its own state) and its latest move (`active_at`, itself and every descendant).
+  const sums = new Map();
+  const TIER = { doing: 0, ready: 1, blocked: 2, unknown: 2, done: 3 };
+  const summary = (id, seen = new Set()) => {
+    if (sums.has(id)) return sums.get(id);
+    seen.add(id);
+    const s = byId.get(id);
+    let recent = s?.active_at || "";
+    let tier = 3;
+    let held = 0;
+    for (const k of kids.get(id) || []) {
+      if (seen.has(k.id)) continue;
+      const sub = summary(k.id, seen);
+      held++;
+      tier = Math.min(tier, k.state === "done" && sub.tier === 3 ? 3 : Math.min(sub.tier, TIER[k.state] ?? 2));
+      if (sub.recent > recent) recent = sub.recent;
+    }
+    const out = { tier: held ? tier : TIER[s?.state] ?? 2, recent };
+    sums.set(id, out);
+    return out;
+  };
+  return { byId, kids, ancestors, summary };
 }
 
-function visibility(ix, opts) {
+// iss-00556 D-01: a done Scope shows when its parent shows its done children (`showsDone`: open, or the focus);
+// a done Scope under a done parent, or without a parent, does not (unless it holds something shown: Epic R-12).
+function visibility(ix, opts, showsDone) {
   const memo = new Map();
   const seen = new Set();
+  const context = (s) => {
+    const p = s.parent_id && s.parent_id !== s.id ? ix.byId.get(s.parent_id) : null;
+    return !!p && showsDone(p);
+  };
   const visible = (s) => {
     if (memo.has(s.id)) return memo.get(s.id);
     if (seen.has(s.id)) return false; // a broken parent cycle
     seen.add(s.id);
-    const v = opts.showDone || s.state !== "done" || ix.kids.get(s.id).some(visible);
+    const v = opts.showDone || s.state !== "done" || ix.kids.get(s.id).some(visible) || context(s);
     memo.set(s.id, v);
     return v;
   };
   return visible;
 }
 
-const stageOf = (s, opts) => (opts.showDone ? s.stage?.all : s.stage?.open) || 1;
+// The stage among siblings: counting the done ones (`stage.all`) inside a parent that shows its done children (D-03),
+// so a finished prerequisite shown there sits left of what waits for it; otherwise among the open ones.
+const stageOf = (s, all) => (all ? s.stage?.all : s.stage?.open) || 1;
 const byRank = (a, b) => (a.rank ?? 1e9) - (b.rank ?? 1e9) || a.number - b.number;
-const byStageRank = (opts) => (a, b) => stageOf(a, opts) - stageOf(b, opts) || byRank(a, b);
+const newer = (a, b) => (a > b ? -1 : a < b ? 1 : 0); // ISO 8601 strings; a missing time ("") is the oldest
+
+// The activity order among siblings (iss-00556 D-03): open frames (by tier, then the latest move), open boxes (the
+// recommended order), then what is done (frames by the latest move, boxes by completion), then by number.
+export function byActivity(ix) {
+  const frame = (s) => s.kind !== "issue" || (ix.kids.get(s.id) || []).length > 0;
+  const info = (s) => {
+    if (frame(s)) {
+      const { tier, recent } = ix.summary(s.id);
+      return tier < 3 ? { group: 0, tier, recent } : { group: 2, recent };
+    }
+    return s.state !== "done" ? { group: 1 } : { group: 2, recent: s.closed_at || s.active_at || "" };
+  };
+  return (a, b) => {
+    const p = info(a), q = info(b);
+    if (p.group !== q.group) return p.group - q.group;
+    if (p.group === 0) return p.tier - q.tier || newer(p.recent, q.recent) || a.number - b.number;
+    if (p.group === 1) return byRank(a, b);
+    return newer(p.recent, q.recent) || a.number - b.number;
+  };
+}
+const byStageActivity = (all, ix) => {
+  const act = byActivity(ix);
+  return (a, b) => stageOf(a, all) - stageOf(b, all) || act(a, b);
+};
 
 // --- Blocks: measure (relative coordinates), then flatten to absolute rectangles -------------------------------
 
@@ -86,7 +141,8 @@ function chipBlock(key, list, ctx) {
 function folded(items, containerKey, ctx) {
   if (!ctx.opts.fold) return items.map((s) => ctx.node(s));
   // A closed parent with open descendants stays a frame (Epic R-12; the prototype's cleanup set skips it).
-  const folds = (s) => ctx.cleanup.has(s.id) && !s.keep_visible;
+  // The focus itself never folds: narrowing to a cleanup candidate shows what it holds (iss-00556).
+  const folds = (s) => ctx.cleanup.has(s.id) && !s.keep_visible && s.id !== ctx.focus;
   const keep = items.filter((s) => !folds(s));
   const fold = items.filter(folds);
   const blocks = keep.map((s) => ctx.node(s));
@@ -94,15 +150,12 @@ function folded(items, containerKey, ctx) {
   return blocks;
 }
 
+// One row, however wide: the graph grows to the right and is panned sideways (iss-00556 R-07; the 1240px wrap is
+// gone). The row stays inside a rows group so that the gap keys (wr, wc) keep their meaning for the routing.
 function wrapBlock(key, items, ctx) {
-  const rows = [];
-  let row = null;
+  const row = { items: [], w: 0, h: 0 };
+  const rows = [row];
   for (const it of items) {
-    const colGap = gap(ctx.gaps, `wc${key}`, BASE.wrapCol, row ? row.items.length - 1 : 0);
-    if (!row || (row.items.length && row.w + colGap + it.w > SIZE.wrapMax)) {
-      row = { items: [], w: 0, h: 0 };
-      rows.push(row);
-    }
     it.x = row.items.length ? row.w + gap(ctx.gaps, `wc${key}`, BASE.wrapCol, row.items.length - 1) : 0;
     row.w = it.x + it.w;
     row.h = Math.max(row.h, it.h);
@@ -135,8 +188,7 @@ function colsBlock(key, columns, ctx) {
     });
     return { t: "group", key: `k${key}.${i}`, axis: "y", w: Math.max(0, ...items.map((it) => it.w)), h: y, kids: items };
   });
-  const bands = [];
-  for (let i = 0; i < cols.length; i += SIZE.bandCols) bands.push(cols.slice(i, i + SIZE.bandCols));
+  const bands = [cols]; // every stage on one band, left to right, however many (iss-00556 R-07)
   let y = 0;
   const bandBlocks = bands.map((list, b) => {
     let x = 0;
@@ -152,12 +204,14 @@ function colsBlock(key, columns, ctx) {
   return { t: "group", key: `band${key}`, axis: "y", w: Math.max(0, ...bandBlocks.map((b) => b.w)), h: y, kids: bandBlocks };
 }
 
-function childrenBlock(key, kids, ctx) {
-  const sorted = kids.slice().sort(byStageRank(ctx.opts));
-  const max = Math.max(1, ...sorted.map((s) => stageOf(s, ctx.opts)));
+function childrenBlock(parent, kids, ctx) {
+  const key = parent.id;
+  const all = ctx.showsDone(parent);
+  const sorted = kids.slice().sort(byStageActivity(all, ctx.ix));
+  const max = Math.max(1, ...sorted.map((s) => stageOf(s, all)));
   if (max <= 1) return wrapBlock(key, folded(sorted, `${key}.0`, ctx), ctx);
   const columns = Array.from({ length: max }, () => []);
-  sorted.forEach((s) => columns[stageOf(s, ctx.opts) - 1].push(s));
+  sorted.forEach((s) => columns[stageOf(s, all) - 1].push(s));
   return colsBlock(
     key,
     columns.filter((c) => c.length).map((c, i) => folded(c, `${key}.${i}`, ctx)),
@@ -167,7 +221,7 @@ function childrenBlock(key, kids, ctx) {
 
 function frameBlock(s, kids, ctx) {
   const [padT, padX, padB] = SIZE.pad[s.kind] || SIZE.pad.epic;
-  const body = kids.length ? childrenBlock(s.id, kids, ctx) : null;
+  const body = kids.length ? childrenBlock(s, kids, ctx) : null;
   const bodyGap = gap(ctx.gaps, `b${s.id}`, BASE.body);
   const compact = !body;
   const head = SIZE.head + grow(ctx, s);
@@ -199,7 +253,7 @@ function nest(roots, ctx) {
 function tree(roots, ctx) {
   const rows = [];
   const walk = (s, depth) => {
-    const kids = ctx.visibleKids(s).slice().sort(byStageRank(ctx.opts));
+    const kids = ctx.visibleKids(s).slice().sort(byStageActivity(ctx.showsDone(s), ctx.ix));
     rows.push({ s, depth, frame: s.kind !== "issue" || kids.length > 0 });
     kids.forEach((k) => walk(k, depth + 1));
   };
@@ -248,12 +302,16 @@ export function layout(scopes, cleanup, options = {}, gaps = {}) {
   const opts = { ...DEFAULTS, ...options };
   if (opts.mode === "tree") opts.fold = false; // the tree shows every Scope as a box
   const ix = index(scopes);
-  const visibleBase = visibility(ix, opts);
   const focus = opts.focus && ix.byId.has(opts.focus) ? opts.focus : null;
+  // A parent shows its done children with "done too", when it is the focus, or when it is open, except an open
+  // parent whose every descendant is done (a cleanup candidate: what it holds is no longer the plan's progress).
+  const finished = new Set((cleanup || []).filter((c) => c.code === "all_descendants_closed").map((c) => c.id));
+  const showsDone = (p) => opts.showDone || p.id === focus || (p.state !== "done" && !finished.has(p.id));
+  const visibleBase = visibility(ix, opts, showsDone);
   const inFocus = (s) => !focus || s.id === focus || ix.ancestors(s.id).includes(focus);
   const visible = (s) => inFocus(s) && (s.id === focus || visibleBase(s));
   const visibleKids = (s) => ix.kids.get(s.id).filter(visible);
-  const ctx = { opts, gaps, cleanup: new Set((cleanup || []).map((c) => c.id)), visibleKids };
+  const ctx = { opts, gaps, ix, focus, cleanup: new Set((cleanup || []).map((c) => c.id)), visibleKids, showsDone };
   ctx.node = (s) => {
     const kids = visibleKids(s);
     return s.kind === "issue" && !kids.length ? boxBlock(s, ctx) : frameBlock(s, kids, ctx);
@@ -261,7 +319,7 @@ export function layout(scopes, cleanup, options = {}, gaps = {}) {
   const isRoot = (s) => (focus ? s.id === focus : !s.parent_id || !ix.byId.has(s.parent_id) || ix.ancestors(s.id).includes(s.id));
   const roots = scopes
     .filter((s) => visible(s) && isRoot(s))
-    .sort((a, b) => (a.kind === "initiative" ? 0 : 1) - (b.kind === "initiative" ? 0 : 1) || byRank(a, b));
+    .sort(byActivity(ix));
   const top = opts.mode === "tree" ? tree(roots, ctx) : nest(roots, ctx);
   const out = { nodes: [], groups: [], trunks: [] };
   const mx = SIZE.margin + (gaps["margin.x"] || 0);
