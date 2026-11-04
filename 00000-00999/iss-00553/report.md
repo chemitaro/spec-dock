@@ -30,7 +30,8 @@ SpecDock 0.7.0 のリリース変更を作り、マージできる状態の PR �
 
 ## 環境の要因の確認
 
-（再実行と CI の結果を、この後に書く。）
+- PR #565（head ebb29c38f）の CI：Provider CI の `provider-tests` が成功（`uv run pytest` 3637 passed、25 skipped、失敗0。時間制限のテストを含む）、`Provider distribution parity`（macOS・ubuntu）も成功。GitHub は OPEN／MERGEABLE／CLEAN（2026-11-04T09:36Z 付近の観測）。
+- ローカルの単独の再実行：このマシンの load が下がらず（40〜133）、行えなかった。そのため時間制限のテストの失敗は、負荷による環境の要因とみなし、CI の合格で確かめた。統括の了承（案 A）に沿う。
 
 ## Residual Risks / Follow-ups
 
