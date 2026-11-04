@@ -28,10 +28,12 @@ from spec_dock.runtime.application.dashboard_scope_details import (
     read_structure_facts,
     scope_facts,
 )
+from spec_dock.runtime.application.dashboard_todos import CatalogUnreadable, TodoFilterInvalid, parse_status
 from spec_dock.runtime.application.todo_aggregate import registry_summary_todos
 from spec_dock.runtime.domain.canonical_layout import scope_relative
 from spec_dock.runtime.domain.dashboard_model import seen_scopes
 from spec_dock.runtime.domain.dashboard_visibility import REPOSITORY_FILE
+from spec_dock.runtime.domain.todo_record import TodoError
 from spec_dock.runtime.infra.dashboard_assets import (
     AssetFile,
     content_type,
@@ -49,7 +51,7 @@ if TYPE_CHECKING:
     from spec_dock.runtime.application.dashboard_site import DashboardSite, RepositoryView, SiteRepository
 
 SEEN_HEADER: Final = "x-specdock-dashboard"
-SCREENS: Final = frozenset({"graph", "board", "timeline"})
+SCREENS: Final = frozenset({"graph", "board", "timeline", "todos"})
 _SNAPSHOT_ERRORS: Final = {
     "missing": ("DASHBOARD_SNAPSHOT_MISSING", "spec-dock canonical link", "spec-dock canonical status"),
     "unreadable": ("DASHBOARD_SNAPSHOT_UNREADABLE", "spec-dock canonical status"),
@@ -207,6 +209,8 @@ class DashboardHttp:
             return self._static(vendor_asset(rest), cors=True)
         if head == "api" and rest[:1] == ["v1"]:
             return self._api(request, rest[1:])
+        if head == "todos" and not rest:
+            return self._shell(embed)  # every repository's human tasks (iss-00554 D-04)
         if head == "r" and len(rest) >= 3:
             if rest[2] == "design-system" and len(rest) > 3:
                 asset = design_system_asset(rest[3:])
@@ -239,7 +243,7 @@ class DashboardHttp:
             return self._html(404, page, embed=embed)
         if is_files:
             return self._file(site, rest[1:])
-        if not rest or (len(rest) == 1 and rest[0] in SCREENS) or (len(rest) == 2 and rest[0] == "scopes"):
+        if not rest or (len(rest) == 1 and rest[0] in SCREENS) or (len(rest) == 2 and rest[0] in ("scopes", "todos")):
             return self._shell(embed)
         return self._plain(404, "not found")
 
@@ -271,6 +275,12 @@ class DashboardHttp:
     def _api(self, request: Request, parts: list[str]) -> Response:
         if parts == ["repositories"]:
             return self._json(200, self._repositories())
+        if parts == ["todos"]:
+            return self._todo_list(request, None)
+        if parts == ["todos", "revision"]:
+            sites = self.site.repositories()
+            revision = self.site.todos.revision(sites, self.site.listing_signature())
+            return self._json(200, {"schema": API_SCHEMA, "revision": revision})
         if len(parts) >= 5 and parts[0] == "r":
             found, site = self.site.lookup(parts[1], parts[2], parts[3])
             if found == "unknown" or site is None:
@@ -343,10 +353,17 @@ class DashboardHttp:
             baseline = (find_seen(self.site.state_root, site.repository, wanted) if wanted else None) or latest
             ids = sorted(view.model.scopes) if view.model is not None else []
             readings = read_structure_facts(site, ids, self.facts)  # iss-00544 D-02
-            document = structure_document(view, now=self.now(), baseline=baseline, latest=latest, readings=readings)
+            todos = self.site.todos.annotations(site, view.model)  # iss-00554 D-03
+            document = structure_document(
+                view, now=self.now(), baseline=baseline, latest=latest, readings=readings, todos=todos
+            )
             return self._json(200, document)
         if op == ["summary"]:
             return self._summary(view)
+        if op == ["todos"]:
+            return self._todo_list(request, site)
+        if len(op) == 2 and op[0] == "todos":
+            return self._todo_one(site, op[1])
         if len(op) == 2 and op[0] == "scopes":
             wanted = request.param("baseline")
             baseline = (find_seen(self.site.state_root, site.repository, wanted) if wanted else None) or find_seen(
@@ -355,7 +372,10 @@ class DashboardHttp:
             known = view.model is not None and op[1] in view.model.scopes
             details = read_scope_details(site, op[1]) if known else None  # iss-00531 D-04
             one = {op[1]: scope_facts(details)} if details is not None else None
-            scope_json = scope_document(view, op[1], baseline=baseline, details=details, readings=one)
+            scope_todos = self.site.todos.annotations(site, view.model) if known else None
+            scope_json = scope_document(
+                view, op[1], baseline=baseline, details=details, readings=one, todos=scope_todos, now=self.now()
+            )
             if scope_json is None:
                 return self._error(404, "DASHBOARD_SCOPE_UNKNOWN", f"{op[1]} is not in this repository's structure")
             return self._json(200, scope_json)
@@ -369,6 +389,33 @@ class DashboardHttp:
             )
         todos = registry_summary_todos(self.site.state_root, view.repository.repository, now=self.now())
         return self._json(200, summary_document(view.model, hidden=False, server=self.local_url, todos=todos))
+
+    # --- Human tasks (iss-00554 D-04) ---------------------------------------------------------------------------
+
+    def _todo_list(self, request: Request, site: SiteRepository | None) -> Response:
+        try:
+            status = parse_status(request.param("status"))
+        except TodoFilterInvalid as error:
+            return self._error(
+                400,
+                "DASHBOARD_TODO_FILTER_INVALID",
+                f"status {error} is not one of open, snoozed, done, cancelled, all",
+            )
+        todos = self.site.todos
+        if site is None:
+            return self._json(200, todos.list_document(self.site.repositories(), status))
+        return self._json(200, todos.repository_document(site, status))
+
+    def _todo_one(self, site: SiteRepository, raw_id: str) -> Response:
+        try:
+            return self._json(200, self.site.todos.one(site, raw_id))
+        except CatalogUnreadable as error:
+            step = str(error.problem.get("next_step") or "spec-dock canonical status")
+            return self._error(503, str(error.problem.get("code") or "TODO_REPOSITORY_UNREADABLE"), str(error), step)
+        except TodoError as error:
+            steps = [error.next_step] if error.next_step else []
+            status = 404 if error.code in ("TODO_NOT_FOUND", "TODO_INVALID") else 409
+            return self._error(status, error.code, error.message, *steps)
 
     # --- Seen (D-07) -------------------------------------------------------------------------------------------
 

@@ -18,5 +18,6 @@ import graph from "./graph.js";
 import overview from "./overview.js";
 import scope from "./scope.js";
 import timeline from "./timeline.js";
+import todos from "./todos.js"; // iss-00554
 
-export const VIEWS = { graph, board, timeline, scope, overview };
+export const VIEWS = { graph, board, timeline, scope, overview, todos };

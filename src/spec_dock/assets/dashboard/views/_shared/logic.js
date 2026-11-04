@@ -22,6 +22,7 @@ export const TABS = [
   ["children", "配下"],
   ["docs", "文書"],
   ["artifacts", "Artifact"],
+  ["todos", "人のタスク"], // iss-00554 D-06
 ];
 
 export const byRank = (a, b) => (a.rank ?? 1e9) - (b.rank ?? 1e9) || a.number - b.number;

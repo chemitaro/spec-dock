@@ -1,0 +1,70 @@
+/* 人のタスクの画面（iss-00554 D-05）。試作 d2 と既存の画面の部品（_shared/parts.css）にそろえ、期限切れは
+   danger の色・記号・言葉の3つで示す（epic-00427 R-11）。この画面の中だけに閉じる。 */
+[data-view="todos"] {
+  & .sd-back { display: inline-flex; align-items: center; gap: 4px; margin-bottom: 12px; padding: 4px 0; font-size: 13px; font-weight: 600; text-decoration: none; }
+  & .sd-sec { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 22px 0 10px; font-size: 15px; font-weight: 700; }
+  & .sd-sec .ds-icon { color: var(--ds-accent); }
+  & .sd-sec__aside { margin-left: auto; font-size: 12.5px; font-weight: 600; color: var(--ds-muted); }
+  & .sd-kv { margin: 14px 0 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 14px; max-width: 720px; padding: 12px 14px; border: 1px solid var(--ds-border); border-radius: var(--ds-radius); background: var(--ds-bg-2); font-size: 13px; }
+  & .sd-kv dt { color: var(--ds-muted); white-space: nowrap; }
+  & .sd-kv dd { margin: 0; font-weight: 650; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; overflow-wrap: anywhere; }
+  & .sd-page-head p b { color: var(--ds-danger-ink); }
+  & .td-overdue-count { color: var(--ds-danger-ink); }
+
+  /* ---------- Groups and cards ---------- */
+  & .td-group { margin: 0 0 18px; }
+  & .td-group__head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; margin: 0 0 8px; font-size: 14px; font-weight: 700; }
+  & .td-group__head b { font-variant-numeric: tabular-nums; color: var(--ds-text-2); }
+  & .td-group__head small { color: var(--ds-muted); font-size: 12px; font-weight: 500; }
+  & .td-group[data-group="overdue"] .td-group__head { color: var(--ds-danger-ink); }
+  & .td-group[data-group="overdue"] .td-group__head .ds-icon { align-self: center; color: var(--ds-danger); }
+  & .td-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr)); gap: 10px; align-items: start; }
+  & .td-card { position: relative; display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 9px 11px 10px 12px; border: 1px solid var(--ds-border); border-left: 4px solid var(--ds-accent); border-radius: var(--ds-radius); background: var(--ds-surface); color: inherit; text-decoration: none; box-shadow: var(--ds-shadow-s); }
+  & .td-card:hover { border-color: var(--ds-border-2); box-shadow: var(--ds-shadow); }
+  & .td-card[data-overdue="1"] { border-left-color: var(--ds-danger); background: var(--ds-danger-bg); border-color: var(--ds-danger-line); }
+  & .td-card:is([data-status="done"], [data-status="cancelled"], [data-status="snoozed"]) { border-left-color: var(--ds-border-2); }
+  & .td-card:is([data-status="done"], [data-status="cancelled"]) .td-card__ttl { color: var(--ds-muted); }
+  & .td-card__r1 { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-width: 0; }
+  & .td-card__r1 .td-due { margin-left: auto; }
+  & .td-card__ttl { font-size: 13.5px; font-weight: 700; line-height: 1.5; overflow-wrap: anywhere; }
+  & .td-card__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 12px; color: var(--ds-text-2); min-width: 0; }
+  & .td-card__meta > span { display: inline-flex; align-items: center; gap: 3px; min-width: 0; overflow-wrap: anywhere; }
+  & .td-card__meta .ds-icon { font-size: 13px; color: var(--ds-muted); flex: none; }
+  & .td-blocks { color: var(--ds-danger-ink); font-weight: 650; }
+  & .td-blocks .ds-icon { color: var(--ds-danger) !important; }
+  & .td-tag { color: var(--ds-accent-strong); font-weight: 650; }
+  & .td-due { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; font-weight: 650; color: var(--ds-muted); white-space: nowrap; }
+  & .td-due .ds-icon { font-size: 13px; }
+  & .td-due[data-tone="warning"] { color: var(--ds-warn-ink); }
+  & .td-due[data-tone="danger"] { padding: 0 6px; border-radius: 999px; background: var(--ds-danger); color: var(--ds-on-accent, #fff); }
+  & .td-tags { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+  & .td-tags a { padding: 2px 8px; border: 1px solid var(--ds-border); border-radius: 999px; font-size: 12px; font-weight: 650; color: var(--ds-text-2); text-decoration: none; background: var(--ds-surface); }
+  & .td-tags a[aria-pressed="true"] { background: var(--ds-accent-soft); border-color: var(--ds-accent-line); color: var(--ds-accent-strong); }
+
+  /* ---------- One task ---------- */
+  & .td-cover { padding: clamp(16px, 3vw, 26px); border: 1px solid var(--ds-border); border-top: 4px solid var(--ds-accent); border-radius: var(--ds-radius-l); background: var(--ds-surface); }
+  & .td-cover[data-overdue="1"] { border-top-color: var(--ds-danger); }
+  & .td-cover:is([data-status="done"], [data-status="cancelled"]) { border-top-color: var(--ds-border-2); }
+  & .td-cover__kicker { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 8px; font-size: 13px; font-weight: 700; }
+  & .td-cover__title { margin: 0; font-size: clamp(1.2rem, 1.05rem + 0.9vw, 1.7rem); line-height: 1.4; font-weight: 700; overflow-wrap: anywhere; }
+  & .td-cover__tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 12px; }
+  & .td-body { max-width: 760px; padding: 12px 16px; border: 1px solid var(--ds-border); border-radius: var(--ds-radius); background: var(--ds-surface); font-size: 14px; line-height: 1.75; overflow-wrap: anywhere; }
+  & .td-body > :first-child { margin-top: 0; }
+  & .td-body > :last-child { margin-bottom: 0; }
+  & .td-body pre { overflow-x: auto; padding: 10px 12px; border-radius: var(--ds-radius); background: var(--ds-surface-2); font-size: 12.5px; }
+  & :is(.td-options, .td-subtasks, .td-links, .td-history) { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; max-width: 760px; }
+  & :is(.td-options, .td-subtasks) li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px 12px; border: 1px solid var(--ds-border); border-radius: var(--ds-radius); background: var(--ds-surface); font-size: 13.5px; overflow-wrap: anywhere; }
+  & .td-options li[data-recommended="1"] { border-color: var(--ds-accent-line); background: var(--ds-accent-soft); }
+  & .td-subtasks li:not([data-status="open"]) { color: var(--ds-muted); }
+  & .td-box { display: inline-grid; place-items: center; width: 16px; height: 16px; border: 1.5px solid var(--ds-border-2); border-radius: 4px; font-size: 12px; flex: none; }
+  & .td-box[data-done="1"] { background: var(--ds-ok); border-color: var(--ds-ok); color: var(--ds-on-accent, #fff); }
+  & .td-links a { display: inline-flex; align-items: center; gap: 4px; overflow-wrap: anywhere; }
+  & .td-history li { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 13px; padding: 4px 0; border-bottom: 1px dashed var(--ds-border); overflow-wrap: anywhere; }
+}
+
+@container app (max-width: 640px) {
+  [data-view="todos"] {
+    & .td-list { grid-template-columns: minmax(0, 1fr); }
+    & .sd-seg { max-width: 100%; overflow-x: auto; }
+  }
+}

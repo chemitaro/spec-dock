@@ -129,6 +129,10 @@ class DashboardSite:
         self._lock = threading.Lock()
         self._listing = _Listing()
         self._caches: dict[str, _Cache] = {}
+        # Imported here: dashboard_todos reaches todo_aggregate and todo_list, which import this module.
+        from spec_dock.runtime.application.dashboard_todos import DashboardTodos
+
+        self.todos = DashboardTodos(self.registry_entries, now=lambda: self.now())  # iss-00554 D-02
 
     # --- Listing ----------------------------------------------------------------------------------------------
 
@@ -213,6 +217,17 @@ class DashboardSite:
     def marks_unreadable(self) -> bool:
         with self._lock:
             return self._refresh_listing().marks_unreadable
+
+    def registry_entries(self) -> tuple[RegistryEntry, ...]:
+        """The last readable registry rows (the human tasks choose their catalogs from these, iss-00554 D-02)."""
+        with self._lock:
+            return self._refresh_listing().entries
+
+    def listing_signature(self) -> object:
+        with self._lock:
+            listing = self._refresh_listing()
+            hidden = sorted(key for key, visibility in listing.visibility.items() if visibility.hidden)
+            return (listing.signature, tuple(sorted(listing.hidden)), tuple(hidden))
 
     def config_problems(self) -> tuple[ConfigProblem, ...]:
         """The unreadable settings layers and disagreeing clones, the user's file first."""
@@ -310,6 +325,7 @@ class DashboardSite:
             step,
             model.pull_request_status if model is not None else None,
             site.problem,
+            self.todos.signature(site),  # CLI-written tasks reach the 5-second refresh (iss-00554 R-07)
         )
         return hashlib.sha256(repr(parts).encode()).hexdigest()[:16]
 

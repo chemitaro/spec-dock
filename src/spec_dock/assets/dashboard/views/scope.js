@@ -8,6 +8,8 @@ import {
   chip,
   emptyState,
   esc,
+  humanCount,
+  humanMark,
   icon,
   kindLabel,
   legend,
@@ -18,7 +20,8 @@ import {
   stateIcon,
   STATES,
 } from "./_shared/parts.js";
-import { repositoryPath } from "../core/route.js";
+import { repositoryPath, todoPath, todosPath } from "../core/route.js";
+import { dueWords, KIND_WORDS } from "./todos/logic.js";
 
 const DOC_INFO = {
   requirement: ["要件", "何を満たすか"],
@@ -195,6 +198,39 @@ function artifactsTab(doc) {
   );
 }
 
+// The human tasks tab (iss-00554 D-06; Epic R-13): blocking it, blocking only a Scope below it, and related.
+function todosTab(ctx, scope, doc) {
+  const todos = doc.todos;
+  if (!todos || todos.status !== "ok") {
+    const problem = todos?.problem;
+    return `<div class="sd-callout" data-tone="warning" data-code="todos-unavailable">${icon("person")}<div><p class="sd-callout__title">人のタスクが読めない</p><p>${esc(problem?.message ?? "このリポジトリのカタログの人のタスクを読めませんでした。")}${problem?.next_step ? ` 次の1手：<code>${esc(problem.next_step)}</code>` : ""}</p></div></div>`;
+  }
+  const table = (items, withBlocks) =>
+    items.length
+      ? `<div class="sd-table-wrap"><table class="sd-table" data-todos><thead><tr><th>人のタスク</th><th>期限</th><th>種類</th>${withBlocks ? "<th>止めている Scope</th>" : ""}</tr></thead><tbody>${items
+          .map((item) => {
+            const due = dueWords(item.due, { overdue: item.overdue });
+            const blocks = withBlocks ? `<td>${(item.blocks || []).map((target) => `<span class="ds-docid">${esc(target)}</span>`).join(" ")}</td>` : "";
+            return `<tr data-overdue="${item.overdue ? 1 : 0}"><td><a data-nav href="${esc(ctx.href(todoPath(item.repository, item.id)))}"><span class="ds-docid">${esc(item.id)}</span>${esc(item.title)}</a></td><td><span class="sd-due" data-tone="${due.tone}">${icon(due.tone === "danger" ? "alert" : "clock")}${esc(due.text)}</span></td><td>${esc(KIND_WORDS[item.kind] ?? item.kind ?? "")}</td>${blocks}</tr>`;
+          })
+          .join("")}</tbody></table></div>`
+      : `<p class="sd-col__empty">ない</p>`;
+  const parent = scope.kind !== "issue";
+  return (
+    section(1, "この Scope を止めている人のタスク", `${todos.blocking.length}件`) +
+    table(todos.blocking, false) +
+    (parent ? section(2, "配下の Scope を止めている人のタスク", `${todos.descendants.length}件`) + table(todos.descendants, true) : "") +
+    section(parent ? 3 : 2, "関係する人のタスク", `${todos.related.length}件`) +
+    table(todos.related, true) +
+    `<p class="sd-note">${icon("info")}人のタスクは Scope の状態を変えない（印だけ）。登録と完了は CLI（<code>spec-dock todo</code>）で行う。<a data-nav href="${esc(ctx.href(todosPath(ctx.repository)))}">このリポジトリの人のタスク</a></p>`
+  );
+}
+
+function humanTag(scope, ctx, path) {
+  const { count, descendants } = humanCount(scope);
+  return count ? `<a class="sd-hm-link" data-nav href="${esc(ctx.href(withParam(path, "tab", "todos")))}">${humanMark(count, { descendants, cls: "sd-hm" })}</a>` : "";
+}
+
 function render(root, ctx) {
   const id = ctx.route.scope;
   const byId = new Map((ctx.data?.scopes || []).map((item) => [item.id, item]));
@@ -232,7 +268,8 @@ function render(root, ctx) {
       ? `<span class="sd-muted">分からない</span>`
       : `<span class="sd-muted">ない</span>`;
   const branches = doc.details?.worktrees?.status === "ok" ? doc.details.worktrees.items.map((item) => item.branch) : [];
-  const counts = { deps: (doc.dependencies?.waits_for?.length || 0) + (doc.dependencies?.waited_by?.length || 0), children: (scope.children || []).length, artifacts: doc.details?.artifacts?.length };
+  const todoCount = doc.todos?.status === "ok" ? doc.todos.blocking.length + doc.todos.descendants.length + doc.todos.related.length : null;
+  const counts = { deps: (doc.dependencies?.waits_for?.length || 0) + (doc.dependencies?.waited_by?.length || 0), children: (scope.children || []).length, artifacts: doc.details?.artifacts?.length, todos: todoCount };
   const tabs = TABS.map(
     ([key, label]) =>
       `<a class="sd-tab" role="tab" data-nav href="${esc(ctx.href(withParam(path, "tab", key === "summary" ? null : key)))}" aria-selected="${tab === key}">${label}${counts[key] != null ? `<small>${counts[key]}</small>` : ""}</a>`,
@@ -242,13 +279,14 @@ function render(root, ctx) {
   else if (tab === "children") body = childrenTab(ctx, scope, doc, byId, showDone);
   else if (tab === "docs") body = docsTab(doc);
   else if (tab === "artifacts") body = artifactsTab(doc);
+  else if (tab === "todos") body = todosTab(ctx, scope, doc);
   else body = summaryTab(ctx, scope, doc, byId);
   root.innerHTML =
     `<div class="sd-page">${newTabLink(ctx)}${back}` +
     `<header class="sd-cover" data-st="${esc(scope.state)}"><div class="sd-cover__main">` +
     `<p class="sd-cover__kicker">${esc(kindLabel(scope.kind))}<span class="ds-docid">${esc(scope.id)}</span><span class="sd-no">#${esc(scope.number)}</span></p>` +
     `<h1 class="sd-cover__title">${esc(scope.title)}</h1>` +
-    `<div class="sd-cover__tags">${chip(scope.state)}<span class="sd-badge" data-tone="${scope.state === "blocked" ? "danger" : scope.state === "unknown" ? "warning" : "accent"}">${esc(scope.reason?.text ?? "")}</span>${mergeBadge(scope)}${changeBadge(scope)}</div>` +
+    `<div class="sd-cover__tags">${chip(scope.state)}<span class="sd-badge" data-tone="${scope.state === "blocked" ? "danger" : scope.state === "unknown" ? "warning" : "accent"}">${esc(scope.reason?.text ?? "")}</span>${mergeBadge(scope)}${changeBadge(scope)}${humanTag(scope, ctx, path)}</div>` +
     `</div><div class="sd-cover__side"><dl>` +
     `<dt>親の道筋</dt><dd>${pathHtml}</dd>` +
     `<dt>保証レベル</dt><dd>${assuranceHtml}</dd>` +

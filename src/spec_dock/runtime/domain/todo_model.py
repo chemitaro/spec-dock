@@ -228,3 +228,44 @@ def matches(record: Mapping[str, object], filters: Filters, now: datetime) -> bo
     if filters.blocking and not view["blocking"]:
         return False
     return not (filters.overdue and not view["overdue"])
+
+
+def _linked(record: Mapping[str, object], key: str) -> list[str]:
+    scopes = record.get("scopes")
+    values = scopes.get(key) if isinstance(scopes, dict) else None
+    return [value for value in values if isinstance(value, str)] if isinstance(values, list) else []
+
+
+def scope_marks(
+    records: Iterable[Mapping[str, object]], parents: Mapping[str, str | None]
+) -> dict[str, dict[str, int]]:
+    """Each Scope's open (snoozed included) human tasks: blocking it, blocking it or any descendant (each task
+    once), and related to it; Scopes not in `parents` are not counted (epic-00547 D-11; iss-00554 D-03)."""
+    blocking: dict[str, int] = dict.fromkeys(parents, 0)
+    related: dict[str, int] = dict.fromkeys(parents, 0)
+    under: dict[str, set[str]] = {scope_id: set() for scope_id in parents}
+    for index, record in enumerate(records):
+        if _closed(record):
+            continue
+        key = f"{record.get('id')}#{index}"
+        for scope_id in dict.fromkeys(_linked(record, "related")):
+            if scope_id in related:
+                related[scope_id] += 1
+        for scope_id in dict.fromkeys(_linked(record, "blocks")):
+            if scope_id not in blocking:
+                continue
+            blocking[scope_id] += 1
+            current: str | None = scope_id
+            seen: set[str] = set()
+            while current is not None and current in under and current not in seen:  # a parent cycle stops here
+                seen.add(current)
+                under[current].add(key)
+                current = parents.get(current)
+    return {
+        scope_id: {
+            "blocking": blocking[scope_id],
+            "blocking_with_descendants": len(under[scope_id]),
+            "related": related[scope_id],
+        }
+        for scope_id in parents
+    }
