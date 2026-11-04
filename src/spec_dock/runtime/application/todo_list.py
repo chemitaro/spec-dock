@@ -195,6 +195,17 @@ def show_todo(namespace: argparse.Namespace, context: ProjectContext) -> Operati
     repository = open_repository(context, namespace)
     todo_id = normalize_id(namespace.id)
     loaded = load_record(repository, todo_id)
+    subtasks = loaded.record.get("subtasks")
+    if todo_id != parent_id(todo_id) and not any(
+        isinstance(item, dict) and item.get("id") == todo_id
+        for item in (subtasks if isinstance(subtasks, list) else [])
+    ):
+        raise TodoError(
+            "TODO_NOT_FOUND",
+            f"{parent_id(todo_id)} has no subtask {todo_id}",
+            details={"id": todo_id},
+            next_step=f"spec-dock todo show {parent_id(todo_id)}",
+        )
     warnings = (*repository.warnings(), *record_conflicts(repository, todo_id))
     view = todo_view(
         loaded.record,
@@ -203,4 +214,6 @@ def show_todo(namespace: argparse.Namespace, context: ProjectContext) -> Operati
         path=repository.store.relative(loaded.path),
         warnings=warnings,
     )
+    if view["derived"]["parent_closable"]:  # type: ignore[index]
+        view["next_step"] = f"spec-dock todo done {parent_id(todo_id)}"
     return OperationResult(namespace.command_path, "succeeded", FamilyData("todo", view), 0, warnings=warnings)

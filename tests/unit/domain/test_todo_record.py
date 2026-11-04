@@ -192,3 +192,23 @@ def test_validation_is_independent_of_the_input_object() -> None:
     for _ in itertools.repeat(None, 2):
         validate(record)
     assert record == snapshot
+
+
+def test_a_subtask_keeps_its_record_and_refuses_task_only_options() -> None:
+    record = transition(human(), "subtask_add", now=LATER, by="human", role=None, title="一")
+    done = transition(record, "done", now=LATER, by="human", role=None, target="t-7k3m.1", record_ref="log.md")
+    assert done["subtasks"][0]["resolution"]["record"] == "log.md"  # type: ignore[index]
+    for options in ({"choice": "a"}, {"include_subtasks": True}):
+        with pytest.raises(TodoError) as raised:
+            transition(record, "done", now=LATER, by="human", role=None, target="t-7k3m.1", **options)  # type: ignore[arg-type]
+        assert raised.value.code == "TODO_INVALID"
+    reopened = transition(done, "reopen", now=LATER, by="human", role=None, target="t-7k3m.1")
+    assert reopened["history"][-1]["resolution"]["record"] == "log.md"  # type: ignore[index]
+
+
+def test_reopen_keeps_the_earlier_answer_in_history() -> None:
+    done = transition(agent_decide(), "done", now=LATER, by="human", role=None, choice="a", record_ref="log.md")
+    reopened = transition(done, "reopen", now=LATER, by="human", role=None)
+    entry = reopened["history"][-1]  # type: ignore[index]
+    assert entry["action"] == "reopened" and entry["resolution"]["choice"] == "a"  # type: ignore[index]
+    assert entry["resolution"]["record"] == "log.md" and validate(reopened) == ()  # type: ignore[index]

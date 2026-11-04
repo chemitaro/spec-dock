@@ -79,7 +79,7 @@ def open_repository(context: ProjectContext, namespace: argparse.Namespace) -> T
     store = TodoStore(linked.catalog)
     try:
         repository: GithubRepository | None = repository_for_checkout(context.root, timeout=namespace.timeout)
-    except (ValueError, OSError):
+    except (ValueError, OSError, RuntimeError):  # no usable origin (GitProcessError is a RuntimeError)
         repository = None
     settings = resolve((read_user_todo_settings(), store.read_settings()))
     return TodoRepository(context, linked, store, repository, resolve_state_root(), settings)

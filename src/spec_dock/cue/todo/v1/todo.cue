@@ -48,7 +48,7 @@ import (
 		resolution: null
 	}
 	if status == "done" || status == "cancelled" {
-		resolution: #Resolution
+		resolution: #Resolution & {choice: null}
 	}
 	if status == "cancelled" {
 		resolution: note: #Text

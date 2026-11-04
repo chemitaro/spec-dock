@@ -34,7 +34,7 @@ def parse_time(value: str) -> datetime:
 def relative(text: str) -> timedelta | None:
     """`30m`, `4h`, `2d` as a duration up to 30 days; anything else is None."""
     matched = _RELATIVE.fullmatch(text)
-    if matched is None:
+    if matched is None or len(matched.group(1)) > 6:  # 30 days is at most 43200 minutes; longer cannot fit
         return None
     span = timedelta(**{_UNITS[matched.group(2)]: int(matched.group(1))})
     return span if span <= MAX_RELATIVE else None
@@ -60,8 +60,9 @@ def parse_when(text: str, *, now: datetime, tz: tzinfo | None, field: str = "due
             day = datetime.strptime(value, "%Y-%m-%d")
         except ValueError as error:
             raise _invalid(text, "is not a real date", field) from error
-        local = tz or now.astimezone().tzinfo
-        moment = day.replace(hour=23, minute=59, second=59, tzinfo=local)
+        end = day.replace(hour=23, minute=59, second=59)
+        # Without a fixed zone, the PC's own offset of that day (not of today) applies across daylight saving.
+        moment = end.replace(tzinfo=tz) if tz is not None else end.astimezone()
     else:
         try:
             moment = datetime.fromisoformat(value.replace("Z", "+00:00"))

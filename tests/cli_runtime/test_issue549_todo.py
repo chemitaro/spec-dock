@@ -169,6 +169,9 @@ def test_subtasks_and_a_checklist(world: WriteWorld, clock: Clock) -> None:
     assert code == 0 and payload["data"]["result"]["derived"]["parent_closable"] is True
     code, payload = todo(world, "show", parent)
     assert payload["data"]["result"]["derived"]["parent_closable"] is True
+    assert payload["data"]["result"]["next_step"] == f"spec-dock todo done {parent}"
+    code, payload = todo(world, "show", f"{parent}.9")
+    assert (code, payload["error"]["code"]) == (3, "TODO_NOT_FOUND")
     bundle = added(world, "--title", "まとめて", "--kind", "checklist", *AGENT, "--item", "A", "--item", "B")
     assert [item["title"] for item in bundle["todo"]["subtasks"]] == ["A", "B"]
     assert bundle["todo"]["due"] == "2026-11-04T05:00:00Z"
@@ -350,6 +353,7 @@ def test_dry_run_plans_without_writing(world: WriteWorld, clock: Clock) -> None:
 def test_todos_do_not_disturb_the_scope_checks(world: WriteWorld, clock: Clock) -> None:
     code, scopes_before = world.run("scope", "list")
     code, validate_before = world.run("workspace", "validate")
+    code, check_before = world.run("scope", "check", "iss-531")
     added(world, "--title", "置く")
     (world.catalog / "todos/settings.json").write_text(json.dumps({"schema": "specdock.todo-settings/v1"}))
     code, scopes_after = world.run("scope", "list")
@@ -357,6 +361,11 @@ def test_todos_do_not_disturb_the_scope_checks(world: WriteWorld, clock: Clock) 
     code, validate_after = world.run("workspace", "validate")
     assert (code, validate_after["data"]) == (validate_before["exit_code"], validate_before["data"])
     assert not any("MISPLACED" in json.dumps(item) for item in validate_after["warnings"])
+    code, check_after = world.run("scope", "check", "iss-531")
+    assert (check_after["exit_code"], check_after["data"]["result"]["errors"]) == (
+        check_before["exit_code"],
+        check_before["data"]["result"]["errors"],
+    )
 
 
 def test_a_busy_catalog_lock_stops_before_writing(
@@ -370,3 +379,13 @@ def test_a_busy_catalog_lock_stops_before_writing(
         code, payload = todo(world, "add", "--title", "待つ")
     assert (code, payload["error"]["code"]) == (3, "CANONICAL_LOCK_BUSY")
     assert not (world.catalog / "todos").exists() and world.changesets() == []
+
+
+def test_a_checkout_without_origin_still_works_with_a_null_ref(world: WriteWorld, clock: Clock) -> None:
+    from tests.support.canonical_repo import git
+
+    git(world.main, "remote", "rename", "origin", "upstream")
+    result = added(world, "--title", "どこでも")
+    assert result["ref"] is None and result["repository"] is None
+    code, payload = todo(world, "list")
+    assert code == 0 and payload["data"]["result"]["repositories"][0]["repository"] is None

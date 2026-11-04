@@ -126,3 +126,27 @@ def test_filters() -> None:
     assert ids(Filters(kind="decide")) == []
     assert ids(Filters(status="done")) == []
     assert ids(Filters(status="all")) == ["t-0001", "t-0002", "t-0003"]
+
+
+def test_huge_spans_are_refused_without_overflow() -> None:
+    from spec_dock.runtime.domain.todo_model import relative
+    from spec_dock.runtime.domain.todo_settings import check_values
+
+    assert relative("1000000000d") is None and relative("43200m") is not None
+    with pytest.raises(TodoError):
+        parse_when("1000000000d", now=NOW, tz=JST)
+    assert check_values({"default_due": "99999999999999999999d"}) is not None
+
+
+def test_a_date_uses_that_day_offset_across_daylight_saving(monkeypatch: pytest.MonkeyPatch) -> None:
+    import time
+
+    monkeypatch.setenv("TZ", "America/New_York")
+    time.tzset()
+    try:
+        winter = datetime(2026, 1, 10, 12, 0, tzinfo=timezone.utc)
+        assert parse_when("2026-07-01", now=winter, tz=None) == "2026-07-02T03:59:59Z"  # EDT, -04:00
+        assert parse_when("2026-01-20", now=winter, tz=None) == "2026-01-21T04:59:59Z"  # EST, -05:00
+    finally:
+        monkeypatch.undo()
+        time.tzset()

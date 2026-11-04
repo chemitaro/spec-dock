@@ -195,7 +195,9 @@ def _resolution(check: _Checker, path: str, value: object, *, status: str, keys:
     for name in ("role", "choice", "note", "record"):
         _optional_text(check, f"{path}.{name}", value.get(name))
     choice = value.get("choice")
-    if isinstance(choice, str) and (keys is None or choice not in keys):
+    if isinstance(choice, str) and keys is None:
+        check.add(f"{path}.choice", "must be null for a subtask")
+    elif isinstance(choice, str) and choice not in keys:  # type: ignore[operator]
         check.add(f"{path}.choice", "must be the key of one of the options")
     if status == "cancelled" and not _text(value.get("note")):
         check.add(f"{path}.note", "must give the reason of the cancellation")
@@ -546,7 +548,25 @@ def transition(
     history = result.setdefault("history", [])
     assert isinstance(history, list)
     if target is not None and target != todo_id:
-        _subtask_transition(result, history, action, target=target, now=now, by=by, role=role, note=note, title=title)
+        if choice is not None or include_subtasks:
+            raise TodoError(
+                "TODO_INVALID",
+                "a subtask takes no --choice or --include-subtasks",
+                exit_code=2,
+                details={"problems": [{"field": "id", "message": "names a subtask"}], "missing": []},
+            )
+        _subtask_transition(
+            result,
+            history,
+            action,
+            target=target,
+            now=now,
+            by=by,
+            role=role,
+            note=note,
+            title=title,
+            record_ref=record_ref,
+        )
         require_valid(result)
         return result
     status = result.get("status")
@@ -589,12 +609,15 @@ def transition(
     elif action == "reopen":
         if status not in CLOSED:
             raise _state_error(todo_id, status, "reopened")
+        previous = result.get("resolution")
         result["status"] = "open"
         result["resolution"] = None
         result["snooze_until"] = None
         if due is not None:
             result["due"] = due
-        history.append(_history_entry("reopened", now=now, by=by, role=role, note=note))
+        entry = _history_entry("reopened", now=now, by=by, role=role, note=note)
+        entry["resolution"] = previous  # the earlier answer stays in history (epic-00547 D-12)
+        history.append(entry)
     elif action == "subtask_add":
         if status in CLOSED:
             raise TodoError(
@@ -640,6 +663,7 @@ def _subtask_transition(
     role: str | None,
     note: str | None,
     title: str | None,
+    record_ref: str | None = None,
 ) -> None:
     todo_id = str(result.get("id"))
     item = next((entry for entry in _subtask_list(result) if entry.get("id") == target), None)
@@ -663,7 +687,7 @@ def _subtask_transition(
             )
         closing = "done" if action == "done" else "cancelled"
         item["status"] = closing
-        item["resolution"] = _resolution_value(now, by, role, choice=None, note=note, record_ref=None)
+        item["resolution"] = _resolution_value(now, by, role, choice=None, note=note, record_ref=record_ref)
         history.append(_history_entry(f"subtask_{closing}", now=now, by=by, role=role, target=target, note=note))
     elif action == "reopen":
         if result.get("status") in CLOSED:
@@ -675,9 +699,12 @@ def _subtask_transition(
             )
         if status not in CLOSED:
             raise _state_error(target, status, "reopened")
+        previous = item.get("resolution")
         item["status"] = "open"
         item["resolution"] = None
-        history.append(_history_entry("subtask_reopened", now=now, by=by, role=role, target=target, note=note))
+        entry = _history_entry("subtask_reopened", now=now, by=by, role=role, target=target, note=note)
+        entry["resolution"] = previous
+        history.append(entry)
     elif action == "update":
         if title is None or title == item.get("title"):
             return
