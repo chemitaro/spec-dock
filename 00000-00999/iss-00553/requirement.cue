@@ -15,8 +15,8 @@ assurance: {
 }
 
 // 目的と背景（任意）。
-// purpose:    "この Issue が実現する価値"
-// background: "解く問題と、関係者"
+purpose:    "SpecDock 0.7.0（人のタスクの CLI `spec-dock todo`）を出し、5つのリポジトリで人のタスクの運用を始められるようにする。"
+background: "epic-00547 の #549（CLI）・#550（集約）・#551（スキルと文書）と、#556（構造の図の既定）が main に入った。手順は #534（0.6.0）と同じ。マージの後のタグ、導入、配布、dogfooding の確かめは統括が行う。"
 
 // 対象と対象外（任意）。
 // includes: ["..."]
@@ -25,11 +25,22 @@ assurance: {
 // 観測できる要件。番号（R-01、R-02、…）をキーにする。
 // title は必須。acceptance（観測できる受け入れの条件）は standard 以上で必須。
 requirements: {
-	// "R-01": {
-	// 	title: "利用者が〜できる"
-	// 	text:  "詳しい説明"
-	// 	acceptance: ["〜が観測できる"]
-	// }
+	"R-01": {
+		title: "版が 0.7.0 になる"
+		text:  "`pyproject.toml`、`uv.lock`、版のファイル `system/spec-dock-version` とその dogfood の写しが 0.7.0 になる。"
+	}
+	"R-02": {
+		title: "上げるときの文書が 0.7.0 の変更を説明する"
+		text:  "`migration.md`（提供側と dogfood の写しはバイト一致）に「## 0.7.0 への更新」の節があり、`todo` の10のコマンド（公開 61 → 71）、記録の置き場（カタログの `todos/`）、集約、`dashboard summary` の `todos`、設定の3段、`todo check` と `cue`、`TODO_*` のコード、スキルの入れ替えに `installation update` が要ること、構造の図の既定の変更と保存のキーの `v2`、最初の1手、戻し方を述べる。"
+	}
+	"R-03": {
+		title: "0.6.0 の配布資産を持つリポジトリが `installation update` で上がる"
+		text:  "`static-inventory.json` が、変わった配布資産の今のハッシュと、0.6.0 のバイトを既知の古い版として持つ。新しい `docs/todo.md` は補われる。"
+	}
+	"R-04": {
+		title: "配布と dogfooding はマージの後に統括が行う"
+		text:  "タグ、パッケージの導入、5つのリポジトリへの配布、利用者の PC での人のタスクの確かめは、この Issue の PR では行わない。"
+	}
 }
 
 // 失敗・境界の条件。番号（F-01、…）をキーにする。

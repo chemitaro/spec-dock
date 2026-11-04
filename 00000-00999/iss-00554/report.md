@@ -37,14 +37,16 @@ ID: "iss-00554"
 - 仕様のレビュー（spec-reviewer opus/high）：round-1 で pass（P0/P1 なし。P2 3件・P3 1件は設計と計画に取り込んだ。`.workbench/spec-review/iss-00554/`）。
 - コードのレビュー（code-reviewer opus/high、標準と仕様の2人）：9e6d716c6 で2人とも pass（P0/P1 なし）。P2 2件（経緯の言葉の鍵、`todos/` のないカタログの覚え）を 7fe233237 で直し、テストを足した。
 - 全体のテスト（7fe233237）：`uv run pytest` 3626 passed、7 skipped。`make lint`（ruff、format、mypy）pass。
-- 最終品質ゲート：（下の「最終品質ゲート」に書く）
 - PC のヘッドレス Chrome（一時の状態の置き場 `.workbench/shots/env` に2つのリポジトリと8件のタスクを置き、このブランチのコードでサーバーを立てた。利用者の常駐のサーバーと `~/.local/state/spec-dock/` は使っていない）：全リポジトリ・リポジトリごと・1件・構造の図・ボード・Issue と Epic の詳しい画面のタブ・横断の概況の8画面を、PC 幅（1440px）と 390px、明るい・暗いで写した（32枚）。どの画面も横にはみ出さない（`scrollWidth - clientWidth = 0`）。期限切れは赤い帯・記号・「期限切れ（n時間超過）」で先頭の組に出る。構造の図の Issue の箱に「人 1」、Epic・Initiative の枠に「人 n 配下も」が出る。コンソールの誤りは、最初の画面の `/favicon.ico` の 404 だけ（既存の動き。推定）。
 - 写し：この Scope の `artifacts/`（`*--todos-all-pc-light.png` など32枚と `*--screenshots-report.json`）。
 - iPhone の Safari での確かめ：未実施（統括が利用者に頼む）。
 
 ## 最終品質ゲート
 
-（記入予定）
+- 合格：7fe233237（campaign `iss-00554-01`、attempt 01。closure は `.workbench/final-quality-gate/iss-00554-01/closure.md`）。
+- 審査（quality-gate-reviewer opus/high、1人）：pass、網羅 complete、P0 0・P1 0・P2 0・P3 1（画面側の『人のタスクが読めない』表示（横断の概況の札、詳しい画面のタブ）を確かめるものがない。情報のみ）。
+- テスト：`make lint` exit 0（ruff check、format、mypy pass）、`uv run pytest` exit 0（3626 passed、7 skipped）。同じコミット。
+- ChatGPT のスキルは無効のため、補助の側はなし。
 
 ## Residual Risks / Follow-ups
 
