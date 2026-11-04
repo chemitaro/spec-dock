@@ -37,6 +37,7 @@ ID: "iss-00551"
   - テストの側：合格。`make lint` は終了コード0。`uv run pytest` は終了コード0（3610 passed、7 skipped、33分58秒）。
   - 試行1（`863c0a9a4`）は `test_issue413_assets.py` の件数の2件が失敗したので、期待値を直して試行2をやり直した。記録は `.workbench/final-quality-gate/iss-00551-g1/closure.md`。ChatGPT のレーンは使っていない（無効）。
 - `spec-dock scope check iss-00551`：誤り0、警告0。
+- PR：https://github.com/chemitaro/spec-dock/pull/561（head `996652619`）。CI（Actions と Commit Status）は通過、GitHub は MERGEABLE／CLEAN（2026-11-04T07:34Z の観測）。マージは利用者が行う。`work finish` は未実行。
 
 ## Residual Risks / Follow-ups
 
