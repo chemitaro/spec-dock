@@ -14,13 +14,13 @@ import shlex
 from typing import TYPE_CHECKING, Final
 
 from spec_dock.runtime.application import todo_common
+from spec_dock.runtime.application.dashboard_site import DashboardSite
 from spec_dock.runtime.application.todo_common import command_error, settings_warnings
 from spec_dock.runtime.application.todo_list import classify, counts_of, normalize_scope, show_from_store
 from spec_dock.runtime.domain.todo_model import Filters, matches, order, tally
 from spec_dock.runtime.domain.todo_record import TodoError, normalize_id
 from spec_dock.runtime.domain.todo_settings import resolve
 from spec_dock.runtime.infra.canonical_registry import RegistryUnreadable, read_registry
-from spec_dock.runtime.infra.dashboard_files import read_hidden
 from spec_dock.runtime.infra.github_structure import GithubRepository
 from spec_dock.runtime.infra.state_root import resolve_state_root
 from spec_dock.runtime.infra.todo_store import TodoStore
@@ -199,6 +199,7 @@ def _list_all(namespace: argparse.Namespace) -> OperationResult[object]:
     pool: list[tuple[dict[str, object], dict[str, object]]] = []  # (record, list item)
     warnings: list[Diagnostic] = list(settings_warnings((user_layer,)))
     seen: set[str] = set()
+    site = DashboardSite(state_root)  # the same answer as the dashboard server (iss-00552 D-05)
     for row in select_catalogs(registry):
         repository = row.repository
         if wanted and (repository is None or repository.key not in wanted):
@@ -206,7 +207,7 @@ def _list_all(namespace: argparse.Namespace) -> OperationResult[object]:
         if repository is not None:
             seen.add(repository.key)
         key = repository.key if repository is not None else None
-        hidden = read_hidden(state_root, repository) if repository is not None else False
+        hidden = site.visibility(repository.key).hidden if repository is not None else False
         place: dict[str, object] = {"catalog": row.entry.catalog, "main_checkout": row.entry.main_checkout}
         catalog, checkout = row.entry.catalog, row.entry.main_checkout
         if row.chosen is not None:

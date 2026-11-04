@@ -122,11 +122,17 @@ def list_text(data: dict[str, object]) -> list[str]:
     for row in data["repositories"]:  # type: ignore[attr-defined]
         name = row["repository"] or "(repository unknown)"
         state = "hidden" if row["hidden"] else "shown" if row["served"] else "not served"
+        if row["hidden"] and row.get("hidden_by"):
+            state += " by=" + ",".join(row["hidden_by"])
+        config = row.get("config")
+        source = f" config={config['source']}" if isinstance(config, dict) else ""
         problem = f" problem={row['problem']}" if row["problem"] else ""
         url = f" {row['url']}" if row["url"] else ""
-        lines.append(f"{name} {state}{problem} catalog={row['catalog']}{url}")
+        lines.append(f"{name} {state}{source}{problem} catalog={row['catalog']}{url}")
     if data.get("marks_unreadable"):
         lines.append("hidden marks unreadable: repositories stay hidden until dashboard/repositories.json is fixed")
+    for item in data.get("config_problems") or []:  # type: ignore[attr-defined]
+        lines.append(f"config problem: {item['layer']} {item['path']}: {item['reason']}")
     if data.get("registry_error"):
         lines.append(f"registry unreadable: {data['registry_error']}")
     return lines
