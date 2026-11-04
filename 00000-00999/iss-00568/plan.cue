@@ -3,9 +3,9 @@ package spec
 goal: "古さの判定を『最後に構造を確かめた時刻』にそろえる"
 
 steps: {
-	"S-01": {title: "確かめた時刻の関数と probe の読み取り（テスト先行）", realizes: ["R-01", "R-02", "F-01"], status: "todo"}
-	"S-02": {title: "モデル、summary、サーバー（署名を含む）に配線する", realizes: ["R-03", "R-04"], status: "todo", after: ["S-01"]}
-	"S-03": {title: "reference_cli.md と inventory を直す", realizes: ["R-04"], status: "todo", after: ["S-02"]}
+	"S-01": {title: "確かめた時刻の関数と probe の読み取り（テスト先行）", realizes: ["R-01", "R-02", "F-01"], status: "done"}
+	"S-02": {title: "モデル、summary、サーバー（署名を含む）に配線する", realizes: ["R-03", "R-04"], status: "done", after: ["S-01"]}
+	"S-03": {title: "reference_cli.md と inventory を直す", realizes: ["R-04"], status: "done", after: ["S-02"]}
 }
 
 tests: {
