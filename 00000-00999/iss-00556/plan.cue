@@ -12,6 +12,8 @@ steps: {
 	"S-05": {title: "見せ方の保存を v2 にし、`prefs.js` で v1 から一部だけ引き継ぐ", realizes: ["R-05", "F-02"], status: "done", session: "impl"}
 	"S-06": {title: "ボードの「終わった」の列の並びを、既存のテスト（`test_board_columns_follow_lanes_and_rank` の newest first）で確かめる", realizes: ["R-06"], status: "done", session: "impl"}
 	"S-07": {title: "PC のヘッドレスの Chrome で、このPCの spec-dock の実際のスナップショットを PC の幅と 390px で写し、`edgeAudit` を確かめ、report.md と artifacts に残す。移行の注記の材料を PR の本文と統括への報告に書く", realizes: ["R-01", "R-02", "R-03"], status: "done", after: ["S-02", "S-03", "S-04", "S-05"], session: "impl"}
+	"S-08": {title: "折り返しをやめ（`wrapBlock`、`colsBlock`）、経路の寄せを4回にし、「全体」と拡大縮小の下限を収めるのに要る倍率まで下げる", realizes: ["R-07"], status: "done", session: "impl"}
+	"S-09": {title: "このPCの実際の構造で、PC と 390px の初めの表示・「全体」・横のドラッグと `edgeAudit` を確かめ、写しを report.md に足し、テストとゲートを最終のコミットでやり直す", realizes: ["R-07"], status: "todo", after: ["S-08"], session: "impl"}
 }
 
 tests: {
@@ -22,6 +24,8 @@ tests: {
 	"T-05": {title: "最上位の枠が4つの組と最近の順に並び、Epic の段の中で開いた箱が推奨順で上、終わった箱が最近終わった順で下。`active_at` のない Scope は最も古い扱い。既定の表示で、終わった Issue がそれを待つ開いた Issue の左の段に入り、開いた子孫を持つ閉じた親の中は開いたものだけの段（node）", verifies: ["R-03", "F-01"]}
 	"T-06": {title: "`restorePrefs` が v1 から `mode`・`fold`・`legend` だけ引き継ぎ、v2 の値を守り、壊れた値と型の違う値を既定にする（node）。`graph.js` が v2 のキーに保存する（静的）", verifies: ["R-05", "F-02"]}
 	"T-07": {title: "ボードの「終わった」の列の先頭が最も新しく終わった Scope（既存の node のテスト `test_board_columns_follow_lanes_and_rank`）", verifies: ["R-06"]}
+	"T-09": {title: "依存のない12件の Issue の Epic と親のない12件の Issue が1行で幅 1240px を超え、7段の依存が1行に並び、代表のデータの線の検査が0件（node）", verifies: ["R-07"]}
+	"T-10": {title: "このPCの spec-dock の実際の構造で、PC と 390px の「全体」で図が収まり、ドラッグで横に動き、ページのはみ出しがなく、`edgeAudit` の違反0（ヘッドレスの Chrome、report.md）", verifies: ["R-07"]}
 	"T-08": {title: "このPCの spec-dock の実際のスナップショットで、構造の図の既定の表示を PC の幅と 390px で写し、`window.specdockEdgeAudit()` の違反0を記録する（ヘッドレスの Chrome、report.md）", verifies: ["R-01", "R-02", "R-03"]}
 }
 
