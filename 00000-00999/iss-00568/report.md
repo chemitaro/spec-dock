@@ -16,14 +16,14 @@ ID: "iss-00568"
 
 契約の変更（次の版の移行の注記用）：`dashboard summary` の `fetched_at`／`stale`、API の `snapshot.fetched_at`／`age_seconds`／`stale` の意味が「最後に構造を確かめた時刻」になった。欄の名前と型は同じ。reference_cli.md に反映した。
 
-コミット：f2ed8f26879807849071ae5b9a04ca3db78ef99d
+コミット：実装 f2ed8f26879807849071ae5b9a04ca3db78ef99d、origin/main（#570）を取り込んだ後の最終 7c03c72fada215e17e09e36337045da40ab0dac8
 
 ## Verification
 
 - 仕様のレビュー（spec-reviewer opus/medium）：P0・P1 なし（P2 が1件、情報のみ）。
 - コードのレビュー（code-reviewer sonnet/high）：指摘 0件。
-- 最終品質ゲート（quality-gate-reviewer opus/high、1人）：f2ed8f2 で合格。P0/P1 なし、coverage 完全、P3 が1件。
-- テスト lane（同じコミット）：`make lint` exit 0、`uv run pytest` exit 0（3706 passed, 7 skipped）。
+- 最終品質ゲート（quality-gate-reviewer opus/high、1人）：7c03c72（取り込み後。取り込み前の f2ed8f2 でも合格）で合格。P0/P1 なし、coverage 完全、P3 が1件。
+- テスト lane（同じコミット）：`make lint` exit 0、`uv run pytest` exit 0（3710 passed, 7 skipped）。
 - 新しいテスト：純関数の表と不正・未来の時刻、モデル、サーバーの API と `dashboard summary` の一致、probe の更新の反映、probe の失敗・破損。
 - 記録：`.workbench/final-quality-gate/iss-00568/closure.md`
 
