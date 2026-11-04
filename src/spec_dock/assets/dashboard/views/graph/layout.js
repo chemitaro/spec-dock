@@ -4,9 +4,10 @@
 // check see the same rectangles in the page and in the node check of the tests.
 //
 // The model decides everything about the Scopes (state, stage, recommended order, cleanup candidates); this module
-// only arranges them: stages left to right, the activity order top to bottom inside a stage (iss-00556 D-03): open
-// frames by what they hold and how recently they moved, open boxes by the recommended order (`rank`), then what is
-// done, most recent first.
+// only arranges them (iss-00560): the children of one parent split into the groups their dependencies connect; a
+// group is a grid of stages (left to right) and rows, where what follows sits on the row of what it follows; the
+// groups go left to right in the activity order (iss-00556 D-03) and wrap at the width seen at 100%, never inside a
+// group.
 import { audit, portSpan, route } from "./router.js";
 
 export const SIZE = {
@@ -22,7 +23,9 @@ export const SIZE = {
   margin: 24,
   indent: 40,
 };
-const BASE = { world: 28, body: 12, wrapRow: 14, wrapCol: 14, cols: 44, col: 12, band: 24, treeRow: 14, treeIndent: 0 };
+const BASE = { world: 28, body: 12, wrapRow: 14, wrapCol: 14, cols: 44, col: 12, treeRow: 14, treeIndent: 0 };
+// The width seen at 100% when the page does not say (the node check): the wrap before iss-00556 (iss-00560 F-01).
+export const WRAP_WIDTH = 1240;
 
 // iss-00556: finished dependencies between what is shown are drawn by default (faint), the waiting ones stand out.
 export const DEFAULTS = { mode: "nest", showDone: false, deps: "all", fold: true, focus: null };
@@ -137,91 +140,321 @@ function chipBlock(key, list, ctx) {
   return { t: "chip", key, ids: list.map((s) => s.id), w: SIZE.chipW, h: SIZE.chipH + (ctx.gaps[`grow:c:${key}`] || 0) };
 }
 
-// Items of one container, with the cleanup candidates folded into one group at the end.
-function folded(items, containerKey, ctx) {
-  if (!ctx.opts.fold) return items.map((s) => ctx.node(s));
-  // A closed parent with open descendants stays a frame (Epic R-12; the prototype's cleanup set skips it).
-  // The focus itself never folds: narrowing to a cleanup candidate shows what it holds (iss-00556).
-  const folds = (s) => ctx.cleanup.has(s.id) && !s.keep_visible && s.id !== ctx.focus;
-  const keep = items.filter((s) => !folds(s));
-  const fold = items.filter(folds);
-  const blocks = keep.map((s) => ctx.node(s));
-  if (fold.length) blocks.push(chipBlock(containerKey, fold, ctx));
-  return blocks;
+// A cleanup candidate folds into a group; a closed parent with open descendants stays a frame (Epic R-12; the
+// prototype's cleanup set skips it), and the focus never folds: narrowing to a candidate shows what it holds.
+const folds = (s, ctx) => ctx.opts.fold && ctx.cleanup.has(s.id) && !s.keep_visible && s.id !== ctx.focus;
+
+// --- Groups of siblings connected by dependencies (iss-00560 D-01) -----------------------------------------
+
+// The dependencies between siblings, as the model counts them for the stages (`child_stages`): a sibling waits for
+// another when anything in its subtree is blocked by something in the other's subtree. Among the open stages, done
+// Scopes and dependencies on done Scopes do not count. A cycle is broken (F-02) by keeping the stronger dependencies
+// first: the siblings' own, then those between open Scopes, then the more pairs, then from the older sibling; a
+// dependency that would close a cycle is dropped. Returns [from, to] pairs without a cycle.
+export function siblingEdges(list, ix, all) {
+  const owner = new Map();
+  const members = new Map();
+  for (const s of list) {
+    const out = [];
+    const stack = [s];
+    while (stack.length) {
+      const x = stack.pop();
+      if (owner.has(x.id)) continue;
+      owner.set(x.id, s.id);
+      out.push(x);
+      stack.push(...(ix.kids.get(x.id) || []));
+    }
+    members.set(s.id, out);
+  }
+  const found = new Map();
+  for (const s of list) {
+    for (const x of members.get(s.id)) {
+      if (!all && x.state === "done") continue;
+      for (const b of x.blocked_by || []) {
+        const from = owner.get(b);
+        if (!from || from === s.id) continue;
+        const target = ix.byId.get(b);
+        if (!all && target?.state === "done") continue;
+        const key = `${from}>${s.id}`;
+        const e = found.get(key) || { from, to: s.id, own: false, open: 0, pairs: 0 };
+        e.own = e.own || (x.id === s.id && b === from);
+        e.open += x.state !== "done" && target?.state !== "done" ? 1 : 0;
+        e.pairs++;
+        found.set(key, e);
+      }
+    }
+  }
+  const number = new Map(list.map((s) => [s.id, s.number]));
+  const strong = [...found.values()].sort(
+    (p, q) => q.own - p.own || q.open - p.open || q.pairs - p.pairs || number.get(p.from) - number.get(q.from) || number.get(p.to) - number.get(q.to),
+  );
+  const next = new Map();
+  const reaches = (a, b) => {
+    const stack = [a];
+    const seen = new Set();
+    while (stack.length) {
+      const x = stack.pop();
+      if (x === b) return true;
+      if (seen.has(x)) continue;
+      seen.add(x);
+      stack.push(...(next.get(x) || []));
+    }
+    return false;
+  };
+  const kept = [];
+  for (const e of strong) {
+    if (reaches(e.to, e.from)) continue;
+    next.set(e.from, [...(next.get(e.from) || []), e.to]);
+    kept.push([e.from, e.to]);
+  }
+  return kept;
 }
 
-// One row, however wide: the graph grows to the right and is panned sideways (iss-00556 R-07; the 1240px wrap is
-// gone). The row stays inside a rows group so that the gap keys (wr, wc) keep their meaning for the routing.
-function wrapBlock(key, items, ctx) {
-  const row = { items: [], w: 0, h: 0 };
-  const rows = [row];
-  for (const it of items) {
-    it.x = row.items.length ? row.w + gap(ctx.gaps, `wc${key}`, BASE.wrapCol, row.items.length - 1) : 0;
-    row.w = it.x + it.w;
-    row.h = Math.max(row.h, it.h);
-    row.items.push(it);
+// The stages among siblings from those dependencies: one more than the latest stage before it (the model's stages
+// when there is no cycle).
+function stagesOf(list, edges) {
+  const before = new Map();
+  for (const [a, b] of edges) before.set(b, [...(before.get(b) || []), a]);
+  const stage = new Map();
+  const walk = (id) => {
+    if (!stage.has(id)) stage.set(id, 1 + Math.max(0, ...(before.get(id) || []).map(walk)));
+    return stage.get(id);
+  };
+  for (const s of list) walk(s.id);
+  return (s) => stage.get(s.id);
+}
+
+// The groups, in the activity order of their first member; each group's members in the order of the stages and
+// the activity. `list` is already in the activity order.
+function components(list, edges) {
+  const up = new Map(list.map((s) => [s.id, s.id]));
+  const find = (id) => {
+    while (up.get(id) !== id) {
+      up.set(id, up.get(up.get(id)));
+      id = up.get(id);
+    }
+    return id;
+  };
+  for (const [a, b] of edges) up.set(find(a), find(b));
+  const groups = new Map();
+  for (const s of list) {
+    const root = find(s.id);
+    if (!groups.has(root)) groups.set(root, []);
+    groups.get(root).push(s);
   }
+  return [...groups.values()];
+}
+
+// Rows inside a group (iss-00560 D-02). Columns are the group's stages; the first column takes the given order,
+// every later one puts each member at the average row of what it follows (the rows already used push it down).
+function placeRows(cols, preds, first, reach) {
+  const row = new Map();
+  cols.forEach((col, ci) => {
+    const want = new Map();
+    for (const s of col) {
+      const p = (preds.get(s.id) || []).filter((id) => row.has(id));
+      want.set(s.id, p.length ? p.reduce((sum, id) => sum + row.get(id), 0) / p.length : Infinity);
+    }
+    // equal wishes: the one with the longer chain after it keeps the row, so that the longest chain stays straight
+    const items =
+      ci === 0
+        ? first
+        : col
+            .map((s, j) => ({ s, j }))
+            .sort((a, b) => want.get(a.s.id) - want.get(b.s.id) || reach(b.s) - reach(a.s) || a.j - b.j)
+            .map((x) => x.s);
+    let next = 0;
+    for (const s of items) {
+      const w = want.get(s.id);
+      const r = Number.isFinite(w) ? Math.max(Math.floor(w + 0.49), next) : next;
+      row.set(s.id, r);
+      next = r + 1;
+    }
+  });
+  return row;
+}
+
+// Crossings (pairs of lines whose ends swap their order) and the rows the lines climb, for choosing between orders.
+function cost(row, edges) {
+  let cross = 0;
+  let climb = 0;
+  for (let i = 0; i < edges.length; i++) {
+    const [a, b] = edges[i];
+    climb += Math.abs(row.get(a) - row.get(b));
+    for (let j = i + 1; j < edges.length; j++) {
+      const [c, d] = edges[j];
+      if (a === c || b === d) continue;
+      if ((row.get(a) - row.get(c)) * (row.get(b) - row.get(d)) < 0) cross++;
+    }
+  }
+  return [cross, climb];
+}
+
+export function rowsOf(members, edges, stage) {
+  const stages = [...new Set(members.map(stage))].sort((a, b) => a - b);
+  const colOf = new Map(members.map((s) => [s.id, stages.indexOf(stage(s))]));
+  const cols = stages.map(() => []);
+  for (const s of members) cols[colOf.get(s.id)].push(s);
+  // only a dependency from a left column to a right one lines up rows (a cycle or a mismatched stage does not)
+  const forward = edges.filter(([a, b]) => colOf.has(a) && colOf.has(b) && colOf.get(a) < colOf.get(b));
+  const preds = new Map();
+  const succs = new Map();
+  for (const [a, b] of forward) {
+    preds.set(b, [...(preds.get(b) || []), a]);
+    succs.set(a, [...(succs.get(a) || []), b]);
+  }
+  const chain = new Map();
+  const reach = (s) => {
+    if (!chain.has(s.id)) chain.set(s.id, 1 + Math.max(0, ...(succs.get(s.id) || []).map((id) => reach({ id }))));
+    return chain.get(s.id);
+  };
+  const first = placeRows(cols, preds, cols[0], reach);
+  let best = first;
+  if (cols[0].length > 1) {
+    // the other order of the first column: by the average row of what follows each one
+    const succ = new Map();
+    for (const [a, b] of forward) succ.set(a, [...(succ.get(a) || []), first.get(b)]);
+    const mean = (s) => (succ.has(s.id) ? succ.get(s.id).reduce((x, y) => x + y, 0) / succ.get(s.id).length : Infinity);
+    const order = cols[0].map((s, j) => ({ s, j })).sort((a, b) => mean(a.s) - mean(b.s) || a.j - b.j).map((x) => x.s);
+    const other = placeRows(cols, preds, order, reach);
+    const [c1, k1] = cost(first, forward);
+    const [c2, k2] = cost(other, forward);
+    if (c2 < c1 || (c2 === c1 && k2 < k1)) best = other;
+  }
+  return { col: colOf, row: best, cols: stages.length };
+}
+
+// One group as a grid of rows and stage columns. A row is as tall as its tallest cell, so what follows sits on the
+// row of what it follows. A column only orders: each cell sits right of the cell before it on its row and of what it
+// follows, one column gap apart, so a wide neighbour on another row leaves no hole in a chain. The routing widens a
+// row (rr<group>#i) or the passage after a column (cc<group>#k: every cell placed across column k moves right).
+function gridBlock(ck, members, edges, stage, ctx, avail) {
+  const { col, row, cols } = rowsOf(members, edges, stage);
+  const cells = [];
+  const cellOf = new Map();
+  const foldsIn = new Map(); // column -> folded members
+  for (const s of members) {
+    if (folds(s, ctx)) {
+      const c = col.get(s.id);
+      if (!foldsIn.has(c)) foldsIn.set(c, []);
+      foldsIn.get(c).push(s);
+    } else {
+      const cell = { block: ctx.node(s, avail), col: col.get(s.id), row: row.get(s.id) };
+      cells.push(cell);
+      cellOf.set(s.id, cell);
+    }
+  }
+  for (const [c, list] of foldsIn) {
+    const cell = { block: chipBlock(`${ck}.${c}`, list, ctx), col: c, row: Math.min(...list.map((s) => row.get(s.id))) };
+    cells.push(cell);
+    for (const s of list) cellOf.set(s.id, cell);
+  }
+  const used = [...new Set(cells.map((x) => x.row))].sort((a, b) => a - b);
+  const rowH = used.map(() => 0);
+  for (const x of cells) {
+    x.r = used.indexOf(x.row);
+    rowH[x.r] = Math.max(rowH[x.r], x.block.h);
+  }
+  // what each cell must sit right of: what it follows and the cell before it on its row
+  const after = new Map(cells.map((x) => [x, new Set()]));
+  for (const [a, b] of edges) {
+    const p = cellOf.get(a), q = cellOf.get(b);
+    if (p && q && p !== q && p.col < q.col) after.get(q).add(p);
+  }
+  const extra = Array.from({ length: cols }, (_, k) => gap(ctx.gaps, `cc${ck}`, BASE.cols, k) - BASE.cols);
+  cells.sort((a, b) => a.col - b.col || a.r - b.r);
+  const lastOnRow = new Map();
+  for (const x of cells) {
+    const left = lastOnRow.get(x.r);
+    if (left) after.get(x).add(left);
+    lastOnRow.set(x.r, x);
+    let at = 0;
+    for (const p of after.get(x)) {
+      let room = BASE.cols;
+      for (let k = p.col; k < x.col; k++) room += extra[k];
+      at = Math.max(at, p.block.x + p.block.w + room);
+    }
+    x.block.x = at;
+  }
+  const w = Math.max(0, ...cells.map((x) => x.block.x + x.block.w));
+  let h = 0;
+  const rows = rowH.map((rh, r) => {
+    const kids = cells.filter((x) => x.r === r);
+    for (const x of kids) {
+      x.block.y = 0;
+      x.block.slot = x.col;
+    }
+    const group = { t: "group", key: `cc${ck}`, axis: "x", x: 0, y: h, w, h: rh, kids: kids.map((x) => x.block) };
+    h += rh + (r < rowH.length - 1 ? gap(ctx.gaps, `rr${ck}`, BASE.col, r) : 0);
+    return group;
+  });
+  return { t: "group", key: `rr${ck}`, axis: "y", w, h, kids: rows };
+}
+
+// Shelves (iss-00560 D-03): the groups left to right, wrapping before one that would pass the width it may use.
+// Where to wrap is decided once, without the routing's widening (ctx.breaks from the layout with no gaps), so that
+// widening a channel never moves a group to another shelf between the rounds.
+function shelfBlock(key, items, ctx, avail, rowBase) {
+  const fixed = ctx.breaks?.get(key);
+  const sizes = [];
+  const shelves = [];
+  let shelf = null;
+  for (const it of items) {
+    const full = fixed ? shelf && shelf.items.length >= fixed[shelves.length - 1] : shelf && shelf.items.length && shelf.w + BASE.wrapCol + it.w > avail;
+    if (!shelf || full) {
+      shelf = { items: [], w: 0, h: 0 };
+      shelves.push(shelf);
+    }
+    const n = shelf.items.length;
+    it.x = n ? shelf.w + gap(ctx.gaps, `wc${key}`, BASE.wrapCol, n - 1) : 0;
+    shelf.w = it.x + it.w;
+    shelf.h = Math.max(shelf.h, it.h);
+    shelf.items.push(it);
+  }
+  ctx.wraps.set(key, shelves.map((r) => r.items.length));
   let y = 0;
-  rows.forEach((r, i) => {
+  shelves.forEach((r, i) => {
     r.y = y;
     r.items.forEach((it) => (it.y = 0));
-    y += r.h + (i < rows.length - 1 ? gap(ctx.gaps, `wr${key}`, BASE.wrapRow, i) : 0);
+    y += r.h + (i < shelves.length - 1 ? gap(ctx.gaps, `wr${key}`, rowBase, i) : 0);
   });
-  // A wrap is rows (y) of items (x).
   return {
     t: "group",
     key: `wr${key}`,
     axis: "y",
-    w: Math.max(0, ...rows.map((r) => r.w)),
+    w: Math.max(0, ...shelves.map((r) => r.w)),
     h: y,
-    kids: rows.map((r, i) => ({ t: "group", key: `wc${key}`, axis: "x", x: 0, y: r.y, w: r.w, h: r.h, kids: r.items, i })),
+    kids: shelves.map((r) => ({ t: "group", key: `wc${key}`, axis: "x", x: 0, y: r.y, w: r.w, h: r.h, kids: r.items })),
   };
 }
 
-function colsBlock(key, columns, ctx) {
-  const cols = columns.map((items, i) => {
-    let y = 0;
-    items.forEach((it, j) => {
-      it.x = 0;
-      it.y = y;
-      y += it.h + (j < items.length - 1 ? gap(ctx.gaps, `k${key}.${i}`, BASE.col, j) : 0);
-    });
-    return { t: "group", key: `k${key}.${i}`, axis: "y", w: Math.max(0, ...items.map((it) => it.w)), h: y, kids: items };
+// The children of one parent (null: the top level), placed by the groups their dependencies connect.
+function childrenBlock(parent, kids, ctx, avail) {
+  const key = parent ? parent.id : "root";
+  const all = parent ? ctx.showsDone(parent) : ctx.opts.showDone;
+  const act = byActivity(ctx.ix);
+  const list = kids.slice().sort(act);
+  const edges = siblingEdges(list, ctx.ix, all);
+  const stage = stagesOf(list, edges);
+  const items = [];
+  const loose = []; // groups that fold whole: one folded group at the end
+  components(list, edges).forEach((members, g) => {
+    if (members.every((s) => folds(s, ctx))) loose.push(...members);
+    else if (members.length === 1) items.push(ctx.node(members[0], avail));
+    else {
+      const inside = new Set(members.map((s) => s.id));
+      const own = edges.filter(([a, b]) => inside.has(a) && inside.has(b));
+      members.sort((a, b) => stage(a) - stage(b) || act(a, b));
+      items.push(gridBlock(`${key}~${g}`, members, own, stage, ctx, avail));
+    }
   });
-  const bands = [cols]; // every stage on one band, left to right, however many (iss-00556 R-07)
-  let y = 0;
-  const bandBlocks = bands.map((list, b) => {
-    let x = 0;
-    list.forEach((c, i) => {
-      c.x = x;
-      c.y = 0;
-      x += c.w + (i < list.length - 1 ? gap(ctx.gaps, `c${key}`, BASE.cols, i) : 0);
-    });
-    const block = { t: "group", key: `c${key}`, axis: "x", x: 0, y, w: x, h: Math.max(0, ...list.map((c) => c.h)), kids: list };
-    y += block.h + (b < bands.length - 1 ? gap(ctx.gaps, `band${key}`, BASE.band, b) : 0);
-    return block;
-  });
-  return { t: "group", key: `band${key}`, axis: "y", w: Math.max(0, ...bandBlocks.map((b) => b.w)), h: y, kids: bandBlocks };
+  if (loose.length) items.push(chipBlock(`${key}.f`, loose, ctx));
+  return shelfBlock(key, items, ctx, avail, parent ? BASE.wrapRow : BASE.world);
 }
 
-function childrenBlock(parent, kids, ctx) {
-  const key = parent.id;
-  const all = ctx.showsDone(parent);
-  const sorted = kids.slice().sort(byStageActivity(all, ctx.ix));
-  const max = Math.max(1, ...sorted.map((s) => stageOf(s, all)));
-  if (max <= 1) return wrapBlock(key, folded(sorted, `${key}.0`, ctx), ctx);
-  const columns = Array.from({ length: max }, () => []);
-  sorted.forEach((s) => columns[stageOf(s, all) - 1].push(s));
-  return colsBlock(
-    key,
-    columns.filter((c) => c.length).map((c, i) => folded(c, `${key}.${i}`, ctx)),
-    ctx,
-  );
-}
-
-function frameBlock(s, kids, ctx) {
+function frameBlock(s, kids, ctx, avail) {
   const [padT, padX, padB] = SIZE.pad[s.kind] || SIZE.pad.epic;
-  const body = kids.length ? childrenBlock(s, kids, ctx) : null;
+  const body = kids.length ? childrenBlock(s, kids, ctx, avail - 2 * padX) : null;
   const bodyGap = gap(ctx.gaps, `b${s.id}`, BASE.body);
   const compact = !body;
   const head = SIZE.head + grow(ctx, s);
@@ -236,18 +469,9 @@ function frameBlock(s, kids, ctx) {
 
 // --- The nested and the tree layout ---------------------------------------------------------------------------
 
-function nest(roots, ctx) {
-  const frames = roots.filter((s) => s.kind !== "issue" || ctx.visibleKids(s).length);
-  const loose = roots.filter((s) => !frames.includes(s));
-  const items = folded(frames, "root", ctx);
-  if (loose.length) items.push(wrapBlock("root", folded(loose, "root.loose", ctx), ctx));
-  let y = 0;
-  items.forEach((it, i) => {
-    it.x = 0;
-    it.y = y;
-    y += it.h + (i < items.length - 1 ? gap(ctx.gaps, "world", BASE.world, i) : 0);
-  });
-  return { t: "group", key: "world", axis: "y", x: 0, y: 0, w: Math.max(0, ...items.map((it) => it.w)), h: y, kids: items };
+function nest(roots, ctx, avail) {
+  const top = childrenBlock(null, roots, ctx, avail);
+  return { ...top, x: 0, y: 0 };
 }
 
 function tree(roots, ctx) {
@@ -272,6 +496,7 @@ function tree(roots, ctx) {
 // --- Flatten ---------------------------------------------------------------------------------------------------
 
 function flatten(block, ox, oy, path, out) {
+  // a grid cell's step carries its column (slot), shared by every row of the grid
   const x = ox + (block.x || 0);
   const y = oy + (block.y || 0);
   const rect = { x1: x, y1: y, x2: x + block.w, y2: y + block.h };
@@ -288,14 +513,15 @@ function flatten(block, ox, oy, path, out) {
     if (block.body) flatten(block.body, x, y, [...path, { c: block.key, axis: "y", i: 1, gapKey: `b${block.s.id}` }], out);
     return;
   }
-  block.kids.forEach((kid, i) => flatten(kid, x, y, [...path, { c: block.key, axis: block.axis, i }], out));
+  block.kids.forEach((kid, i) => flatten(kid, x, y, [...path, { c: block.key, axis: block.axis, i: kid.slot ?? i }], out));
 }
 
 /**
  * Lay the Scopes out.
  * @param scopes  structure API `scopes`
  * @param cleanup structure API `cleanup` ([{id, code, text}])
- * @param options {mode: "nest"|"tree", showDone, deps: "all"|"wait"|"none", fold, focus}
+ * @param options {mode: "nest"|"tree", showDone, deps: "all"|"wait"|"none", fold, focus, width} — width: the graph's
+ *                visible width at 100% (px), where the groups wrap (WRAP_WIDTH when absent)
  * @param gaps    extra pixels per gap key (from earlier routing rounds)
  */
 export function layout(scopes, cleanup, options = {}, gaps = {}) {
@@ -311,25 +537,28 @@ export function layout(scopes, cleanup, options = {}, gaps = {}) {
   const inFocus = (s) => !focus || s.id === focus || ix.ancestors(s.id).includes(focus);
   const visible = (s) => inFocus(s) && (s.id === focus || visibleBase(s));
   const visibleKids = (s) => ix.kids.get(s.id).filter(visible);
-  const ctx = { opts, gaps, ix, focus, cleanup: new Set((cleanup || []).map((c) => c.id)), visibleKids, showsDone };
-  ctx.node = (s) => {
+  // the shelves of the layout without the routing's widening (computed first when there is any widening)
+  const breaks = Object.keys(gaps).length && opts.mode !== "tree" ? layout(scopes, cleanup, options, {}).wraps : null;
+  const ctx = { opts, gaps, ix, focus, cleanup: new Set((cleanup || []).map((c) => c.id)), visibleKids, showsDone, breaks, wraps: new Map() };
+  ctx.node = (s, avail) => {
     const kids = visibleKids(s);
-    return s.kind === "issue" && !kids.length ? boxBlock(s, ctx) : frameBlock(s, kids, ctx);
+    return s.kind === "issue" && !kids.length ? boxBlock(s, ctx) : frameBlock(s, kids, ctx, avail);
   };
   const isRoot = (s) => (focus ? s.id === focus : !s.parent_id || !ix.byId.has(s.parent_id) || ix.ancestors(s.id).includes(s.id));
   const roots = scopes
     .filter((s) => visible(s) && isRoot(s))
     .sort(byActivity(ix));
-  const top = opts.mode === "tree" ? tree(roots, ctx) : nest(roots, ctx);
-  const out = { nodes: [], groups: [], trunks: [] };
   const mx = SIZE.margin + (gaps["margin.x"] || 0);
+  const seen = Number(opts.width) > 0 ? Number(opts.width) : WRAP_WIDTH;
+  const top = opts.mode === "tree" ? tree(roots, ctx) : nest(roots, ctx, seen - 2 * SIZE.margin);
+  const out = { nodes: [], groups: [], trunks: [] };
   const my = SIZE.margin + (gaps["margin.y"] || 0);
   flatten(top, mx, my, [], out);
   const width = top.w + 2 * mx;
   const height = top.h + 2 * my;
   if (opts.mode === "tree") out.trunks = treeLines(out.nodes, ix);
   const edges = pairs(scopes, ix, out, opts);
-  return { opts, width, height, nodes: out.nodes, groups: out.groups, trunks: out.trunks, edges, focus, ancestors: focus ? ix.ancestors(focus) : [] };
+  return { opts, width, height, nodes: out.nodes, groups: out.groups, trunks: out.trunks, edges, focus, ancestors: focus ? ix.ancestors(focus) : [], wraps: ctx.wraps };
 }
 
 // The tree's parent lines: a vertical trunk from the parent's lower left, a short stub into each child's left side
