@@ -428,10 +428,10 @@ def spec_markdown(
         blocks += _others(evaluation)
     else:
         blocks.append("評価が通らないので、本文は描いていません。上の誤りを直してから、もう一度描いてください。")
-    return _script_safe("\n".join(front) + "\n\n" + "\n\n".join(blocks) + "\n")
+    return script_safe("\n".join(front) + "\n\n" + "\n\n".join(blocks) + "\n")
 
 
-def _script_safe(markdown: str) -> str:
+def script_safe(markdown: str) -> str:
     """`</script` never appears; `<!--` is broken only when a `<script` open tag could follow it (double escape)."""
     safe = _SCRIPT_END.sub(r"<\\/\1", markdown)
     if "<!--" in safe and _SCRIPT_OPEN.search(safe):
@@ -464,7 +464,7 @@ def wrap_page(
     vendor_base: str | None,
     embedded: EmbeddedDesignSystem | None = None,
 ) -> str:
-    """The thin explanation shape of contract K5 around `markdown` (already script-safe).
+    """The thin explanation shape of contract K5 around `markdown`, made script-safe here (`script_safe`).
 
     With `embedded`, the page links nothing: the CSS goes into `<style>` and each script into a base64 `data:`
     URL, so no script text can end the element early. `design_system_base` is then unused.
@@ -488,7 +488,7 @@ def wrap_page(
             else [f'<link rel="stylesheet" href="{attribute(_join(design_system_base, "ds.css"))}">']
         ),
         '<script type="text/markdown" id="ds-source">',
-        _script_safe(markdown).rstrip("\n"),
+        script_safe(markdown).rstrip("\n"),
         "</script>",
         *(
             [f'<script src="data:text/javascript;base64,{_base64(script)}"></script>' for script in embedded.scripts]
