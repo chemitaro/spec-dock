@@ -57,6 +57,8 @@ def test_launchd_install_status_and_uninstall(
     assert (state / "dashboard").is_dir()
     document = plistlib.loads(plist.read_bytes())
     assert document["KeepAlive"] is True
+    # The server reads the same user settings file as this CLI (iss-00552).
+    assert document["EnvironmentVariables"]["XDG_CONFIG_HOME"] == os.environ["XDG_CONFIG_HOME"]
     assert document["ProgramArguments"][1:] == [
         "dashboard",
         "serve",

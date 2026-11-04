@@ -141,7 +141,7 @@ ARTIFACT_SCOPEの@rootはArtifact所有者だけで、Scope作成/Startの対象
 `dashboard service install`が入れる常駐の約束です（言い直した約束3：常駐は利用者が明示して入れたときだけ入り、`status`で見え、`uninstall`で何も残さず消えます）。
 
 - **動かすもの**：`<spec-dock> dashboard serve --service --port <N> [--tailscale] --state-root <状態の置き場>`。`--service`は常駐のための内部の引数で、ヘルプには出しません。`--state-root`は前面の`serve`でも使えます（絶対の道）。
-- **launchd**：ラベル`io.github.chemitaro.spec-dock.dashboard`、`RunAtLoad`、`KeepAlive`、`ThrottleInterval` 10、標準出力と標準エラーは`<状態の置き場>/dashboard/service.log`、`PATH`はgitとtailscaleの場所と`/usr/bin:/bin:/usr/sbin:/sbin`。
+- **launchd**：ラベル`io.github.chemitaro.spec-dock.dashboard`、`RunAtLoad`、`KeepAlive`、`ThrottleInterval` 10、標準出力と標準エラーは`<状態の置き場>/dashboard/service.log`、`PATH`はgitとtailscaleの場所と`/usr/bin:/bin:/usr/sbin:/sbin`。`install`のときに`XDG_CONFIG_HOME`が絶対の道なら、それも常駐の環境に入れます（サーバーがCLIと同じ利用者の設定のファイルを読むため。systemdも同じ）。
 - **systemd**：`${XDG_CONFIG_HOME:-~/.config}/systemd/user/spec-dock-dashboard.service`、`Type=simple`、`Restart=always`、`RestartSec=10`、`WantedBy=default.target`。出力はjournal（`journalctl --user -u spec-dock-dashboard`）。systemdのユーザーの管理が一時的に応えないときも、単位があれば`status`に見え、`uninstall`で外せます。
 - **前面の`serve`との共存**：`--service`のサーバーは、ほかのサーバーが`dashboard/server.lock`を持っていれば終わらずに30秒ごとに取り直して待ち、そのサーバーが止まれば引き継ぎます。待っている間のSIGTERMでは終了コード0です。前面の`serve`は、常駐が動いていればそのURLを示して終わります。
 - **Tailscale**：`--service --tailscale`で住所が得られなければ`127.0.0.1`だけで起動し、30秒ごとに住所を取り直して、得られたら待ち受けと`Host`の検査と埋め込みの許可と在りかの記録の`urls.tailscale`に足します。

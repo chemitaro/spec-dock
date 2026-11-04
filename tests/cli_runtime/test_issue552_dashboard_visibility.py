@@ -129,3 +129,16 @@ def test_todo_list_hidden_follows_the_settings(state: Path, tmp_path: Path, caps
         "github.com/o/r": True,
         "github.com/o/s": True,
     }
+
+
+def test_summary_hidden_follows_the_settings(state: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    assert _run(capsys, "dashboard", "summary", "o/r")[1]["data"]["result"]["hidden"] is False
+    _user(tmp_path, {"repositories": {"o/r": {"visible": False}}})
+    assert _run(capsys, "dashboard", "summary", "o/r")[1]["data"]["result"]["hidden"] is True
+    _user(tmp_path, {})
+    second = tmp_path / "r2" / "spec-dock" / ".canonical"
+    register(state, "github.com/o/s", second)
+    (second / "dashboard.json").write_text(json.dumps({"schema": "specdock.dashboard-settings/v1", "visible": True}))
+    summary = _run(capsys, "dashboard", "summary", "o/s")[1]["data"]["result"]
+    rows = _rows(capsys)
+    assert summary["hidden"] is rows["github.com/o/s"]["hidden"] is True  # clones disagree: hidden everywhere

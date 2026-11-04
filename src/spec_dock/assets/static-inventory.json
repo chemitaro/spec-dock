@@ -399,7 +399,7 @@
     {
       "path": "spec-dock/docs/reference_cli.md",
       "source": "spec_dock/docs/reference_cli.md",
-      "sha256": "665923f9918b8c9aa975005c1152ee865e88a6beb69053e9a2b8a5a4a9f63d0b",
+      "sha256": "790ff437cb0dc7519b63f92b2587a714a4214c566a7a9ae15c03ff56b698d7a5",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
