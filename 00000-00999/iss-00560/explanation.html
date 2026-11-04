@@ -4,56 +4,63 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<title>説明資料</title>
+<title>iss-00560 説明資料</title>
 <link rel="stylesheet" href="../../../design-system/ds.css">
 <!-- ▼ 説明資料の本文（Markdown）。編集するのはこのブロックだけです。 -->
 <script type="text/markdown" id="ds-source">
 ---
-title: この Scope の説明資料（題名を書き換えます）
-lead: この資料で理解できることを、初めて読む人にも分かるように1〜2文で書きます。
+title: 構造の図で依存のつながりを左から右へ1行に並べる（iss-00560）
+lead: 構造の図（入れ子）の配置を、依存の矢印でつながったものが同じ行に左から右へ並び、つながっていないまとまりは画面の幅で折り返す形に変えます。
 category: 説明資料
 audience: 本日チームに加わった新メンバー
-status: 下書き
+status: 実装中
 ---
-
-<!-- spec-dock:explanation-skeleton -->
-<!-- 雛形から書き換えたら、上の印の行を消します。印が残っていると、検査は「雛形のまま」と判定します。 -->
 
 ## この資料で分かること
 
 :::summary
-- 読み終えたときに理解できていることを、1文ずつ書きます。
-- 背景、仕組み、失敗時の動き、確認方法のうち、特に伝えたい点を選びます。
-- 短い Scope なら、1〜2項目でかまいません。
+- 今の配置で、つながりの前後の高さがずれる理由。
+- 新しい配置の3つの決まり（行のそろえ、まとまりの折り返し、幅の変化での並べ直し）。
+- 確かめ方。
 :::
 
 ## 背景と目的
 
-なぜこの Scope に取り組むのか、どの問題を解決するのかを具体的に説明します。
+構造の図は、同じ親の子を依存の段の列に分け、列の中を活動順に上から積んでいました。列ごとに上から詰めるので、spec-dock の init-00423 では epic-00425 → 427 → 471 → 526 が上、下、上と行き来し、つながりが追いにくくなっていました。利用者は 2026-11-04 に「依存の矢印でつながっているものは左から右へ並べたい。つながっていないものは画面の幅に合わせて Epic の単位で折り返してよい」と決めました。
 
-## 全体の構成
+## 新しい配置
 
-構成要素の役割と関係を説明します。図は、理解を大きく助ける場合だけ入れます。
+1. **まとまり**：同じ親の子を、依存（子の配下どうしの依存を含む）でつながったまとまりに分けます。
+2. **格子**：まとまりの中は、段の列 × 行の格子です。後のものは前のものと同じ行に置きます。分かれと合流では、交差と上下の行き来が少なくなるよう行を入れ替えます。
+3. **棚**：まとまりを活動順に左から置き、画面の見える幅（倍率100%）を超えるところで、まとまりの境目で次の行へ折り返します。つながりの途中では折り返しません。
+4. **並べ直し**：ウィンドウの幅が変わったときだけ並べ直します。拡大・縮小では並べ直しません。
 
-```plantuml id=overview
+```plantuml id=layout
 @startuml
-title 全体の構成
-top to bottom direction
-actor "利用者" as User
-component "説明対象の仕組み" as System
-database "データ" as Data
-User -> System : 操作する
-System -> Data : 読み書きする
-System --> User : 結果を返す
+title 1つの親の中の配置
+rectangle "棚1" {
+  rectangle "まとまりA（格子）" {
+    card "425" as a1
+    card "427" as a2
+    card "471" as a3
+    card "526" as a4
+    a1 -right-> a2
+    a2 -right-> a3
+    a3 -right-> a4
+  }
+}
+rectangle "棚2（幅で折り返し）" {
+  card "独立した Epic X" as x
+  card "独立した Epic Y" as y
+}
 @enduml
 ```
 
 ## 確認方法
 
-読者が手元で確かめられる手順を書きます。
-
 ```sh
-spec-dock active show --json
+spec-dock scope check iss-00560
+uv run pytest tests/unit/presentation/test_dashboard_graph_js.py
 ```
 </script>
 <script src="../../../design-system/ds.js"></script>
