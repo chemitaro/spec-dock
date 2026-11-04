@@ -1,0 +1,59 @@
+{
+  "schema": "specdock.todo/v1",
+  "id": "t-abcd",
+  "title": "方式を選ぶ",
+  "kind": "decide",
+  "status": "open",
+  "created_at": "2026-11-04T10:00:00Z",
+  "updated_at": "2026-11-04T10:00:00Z",
+  "origin": {
+    "by": "agent",
+    "role": "iss-00549 の担当"
+  },
+  "body": "A と B のどちらにするか",
+  "options": [
+    {
+      "key": "a",
+      "text": "A"
+    },
+    {
+      "key": "b",
+      "text": "B"
+    }
+  ],
+  "recommendation": {
+    "key": "a",
+    "reason": "速い"
+  },
+  "reply_to": "Orca の担当",
+  "effort": "0m",
+  "due": "2026-11-04T14:00:00Z",
+  "snooze_until": null,
+  "scopes": {
+    "related": [
+      "iss-00549"
+    ],
+    "blocks": [
+      "epic-00547"
+    ]
+  },
+  "links": [
+    "https://example.com/x"
+  ],
+  "tags": [
+    "spec"
+  ],
+  "subtasks": [],
+  "resolution": null,
+  "history": [
+    {
+      "at": "2026-11-04T10:00:00Z",
+      "by": "agent",
+      "role": "iss-00549 の担当",
+      "action": "added",
+      "target": null,
+      "note": null,
+      "fields": []
+    }
+  ]
+}

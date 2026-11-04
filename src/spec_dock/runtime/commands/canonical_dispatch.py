@@ -55,6 +55,17 @@ from spec_dock.runtime.application.dashboard_service import (
 )
 from spec_dock.runtime.application.dashboard_summary import summarize_checkout, summarize_named
 from spec_dock.runtime.application.project_context import ProjectContext
+from spec_dock.runtime.application.todo_check import check_todos
+from spec_dock.runtime.application.todo_commands import (
+    add_todo,
+    cancel_todo,
+    done_todo,
+    reopen_todo,
+    snooze_todo,
+    update_todo,
+)
+from spec_dock.runtime.application.todo_list import list_todos, show_todo
+from spec_dock.runtime.application.todo_settings import show_settings
 from spec_dock.runtime.presentation.envelope import OperationResult
 
 CanonicalHandler = Callable[[argparse.Namespace, ProjectContext], OperationResult[object]]
@@ -111,6 +122,15 @@ CANONICAL_HANDLERS: dict[str, CanonicalHandler] = {
     "dashboard summary": summarize_checkout,
     "dashboard hide": mark_checkout,
     "dashboard show": mark_checkout,
+    "todo add": add_todo,
+    "todo list": list_todos,
+    "todo show": show_todo,
+    "todo update": update_todo,
+    "todo done": done_todo,
+    "todo snooze": snooze_todo,
+    "todo cancel": cancel_todo,
+    "todo reopen": reopen_todo,
+    "todo check": check_todos,
 }
 
 # Consulted before resolve_context: commands that work without a repository (canonical sync --registered)
@@ -126,6 +146,7 @@ REPOSITORY_INDEPENDENT_HANDLERS: dict[str, RepositoryIndependentHandler] = {
     "dashboard service install": install_service,
     "dashboard service status": service_status,
     "dashboard service uninstall": uninstall_service,
+    "todo settings": show_settings,
 }
 
 

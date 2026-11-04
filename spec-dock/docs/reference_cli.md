@@ -1,6 +1,6 @@
 # CLI参照（Current）
 
-通常packageの外部 `spec-dock` が公開61 leafの入口です。正確な文法は `spec-dock help COMMAND` または `spec-dock COMMAND --help` で確認します。通常Scope TARGETとGitHub取込用REFは別の文法です。曖昧な対象は副作用前に拒否します。
+通常packageの外部 `spec-dock` が公開71 leafの入口です。正確な文法は `spec-dock help COMMAND` または `spec-dock COMMAND --help` で確認します。通常Scope TARGETとGitHub取込用REFは別の文法です。曖昧な対象は副作用前に拒否します。
 
 | 用途 | 入力 | 境界 |
 |---|---|---|
@@ -81,6 +81,16 @@ SpecDock 0.5.0 は宣言の版4（canonical モード）だけを扱います（
 | C59 | `dashboard service install` | `[--port N] [--tailscale]` | ログインのときにダッシュボードのサーバーを起動し、落ちても起動し直す常駐を入れます（macOSはlaunchdの`~/Library/LaunchAgents/io.github.chemitaro.spec-dock.dashboard.plist`、Linuxはsystemdのユーザーの単位`spec-dock-dashboard.service`）。定期の同期の常駐とは別のもので、同期の常駐には触りません。`canonical link`や`installation update`はこの常駐を入れません。実行ファイルは同期の常駐が記録したもの（なければ今の`spec-dock`）。同じ設定ならなにもせず（`unchanged`）、`--port`か`--tailscale`を変えて実行し直すと書き直して起動し直します（`updated`）。番号は1〜65535（既定47800。外れれば`DASHBOARD_PORT_INVALID`、終了コード2）。launchdもsystemdのユーザーの管理もなければ何も書かずに`DASHBOARD_SERVICE_UNSUPPORTED`（終了コード3、`dashboard serve`を案内）、`launchctl`か`systemctl`が失敗すれば`DASHBOARD_SERVICE_FAILED`（終了コード3）。`--dry-run`はありません。 | 常駐の設定のファイルと登録、状態の置き場の`dashboard/` |
 | C60 | `dashboard service status` | | 常駐が入っているか（`installed`）、管理の側に読み込まれているか（`loaded`）、サーバーが動いているか（`running`、在りかの記録の`pid`）、URL、設定の番号とTailscaleと状態の置き場、動いているサーバーの版と入っているパッケージの版（違えば`restart_pending`）を示します。常駐を入れられないPCでは`supported: false`です。 | 読取りのみ |
 | C61 | `dashboard service uninstall` | | 常駐を止め（`launchctl bootout`か`systemctl --user disable --now`）、設定のファイルと`dashboard/service.log`を消します。入っていなければ`removed: false`で成功します。同期の常駐、隠す印、「見た」の記録には触りません。`--dry-run`はありません。 | 常駐の設定のファイルと登録、`dashboard/service.log` |
+| C62 | `todo add` | `--title TITLE [--kind KIND] [--by agent\|human] [--role ROLE] [--body TEXT\|--body-file FILE] [--option KEY=TEXT]... [--recommend KEY --reason TEXT] [--reply-to TEXT] [--effort 10m] [--due WHEN] [--scope ID]... [--blocks ID]... [--link URL]... [--tag TAG]... [--parent ID] [--item TITLE]...` | 人のタスクを、そのリポジトリのカタログの`todos/<YYYY-MM>/t-xxxx.json`に1件1つのファイルで登録します。人（既定）は題名だけで登録でき、エージェント（`--by agent`）は役割、種類、本文、答える場所、所要時間（`decide`は選択肢2つ以上と推奨）が要ります（欠ければ`TODO_INVALID`、終了コード2、`details.missing`）。`--due`がなければ既定の期限（初めは4時間後）。`--parent`はサブタスク（1段だけ）、`--kind checklist --item`は会話の束です。目安の件数を超えると`TODO_LIMIT_EXCEEDED`を警告して登録します。GitHubには要求を送りません。 | カタログの`todos/` |
+| C63 | `todo list` | `[--status open\|snoozed\|done\|cancelled\|all] [--scope ID] [--kind KIND] [--tag TAG] [--blocking] [--overdue]` | このリポジトリの人のタスクを、期限切れ、期限の近いもの、止めているもの、あとで、延期中、閉じたもの、の順に返します（契約`specdock.todo-list/v1`）。既定は延期中を隠した開いたものです。 | 読取りのみ |
+| C64 | `todo show` | `ID` | 1件（サブタスクのIDならその親）を、サブタスク、残りの数、親を閉じてよいか（`parent_closable`）とともに示します。 | 読取りのみ |
+| C65 | `todo update` | `ID [--title] [--body\|--body-file] [--kind] [--due] [--reply-to] [--effort] [--option]... [--recommend --reason] [--add-scope\|--remove-scope ID]... [--add-blocks\|--remove-blocks ID]... [--add-tag\|--remove-tag]... [--add-link\|--remove-link]... [--note] [--by] [--role]` | 欄を直し、経緯（`history`）に変えた欄の名前を残します。サブタスクのIDは`--title`と`--note`だけです。 | カタログの`todos/` |
+| C66 | `todo done` | `ID [--choice KEY] [--note TEXT] [--record PATH\|URL] [--include-subtasks] [--by] [--role]` | 完了にし、答え（`resolution`）と経緯を書きます。開いたサブタスクがあれば`TODO_SUBTASKS_OPEN`で止まります。ファイルは動かしません。 | カタログの`todos/` |
+| C67 | `todo snooze` | `ID --until WHEN [--due WHEN] [--note] [--by] [--role]` | 指定の時刻まで既定の一覧から隠します（サブタスクは延期しません）。 | カタログの`todos/` |
+| C68 | `todo cancel` | `ID --reason TEXT [--include-subtasks] [--by] [--role]` | 理由つきで取り消します。 | カタログの`todos/` |
+| C69 | `todo reopen` | `ID [--due WHEN] [--note] [--by] [--role]` | 閉じたタスクかサブタスクを開き直します。前の答えは経緯に残ります。 | カタログの`todos/` |
+| C70 | `todo check` | 共通optionのみ | `todos/`の全部のファイルを、Pythonの検査と、`cue`（v0.17.1以上）があれば`cue vet`で確かめます。誤りはファイル、欄、出どころつきで、終了コード7（`TODO_CHECK_FAILED`）です。`cue`がなければ`TODO_CUE_SKIPPED`を警告してPythonの検査で決めます。 | 読取りのみ |
+| C71 | `todo settings` | 共通optionのみ | 件数の目安と既定の期限の、効いている値と出どころ（初めの値、利用者の設定、リポジトリの設定）を示します。チェックアウトの外でも動きます。 | 読取りのみ |
 
 ARTIFACT_SCOPEの@rootはArtifact所有者だけで、Scope作成/Startの対象ではありません。通常操作はworkspaceの版4の新writer宣言を検証します。help/version/completion、raw doctor、installation、canonical checkは各leafの限定的なcontextを使います。
 
@@ -134,6 +144,17 @@ ARTIFACT_SCOPEの@rootはArtifact所有者だけで、Scope作成/Startの対象
 - **前面の`serve`との共存**：`--service`のサーバーは、ほかのサーバーが`dashboard/server.lock`を持っていれば終わらずに30秒ごとに取り直して待ち、そのサーバーが止まれば引き継ぎます。待っている間のSIGTERMでは終了コード0です。前面の`serve`は、常駐が動いていればそのURLを示して終わります。
 - **Tailscale**：`--service --tailscale`で住所が得られなければ`127.0.0.1`だけで起動し、30秒ごとに住所を取り直して、得られたら待ち受けと`Host`の検査と埋め込みの許可と在りかの記録の`urls.tailscale`に足します。
 - **版の更新**：サーバーは60秒ごとに入っているパッケージの版を読み直します。`--service`のサーバーは、版が変わっていれば在りかの記録を消して終了コード75で終わり（CLIのJSONは書きません）、launchdとsystemdが新しい版で起動し直します。前面の`serve`は終わらず、標準エラーに1回知らせ、`/api/v1/repositories`の`server`に`installed_version`と`restart_required: true`を出します。
+
+## 人のタスクの契約（`specdock.todo/v1`、`specdock.todo-list/v1`）
+
+`todo`のコマンドは、そのチェックアウトのリポジトリのカタログ（`spec-dock/initiatives/todos/`）だけを読み書きし、GitHubに要求を送らず、構造のスナップショットも取り直しません。Scopeの状態、`dependency check`、`work start`の判定は、人のタスクで変わりません（止めている印を示すだけです）。項目を足すのは版を変えずに行い、消すか意味を変えるときは版を上げます。
+
+- **記録（`specdock.todo/v1`）**：`todos/<作った年月（UTC）>/t-xxxx.json`に1件1つ。閉じても動かさず、消しません。IDは`t-`と4文字（`0-9`と`i`、`l`、`o`、`u`を除く小文字。大文字の入力も受けます）、サブタスクは`t-xxxx.1`。欄は`schema`、`id`、`title`（1行、200文字まで）、`kind`（`decide`、`check`、`operate`、`act`、`todo`、`checklist`）、`status`（`open`、`snoozed`、`done`、`cancelled`）、`created_at`、`updated_at`、`origin {by, role}`、`body`、`options [{key, text}]`、`recommendation {key, reason}`、`reply_to`、`effort`、`due`、`snooze_until`、`scopes {related, blocks}`、`links`、`tags`、`subtasks [{id, title, status, created_at, updated_at, resolution}]`、`resolution {at, by, role, choice, note, record}`、`history [{at, by, role, action, target, note, fields}]`。時刻はUTCの`YYYY-MM-DDTHH:MM:SSZ`。知らない欄は誤りにせず、書き換えるときに残します。型の定義はパッケージの`cue/todo/v1/todo.cue`（`#Todo`）です。
+- **1件の結果**（`add`、`show`、`update`、`done`、`snooze`、`cancel`、`reopen`の`data.result`）：`{todo, derived, ref, repository, path, warnings_detail}`。`derived`は`effective_status`（延期の時刻を過ぎれば`open`）、`overdue`、`due_soon`（24時間以内）、`blocking`、`parent_closable`、`open_subtasks`、`subtask_counts`。`ref`は`<owner>/<name>/t-xxxx`。
+- **一覧（`specdock.todo-list/v1`）**：`schema`、`generated_at`、`mode`、`filters`、`repositories [{repository, catalog, main_checkout, hidden, status, problem, counts {open, blocking, overdue, snoozed, agent_parents {count, limit, source}}, invalid_files, conflict_copies}]`、`items [{ref, repository, path, derived, todo}]`。この版はチェックアウトの中の`mode: repository`（1行）だけです。全リポジトリの集約（`mode: all_repositories`）は後の版で足します。
+- **設定の3段**：初めの値（`parent_limit` 20、`subtask_limit` 30、`default_due` `4h`）< 利用者の設定`$XDG_CONFIG_HOME/spec-dock/config.json`（なければ`~/.config/spec-dock/config.json`。`{"schema": "specdock.config/v1", "todo": {...}}`）< リポジトリの設定`todos/settings.json`（`{"schema": "specdock.todo-settings/v1", ...}`）。鍵ごとに後の段が勝ちます。壊れた段は丸ごと飛ばし、`TODO_SETTINGS_INVALID`を警告します。SpecDockは設定のファイルを作りません。
+- **件数の目安**：開いている、エージェントが登録した、`checklist`でない親のタスクの数（`parent_limit`）と、1つの親の開いたサブタスクの数（`subtask_limit`）。超えても登録し、`TODO_LIMIT_EXCEEDED`を警告します。
+- **エラーと警告**：`TODO_INVALID`（2、入力の誤り。`details.problems`、`details.missing`）、`TODO_NESTING_TOO_DEEP`（2）、`TODO_NOT_FOUND`、`TODO_ID_AMBIGUOUS`、`TODO_STATE_INVALID`、`TODO_SUBTASKS_OPEN`、`TODO_PARENT_CLOSED`、`TODO_RECORD_INVALID`、`TODO_SCHEMA_UNSUPPORTED`、`TODO_ID_EXHAUSTED`（いずれも3）、`TODO_WRITE_INCOMPLETE`（6）、`TODO_CHECK_FAILED`（7）。警告は`TODO_LIMIT_EXCEEDED`、`TODO_SCOPE_UNKNOWN`、`TODO_SETTINGS_INVALID`、`TODO_CONFLICT_COPY`（中身を元のファイルに統合してから写しを消す）、`TODO_RECORD_INVALID`（一覧で読めない記録）、`TODO_FILE_UNKNOWN`、`TODO_CUE_SKIPPED`、`TODO_CUE_FAILED`。リンクがなければ、ほかのコマンドと同じく`CANONICAL_NOT_LINKED`（次の1手`spec-dock canonical link`）で何も書かずに止まります。
 
 ## JSONと途中失敗
 

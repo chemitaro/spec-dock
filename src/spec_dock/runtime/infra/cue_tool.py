@@ -89,6 +89,14 @@ class CueTool:
         argv += [str(path) for path in files]
         return _run(argv, cwd=cwd, timeout=timeout)
 
+    def vet(self, schema: Path, data: str, *, expression: str, cwd: Path, timeout: float) -> CueRun:
+        """`cue vet -c -d <expression> <schema> json: -` with one JSON document on standard input (iss-00549 D-08).
+
+        One document keyed by file names lets every error name its file in its field path.
+        """
+        argv = [self.executable, "vet", "-c", "-d", expression, str(schema), "json:", "-"]
+        return _run(argv, cwd=cwd, timeout=timeout, stdin=data)
+
 
 # A field path: identifiers, quoted labels and list indexes joined by dots (`steps."S-01".status`).
 _SEGMENT = r'(?:[A-Za-z_#$][A-Za-z0-9_#$]*|"(?:[^"\\]|\\.)*"|\d+)'
@@ -156,10 +164,19 @@ def locate_cue(*, timeout: float) -> CueTool:
     return CueTool(executable, first.split()[2])
 
 
-def _run(argv: list[str], *, cwd: Path | None, timeout: float) -> CueRun:
+def _run(argv: list[str], *, cwd: Path | None, timeout: float, stdin: str | None = None) -> CueRun:
     """One `cue` process from an argument list (shell=False) under the time limit."""
     try:
-        completed = subprocess.run(argv, cwd=cwd, capture_output=True, text=True, timeout=timeout, check=False)
+        completed = subprocess.run(
+            argv,
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+            input=stdin,
+            stdin=None if stdin is not None else subprocess.DEVNULL,
+        )
     except subprocess.TimeoutExpired as error:
         raise CueToolError(
             CUE_TIMEOUT, f"cue did not finish within {timeout:g} seconds", exit_code=5, next_step=TIMEOUT_STEP

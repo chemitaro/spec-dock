@@ -35,3 +35,8 @@ def shipped_schemas() -> tuple[str, ...]:
 
 def _number(schema: str) -> int:
     return int(schema.rsplit("/v", 1)[1])
+
+
+def todo_schema_path() -> Path:
+    """The human-task record type `#Todo` (iss-00549 D-08); it is not a Scope type and never in shipped_schemas."""
+    return _root() / "todo" / "v1" / "todo.cue"
