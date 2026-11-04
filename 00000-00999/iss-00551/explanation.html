@@ -9,52 +9,35 @@
 <!-- ▼ 説明資料の本文（Markdown）。編集するのはこのブロックだけです。 -->
 <script type="text/markdown" id="ds-source">
 ---
-title: この Scope の説明資料（題名を書き換えます）
-lead: この資料で理解できることを、初めて読む人にも分かるように1〜2文で書きます。
+title: 人のタスクの規則を、配るスキルと文書に書く
+lead: エージェントが人のタスクをいつ登録し、いつ登録せず、誰がどう閉じるかを、配布するスキル（SKILL.md）と文書（todo.md）に書く Issue です。
 category: 説明資料
 audience: 本日チームに加わった新メンバー
 status: 下書き
 ---
 
-<!-- spec-dock:explanation-skeleton -->
-<!-- 雛形から書き換えたら、上の印の行を消します。印が残っていると、検査は「雛形のまま」と判定します。 -->
-
 ## この資料で分かること
 
 :::summary
-- 読み終えたときに理解できていることを、1文ずつ書きます。
-- 背景、仕組み、失敗時の動き、確認方法のうち、特に伝えたい点を選びます。
-- 短い Scope なら、1〜2項目でかまいません。
+- 登録する場面と、登録しない場面の規則が分かる。
+- 1回の会話で終わらない複数の項目を、束とサブタスクで扱う理由が分かる。
+- 何をどこに書き、どう確かめるかが分かる。
 :::
 
 ## 背景と目的
 
-なぜこの Scope に取り組むのか、どの問題を解決するのかを具体的に説明します。
+`spec-dock todo` のコマンドと集約は、iss-00549 と iss-00550 でマージ済みです。しかし、エージェントが「どんなときに登録するか」という規則が配布物にないので、使われ方がばらつきます。この Issue は規則を文で書くだけで、コードは変えません。
 
 ## 全体の構成
 
-構成要素の役割と関係を説明します。図は、理解を大きく助ける場合だけ入れます。
+- `SKILL.md` に「人のタスク」の節を足す：登録しない場面、登録する場面、束、閉じ方、統括の読み方、秘密と隔離セッションの扱い。
+- `docs/todo.md` を足す：使い方、記録の形、設定の3段、集約、外部の道具の読み方。
+- `docs/canonical.md` と `docs/README.md` を直す。
+- dogfood の写しと `static-inventory.json` の sha256 を合わせる。
 
-```plantuml id=overview
-@startuml
-title 全体の構成
-top to bottom direction
-actor "利用者" as User
-component "説明対象の仕組み" as System
-database "データ" as Data
-User -> System : 操作する
-System -> Data : 読み書きする
-System --> User : 結果を返す
-@enduml
-```
+## 失敗時の動きと確認
 
-## 確認方法
-
-読者が手元で確かめられる手順を書きます。
-
-```sh
-spec-dock active show --json
-```
+文がコマンドの契約と食い違うと、エージェントが誤った引数で止まります。そのため、テストで規則の語を確かめ、`canonical.md` のエラーコードが `reference_cli.md` にあることも確かめます。戻すときは PR を `git revert` します。
 </script>
 <script src="../../../design-system/ds.js"></script>
 </head>
