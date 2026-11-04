@@ -5,10 +5,10 @@ package spec
 goal: "構造の図の入れ子の配置を、つながりの行をそろえ、つながっていないまとまりを幅で折り返す形に、テスト駆動で直し、実データで確かめ、マージできる PR にする。"
 
 steps: {
-	"S-01": {title: "node のテストに見える幅の選択と見本（つながり、分かれ、交差、輪、詰めた横、独立した12件）を足し、失敗を確かめる", realizes: ["R-01", "R-02", "R-04", "F-01", "F-02"], status: "todo", session: "impl"}
-	"S-02": {title: "`layout.js` に兄弟の依存と段、まとまり、行、格子、棚を入れ、最上位も同じ配置にする", realizes: ["R-01", "R-02", "F-01", "F-02"], status: "todo", after: ["S-01"], session: "impl"}
-	"S-03": {title: "`graph.js` で見える幅を渡し、幅が変わったときだけ並べ直す", realizes: ["R-03"], status: "todo", after: ["S-02"], session: "impl"}
-	"S-04": {title: "線の検査の代表のデータ（幅を変えたものを含む）で違反0を確かめ、既存のテストの期待を新しい配置に合わせる", realizes: ["R-04"], status: "todo", after: ["S-02"], session: "impl"}
+	"S-01": {title: "node のテストに見える幅の選択と見本（つながり、分かれ、交差、輪、詰めた横、独立した12件）を足し、失敗を確かめる", realizes: ["R-01", "R-02", "R-04", "F-01", "F-02"], status: "done", session: "impl"}
+	"S-02": {title: "`layout.js` に兄弟の依存と段、まとまり、行、格子、棚を入れ、最上位も同じ配置にする", realizes: ["R-01", "R-02", "F-01", "F-02"], status: "done", after: ["S-01"], session: "impl"}
+	"S-03": {title: "`graph.js` で見える幅を渡し、幅が変わったときだけ並べ直す", realizes: ["R-03"], status: "done", after: ["S-02"], session: "impl"}
+	"S-04": {title: "線の検査の代表のデータ（幅を変えたものを含む）で違反0を確かめ、既存のテストの期待を新しい配置に合わせる", realizes: ["R-04"], status: "done", after: ["S-02"], session: "impl"}
 	"S-05": {title: "このPCの spec-dock の実際のスナップショットで、PC の幅と 390px の写し、幅を変えたときの並べ直し、`edgeAudit` を確かめ、report.md と artifacts に残す", realizes: ["R-01", "R-03", "R-04"], status: "todo", after: ["S-03", "S-04"], session: "impl"}
 	"S-06": {title: "report.md に、Epic R-15 の食い違う文（折り返さず右へ広げる、長い依存の折り返し）の直しの依頼と、0.6.0 の移行の注記の材料を書き、PR の本文と統括への報告（worker_done）に入れる", realizes: ["R-02"], status: "todo", after: ["S-05"], session: "impl"}
 }
