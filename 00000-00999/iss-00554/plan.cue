@@ -7,10 +7,10 @@ goal: "人のタスクの API と画面、既存の画面の印を、#549・#550
 
 steps: {
 	"S-01": {title: "仕様を書き、仕様のレビューを通す", realizes: ["R-01", "R-04"], status: "done", session: "impl"}
-	"S-02": {title: "`scope_marks` と、`todo_aggregate.collect` への切り出し", realizes: ["R-01", "R-04"], status: "todo", after: ["S-01"], session: "impl"}
-	"S-03": {title: "`dashboard_todos.py`（覚えと選び方）、`revision`、API の道", realizes: ["R-01", "R-03", "R-07", "R-08", "F-02"], status: "todo", after: ["S-02"], session: "impl"}
-	"S-04": {title: "`structure`・`scopes/<ID>` の印と一覧と要約", realizes: ["R-04", "R-05", "R-06", "F-01"], status: "todo", after: ["S-03"], session: "impl"}
-	"S-05": {title: "画面：道、上の帯、`views/todos.js` と logic と css", realizes: ["R-01", "R-02", "R-03", "R-07"], status: "todo", after: ["S-03"], session: "impl"}
+	"S-02": {title: "`scope_marks` と、`todo_aggregate.collect` への切り出し", realizes: ["R-01", "R-04"], status: "done", after: ["S-01"], session: "impl"}
+	"S-03": {title: "`dashboard_todos.py`（覚えと選び方）、`revision`、API の道", realizes: ["R-01", "R-03", "R-07", "R-08", "F-02"], status: "done", after: ["S-02"], session: "impl"}
+	"S-04": {title: "`structure`・`scopes/<ID>` の印と一覧と要約", realizes: ["R-04", "R-05", "R-06", "F-01"], status: "done", after: ["S-03"], session: "impl"}
+	"S-05": {title: "画面：道、上の帯、`views/todos.js` と logic と css", realizes: ["R-01", "R-02", "R-03", "R-07"], status: "doing", after: ["S-03"], session: "impl"}
 	"S-06": {title: "既存の画面の印：構造の図、ボード、詳しい画面のタブ、横断の概況", realizes: ["R-04", "R-05", "R-06"], status: "todo", after: ["S-04", "S-05"], session: "impl"}
 	"S-07": {title: "一時の状態の置き場でサーバーを立て、ヘッドレス Chrome で PC 幅と 390px、明るい・暗いの写しを残す", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06"], status: "todo", after: ["S-06"], session: "impl"}
 	"S-08": {title: "コードのレビュー、最終品質ゲート、report.md、PR と CI", realizes: ["R-01", "R-08"], status: "todo", after: ["S-07"], session: "impl"}
