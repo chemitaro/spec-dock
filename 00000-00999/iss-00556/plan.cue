@@ -1,36 +1,39 @@
 package spec
 
 // 計画（Issue）。型 specdock/v1。
-// 作業しながら、手順の追加、変更、status の更新を、このファイルに直接書く。
 
-// 目標（任意）。
-// goal: "..."
+goal: "構造の図の既定の表示と並びを、テスト駆動で直し、このPCの実際のスナップショットで確かめ、マージできる PR にする。"
 
-// 実装の手順。番号（S-01、…）をキーにし、番号の順に並べる。
-// title と realizes（満たす要件・失敗の条件の番号）が必須。
-// status は todo（既定）、doing、done、dropped。after は先に済ませる手順の番号。
-// 1手順を1行に書き、status は title と realizes のすぐ後に置く。status の位置がそろうので一括で書き換えやすく、
-// 同じ手順に status を2つ書く誤りも防げる（同じ値の2つは CUE が黙ってまとめ、違う値なら誤りになる）。
-// すべての要件に、それを満たす手順が要る（dropped の手順は数えない）。
-// strict 以上では、dropped でない手順のすべてが、いずれかの番号に結び付く。
 steps: {
-	// "S-01": {title: "〜を作る", realizes: ["R-01"], status: "todo", after: ["..."], session: "impl"}
+	"S-01": {title: "構造の API に `active_at` を足す", realizes: ["R-04", "F-01"], status: "todo", session: "impl"}
+	"S-02": {title: "可視の判定を、親が開いていれば終わった Scope も出す形にする", realizes: ["R-01"], status: "todo", session: "impl"}
+	"S-03": {title: "依存の線の既定を「すべての線」にする", realizes: ["R-02"], status: "todo", session: "impl"}
+	"S-04": {title: "段の中と最上位の並びを活動順にする", realizes: ["R-03", "F-01"], status: "todo", after: ["S-01"], session: "impl"}
+	"S-05": {title: "見せ方の保存を v2 にし、`prefs.js` で v1 から一部だけ引き継ぐ", realizes: ["R-05", "F-02"], status: "todo", session: "impl"}
+	"S-06": {title: "ボードの「終わった」の列の並びをテストで確かめる", realizes: ["R-06"], status: "todo", session: "impl"}
+	"S-07": {title: "PC のヘッドレスの Chrome で、このPCの spec-dock の実際のスナップショットを PC の幅と 390px で写し、`edgeAudit` を確かめ、report.md と artifacts に残す", realizes: ["R-01", "R-02", "R-03"], status: "todo", after: ["S-02", "S-03", "S-04", "S-05"], session: "impl"}
 }
 
-// テスト。番号（T-01、…）をキーにする。title と verifies（確かめる要件・失敗の条件の番号）が必須。
-// standard 以上では、すべての要件に、strict 以上では、すべての失敗の条件に、確かめるテストが要る。
 tests: {
-	// "T-01": {title: "〜を確かめる", verifies: ["R-01"]}
+	"T-01": {title: "`active_at` が、作成だけ、完了、PR のマージ、Issue の更新の各場合に最も新しい時刻になり、読めない時刻を使わない（pytest）", verifies: ["R-04", "F-01"]}
+	"T-02": {title: "見本の既定の表示（入れ子と木）で、開いた親の終わった Scope が出て、終わった親の終わった子と親のない終わった Scope が出ない。R-12 の親と片付けの候補は今までどおり。終わった Epic に絞ると子が出る（node）", verifies: ["R-01"]}
+	"T-03": {title: "既定の表示で、出ている終わった Issue からの依存が `done: true` の線になり、`deps: wait` では消える（node）", verifies: ["R-02"]}
+	"T-04": {title: "線の検査の代表のデータのすべての表し方で問題0件（今のテストを新しい既定と可視の判定で通す）", verifies: ["R-02"]}
+	"T-05": {title: "最上位の枠が4つの組と最近の順に並び、Epic の段の中で開いた箱が推奨順で上、終わった箱が最近終わった順で下。`active_at` のない Scope は最も古い扱い。段は今までどおり（node）", verifies: ["R-03", "F-01"]}
+	"T-06": {title: "`restorePrefs` が v1 から `mode`・`fold`・`legend` だけ引き継ぎ、v2 の値を守り、壊れた値と型の違う値を既定にする（node）。`graph.js` が v2 のキーに保存する（静的）", verifies: ["R-05", "F-02"]}
+	"T-07": {title: "ボードの「終わった」の列の先頭が最も新しく終わった Scope（node）", verifies: ["R-06"]}
+	"T-08": {title: "このPCの spec-dock の実際のスナップショットで、構造の図の既定の表示を PC の幅と 390px で写し、`window.specdockEdgeAudit()` の違反0を記録する（ヘッドレスの Chrome、report.md）", verifies: ["R-01", "R-02", "R-03"]}
 }
 
-// 検証のしかた、戻し方、終わりの条件（任意）。critical では、手順があれば rollback が要る。
-// verification: "..."
-// rollback:     "..."
-// exit:         "..."
+verification: "`spec-dock scope check iss-00556`、`make lint`、`uv run pytest`（全体）、PC のヘッドレスの Chrome（一時の状態の置き場、`--disable-features=MacAppCodeSignClone`、`Browser.close`）。実際のスナップショットは読むだけにし、テストには入れない。"
+rollback: "マージの前なら PR を閉じる。マージの後なら `git revert`（v2 の保存は残るが、前の版の画面は v1 を読むので害はない）。"
+exit: "PR が CI を通り、マージできる状態で、report.md に検証とゲートの結果と写しがある。"
 
-// 実行の割り当て（任意）。手順の session は、ここのセッションの名前を指す。
-// レビューの after は、どの手順の後かを指す。モデルと推論の名前は、どんな文字列でもよい。
-// execution: {
-// 	sessions: impl: {task: "仕様化と実装", model: "...", effort: "...", rationale: "..."}
-// 	reviews: code: {role: "コードのレビュー", after: "S-01", model: "...", effort: "..."}
-// }
+execution: {
+	sessions: impl: {task: "仕様化と実装（Orca の worker）", model: "opus", effort: "medium", rationale: "policy §4 standard の実装（epic-00427 の session std）"}
+	reviews: {
+		spec: {role: "仕様のレビュー", after: "S-01", model: "opus", effort: "high"}
+		code: {role: "コードのレビュー", after: "S-07", model: "opus", effort: "high"}
+		gate: {role: "最終品質ゲート", after: "S-07", model: "opus", effort: "high"}
+	}
+}
