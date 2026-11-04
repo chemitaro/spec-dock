@@ -1,7 +1,8 @@
 """What the dashboard server serves: the repository list and each repository's reading (iss-00529 D-03).
 
-The registry and the hidden marks are re-read when their files change, so a new `canonical link` appears
-without a restart (Epic R-01). Each repository keeps its last readable snapshot: an unreadable file (broken, or
+The registry, the hidden marks and the dashboard settings (the user's `config.json` and each catalog's
+`dashboard.json`, iss-00552 D-03) are re-read when their files change, so a new `canonical link` or a settings
+edit applies without a restart (Epic R-01). Each repository keeps its last readable snapshot: an unreadable file (broken, or
 caught mid-write) keeps showing it, marked unreadable (Epic D-12, F-04); a missing or unknown-version file does
 not. Models are rebuilt per request because staleness and pull request certainty change with time.
 """
@@ -17,6 +18,7 @@ from typing import TYPE_CHECKING, Literal
 
 from spec_dock.runtime.domain.canonical_structure import parse_timestamp
 from spec_dock.runtime.domain.dashboard_model import STALE_AFTER, build_model
+from spec_dock.runtime.domain.dashboard_visibility import REPOSITORY_FILE, Visibility, resolve_config
 from spec_dock.runtime.infra.canonical_registry import RegistryUnreadable, read_registry, registry_path
 from spec_dock.runtime.infra.canonical_state import STATE_FILE, catalog_state_dir
 from spec_dock.runtime.infra.dashboard_files import (
@@ -27,6 +29,7 @@ from spec_dock.runtime.infra.dashboard_files import (
 )
 from spec_dock.runtime.infra.dashboard_store import hidden_repositories
 from spec_dock.runtime.infra.github_structure import GithubRepository
+from spec_dock.runtime.infra.user_config import read_repository_dashboard, read_user_dashboard, user_config_path
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -34,11 +37,13 @@ if TYPE_CHECKING:
     from spec_dock.runtime.domain.canonical_sync_state import RegistryEntry
     from spec_dock.runtime.domain.dashboard_model import DashboardModel
     from spec_dock.runtime.domain.dashboard_snapshot import ParsedSnapshot
+    from spec_dock.runtime.domain.dashboard_visibility import ConfigProblem, UserDashboard
 
 ReadStatus = Literal["ok", "unreadable", "missing", "unsupported"]
 Lookup = Literal["visible", "hidden", "unknown"]
 Problem = Literal["ambiguous"]
 _Signature = tuple[int, int] | None
+_ListingSignature = tuple[_Signature, _Signature, _Signature, tuple[_Signature, ...]]
 
 
 def _utc_now() -> datetime:
@@ -75,6 +80,7 @@ class RegistryRow:
     hidden: bool
     served: bool
     problem: str | None
+    visibility: Visibility | None = None  # None for a row whose repository is unknown
 
 
 @dataclass(frozen=True)
@@ -101,30 +107,39 @@ class _Cache:
 
 @dataclass
 class _Listing:
-    signature: tuple[_Signature, _Signature] | None = None
+    signature: _ListingSignature | None = None
     entries: tuple[RegistryEntry, ...] = ()
-    hidden: frozenset[str] = frozenset()
+    hidden: frozenset[str] = frozenset()  # the marks as read (every served key while never readable)
     registry_error: str | None = None
     marks_unreadable: bool = False
     marks_read: bool = False
     served: dict[str, SiteRepository] = field(default_factory=dict)
+    user: UserDashboard | None = None
+    visibility: dict[str, Visibility] = field(default_factory=dict)
+    problems: tuple[ConfigProblem, ...] = ()
 
 
 class DashboardSite:
-    def __init__(self, state_root: Path, *, now: Callable[[], datetime] = _utc_now) -> None:
+    def __init__(
+        self, state_root: Path, *, now: Callable[[], datetime] = _utc_now, user_config: Path | None = None
+    ) -> None:
         self.state_root = state_root
         self.now = now
+        self.user_config = user_config if user_config is not None else user_config_path()
         self._lock = threading.Lock()
         self._listing = _Listing()
         self._caches: dict[str, _Cache] = {}
 
     # --- Listing ----------------------------------------------------------------------------------------------
 
-    def _refresh_listing(self) -> _Listing:
+    def _listing_signature(self, entries: tuple[RegistryEntry, ...]) -> _ListingSignature:
         marks = self.state_root / DASHBOARD_DIRECTORY / REPOSITORIES_FILE
-        signature = (_signature(registry_path(self.state_root)), _signature(marks))
+        settings = tuple(_signature(Path(entry.catalog) / REPOSITORY_FILE) for entry in entries)
+        return (_signature(registry_path(self.state_root)), _signature(marks), _signature(self.user_config), settings)
+
+    def _refresh_listing(self) -> _Listing:
         listing = self._listing
-        if listing.signature == signature:
+        if listing.signature is not None and listing.signature == self._listing_signature(listing.entries):
             return listing
         entries = listing.entries
         error: str | None = None
@@ -153,14 +168,36 @@ class DashboardSite:
             hidden, marks_read = listing.hidden, True
         else:
             hidden, marks_read = frozenset(served), False
-        self._listing = _Listing(signature, entries, hidden, error, read is None, marks_read, served)
+        user = read_user_dashboard(self.user_config)
+        visibility: dict[str, Visibility] = {}
+        problems: list[ConfigProblem] = []
+        for key, items in groups.items():
+            layers = [read_repository_dashboard(Path(item.catalog)) for item in items]
+            config = resolve_config(user, layers, key)
+            visibility[key] = Visibility(key in hidden, config)
+            problems.extend(problem for problem in config.problems if problem not in problems)
+        if user.state == "invalid" and not groups:
+            problems.extend(resolve_config(user, (), "").problems)
+        problems.sort(key=lambda problem: (problem.layer != "user", problem.path))
+        self._listing = _Listing(
+            self._listing_signature(entries),
+            entries,
+            hidden,
+            error,
+            read is None,
+            marks_read,
+            served,
+            user,
+            visibility,
+            tuple(problems),
+        )
         return self._listing
 
     def repositories(self) -> tuple[SiteRepository, ...]:
         """The visible (registered, known, not hidden) repositories, by key."""
         with self._lock:
             listing = self._refresh_listing()
-            return tuple(listing.served[key] for key in sorted(listing.served) if key not in listing.hidden)
+            return tuple(listing.served[key] for key in sorted(listing.served) if not listing.visibility[key].hidden)
 
     def unknown_count(self) -> int:
         with self._lock:
@@ -169,6 +206,23 @@ class DashboardSite:
     def marks_unreadable(self) -> bool:
         with self._lock:
             return self._refresh_listing().marks_unreadable
+
+    def config_problems(self) -> tuple[ConfigProblem, ...]:
+        """The unreadable settings layers and disagreeing clones, the user's file first."""
+        with self._lock:
+            return self._refresh_listing().problems
+
+    def visibility(self, key: str, fallback_catalog: Path | None = None) -> Visibility:
+        """One repository's answer; an unregistered one reads `fallback_catalog` as its repository layer."""
+        with self._lock:
+            listing = self._refresh_listing()
+        found = listing.visibility.get(key)
+        if found is not None:
+            return found
+        mark = key in listing.hidden or not listing.marks_read  # marks never readable hide (fail closed)
+        layers = [read_repository_dashboard(fallback_catalog)] if fallback_catalog is not None else []
+        user = listing.user if listing.user is not None else read_user_dashboard(self.user_config)
+        return Visibility(mark, resolve_config(user, layers, key))
 
     def registry_error(self) -> str | None:
         with self._lock:
@@ -185,9 +239,12 @@ class DashboardSite:
                 rows.append(RegistryRow(None, entry.catalog, entry.main_checkout, False, False, "repository_unknown"))
                 continue
             site = listing.served[repository.key]
-            hidden = repository.key in listing.hidden
+            visibility = listing.visibility[repository.key]
+            hidden = visibility.hidden
             rows.append(
-                RegistryRow(repository.key, entry.catalog, entry.main_checkout, hidden, not hidden, site.problem)
+                RegistryRow(
+                    repository.key, entry.catalog, entry.main_checkout, hidden, not hidden, site.problem, visibility
+                )
             )
         return tuple(rows)
 
@@ -201,7 +258,7 @@ class DashboardSite:
             site = listing.served.get(key)
             if site is None:
                 return "unknown", None
-            return ("hidden" if key in listing.hidden else "visible"), site
+            return ("hidden" if listing.visibility[key].hidden else "visible"), site
 
     # --- One repository --------------------------------------------------------------------------------------
 
@@ -257,3 +314,8 @@ def _parse(value: str | None) -> GithubRepository | None:
         return GithubRepository.parse(value)
     except ValueError:
         return None
+
+
+def read_visibility(state_root: Path, repository: GithubRepository, fallback_catalog: Path | None = None) -> Visibility:
+    """What a server started now would decide for `repository` (iss-00552 D-02): the summary and `todo list` use it."""
+    return DashboardSite(state_root).visibility(repository.key, fallback_catalog)

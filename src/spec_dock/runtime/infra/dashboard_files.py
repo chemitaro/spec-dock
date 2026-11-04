@@ -75,15 +75,6 @@ def _read_object(path: Path) -> dict[str, object] | None:
     return payload if isinstance(payload, dict) else None
 
 
-def read_hidden(state_root: Path, repository: GithubRepository) -> bool:
-    """True when `dashboard hide` marked the repository; a missing or malformed file hides nothing."""
-    payload = _read_object(state_root / DASHBOARD_DIRECTORY / REPOSITORIES_FILE)
-    if payload is None or payload.get("schema") != REPOSITORIES_SCHEMA:
-        return False
-    marks = payload.get("repositories")
-    return isinstance(marks, dict) and repository.key in marks
-
-
 def pid_alive(pid: int) -> bool:
     try:
         os.kill(pid, 0)

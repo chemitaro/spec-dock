@@ -13,9 +13,10 @@ from typing import TYPE_CHECKING, Final
 from spec_dock.runtime.application import todo_common
 from spec_dock.runtime.application.canonical_catalog import require_linked
 from spec_dock.runtime.application.canonical_errors import CanonicalCommandError
+from spec_dock.runtime.application.dashboard_site import read_visibility
 from spec_dock.runtime.application.todo_aggregate import registry_summary_todos, summary_todos
 from spec_dock.runtime.domain.dashboard_model import build_model
-from spec_dock.runtime.infra.dashboard_files import read_hidden, read_server_url, read_snapshot_file
+from spec_dock.runtime.infra.dashboard_files import read_server_url, read_snapshot_file
 from spec_dock.runtime.infra.github_structure import GithubRepository, repository_for_checkout
 from spec_dock.runtime.infra.state_root import resolve_state_root
 from spec_dock.runtime.presentation.command_data import FamilyData
@@ -82,7 +83,8 @@ def summarize(
         if catalog is not None
         else registry_summary_todos(root, repository, now=todo_now())
     )
-    summary = summary_document(model, hidden=read_hidden(root, repository), server=read_server_url(root), todos=todos)
+    hidden = read_visibility(root, repository, catalog[0] if catalog is not None else None).hidden
+    summary = summary_document(model, hidden=hidden, server=read_server_url(root), todos=todos)
     return OperationResult(command, "succeeded", FamilyData("dashboard", summary), 0)
 
 
