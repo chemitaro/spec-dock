@@ -21,6 +21,11 @@ F536 = ROOT / "tests/fixtures/issue536"
 # Installed path -> (provider source, the bytes 0.7.0 shipped). A 0.7.0 consumer must be able to `installation update`.
 CHANGED = {
     "spec-dock/docs/reference_cli.md": (SCAFFOLD / "docs/reference_cli.md", F536 / "reference_cli.md.0.7.0.txt"),
+    "spec-dock/docs/authoring/cue.md": (SCAFFOLD / "docs/authoring/cue.md", F536 / "cue.md.0.7.0.txt"),
+    "spec-dock/templates/cue/issue/plan.cue": (
+        SCAFFOLD / "templates/cue/issue/plan.cue",
+        F536 / "issue-plan.cue.0.7.0.txt",
+    ),
     "spec-dock/docs/migration.md": (SCAFFOLD / "docs/migration.md", F536 / "migration.md.0.7.0.txt"),
     "spec-dock/system/spec-dock-version": (SCAFFOLD / "system/spec-dock-version", F536 / "spec-dock-version.0.7.0.txt"),
 }
@@ -56,6 +61,9 @@ def test_the_migration_notes_describe_0_8_0_and_the_dogfood_copy_matches() -> No
         "specdock.todo-list/v1",
         "DASHBOARD_TODO_FILTER_INVALID",
         "/todos",
+        "docs/authoring/cue.md",
+        "templates/cue/issue/plan.cue",
+        "age_seconds",
         "自動で起動し直",
     ):
         assert token in section, token
