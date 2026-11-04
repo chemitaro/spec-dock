@@ -6,7 +6,15 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from spec_dock.runtime.domain.todo_model import Filters, count_limits, derived, matches, order, parse_when
+from spec_dock.runtime.domain.todo_model import (
+    Filters,
+    count_limits,
+    derived,
+    matches,
+    order,
+    parse_when,
+    scope_marks,
+)
 from spec_dock.runtime.domain.todo_record import TodoError, new_record, transition
 
 NOW = datetime(2026, 11, 4, 10, 0, tzinfo=timezone.utc)
@@ -150,3 +158,48 @@ def test_a_date_uses_that_day_offset_across_daylight_saving(monkeypatch: pytest.
     finally:
         monkeypatch.undo()
         time.tzset()
+
+
+# --- scope_marks (iss-00554 D-03, T-01) ------------------------------------------------------------------------
+
+PARENTS = {
+    "init-00001": None,
+    "epic-00002": "init-00001",
+    "iss-00003": "epic-00002",
+    "iss-00004": "epic-00002",
+    "epic-00005": "init-00001",
+}
+
+
+def test_scope_marks_count_direct_descendant_and_related_open_tasks() -> None:
+    due = "2026-11-05T00:00:00Z"
+    records = [
+        task("t-0001", due, scopes={"related": ["epic-00002"], "blocks": ["iss-00003"]}),
+        task("t-0002", due, scopes={"related": [], "blocks": ["iss-00003", "iss-00004"]}),  # one task, two Issues
+        task("t-0003", due, scopes={"related": ["iss-00003"], "blocks": ["epic-00002"]}),
+        task(
+            "t-0004",
+            due,
+            status="snoozed",
+            snooze_until="2026-11-06T00:00:00Z",
+            scopes={"related": [], "blocks": ["iss-00004"]},
+        ),
+        task(
+            "t-0005", due, status="done", scopes={"related": ["iss-00003"], "blocks": ["iss-00003"]}
+        ),  # closed: not counted
+        task("t-0006", due, scopes={"related": ["iss-09999"], "blocks": ["iss-09999"]}),  # unknown Scope: not counted
+    ]
+    marks = scope_marks(records, PARENTS)
+    assert marks["iss-00003"] == {"blocking": 2, "blocking_with_descendants": 2, "related": 1}
+    assert marks["iss-00004"] == {"blocking": 2, "blocking_with_descendants": 2, "related": 0}
+    assert marks["epic-00002"] == {"blocking": 1, "blocking_with_descendants": 4, "related": 1}
+    assert marks["init-00001"] == {"blocking": 0, "blocking_with_descendants": 4, "related": 0}
+    assert marks["epic-00005"] == {"blocking": 0, "blocking_with_descendants": 0, "related": 0}
+    assert "iss-09999" not in marks
+
+
+def test_scope_marks_stop_on_a_parent_cycle() -> None:
+    record = task("t-0001", "2026-11-05T00:00:00Z", scopes={"related": [], "blocks": ["epic-00001"]})
+    marks = scope_marks([record], {"epic-00001": "epic-00002", "epic-00002": "epic-00001"})
+    assert marks["epic-00001"]["blocking_with_descendants"] == 1
+    assert marks["epic-00002"]["blocking_with_descendants"] == 1

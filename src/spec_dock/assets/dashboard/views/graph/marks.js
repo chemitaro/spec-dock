@@ -1,9 +1,16 @@
 // The structure graph's small marks (iss-00532 D-04): PR, CI, mergeability, assurance steps, stage, "waits after",
 // progress bars. The values (state shapes and words, icons, kinds, assurance steps) are the shell's core/ui.js,
 // shared with the board and the detail screen (#531, iss-00544).
-import { ASSURANCE_LEVELS, esc, ic, KIND_LABEL, PR_STATE_WORDS, STATES, stateIcon } from "../../core/ui.js";
+import { ASSURANCE_LEVELS, esc, humanCount, humanMark, ic, KIND_LABEL, PR_STATE_WORDS, STATES, stateIcon } from "../../core/ui.js";
 
 export { STATES, stateIcon, esc, ic };
+
+// People blocking the box (an Issue) or its subtree (a frame) (iss-00554 D-06); the shell's mark and words.
+export function hmMark(scope) {
+  const { count, descendants } = humanCount(scope);
+  return humanMark(count, { descendants });
+}
+export { humanCount };
 
 export const KIND = KIND_LABEL;
 

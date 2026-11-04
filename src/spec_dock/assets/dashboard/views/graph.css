@@ -118,6 +118,12 @@
 .gx .dn { display: inline-flex; align-items: center; gap: 2px; padding: 0 5px 0 3px; height: 17px; border-radius: 4px; background: var(--ds-surface-2); border: 1px solid var(--ds-border); color: var(--ds-text-2); font-size: 11px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .gx .dn .ds-icon { font-size: 12px; stroke-width: 2.2; color: var(--ds-muted); }
 .gx .gx-marks .dn { margin-left: auto; }
+/* 人が止めている数（iss-00554 D-06）。後に続くの前に置き、行を折り返さない */
+.gx .hm { display: inline-flex; align-items: center; gap: 1px; flex: none; padding: 0 5px 0 3px; height: 17px; border-radius: 4px; background: var(--ds-danger-bg); border: 1px solid var(--ds-danger-line); color: var(--ds-danger-ink); font-size: 11px; font-weight: 700; line-height: 1; white-space: nowrap; }
+.gx .hm .ds-icon { font-size: 12px; stroke-width: 2.2; }
+.gx .hm small { margin-left: 2px; font-size: 9.5px; font-weight: 650; }
+.gx .gx-marks .hm { margin-left: auto; }
+.gx .gx-marks .hm + .dn { margin-left: 0; }
 /* 畳んだ片付けの候補 */
 .gx .gx-clean { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px 0 8px; border: 1px dashed var(--ds-warn-line); border-radius: 6px; background: var(--ds-warn-bg); color: var(--ds-warn-ink); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; align-self: flex-start; }
 .gx .gx-clean .ds-icon { font-size: 14px; color: var(--ds-warn); }

@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from datetime import datetime
 
     from spec_dock.runtime.application.dashboard_site import RepositoryView
+    from spec_dock.runtime.application.dashboard_todos import Annotations
     from spec_dock.runtime.domain.canonical_structure import PullRequest
     from spec_dock.runtime.domain.dashboard_model import (
         ChildStages,
@@ -38,6 +39,7 @@ if TYPE_CHECKING:
     from spec_dock.runtime.infra.dashboard_store import SeenRecord
 
 API_SCHEMA: Final = "specdock.dashboard/v1"
+NO_TODOS: Final = {"blocking": 0, "blocking_with_descendants": 0, "related": 0}
 EVENT_LIMIT: Final = 50
 
 
@@ -192,6 +194,7 @@ def scope_item(
     rank: int | None = None,
     facts: Mapping[str, Mapping[str, object]] | None = None,
     readings: Mapping[str, Mapping[str, str | None]] | None = None,
+    todos: Annotations | None = None,
 ) -> dict[str, object]:
     node = model.snapshot.find(scope.id)
     read = (readings or {}).get(scope.id, {})
@@ -224,6 +227,8 @@ def scope_item(
         # The CUE assurance level and this PC's worktree branch (iss-00544 D-02); null when unknown.
         "assurance": read.get("assurance"),
         "branch": read.get("branch"),
+        # Open human tasks blocking it, blocking it or a descendant, and related to it (iss-00554 D-03; not a contract).
+        "todos": dict(todos.marks.get(scope.id, NO_TODOS)) if todos is not None else dict(NO_TODOS),
     }
 
 
@@ -245,6 +250,7 @@ def structure_document(
     baseline: SeenRecord | None,
     latest: SeenRecord | None,
     readings: Mapping[str, Mapping[str, str | None]] | None = None,
+    todos: Annotations | None = None,
 ) -> dict[str, object]:
     model = view.model
     changes: Mapping[str, ScopeChange] = (
@@ -261,6 +267,8 @@ def structure_document(
             "baseline_id": baseline.seen_id if baseline else None,
         },
         "changes_count": len(changes),
+        # The `dashboard summary` counts of the human tasks (iss-00554 D-03); null when not read.
+        "todos": dict(todos.summary) if todos is not None else None,
     }
     if model is None:
         document.update({
@@ -283,7 +291,7 @@ def structure_document(
         },
         "anomalies": [{"number": a.number, "code": a.code, "message": a.message} for a in model.anomalies],
         "scopes": [
-            scope_item(model, scope, changes.get(scope.id), order[scope.id], facts, readings) for scope in scopes
+            scope_item(model, scope, changes.get(scope.id), order[scope.id], facts, readings, todos) for scope in scopes
         ],
         "cleanup": [{"id": c.scope_id, "code": c.code, "text": c.text} for c in model.cleanup],
         "timeline": {
@@ -366,6 +374,8 @@ def scope_document(
     baseline: SeenRecord | None,
     details: Mapping[str, object] | None = None,
     readings: Mapping[str, Mapping[str, str | None]] | None = None,
+    todos: Annotations | None = None,
+    now: datetime | None = None,
 ) -> dict[str, object] | None:
     model = view.model
     if model is None or scope_id not in model.scopes:
@@ -385,6 +395,7 @@ def scope_document(
             ranks(model)[scope_id],
             layout_facts(model),
             readings,
+            todos,
         ),
         "upstream": _path(upstream(model, scope_id)),
         "downstream": _path(downstream_ids(model, scope_id)),
@@ -395,4 +406,5 @@ def scope_document(
         "open_child_stages": _stages(open_stages),
         "dependencies": dependencies(model, scope_id),
         "details": dict(details) if details is not None else None,
+        "todos": todos.scope_lists(model, scope_id, now) if todos is not None and now is not None else None,
     }
