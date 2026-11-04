@@ -7,16 +7,16 @@ goal: "人のタスクの記録の形、2段の検査、置き場、設定、`to
 
 steps: {
 	"S-01": {title: "仕様を書き、仕様のレビューを通す", realizes: ["R-11"], status: "done", session: "impl"}
-	"S-02": {title: "記録の形、ID、移り変わり、検査（`domain/todo_record.py`）", realizes: ["R-03", "R-04", "F-01"], status: "todo", after: ["S-01"], session: "impl"}
-	"S-03": {title: "期限、派生の状態、並び、件数、絞り込み（`domain/todo_model.py`）", realizes: ["R-06", "R-07", "R-09"], status: "todo", after: ["S-02"], session: "impl"}
-	"S-04": {title: "3段の設定（`domain/todo_settings.py`、`infra/user_config.py`）", realizes: ["R-08"], status: "todo", after: ["S-01"], session: "impl"}
-	"S-05": {title: "置き場と読み書き（`infra/todo_store.py`）", realizes: ["R-01", "F-02"], status: "todo", after: ["S-02"], session: "impl"}
-	"S-06": {title: "CUE の型と見本、`CueTool.vet`、`todo check`", realizes: ["R-02", "F-02"], status: "todo", after: ["S-02", "S-05"], session: "impl"}
-	"S-07": {title: "書くコマンド（add、update、done、snooze、cancel、reopen）と読むコマンド（list、show）、`todo settings`", realizes: ["R-01", "R-03", "R-04", "R-05", "R-06", "R-07", "R-08", "R-09", "F-01", "F-03"], status: "todo", after: ["S-03", "S-04", "S-05"], session: "impl"}
-	"S-08": {title: "CLI の葉、ヘルプ、ディスパッチ、テキストの出力", realizes: ["R-11", "F-03"], status: "todo", after: ["S-07"], session: "impl"}
-	"S-09": {title: "カタログの検査が `todos/` を取り違えないことと、Scope の判定が変わらないことのテスト", realizes: ["R-09", "R-10"], status: "todo", after: ["S-07"], session: "impl"}
-	"S-10": {title: "文書（`reference_cli.md`、`docs/README.md`、`cli-redesign-guide.html`）、inventory、dogfood の写し", realizes: ["R-11"], status: "todo", after: ["S-08"], session: "impl"}
-	"S-11": {title: "コードのレビュー、最終品質ゲート、report.md、PR と CI", realizes: ["R-01", "R-02", "R-11"], status: "todo", after: ["S-09", "S-10"], session: "impl"}
+	"S-02": {title: "記録の形、ID、移り変わり、検査（`domain/todo_record.py`）", realizes: ["R-03", "R-04", "F-01"], status: "done", after: ["S-01"], session: "impl"}
+	"S-03": {title: "期限、派生の状態、並び、件数、絞り込み（`domain/todo_model.py`）", realizes: ["R-06", "R-07", "R-09"], status: "done", after: ["S-02"], session: "impl"}
+	"S-04": {title: "3段の設定（`domain/todo_settings.py`、`infra/user_config.py`）", realizes: ["R-08"], status: "done", after: ["S-01"], session: "impl"}
+	"S-05": {title: "置き場と読み書き（`infra/todo_store.py`）", realizes: ["R-01", "F-02"], status: "done", after: ["S-02"], session: "impl"}
+	"S-06": {title: "CUE の型と見本、`CueTool.vet`、`todo check`", realizes: ["R-02", "F-02"], status: "done", after: ["S-02", "S-05"], session: "impl"}
+	"S-07": {title: "書くコマンド（add、update、done、snooze、cancel、reopen）と読むコマンド（list、show）、`todo settings`", realizes: ["R-01", "R-03", "R-04", "R-05", "R-06", "R-07", "R-08", "R-09", "F-01", "F-03"], status: "done", after: ["S-03", "S-04", "S-05"], session: "impl"}
+	"S-08": {title: "CLI の葉、ヘルプ、ディスパッチ、テキストの出力", realizes: ["R-11", "F-03"], status: "done", after: ["S-07"], session: "impl"}
+	"S-09": {title: "カタログの検査が `todos/` を取り違えないことと、Scope の判定が変わらないことのテスト", realizes: ["R-09", "R-10"], status: "done", after: ["S-07"], session: "impl"}
+	"S-10": {title: "文書（`reference_cli.md`、`docs/README.md`、`cli-redesign-guide.html`）、inventory、dogfood の写し", realizes: ["R-11"], status: "done", after: ["S-08"], session: "impl"}
+	"S-11": {title: "コードのレビュー、最終品質ゲート、report.md、PR と CI", realizes: ["R-01", "R-02", "R-11"], status: "doing", after: ["S-09", "S-10"], session: "impl"}
 }
 
 tests: {
