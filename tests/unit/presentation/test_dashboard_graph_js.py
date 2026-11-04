@@ -255,8 +255,34 @@ def _context() -> dict[str, Any]:
             node(80, "epic"),  # open with every child closed: a cleanup candidate, not the context of its children
             closed(81, "issue", parent=80, closed_at=_at("10-20")),
             closed(82, "issue", parent=80, closed_at=_at("10-21")),
+            closed(90, "epic"),  # closed with open children (Epic R-12): its stages count the open ones only
+            closed(91, "issue", parent=90),
+            node(92, "issue", parent=90, blocked_by=(91,)),
+            node(95, "issue", parent=90),
+            node(96, "issue", parent=90, blocked_by=(95,)),
         )
     )
+
+
+def _missing_times() -> dict[str, Any]:
+    """Scopes without `active_at` (and a done one without `closed_at`): the oldest in the activity order (F-01)."""
+    doc = document(
+        snapshot(
+            node(100, "initiative"),
+            node(101, "epic", parent=100),
+            node(102, "issue", parent=101),
+            node(103, "epic", parent=100),
+            node(104, "issue", parent=103),
+            closed(105, "issue", parent=103),
+            closed(106, "issue", parent=103, closed_at=_at("10-20")),
+        )
+    )
+    for item in doc["scopes"]:
+        if item["id"] in {"epic-00101", "iss-00102", "iss-00105"}:
+            item.pop("active_at")
+        if item["id"] == "iss-00105":
+            item["closed_at"] = None
+    return doc
 
 
 @pytest.fixture(scope="module")
@@ -273,8 +299,8 @@ def context(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
     return _run(
         tmp_path_factory.mktemp("context"),
         {
-            "documents": {"context": _context()},
-            "layouts": {"context": layouts},
+            "documents": {"context": _context(), "missing": _missing_times()},
+            "layouts": {"context": layouts, "missing": {"home": {}}},
             "checks": ["layout", "audit"],
             "prefs": [
                 {"current": None, "legacy": None},
@@ -337,6 +363,22 @@ def test_frames_follow_activity_and_boxes_put_done_below(context: dict[str, Any]
     assert _top_down(home, first) == ["iss-00007", "iss-00006", "iss-00004", "iss-00003"]
     tree = _ids(context, "tree")
     assert _top_down(tree, roots) == ["init-00001", "epic-00020", "epic-00030", "init-00060"]
+    # a closed parent with open children shows no done child: its stages are the open ones, so 92 (waiting only for
+    # the done 91) shares the first stage with 95, and 96 (waiting for 95) is the second (its open children are
+    # cleanup candidates: unfolded)
+    unfolded = _ids(context, "unfolded")
+    assert "iss-00091" not in unfolded
+    assert unfolded["iss-00092"]["x1"] == unfolded["iss-00095"]["x1"] < unfolded["iss-00096"]["x1"]
+
+
+def test_scopes_without_times_are_the_oldest(context: dict[str, Any]) -> None:
+    nodes = {item["id"]: item for item in context["layout"]["missing"]["home"]["nodes"]}
+    # epic 101 and its Issue have no time: after epic 103 of the same tier, against the order of the numbers
+    reading = sorted(("epic-00101", "epic-00103"), key=lambda i: (nodes[i]["y1"], nodes[i]["x1"]))
+    assert reading == ["epic-00103", "epic-00101"]
+    # done 105 has neither completion nor activity time: after 106
+    done = sorted(("iss-00105", "iss-00106"), key=lambda i: (nodes[i]["y1"], nodes[i]["x1"]))
+    assert done == ["iss-00106", "iss-00105"]
 
 
 def test_saved_choices_of_the_old_version_do_not_override_the_new_defaults(context: dict[str, Any]) -> None:
