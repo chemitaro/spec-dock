@@ -7,6 +7,7 @@ neither GitHub nor a server. One repository's failure stays in its own row.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 import os
 from pathlib import Path
@@ -31,6 +32,7 @@ from spec_dock.runtime.presentation.todo_document import list_item, repository_r
 
 if TYPE_CHECKING:
     import argparse
+    from collections.abc import Iterable
     from datetime import datetime
 
     from spec_dock.runtime.application.todo_list import Classified
@@ -195,18 +197,71 @@ def _list_all(namespace: argparse.Namespace) -> OperationResult[object]:
     registry = registry_or_stop(state_root)
     now = todo_common.utc_now()
     user_layer = read_user_todo_settings()
+    rows = [
+        row
+        for row in select_catalogs(registry)
+        if not wanted or (row.repository is not None and row.repository.key in wanted)
+    ]
+    collected = collect(
+        rows,
+        filters=filters,
+        now=now,
+        user_layer=user_layer,
+        hidden=lambda repository: read_hidden(state_root, repository),
+    )
+    warnings: list[Diagnostic] = [*settings_warnings((user_layer,)), *collected.warnings]
+    seen = {row.repository.key for row in rows if row.repository is not None}
+    for key in wanted:
+        if key not in seen:
+            warnings.append(
+                Diagnostic(
+                    UNKNOWN,
+                    f"{key} is not in this PC's catalog registry",
+                    {"repository": key, "next_step": LIST_STEP},
+                )
+            )
+    document = todo_list_document(
+        now=now, filters=filters.to_json(), repositories=collected.rows, items=collected.items, mode="all_repositories"
+    )
+    return OperationResult(
+        namespace.command_path, "succeeded", FamilyData("todo", document), 0, warnings=tuple(warnings)
+    )
+
+
+@dataclass(frozen=True)
+class Collected:
+    rows: list[dict[str, object]]
+    items: list[dict[str, object]]
+    warnings: list[Diagnostic]
+
+
+Reader = Callable[[Path, str], CatalogRead]  # (catalog, main checkout) -> its reading
+
+
+def _read_with_layer(user_layer: Layer | None) -> Reader:
+    return lambda catalog, main_checkout: read_catalog(catalog, main_checkout, user_layer=user_layer)
+
+
+def collect(
+    selected: Iterable[Selected],
+    *,
+    filters: Filters,
+    now: datetime,
+    user_layer: Layer | None,
+    hidden: Callable[[GithubRepository], bool],
+    read: Reader | None = None,
+) -> Collected:
+    """The rows, the ordered matching items and the warnings of the chosen registry rows, each repository's failure
+    kept in its own row (D-04). Shared by `todo list --all-repositories` and the dashboard server (iss-00554 D-01);
+    `read` lets the server pass its remembered readings."""
+    reader = read or _read_with_layer(user_layer)
     rows: list[dict[str, object]] = []
     pool: list[tuple[dict[str, object], dict[str, object]]] = []  # (record, list item)
-    warnings: list[Diagnostic] = list(settings_warnings((user_layer,)))
-    seen: set[str] = set()
-    for row in select_catalogs(registry):
+    warnings: list[Diagnostic] = []
+    for row in selected:
         repository = row.repository
-        if wanted and (repository is None or repository.key not in wanted):
-            continue
-        if repository is not None:
-            seen.add(repository.key)
         key = repository.key if repository is not None else None
-        hidden = read_hidden(state_root, repository) if repository is not None else False
+        is_hidden = hidden(repository) if repository is not None else False
         place: dict[str, object] = {"catalog": row.entry.catalog, "main_checkout": row.entry.main_checkout}
         catalog, checkout = row.entry.catalog, row.entry.main_checkout
         if row.chosen is not None:
@@ -220,7 +275,7 @@ def _list_all(namespace: argparse.Namespace) -> OperationResult[object]:
                     repository=key,
                     catalog=catalog,
                     main_checkout=checkout,
-                    hidden=hidden,
+                    hidden=is_hidden,
                     status="duplicate",
                     problem=problem,
                 )
@@ -229,15 +284,15 @@ def _list_all(namespace: argparse.Namespace) -> OperationResult[object]:
                 Diagnostic(DUPLICATE, str(problem["message"]), {"catalog": row.entry.catalog, "chosen": row.chosen})
             )
             continue
-        read = read_catalog(row.catalog, row.entry.main_checkout, user_layer=user_layer)
-        if read.problem is not None or read.classified is None or read.settings is None:
-            problem = read.problem or {}
+        reading = reader(row.catalog, row.entry.main_checkout)
+        if reading.problem is not None or reading.classified is None or reading.settings is None:
+            problem = reading.problem or {}
             rows.append(
                 repository_row(
                     repository=key,
                     catalog=catalog,
                     main_checkout=checkout,
-                    hidden=hidden,
+                    hidden=is_hidden,
                     status="unreadable",
                     problem=problem,
                 )
@@ -246,44 +301,32 @@ def _list_all(namespace: argparse.Namespace) -> OperationResult[object]:
                 Diagnostic(UNREADABLE, str(problem.get("message")), {**problem, "repository": key, **place})
             )
             continue
-        classified = read.classified
+        classified = reading.classified
         records = [item.record for item in classified.valid]
         rows.append(
             repository_row(
                 repository=key,
                 catalog=catalog,
                 main_checkout=checkout,
-                hidden=hidden,
+                hidden=is_hidden,
                 status="ok",
                 problem=None,
-                counts=counts_of(records, read.settings, now),
+                counts=counts_of(records, reading.settings, now),
                 invalid_files=list(classified.invalid_files),
                 conflict_copies=list(classified.conflict_copies),
             )
         )
         warnings.extend(_with_repository(item, repository) for item in classified.warnings)
-        warnings.extend(item for item in settings_warnings(read.settings.layers) if item.details["layer"] != "user")
+        warnings.extend(item for item in settings_warnings(reading.settings.layers) if item.details["layer"] != "user")
         for stored in classified.valid:
             if matches(stored.record, filters, now):
-                item = list_item(stored.record, now=now, repository=repository, path=read.store.relative(stored.path))
-                pool.append((stored.record, item))
-    for key in wanted:
-        if key not in seen:
-            warnings.append(
-                Diagnostic(
-                    UNKNOWN,
-                    f"{key} is not in this PC's catalog registry",
-                    {"repository": key, "next_step": LIST_STEP},
+                item = list_item(
+                    stored.record, now=now, repository=repository, path=reading.store.relative(stored.path)
                 )
-            )
+                pool.append((stored.record, item))
     by_record = {id(record): item for record, item in pool}
     items = [by_record[id(record)] for record in order([record for record, _item in pool], now)]
-    document = todo_list_document(
-        now=now, filters=filters.to_json(), repositories=rows, items=items, mode="all_repositories"
-    )
-    return OperationResult(
-        namespace.command_path, "succeeded", FamilyData("todo", document), 0, warnings=tuple(warnings)
-    )
+    return Collected(rows, items, warnings)
 
 
 # --- todo show <REF> (D-05) ------------------------------------------------------------------------------------

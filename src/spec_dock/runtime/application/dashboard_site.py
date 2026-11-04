@@ -15,6 +15,7 @@ from pathlib import Path
 import threading
 from typing import TYPE_CHECKING, Literal
 
+from spec_dock.runtime.application.dashboard_todos import DashboardTodos
 from spec_dock.runtime.domain.canonical_structure import parse_timestamp
 from spec_dock.runtime.domain.dashboard_model import STALE_AFTER, build_model
 from spec_dock.runtime.infra.canonical_registry import RegistryUnreadable, read_registry, registry_path
@@ -117,6 +118,7 @@ class DashboardSite:
         self._lock = threading.Lock()
         self._listing = _Listing()
         self._caches: dict[str, _Cache] = {}
+        self.todos = DashboardTodos(self.registry_entries, now=lambda: self.now())  # iss-00554 D-02
 
     # --- Listing ----------------------------------------------------------------------------------------------
 
@@ -169,6 +171,16 @@ class DashboardSite:
     def marks_unreadable(self) -> bool:
         with self._lock:
             return self._refresh_listing().marks_unreadable
+
+    def registry_entries(self) -> tuple[RegistryEntry, ...]:
+        """The last readable registry rows (the human tasks choose their catalogs from these, iss-00554 D-02)."""
+        with self._lock:
+            return self._refresh_listing().entries
+
+    def listing_signature(self) -> object:
+        with self._lock:
+            listing = self._refresh_listing()
+            return (listing.signature, tuple(sorted(listing.hidden)))
 
     def registry_error(self) -> str | None:
         with self._lock:
@@ -246,6 +258,7 @@ class DashboardSite:
             step,
             model.pull_request_status if model is not None else None,
             site.problem,
+            self.todos.signature(site),  # CLI-written tasks reach the 5-second refresh (iss-00554 R-07)
         )
         return hashlib.sha256(repr(parts).encode()).hexdigest()[:16]
 
