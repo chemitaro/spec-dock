@@ -37,3 +37,10 @@ SpecDock 0.7.0 のリリース変更を作り、マージできる状態の PR �
 
 - 時間制限のテストの閾値は統括が別に扱う。
 - マージの後：タグ、パッケージの導入、5つのリポジトリへの配布、dogfooding（別の worktree で登録したタスクが見えること R-01、2つのリポジトリの集約 R-10、統括と作業者がスキルの規則で登録・完了すること R-14）は統括が行う。
+
+## 統括の運用の確かめ（2026-11-04、0.7.0）
+
+- 4つのリポジトリ（input-devices#25、housing-lifecycle#251、taikyohiyou_project#2257 は利用者がマージ。company-os#7 は中身が main に取り込み済み（05ab0ff）で GitHub の表示が追いつかなかったため、コメントを付けて閉じた）が 0.7.0 になり、`canonical check` が合格した。
+- R-01：spec-dock の main のチェックアウトで `todo add --by human` した t-gwye が、別の worktree（iss-00567）の `todo list` に出た。確かめの後 `todo cancel` した。
+- R-10：`todo list --all-repositories --json` が mode all_repositories で、登録簿の7リポジトリをすべて status ok で返した。
+- R-14：配布したスキル（`.agents/skills/spec-dock/SKILL.md`）に「人のタスク」の規則が入っていることを確かめた。
