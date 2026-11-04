@@ -33,8 +33,8 @@ excludes: [
 requirements: {
 	"R-01": {
 		title: "配布するスキルに、登録する場面と登録しない場面が書いてある"
-		text:  "会話の中で答えが返るもの（Claude Code や Codex の複数の質問を含む）は登録しない。答えを待ったままターンを終えるとき、人しかできない操作をすぐにしてもらえないとき、数日かかる確かめ、期限のある行為は、`todo add --by agent --role <役割> --kind <種類>`（背景と問い、`--reply-to`、`--effort`、`decide` は選択肢と推奨）で登録してから、止まらない作業を続ける。止める Scope があれば `--blocks` を付ける。PR のマージ待ちは登録しない。作業者から統括への問いは Orca で行い、統括が答えられず人に上げるときだけ統括が `decide` で登録する。秘密の値を書かない。Claude Code の隔離セッション（`--worktree`）では読むだけにし、登録は統括に頼む。（Epic の R-14、D-17 の 1・2・4・7）"
-		acceptance: ["`.agents/skills/spec-dock/SKILL.md`（提供側と dogfood の写し）にこの規則がある"]
+		text:  "会話の中で答えが返るもの（Claude Code や Codex の複数の質問を含む）は登録しない。答えを待ったままターンを終えるとき、人しかできない操作をすぐにしてもらえないとき、数日かかる確かめ、期限のある行為は、`todo add --by agent --role <役割> --kind <種類>`（背景と問い、`--reply-to`、`--effort`、`decide` は選択肢と推奨）で登録してから、止まらない作業を続ける。止める Scope があれば `--blocks` を付ける。PR のマージ待ちは登録しない（意図して登録するのは妨げない）。作業者から統括への問いは Orca で行い、統括が答えられず人に上げるときだけ統括が `decide` で登録する。秘密の値を書かない（操作のコマンドは書いてよい）。Claude Code の隔離セッション（`--worktree`）では読むだけにし、登録は統括に頼む。（Epic の R-14、D-17 の 1・2・4・7）"
+		acceptance: ["`.agents/skills/spec-dock/SKILL.md`（提供側と dogfood の写し）の「人のタスク」の節にこの規則がある"]
 	}
 	"R-02": {
 		title: "配布するスキルに、束とサブタスクの規則が書いてある"
@@ -54,7 +54,7 @@ requirements: {
 	"R-05": {
 		title: "配布物と dogfood の写しと一覧が合っている"
 		text:  "提供側の資産、`spec-dock/` の写し、`static-inventory.json` の sha256 と `known_old_sha256` が合い、新しいスキルと文書が `installation init` で入る。"
-		acceptance: ["提供側と写しの中身が一致する", "`static-inventory.json` の sha256 が実際の中身と合う", "新しいリポジトリの `installation init` で `todo.md` と更新したスキルが入る"]
+		acceptance: ["提供側と写しの中身が一致する", "`static-inventory.json` の sha256 が実際の中身と合う", "新しいリポジトリの `installation init` で `todo.md` と更新したスキルが入る", "新しい候補の wheel を入れた隔離環境と隔離した利用者のリポジトリで、スキルと文書が入り、規則のとおりの `todo add`（束を含む）と `todo done --record` が動く（結果は report.md に書く）"]
 	}
 }
 

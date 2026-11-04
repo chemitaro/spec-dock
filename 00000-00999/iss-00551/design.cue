@@ -39,7 +39,7 @@ design: {
 		text: """
 			- `spec-dock/docs/` と `.agents/skills/spec-dock/SKILL.md` の写しを同じ内容にする。
 			- `src/spec_dock/assets/static-inventory.json`：`todo.md` を新しい項目として足し（`known_old_sha256` は空）、`SKILL.md`、`canonical.md`、`README.md` は sha256 を更新して前の値を `known_old_sha256` に足す。ほかの行は変えない。
-			- テスト（`tests/unit/infra/`）：スキルに規則の語（`--kind checklist`、`todo done --record`、`todo list`、`--blocks`、`--worktree`）があること、`todo.md` が配布され `README.md`／`canonical.md` から辿れること、`canonical.md` の `TODO_*` が `reference_cli.md` にあること、提供側と写しが一致すること、新しいリポジトリの `installation init` で入ること。
+			- テスト（`tests/unit/infra/`）：スキルの「人のタスク」の節の中に規則の語（`--kind checklist`、`todo done --record`、`todo list`、`--blocks`、`--worktree`）があること（節の外の既存の文では満たさない）、`todo.md` が配布され `README.md`／`canonical.md` から辿れること、`canonical.md` の `TODO_*` が `reference_cli.md` にあること、提供側と写しが一致すること、新しいリポジトリの `installation init` で入ること。
 			"""
 		satisfies: ["R-05"]
 	}
