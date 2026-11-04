@@ -13,7 +13,7 @@ title: 人のタスクの管理（epic-00547）
 lead: エージェントが人に頼むことと、人が自分で決めたことを、各リポジトリの SpecDock に1か所でまとめ、全リポジトリを集めてダッシュボードで見られるようにします。人の返事待ちで止まっている作業も、構造の図とボードで分かるようにします。
 category: 説明資料
 audience: 利用者（要件を決める人）と、この Epic を実装するエージェント
-status: 要件の下書き（2026-11-04）
+status: 要件は承認済み。設計と計画を書いた（2026-11-04）
 ---
 
 ## この資料で分かること
@@ -87,7 +87,7 @@ status: 要件の下書き（2026-11-04）
 ## コマンド
 
 ```text
-spec-dock todo add / list / show / update / done / snooze / cancel / reopen / check
+spec-dock todo add / list / show / update / done / snooze / cancel / reopen / check / settings
 spec-dock todo list --all-repositories --json   # 全リポジトリを集めた一覧
 ```
 
@@ -112,10 +112,11 @@ spec-dock todo list --all-repositories --json   # 全リポジトリを集めた
 - Company OS の受付簿は、しばらく使って良ければ移す。
 - 画面を作る Issue は epic-00427（ダッシュボード）の完了を待つ。CLI と記録の形は先に進められる。
 
-## まだ決めていないこと
+## 進め方（設計と計画、2026-11-04）
 
-- 設計と Issue の分け方（統括がこの後に下書きします）。
-- コマンドの名前と欄の細部（設計で柔軟に変えます）。
+- 子の Issue は6つです。(1) 記録の形と型と設定、CLI の中核、(2) 全リポジトリの集約と `dashboard summary` の数、(3) 配布するスキルの規則と文書、(4) CLI の版のリリースと、spec-dock での使い始め、(5) ダッシュボードの画面（epic-00427 の完了を待つ）、(6) 画面の版のリリース。
+- 効いている設定の値とその出どころは `spec-dock todo settings` で確かめます。
+- コマンドの名前は `todo` のまま進めます。欄の細部は `design.cue` にあります。
 </script>
 <script src="../../../design-system/ds.js"></script>
 </head>
