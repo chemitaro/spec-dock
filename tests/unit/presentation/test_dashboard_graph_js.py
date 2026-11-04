@@ -149,11 +149,12 @@ def test_prerequisites_sit_left_and_a_stage_keeps_the_recommended_order(small: d
     assert nodes["iss-00024"]["x1"] == nodes["iss-00025"]["x1"] > nodes["iss-00022"]["x2"]
 
 
-def test_seven_stages_wrap_onto_a_second_row(small: dict[str, Any]) -> None:
+def test_seven_stages_stay_on_one_row(small: dict[str, Any]) -> None:
+    """iss-00556 R-07: the stages no longer wrap after six; they go on to the right."""
     nodes = _nodes(small, "home")
-    assert nodes["iss-00011"]["x1"] < nodes["iss-00016"]["x1"]  # six columns in the first row
-    assert nodes["iss-00017"]["x1"] == nodes["iss-00011"]["x1"]
-    assert nodes["iss-00017"]["y1"] > nodes["iss-00011"]["y2"]
+    chain = [nodes[f"iss-{n:05d}"] for n in range(11, 18)]
+    assert len({box["y1"] for box in chain}) == 1
+    assert all(a["x2"] < b["x1"] for a, b in zip(chain, chain[1:]))
 
 
 def test_home_hides_done_keeps_closed_parents_and_folds_cleanup(small: dict[str, Any]) -> None:
@@ -264,6 +265,17 @@ def _context() -> dict[str, Any]:
     )
 
 
+def _wide() -> dict[str, Any]:
+    """An Epic of twelve Issues without dependencies, and twelve top-level Issues: wider than 1240px each."""
+    return document(
+        snapshot(
+            node(200, "epic"),
+            *(node(n, "issue", parent=200) for n in range(201, 213)),
+            *(node(n, "issue") for n in range(220, 232)),
+        )
+    )
+
+
 def _missing_times() -> dict[str, Any]:
     """Scopes without `active_at` (and a done one without `closed_at`): the oldest in the activity order (F-01)."""
     doc = document(
@@ -299,8 +311,8 @@ def context(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
     return _run(
         tmp_path_factory.mktemp("context"),
         {
-            "documents": {"context": _context(), "missing": _missing_times()},
-            "layouts": {"context": layouts, "missing": {"home": {}}},
+            "documents": {"context": _context(), "missing": _missing_times(), "wide": _wide()},
+            "layouts": {"context": layouts, "missing": {"home": {}}, "wide": {"home": {}}},
             "checks": ["layout", "audit"],
             "prefs": [
                 {"current": None, "legacy": None},
@@ -404,3 +416,14 @@ def test_the_graph_saves_its_choices_under_the_new_key() -> None:
     source = (ASSETS / "views" / "graph.js").read_text(encoding="utf-8")
     assert '"specdock.graph.v1"' not in source
     assert "restorePrefs" in source and "PREFS_KEY" in source and "LEGACY_KEY" in source
+
+
+def test_a_wide_stage_stays_on_one_row_and_grows_to_the_right(context: dict[str, Any]) -> None:
+    """iss-00556 R-07: no wrapping at 1240px; the graph is panned sideways instead."""
+    nodes = {item["id"]: item for item in context["layout"]["wide"]["home"]["nodes"]}
+    for ids in ([f"iss-{n:05d}" for n in range(201, 213)], [f"iss-{n:05d}" for n in range(220, 232)]):
+        boxes = [nodes[i] for i in ids]
+        assert len({box["y1"] for box in boxes}) == 1
+        xs = sorted(box["x1"] for box in boxes)
+        assert xs[-1] - xs[0] > 1240
+    assert not [run for run in context["audit"] if run["name"] == "wide" and any(run[key] for key in AUDIT_KEYS)]

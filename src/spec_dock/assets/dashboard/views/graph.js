@@ -685,19 +685,28 @@ function initialView() {
   V.ty = top;
 }
 
+// The smallest zoom: 0.12, or less when that is what it takes to show the whole graph. With no wrapping
+// (iss-00556 R-07) a graph can be several thousand pixels wide, wider than 0.12 shows on a phone.
+const fitScale = () => {
+  const v = V.el.view;
+  const L = V.EG.layout;
+  const top = barBottom() + 8;
+  return Math.min(1, (v.clientWidth - 16) / L.width, (v.clientHeight - top - 16) / L.height);
+};
+const minScale = () => Math.max(0.02, Math.min(0.12, fitScale()));
+
 function fit() {
   const v = V.el.view;
   const L = V.EG.layout;
   const top = barBottom() + 8;
-  const s = Math.min(1, (v.clientWidth - 16) / L.width, (v.clientHeight - top - 16) / L.height);
-  V.s = Math.max(0.12, s);
+  V.s = Math.max(minScale(), fitScale());
   V.tx = (v.clientWidth - L.width * V.s) / 2;
   V.ty = top + Math.max(0, (v.clientHeight - top - 8 - L.height * V.s) / 2);
   applyT();
 }
 
 function zoomAt(f, cx, cy) {
-  const ns = Math.min(2, Math.max(0.12, V.s * f));
+  const ns = Math.min(2, Math.max(minScale(), V.s * f));
   V.tx = cx - (cx - V.tx) * (ns / V.s);
   V.ty = cy - (cy - V.ty) * (ns / V.s);
   V.s = ns;

@@ -19,8 +19,6 @@ export const SIZE = {
   head: 46, // the frame's heading row (22) and summary row (6 + 18)
   pad: { initiative: [16, 16, 16], epic: [9, 12, 12], issue: [9, 12, 12] }, // top, sides, bottom
   minFrameW: { initiative: 420, epic: 300, issue: 300 },
-  wrapMax: 1240,
-  bandCols: 6,
   margin: 24,
   indent: 40,
 };
@@ -152,15 +150,12 @@ function folded(items, containerKey, ctx) {
   return blocks;
 }
 
+// One row, however wide: the graph grows to the right and is panned sideways (iss-00556 R-07; the 1240px wrap is
+// gone). The row stays inside a rows group so that the gap keys (wr, wc) keep their meaning for the routing.
 function wrapBlock(key, items, ctx) {
-  const rows = [];
-  let row = null;
+  const row = { items: [], w: 0, h: 0 };
+  const rows = [row];
   for (const it of items) {
-    const colGap = gap(ctx.gaps, `wc${key}`, BASE.wrapCol, row ? row.items.length - 1 : 0);
-    if (!row || (row.items.length && row.w + colGap + it.w > SIZE.wrapMax)) {
-      row = { items: [], w: 0, h: 0 };
-      rows.push(row);
-    }
     it.x = row.items.length ? row.w + gap(ctx.gaps, `wc${key}`, BASE.wrapCol, row.items.length - 1) : 0;
     row.w = it.x + it.w;
     row.h = Math.max(row.h, it.h);
@@ -193,8 +188,7 @@ function colsBlock(key, columns, ctx) {
     });
     return { t: "group", key: `k${key}.${i}`, axis: "y", w: Math.max(0, ...items.map((it) => it.w)), h: y, kids: items };
   });
-  const bands = [];
-  for (let i = 0; i < cols.length; i += SIZE.bandCols) bands.push(cols.slice(i, i + SIZE.bandCols));
+  const bands = [cols]; // every stage on one band, left to right, however many (iss-00556 R-07)
   let y = 0;
   const bandBlocks = bands.map((list, b) => {
     let x = 0;
