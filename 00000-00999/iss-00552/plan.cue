@@ -19,12 +19,12 @@ steps: {
 tests: {
 	"T-01": {title: "利用者の全体の既定とリポジトリごとの値、鍵のそろえ方", verifies: ["R-01"]}
 	"T-02": {title: "リポジトリの `dashboard.json` が利用者の設定に勝つ（true と false の両方）", verifies: ["R-02"]}
-	"T-03": {title: "設定がなければ印だけで前と同じ。印は設定が出しても隠す。`show` が設定の隠すときに `hidden: true`、`hidden_by`、`DASHBOARD_HIDDEN_BY_CONFIG`", verifies: ["R-03"]}
+	"T-03": {title: "設定がなければ印だけで前と同じ。印は設定が出しても隠す。`show` が設定の隠すときに `hidden: true`、`hidden_by`、`DASHBOARD_HIDDEN_BY_CONFIG`。直接のURLの次の1手が出どころで変わる", verifies: ["R-03"]}
 	"T-04": {title: "`dashboard list` の JSON の `mark`、`config`、`hidden_by`、`config_problems` と文字の出力", verifies: ["R-04"]}
 	"T-05": {title: "同じ `DashboardSite` が、利用者の設定と `dashboard.json` の書き換えを次の読み取りで反映する", verifies: ["R-05"]}
-	"T-06": {title: "`dashboard summary` と `todo list --all-repositories` の `hidden` が設定を含む", verifies: ["R-06"]}
+	"T-06": {title: "`dashboard summary` と `todo list --all-repositories` の `hidden` が設定を含み、印が読めないときと食い違いでも `dashboard list` と一致する", verifies: ["R-06"]}
 	"T-07": {title: "壊れた利用者の設定（JSON でない、schema 違い、値の型違い、鍵の誤り）で全部隠れ、`todo` の節の誤りは影響しない", verifies: ["F-01"]}
-	"T-08": {title: "壊れた `dashboard.json` と、2つのクローンの食い違いで、そのリポジトリだけ隠れる", verifies: ["F-02"]}
+	"T-08": {title: "壊れた `dashboard.json` と、2つのクローンの食い違い（true と false、true となし）で、そのリポジトリだけ隠れ、`config_problems` に理由が出る", verifies: ["F-02"]}
 	"T-09": {title: "`hide`／`show`／`list` が設定のファイルを作らず、書かない", verifies: ["F-03"]}
 	"T-10": {title: "ヘルプと `reference_cli.md` の記述、inventory の sha256 と dogfood の写し（既存の配布資産のテスト）", verifies: ["R-07"]}
 }

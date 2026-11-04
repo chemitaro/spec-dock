@@ -54,6 +54,7 @@ requirements: {
 			"設定がなく印だけがある利用者で、表示が前と同じ（印のリポジトリだけが隠れる）",
 			"設定が出すリポジトリに `dashboard hide` すると隠れ、`hidden_by` が `[\"mark\"]`",
 			"設定が隠すリポジトリに `dashboard show` すると、印は消えるが `hidden: true`、`hidden_by` に設定の出どころ、警告 `DASHBOARD_HIDDEN_BY_CONFIG` が出る",
+			"設定が隠すリポジトリの直接のURLは、`dashboard show` ではなく `dashboard list` と設定のファイルを案内する",
 		]
 	}
 	"R-04": {
@@ -75,12 +76,13 @@ requirements: {
 		title: "`dashboard summary` と `todo list` の `hidden` も、同じ最終の値になる"
 		acceptance: [
 			"設定が隠すリポジトリで、`dashboard summary` の `hidden` と `todo list --all-repositories` の行の `hidden` が true",
+			"印のファイルが読めないとき、2つのクローンが食い違うときも、`dashboard list` と同じ値になる",
 		]
 	}
 	"R-07": {
 		title: "文書とヘルプが、設定の置き場、形、優先、壊れたときの扱いを示す"
 		acceptance: [
-			"`reference_cli.md` の設定とダッシュボードの節、`dashboard list`／`show` のヘルプが新しい契約を示し、inventory の sha256 と dogfood の写しが合う",
+			"`reference_cli.md` の設定とダッシュボードの節、`dashboard` と `todo` の葉のヘルプ（説明と読む物）が新しい契約を示し、inventory の sha256 と dogfood の写しが合う",
 		]
 	}
 }
@@ -94,6 +96,7 @@ failures: {
 	}
 	"F-02": {
 		title: "リポジトリの `dashboard.json` が壊れているか、2つのクローンで食い違えば、そのリポジトリを隠す"
+		text:  "食い違いは、各クローンの値（`visible` の bool、またはなし）が1種類でないこと。一方だけに `visible` があるのも食い違い。`config_problems` に、各カタログの道と理由を示す。"
 		impact: "そのリポジトリだけが見えなくなる"
 		recovery: "`config_problems` の道のファイルを直すか、食い違いを解く"
 	}
