@@ -5,13 +5,13 @@ package spec
 goal: "構造の図の既定の表示と並びを、テスト駆動で直し、このPCの実際のスナップショットで確かめ、マージできる PR にする。"
 
 steps: {
-	"S-01": {title: "構造の API に `active_at` を足す", realizes: ["R-04", "F-01"], status: "todo", session: "impl"}
-	"S-02": {title: "可視の判定を、親が開いていれば終わった Scope も出す形にする", realizes: ["R-01"], status: "todo", session: "impl"}
-	"S-03": {title: "依存の線の既定を「すべての線」にする", realizes: ["R-02"], status: "todo", session: "impl"}
-	"S-04": {title: "段の中と最上位の並びを活動順にする", realizes: ["R-03", "F-01"], status: "todo", after: ["S-01"], session: "impl"}
-	"S-05": {title: "見せ方の保存を v2 にし、`prefs.js` で v1 から一部だけ引き継ぐ", realizes: ["R-05", "F-02"], status: "todo", session: "impl"}
-	"S-06": {title: "ボードの「終わった」の列の並びを、既存のテスト（`test_board_columns_follow_lanes_and_rank` の newest first）で確かめる", realizes: ["R-06"], status: "todo", session: "impl"}
-	"S-07": {title: "PC のヘッドレスの Chrome で、このPCの spec-dock の実際のスナップショットを PC の幅と 390px で写し、`edgeAudit` を確かめ、report.md と artifacts に残す。移行の注記の材料を PR の本文と統括への報告に書く", realizes: ["R-01", "R-02", "R-03"], status: "todo", after: ["S-02", "S-03", "S-04", "S-05"], session: "impl"}
+	"S-01": {title: "構造の API に `active_at` を足す", realizes: ["R-04", "F-01"], status: "done", session: "impl"}
+	"S-02": {title: "可視の判定を、親が開いていれば終わった Scope も出す形にする", realizes: ["R-01"], status: "done", session: "impl"}
+	"S-03": {title: "依存の線の既定を「すべての線」にする", realizes: ["R-02"], status: "done", session: "impl"}
+	"S-04": {title: "段の中と最上位の並びを活動順にする", realizes: ["R-03", "F-01"], status: "done", after: ["S-01"], session: "impl"}
+	"S-05": {title: "見せ方の保存を v2 にし、`prefs.js` で v1 から一部だけ引き継ぐ", realizes: ["R-05", "F-02"], status: "done", session: "impl"}
+	"S-06": {title: "ボードの「終わった」の列の並びを、既存のテスト（`test_board_columns_follow_lanes_and_rank` の newest first）で確かめる", realizes: ["R-06"], status: "done", session: "impl"}
+	"S-07": {title: "PC のヘッドレスの Chrome で、このPCの spec-dock の実際のスナップショットを PC の幅と 390px で写し、`edgeAudit` を確かめ、report.md と artifacts に残す。移行の注記の材料を PR の本文と統括への報告に書く", realizes: ["R-01", "R-02", "R-03"], status: "done", after: ["S-02", "S-03", "S-04", "S-05"], session: "impl"}
 }
 
 tests: {
