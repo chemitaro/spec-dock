@@ -23,7 +23,7 @@ design: {
 	}
 	"D-03": {
 		title:     "static-inventory.json と統合テスト"
-		text:      "変わった3つの資産の今のハッシュを入れ、0.7.0 のバイト（タグ v0.7.0 から取り、fixture に置く）を `known_old_sha256` に足す。統合テストで、0.7.0 の資産を持つリポジトリが `installation update` で上がることを確かめる。"
+		text:      "変わった3つの資産の今のハッシュを入れ、0.7.0 のバイト（`reference_cli.md` は #535 が足し済み）（タグ v0.7.0 から取り、fixture に置く）を `known_old_sha256` に足す。統合テストで、0.7.0 の資産を持つリポジトリが `installation update` で上がることを確かめる。"
 		satisfies: ["R-03"]
 	}
 	"D-04": {
