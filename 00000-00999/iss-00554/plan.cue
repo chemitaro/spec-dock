@@ -6,7 +6,7 @@ package spec
 goal: "人のタスクの API と画面、既存の画面の印を、#549・#550 の部品の上にテスト駆動で作り、PC のヘッドレス Chrome の写しを残し、レビューとゲートを通して main への PR をマージできる状態にする。"
 
 steps: {
-	"S-01": {title: "仕様を書き、仕様のレビューを通す", realizes: ["R-01", "R-04"], status: "doing", session: "impl"}
+	"S-01": {title: "仕様を書き、仕様のレビューを通す", realizes: ["R-01", "R-04"], status: "done", session: "impl"}
 	"S-02": {title: "`scope_marks` と、`todo_aggregate.collect` への切り出し", realizes: ["R-01", "R-04"], status: "todo", after: ["S-01"], session: "impl"}
 	"S-03": {title: "`dashboard_todos.py`（覚えと選び方）、`revision`、API の道", realizes: ["R-01", "R-03", "R-07", "R-08", "F-02"], status: "todo", after: ["S-02"], session: "impl"}
 	"S-04": {title: "`structure`・`scopes/<ID>` の印と一覧と要約", realizes: ["R-04", "R-05", "R-06", "F-01"], status: "todo", after: ["S-03"], session: "impl"}
@@ -20,13 +20,14 @@ tests: {
 	"T-01": {title: "`scope_marks` が、直接・配下を含む（重ねない）・関係する数を、閉じていないタスクだけで数え、知らない ID と輪で止まらない", verifies: ["R-04"]}
 	"T-02": {title: "`collect` への切り出しの後も `todo list --all-repositories` の出力が変わらない（#550 のテストがそのまま通る）", verifies: ["R-01"]}
 	"T-03": {title: "`/api/v1/todos` が表示中の2つのリポジトリのタスクを `ref` と `repository` つきで D-08 の並びで返し、隠したリポジトリを入れず、`status` で絞れ、知らない値は 400", verifies: ["R-01", "R-02"]}
-	"T-04": {title: "`/api/v1/r/<repo>/todos` と `/todos/<ID>` が CLI と同じ形を返し、ない ID・形の違う ID は 404、壊れた記録は 409、読めないカタログは 503", verifies: ["R-03", "F-02"]}
+	"T-04": {title: "`/api/v1/r/<repo>/todos` と `/todos/<ID>` が CLI と同じ形を返し、ない ID・形の違う ID は 404、壊れた記録は 409、1件の要求で読めないカタログは 503（一覧は 200 で行が `unreadable`）", verifies: ["R-03", "F-02"]}
 	"T-05": {title: "1つのリポジトリの `todos` がファイルのとき、`/api/v1/todos` はその行を `unreadable` にし、ほかを返す。壊れた記録・衝突の写しは `invalid_files`／`conflict_copies` になる", verifies: ["R-08"]}
-	"T-06": {title: "タスクを足すとリポジトリの `revision` と `/api/v1/todos/revision` が変わり、変わらない間は `read_catalog` を呼ばない", verifies: ["R-07"]}
+	"T-06": {title: "タスクを足すとリポジトリの `revision` と `/api/v1/todos/revision` が変わり、時刻が期限を過ぎても変わり、変わらない間は `read_catalog` を呼ばない", verifies: ["R-07"]}
 	"T-07": {title: "`structure` の Scope の `todos` の印と上の `todos` の要約（`dashboard summary` と同じ数）、`scopes/<ID>` の止めている・配下・関係する一覧。人のタスクの読み取りが例外でも構造は 200 で `unavailable`", verifies: ["R-04", "R-05", "R-06", "F-01"]}
 	"T-08": {title: "画面の道 `/todos`、`/r/<repo>/todos`、`/r/<repo>/todos/<ID>` が殻を返し、全部の API と画面を開いてもカタログと状態の置き場が変わらない", verifies: ["R-03", "R-08"]}
 	"T-09": {title: "node で、組の決め方、絞り込みの読み書き、期限の言葉、安全な Markdown（`<script>` とリンクの `javascript:` を描かない）、道の読み取り、人の印の言葉、カードと箱の印を確かめる", verifies: ["R-01", "R-02", "R-03", "R-04"]}
 	"T-10": {title: "静的な検査：画面がサーバーの外を読まない、利用者の文字が esc を通る、書く口（POST、完了のボタン、写せるコマンド）がない、css が `[data-view=\"todos\"]` の下に閉じる", verifies: ["R-08", "R-03"]}
+	"T-12": {title: "速さ：250件の構造と100件のタスクで、`structure` の応答（印と要約つき）と `scope_marks` が今の目安の中に収まる", verifies: ["R-04"]}
 	"T-11": {title: "ヘッドレス Chrome で、全リポジトリ・リポジトリごと・1件・構造の図・ボード・詳しい画面のタブ・横断の概況を PC 幅と 390px、明るい・暗いで写し、期限切れの印、人の印、横にはみ出さないことを見る", verifies: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06"]}
 }
 

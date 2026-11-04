@@ -17,11 +17,11 @@ goal: "人のタスクの規則をスキルに、使い方を文書に書き、�
 
 steps: {
 	"S-01": {title: "仕様を書き、仕様のレビューを通す", realizes: ["R-05"], status: "done", session: "impl"}
-	"S-02": {title: "確かめるテストを先に書く（Red）", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05"], status: "todo", after: ["S-01"], session: "impl"}
-	"S-03": {title: "スキルの「人のタスク」の節を書く", realizes: ["R-01", "R-02", "R-03"], status: "todo", after: ["S-02"], session: "impl"}
-	"S-04": {title: "`todo.md` を足し、`README.md`、`canonical.md` を直す", realizes: ["R-04"], status: "todo", after: ["S-02"], session: "impl"}
-	"S-05": {title: "写しと `static-inventory.json` を合わせ、テストを通す（Green）", realizes: ["R-05"], status: "todo", after: ["S-03", "S-04"], session: "impl"}
-	"S-06": {title: "候補の wheel と隔離した利用者のリポジトリで、規則のとおりの登録・完了を確かめる", realizes: ["R-05"], status: "todo", after: ["S-05"], session: "impl"}
+	"S-02": {title: "確かめるテストを先に書く（Red）", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05"], status: "done", after: ["S-01"], session: "impl"}
+	"S-03": {title: "スキルの「人のタスク」の節を書く", realizes: ["R-01", "R-02", "R-03"], status: "done", after: ["S-02"], session: "impl"}
+	"S-04": {title: "`todo.md` を足し、`README.md`、`canonical.md` を直す", realizes: ["R-04"], status: "done", after: ["S-02"], session: "impl"}
+	"S-05": {title: "写しと `static-inventory.json` を合わせ、テストを通す（Green）", realizes: ["R-05"], status: "done", after: ["S-03", "S-04"], session: "impl"}
+	"S-06": {title: "候補の wheel と隔離した利用者のリポジトリで、規則のとおりの登録・完了を確かめる", realizes: ["R-05"], status: "done", after: ["S-05"], session: "impl"}
 	"S-07": {title: "コードのレビュー、最終品質ゲート、report.md、PR と CI", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05"], status: "todo", after: ["S-06"], session: "impl"}
 }
 

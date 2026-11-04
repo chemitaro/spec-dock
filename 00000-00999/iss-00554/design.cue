@@ -35,14 +35,14 @@ design: {
 	"D-02": {
 		title: "`application/dashboard_todos.py`：サーバーの人のタスクの読み取り"
 		text: """
-			- `DashboardTodos(state_root, now)`：スレッドの鍵つきで、カタログの道ごとに `(署名, CatalogRead)` を覚える。署名は `todos/` と、その下の年月のディレクトリと `settings.json` の `(st_mtime_ns, st_size)` の組（ない物は None）。記録の書き込みは年月のディレクトリの中の置き換え（rename）なので、ディレクトリの時刻が変わる。署名が同じなら `read_catalog` を呼ばない。
-			- カタログの選び方：`SiteRepository` ごとに登録簿を読み、`catalog_for(registry, repository)` の行を使う（2つのクローンでも最初の行。D-14 と同じ）。登録簿が読めない・行がないときは `unavailable` と `problem`（`TODO_REGISTRY_UNREADABLE`／`TODO_REPOSITORY_UNKNOWN`）。
+			- `DashboardTodos(state_root, now)`：スレッドの鍵つきで、カタログの道ごとに `(署名, CatalogRead)` を覚える。署名は `todos/` と、その下の年月のディレクトリと `settings.json` の `(st_mtime_ns, st_size)` の組（ない物は None）。記録の書き込みは年月のディレクトリの中の置き換え（rename）なので、ディレクトリの時刻が変わる。署名が同じなら `read_catalog` を呼ばない。利用者の設定のファイル（`user_config_path()`）の署名も覚えの鍵に入れ、件数の目安の古さを防ぐ（仕様のレビューの P3）。
+			- カタログの選び方：`SiteRepository` ごとに登録簿を読み、`catalog_for(registry, repository)` の行を使う（2つのクローンでも最初の行。D-14 と同じ）。登録簿が読めない・行がないときは、一覧ではそのリポジトリの行を契約どおりの `status: unreadable` にし、`problem.code` を `TODO_REGISTRY_UNREADABLE`／`TODO_REPOSITORY_UNKNOWN` にする（`unavailable` は `structure` の要約だけで使う）。一覧の API は、読めない行があっても 200 で返す（仕様のレビューの P2）。
 			- 提供する読み取り：
 			  - `list_document(sites, status)`：表示中の全リポジトリの `specdock.todo-list/v1`（`mode: all_repositories`、`hidden: false`）。
 			  - `repository_document(site, status)`：1つの一覧（`mode: repository`）。
 			  - `one(site, todo_id)`：`show_from_store` の1件。
 			  - `annotations(site, model)`：D-03 の印と一覧と要約。
-			  - `signature(site)`：`revision` に入れる署名。
+			  - `signature(site)`：`revision` に入れる署名。ファイルの署名に加え、覚えた記録から今の時刻で決まる組（期限切れ・期限が近い・延期明けのタスクの ID）を入れ、書き込みがなくても期限が過ぎれば `revision` が変わるようにする（仕様のレビューの P2）。
 			- `status` の問い合わせは `open|snoozed|done|cancelled|all`（既定 `open`）。ほかの値は 400 `DASHBOARD_TODO_FILTER_INVALID`。
 			- ユーザーの設定（件数の目安）は `read_user_todo_settings()` で読む（読むだけ）。
 			"""
@@ -64,7 +64,7 @@ design: {
 			- API：
 			  - `GET /api/v1/todos[?status=]`：`list_document`（表示中のリポジトリだけ。隠したものは入れない）。
 			  - `GET /api/v1/todos/revision`：表示中の全リポジトリの `signature` と登録簿・隠す印の署名を合わせた16桁の値 `{schema, revision}`。
-			  - `GET /api/v1/r/<repo>/todos[?status=]`、`GET /api/v1/r/<repo>/todos/<ID>`：1件は `normalize_id` を通し、`TODO_NOT_FOUND` と形の違う ID は 404、`TODO_RECORD_INVALID`／`TODO_SCHEMA_UNSUPPORTED`／重なった ID は 409、カタログが読めないときは 503（`code` と `next_steps` つきの `specdock.dashboard/v1` の誤り）。
+			  - `GET /api/v1/r/<repo>/todos[?status=]`、`GET /api/v1/r/<repo>/todos/<ID>`：1件は `normalize_id` を通し、`TODO_NOT_FOUND` と形の違う ID は 404、`TODO_RECORD_INVALID`／`TODO_SCHEMA_UNSUPPORTED`／重なった ID は 409、1件の要求でカタログが読めないときは 503（`code` と `next_steps` つきの `specdock.dashboard/v1` の誤り）。
 			  - 知らない・隠したリポジトリは、今の `/api/v1/r/...` と同じ 404。1つのリポジトリの例外は、今と同じくその応答だけの 500。
 			- `structure` と `scopes/<ID>` は `annotations` を渡す。人のタスクの読み取りが例外を出しても、印を0、`todos.status` を `unavailable` にして構造を返す（F-01）。
 			- `DashboardSite._revision` に、`DashboardTodos.signature(site)` を足す（`DashboardSite` が `DashboardTodos` を持ち、`DashboardHttp` は `site.todos` を使う）。

@@ -29,7 +29,7 @@ design: {
 		title: "配布する文書"
 		text: """
 			- `src/spec_dock/assets/spec_dock/docs/todo.md` を足す：人のタスクの使い方（登録・一覧・閉じ方）、記録の形、設定の3段と見本、集約（`--all-repositories`）、外部の道具の読み方（`todos/` の JSON を読む側が守ること）。コマンドの引数と契約は `reference_cli.md` に任せてリンクする。
-			- `docs/README.md` の Current に `todo.md` を足す。
+			- `docs/README.md` と `docs/guide.md` の Current に `todo.md` を足す（Current の一覧を縛るテストの一覧にも足す）。
 			- `docs/canonical.md` に、カタログに `todos/<YYYY-MM>/` があること（Scope ではない）、`todos/settings.json`、エラーと次の1手の表に人のタスクのコード（`TODO_*`）を足す。コードの名前と意味は `reference_cli.md` の契約の節と合わせる。
 			"""
 		satisfies: ["R-04", "F-01"]
