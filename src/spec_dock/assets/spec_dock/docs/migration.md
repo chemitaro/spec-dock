@@ -114,6 +114,24 @@ SpecDock 0.5.0 は、`spec-dock/workspace.json` の `schema_version` が 4 の�
   - 配布の `spec-dock/.gitignore` から、`dashboard.md`・`tree.puml`・`tree-all.puml`・`deps-issues.puml`・`deps-raw.puml` の5つの名前が外れます。`installation update` の後、残っているこれらのファイルが `git status` に出ます。使わないので、消してかまいません（Git で管理していなければ、ただ消します）。
 - 戻し方：0.6.0 に問題があれば、常駐を入れていれば先に `spec-dock dashboard service uninstall` を実行し、パッケージを 0.5.1 に戻します。配布資産を 0.6.0 に上げた後なら、その更新の PR（版のファイル `spec-dock/system/spec-dock-version` を含む）を `git revert` して、配布資産を 0.5.1 のバイトに戻します。版のファイルだけを戻すと、0.5.1 の `canonical check` が 0.6.0 の資産を知らない変更として CI を止めます（0.5.1 の `installation update` も 0.6.0 のバイトを知らないので、戻す手段になりません）。
 
+## 0.7.0 への更新
+
+0.7.0 は、人のタスク（`spec-dock todo`）を届ける版です。canonical モード（宣言の版4）の版で、カタログの形式（format 1）、`workspace.json` の版（4）、構造のスナップショットは変わりません。
+
+- パッケージを 0.7.0 に上げた後、各リポジトリで `spec-dock installation update --target <チェックアウト> --backup-dir <新しい外のディレクトリ> --yes` を実行して配布資産を上げ、通常の PR でコミットします。`todo` のコマンドはパッケージだけで使えますが、配布のスキルの「人のタスク」の規則は静的な資産なので、`installation update` で入れ替わります。0.6.0 の配布資産のままでも動きますが、スキル（`.agents/skills/spec-dock/SKILL.md`）、`docs/todo.md`（新しい）、`docs/README.md`、`docs/guide.md`、`canonical.md`、`reference_cli.md`、`cli-redesign-guide.html`、この `migration.md` が新しくなります。CI の見本は `spec-dock/system/spec-dock-version` の版（0.7.0）の SpecDock を入れて動きます。
+- 最初の1手：`spec-dock todo list` を実行します。`todos/` は最初の `todo add` が作るので、それまでは空の一覧が返り、`todo check` は「記録がない」で成功します。使い方は `spec-dock/docs/todo.md` にあります。
+- 新しいコマンド（公開のコマンドは 61 から 71 になります。#549・#550）：`todo add`・`todo list`・`todo show`・`todo update`・`todo done`・`todo snooze`・`todo cancel`・`todo reopen`・`todo check`・`todo settings`。
+  - 人にしかできない判断・確認・操作を、そのリポジトリのカタログの `todos/<YYYY-MM>/t-xxxx.json` に1件1つの記録（`specdock.todo/v1`）として登録して追います。GitHub には何も送りません。
+  - `todo list --all-repositories`・`--repository R`：この PC の登録簿にある全リポジトリの人のタスクを集めます（`specdock.todo-list/v1`、`mode: repository` か `all_repositories`）。`todo show <REF>`（`owner/name/t-xxxx`）は、チェックアウトの外から1件を返します。
+  - `dashboard summary`（と API の `/api/v1/r/<repo>/summary`）に `todos`（`open`・`blocking`・`overdue`）の数が足されます。読めないときは `status: unavailable` で、要約は成功します。
+  - 設定は3段です。初めの値 < 利用者の設定（`$XDG_CONFIG_HOME/spec-dock/config.json`、`specdock.config/v1`）< リポジトリの設定（`todos/settings.json`、`specdock.todo-settings/v1`）。SpecDock は設定のファイルを作りません。なくても初めの値で動きます。
+  - `todo check` は、Python の検査に加えて、`cue`（v0.17.1 以上）があれば CUE の型でも確かめます。なければ警告 `TODO_CUE_SKIPPED` を出して Python の検査で決めます。
+  - 主な新しいエラーのコード（全部は `reference_cli.md`）：`TODO_*`（`TODO_INVALID`、`TODO_NOT_FOUND`、`TODO_SUBTASKS_OPEN`、`TODO_CHECK_FAILED`、`TODO_REPOSITORY_UNREADABLE`、`TODO_REGISTRY_UNREADABLE` など）。`canonical.md` に次の1手があります。
+- 配布するスキルと文書（#551）：スキルに「人のタスク」の規則（登録する場面としない場面、`todo add --by agent --role --kind`、束、`todo done --record` での閉じ方）が足されます。`docs/todo.md` が新しく配られ、`canonical.md`、`docs/README.md`、`docs/guide.md` が変わります。
+- 構造の図（ホーム。#556）：既定で、親が開いていれば終わった Scope も出し、図に出ている箱どうしの終わった依存も薄い線で出します。同じ段は活動順に並べ、折り返さずに右へ広げます（横に動かして見る）。ブラウザーの保存のキーが `specdock.graph.v1` から `specdock.graph.v2` になり、表し方・凡例などは引き継がれますが、「終わったものも」と依存の線の選択は一度だけ新しい既定に戻ります。構造の API の各 Scope に `active_at` が足されます。
+- 前の版との同居：前の版の SpecDock が別の PC で同じカタログを同期しても、`todos/` はふつうのファイルとして保存と push がされ、検査に引っかかりません（前の版では `todo` のコマンドがないだけです）。
+- 戻し方：0.7.0 に問題があれば、パッケージを 0.6.0 に戻します。配布資産を 0.7.0 に上げた後なら、その更新の PR（版のファイル `spec-dock/system/spec-dock-version` を含む）を `git revert` して、配布資産を 0.6.0 のバイトに戻します。版のファイルだけを戻すと、0.6.0 の `canonical check` が 0.7.0 の資産を知らない変更として CI を止めます（0.6.0 の `installation update` も 0.7.0 のバイトを知らないので、戻す手段になりません）。カタログの `todos/` のファイルは残してかまいません（前の版のほかのコマンドに影響せず、版を上げ直せばそのまま読めます）。
+
 ## 新規導入
 
 ```sh
