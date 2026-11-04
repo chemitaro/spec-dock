@@ -13,6 +13,11 @@ const { audit } = await load("views/graph/router.js");
 const series = await load("views/timeline/series.js");
 const request = JSON.parse(readFileSync(requestPath, "utf8"));
 const out = { audit: [], layout: {}, series: {} };
+if (request.prefs) {
+  const { restorePrefs } = await load("views/graph/prefs.js");
+  const { DEFAULTS } = await load("views/graph/layout.js");
+  out.prefs = request.prefs.map((p) => restorePrefs(p.current, p.legacy, DEFAULTS));
+}
 
 function combos(doc) {
   const list = [];

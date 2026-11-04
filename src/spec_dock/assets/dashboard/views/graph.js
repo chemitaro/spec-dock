@@ -10,9 +10,9 @@ import { chip } from "../core/ui.js";
 import { DEFAULTS, index, routeLayout } from "./graph/layout.js";
 import { audit, svg as edgeSvg } from "./graph/router.js";
 import * as M from "./graph/marks.js";
+import { LEGACY_KEY, PREFS_KEY, restorePrefs } from "./graph/prefs.js";
 
 const { esc, ic, stateIcon, STATES } = M;
-const PREFS = "specdock.graph.v1";
 const PHONE = 640;
 // Why there is no graph (F-01). The reason and the next step are in the shell's notices above.
 export function emptyText(data) {
@@ -54,19 +54,24 @@ const V = {
   lastTap: null,
 };
 
+// The saved choices (iss-00556 D-05): version 2, with only some of version 1 carried over (graph/prefs.js).
 function loadPrefs() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(PREFS) || "{}");
-    for (const key of ["mode", "showDone", "deps", "fold"]) if (key in saved) V.opts[key] = saved[key];
-    V.legend = !!saved.legend;
-  } catch {
-    // private windows and blocked storage: keep the defaults
-  }
+  const read = (key) => {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw == null ? null : JSON.parse(raw);
+    } catch {
+      return null; // private windows, blocked storage and broken values: the defaults
+    }
+  };
+  const { opts, legend } = restorePrefs(read(PREFS_KEY), read(LEGACY_KEY), DEFAULTS);
+  Object.assign(V.opts, opts);
+  V.legend = legend;
 }
 function savePrefs() {
   try {
     const { mode, showDone, deps, fold } = V.opts; // the focus lives in the URL, not in the preferences
-    localStorage.setItem(PREFS, JSON.stringify({ mode, showDone, deps, fold, legend: V.legend }));
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ mode, showDone, deps, fold, legend: V.legend }));
   } catch {
     // ignore
   }

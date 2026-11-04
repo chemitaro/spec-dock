@@ -159,7 +159,9 @@ def test_seven_stages_wrap_onto_a_second_row(small: dict[str, Any]) -> None:
 def test_home_hides_done_keeps_closed_parents_and_folds_cleanup(small: dict[str, Any]) -> None:
     home = small["layout"]["small"]["home"]
     nodes = _nodes(small, "home")
-    assert "iss-00005" not in nodes and "iss-00009" not in nodes
+    # iss-00556: a done Issue under an open Epic stays (5); one under an Epic folded as a cleanup candidate (9)
+    # belongs to the folded group's Epic and is not drawn on its own
+    assert "iss-00005" in nodes and "iss-00009" not in nodes
     assert nodes["epic-00006"]["type"] == "frame"  # closed, but its open child keeps it
     folded = {item_id for group in home["groups"] for item_id in group["ids"]}
     assert folded == {"iss-00007", "epic-00008"}
@@ -183,7 +185,7 @@ def test_the_tree_shows_every_scope_as_a_box_with_parent_lines(small: dict[str, 
 def test_focus_shows_only_the_scope_and_its_descendants(small: dict[str, Any]) -> None:
     focus = small["layout"]["small"]["focus"]
     assert focus["focus"] == "epic-00001"
-    assert set(_nodes(small, "focus")) == {"epic-00001", "iss-00002", "iss-00003"}
+    assert set(_nodes(small, "focus")) == {"epic-00001", "iss-00002", "iss-00003", "iss-00005"}
 
 
 def test_the_three_dependency_line_choices(small: dict[str, Any]) -> None:
@@ -217,3 +219,127 @@ def test_recent_events_are_grouped_by_day_newest_first(small: dict[str, Any]) ->
     assert [item["at"] for item in events] == sorted((item["at"] for item in events), reverse=True)
     assert len({group["day"] for group in groups}) == len(groups)
     assert all(item["scope"]["id"] == item["scope_id"] for item in events)
+
+
+# --- iss-00556: the plan's context in the default view, the activity order, the saved choices --------------------
+
+
+def _at(day: str) -> str:
+    return f"2026-{day}T00:00:00Z"
+
+
+def _context() -> dict[str, Any]:
+    return document(
+        snapshot(
+            node(1, "initiative", updated_at=_at("10-26")),
+            node(2, "epic", parent=1),  # doing inside: first among the Initiative's frames
+            closed(3, "issue", parent=2, closed_at=_at("10-28"), updated_at=_at("10-28")),
+            closed(4, "issue", parent=2, closed_at=_at("10-31"), updated_at=_at("10-31")),
+            node(5, "issue", parent=2, blocked_by=(3,)),  # waits for a finished Issue: a done line
+            node(6, "issue", parent=2),
+            node(7, "issue", parent=2, in_progress=True, updated_at=_at("11-03")),
+            closed(8, "epic", parent=1, closed_at=_at("10-29"), updated_at=_at("10-29")),  # a folded frame
+            closed(9, "issue", parent=8, closed_at=_at("10-27")),  # its parent is done: hidden
+            closed(10, "epic", closed_at=_at("11-02")),  # no parent: hidden
+            closed(11, "issue", parent=10, closed_at=_at("11-01")),
+            node(12, "epic", parent=1),
+            node(13, "issue", parent=12, updated_at=_at("10-27")),
+            node(14, "epic", parent=1),  # ready inside, moved later than 12: above 12
+            node(15, "issue", parent=14, updated_at=_at("11-01")),
+            node(20, "epic"),
+            node(21, "issue", parent=20, in_progress=True, updated_at=_at("10-30")),
+            node(30, "epic"),
+            node(31, "issue", parent=30),
+            node(60, "initiative"),  # only a blocked Epic inside
+            node(61, "epic", parent=60, blocked_by=(30,)),
+        )
+    )
+
+
+@pytest.fixture(scope="module")
+def context(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
+    layouts = {
+        "home": {},
+        "tree": {"mode": "tree"},
+        "wait": {"deps": "wait"},
+        "done": {"showDone": True},
+        "focus8": {"focus": "epic-00008"},
+    }
+    return _run(
+        tmp_path_factory.mktemp("context"),
+        {
+            "documents": {"context": _context()},
+            "layouts": {"context": layouts},
+            "checks": ["layout", "audit"],
+            "prefs": [
+                {"current": None, "legacy": None},
+                {"current": None, "legacy": {"mode": "tree", "showDone": True, "deps": "wait", "fold": False, "legend": True}},
+                {"current": {"mode": "nest", "showDone": True, "deps": "wait", "fold": True, "legend": False}, "legacy": {"mode": "tree"}},
+                {"current": {"mode": "box", "showDone": "yes", "deps": "some", "fold": 1, "legend": None}, "legacy": None},
+                {"current": [1, 2], "legacy": "x"},
+            ],
+        },
+    )
+
+
+def _ids(result: dict[str, Any], key: str) -> dict[str, dict[str, Any]]:
+    return {item["id"]: item for item in result["layout"]["context"][key]["nodes"]}
+
+
+def _top_down(nodes: dict[str, dict[str, Any]], ids: tuple[str, ...]) -> list[str]:
+    return [item["id"] for item in sorted((nodes[i] for i in ids), key=lambda item: item["y1"])]
+
+
+def test_the_default_view_keeps_done_scopes_under_open_parents(context: dict[str, Any]) -> None:
+    for key in ("home", "tree"):
+        nodes = _ids(context, key)
+        assert {"iss-00003", "iss-00004", "epic-00008"} <= nodes.keys(), key
+        assert not {"iss-00009", "epic-00010", "iss-00011"} & nodes.keys(), key
+    home = _ids(context, "home")
+    assert home["epic-00008"]["type"] == "frame"
+    folded = context["layout"]["context"]["home"]
+    assert folded["nodes"] and all(item["id"] != "iss-00009" for item in folded["nodes"])
+    assert {"iss-00009", "epic-00010", "iss-00011"} <= _ids(context, "done").keys()
+    assert "iss-00009" in _ids(context, "focus8")  # narrowed to a done Epic: its children show
+
+
+def test_the_default_view_draws_finished_dependencies_between_shown_boxes(context: dict[str, Any]) -> None:
+    def pairs(key: str) -> dict[tuple[str, str], bool]:
+        return {(p[0], p[1]): e["done"] for e in context["layout"]["context"][key]["edges"] for p in e["pairs"]}
+
+    assert pairs("home")[("iss-00003", "iss-00005")] is True
+    assert ("iss-00003", "iss-00005") not in pairs("wait")
+    dirty = [run for run in context["audit"] if any(run[key] for key in AUDIT_KEYS)]
+    assert dirty == []
+
+
+def test_frames_follow_activity_and_boxes_put_done_below(context: dict[str, Any]) -> None:
+    home = _ids(context, "home")
+    roots = ("init-00001", "epic-00020", "epic-00030", "init-00060")
+    assert _top_down(home, roots) == ["init-00001", "epic-00020", "epic-00030", "init-00060"]
+    inside = ("epic-00002", "epic-00008", "epic-00012", "epic-00014")
+    order = sorted(inside, key=lambda i: (home[i]["y1"], home[i]["x1"]))
+    assert order == ["epic-00002", "epic-00014", "epic-00012", "epic-00008"]
+    # the finished prerequisite 3 sits in the stage left of 5, which waits for it (stages counting the done ones)
+    assert home["iss-00003"]["x2"] < home["iss-00005"]["x1"]
+    first = ("iss-00003", "iss-00004", "iss-00006", "iss-00007")
+    assert len({home[i]["x1"] for i in first}) == 1
+    assert _top_down(home, first) == ["iss-00007", "iss-00006", "iss-00004", "iss-00003"]
+    tree = _ids(context, "tree")
+    assert _top_down(tree, roots) == ["init-00001", "epic-00020", "epic-00030", "init-00060"]
+
+
+def test_saved_choices_of_the_old_version_do_not_override_the_new_defaults(context: dict[str, Any]) -> None:
+    empty, legacy, current, broken, junk = context["prefs"]
+    defaults = {"mode": "nest", "showDone": False, "deps": "all", "fold": True}
+    assert empty == {"opts": defaults, "legend": False}
+    assert legacy == {"opts": {**defaults, "mode": "tree", "fold": False}, "legend": True}
+    assert current == {"opts": {**defaults, "showDone": True, "deps": "wait"}, "legend": False}
+    assert broken == {"opts": defaults, "legend": False}
+    assert junk == {"opts": defaults, "legend": False}
+
+
+def test_the_graph_saves_its_choices_under_the_new_key() -> None:
+    source = (ASSETS / "views" / "graph.js").read_text(encoding="utf-8")
+    assert '"specdock.graph.v1"' not in source
+    assert "restorePrefs" in source and "PREFS_KEY" in source and "LEGACY_KEY" in source
