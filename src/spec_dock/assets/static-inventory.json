@@ -136,13 +136,14 @@
     {
       "path": "spec-dock/docs/authoring/cue.md",
       "source": "spec_dock/docs/authoring/cue.md",
-      "sha256": "9111026224270819dac9fbfa76425f720cae48f409dfc0d2264352beb9c4d3d3",
+      "sha256": "af386b3c6dcdcdc0770ed3b2e94d456cc112402904f01fdf9ee45138c91d896a",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
         "a4593015a9dc78bff46204436f02ba0ecc49cf3e13de5d9b33cd28e958451d28",
         "c674b205dce51b30766e60dd1302aedf8672e2facefda4aaa47f37d7499ec88e",
-        "7260427edba1ece13a97f9d726f841df04b18c8582e8f6319ef164636fc50d91"
+        "7260427edba1ece13a97f9d726f841df04b18c8582e8f6319ef164636fc50d91",
+        "9111026224270819dac9fbfa76425f720cae48f409dfc0d2264352beb9c4d3d3"
       ]
     },
     {
@@ -962,11 +963,12 @@
     {
       "path": "spec-dock/templates/cue/issue/plan.cue",
       "source": "spec_dock/templates/cue/issue/plan.cue",
-      "sha256": "274a58e86c6420363df98d2ff0722867a881c8730ef516dc6958c4cfbb11912a",
+      "sha256": "3117deb53b37fe0a1868cec22e9a8779f7baecffbc0fdf6702ba6c55aaff12a0",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
-        "08b4c2fd41459117329ac84713218c6bb0b22521ff6252388e3b4fe34d89d034"
+        "08b4c2fd41459117329ac84713218c6bb0b22521ff6252388e3b4fe34d89d034",
+        "274a58e86c6420363df98d2ff0722867a881c8730ef516dc6958c4cfbb11912a"
       ]
     },
     {
