@@ -116,13 +116,17 @@ assurance: {
 
 ```cue
 execution: {
-	sessions: impl: {task: "仕様化と実装", model: "<モデル>", effort: "<推論>", rationale: "<選んだ根拠>"}
+	sessions: {
+		spec: {task: "仕様化（起動した側が選んだ値の記録）", model: "<モデル>", effort: "<推論>", rationale: "<起動した側と根拠>"}
+		impl: {task: "実装", model: "<モデル>", effort: "<推論>", rationale: "<選んだ根拠>"}
+	}
 	reviews: code: {role: "コードのレビュー", after: "S-02", model: "<モデル>", effort: "<推論>"}
 }
 steps: "S-01": {title: "...", realizes: ["R-01"], session: "impl"}
 ```
 
-- 推論は手順ごとではなく、セッションごとに書きます。各手順の `session` は、セッションの名前を指します。レビューの `after` は、どの手順（Epic と Initiative では切り分け）の後かを指します。
+- 推論は手順ごとではなく、セッションごとに書きます。各手順の `session` は、実装のセッション（`impl`）を指します。仕様化のセッション（`spec`）は、手順が指さない記録です。
+- セッションのモデルと推論は起動のときに決まるので、計画で選べるのは、計画の後に起動するセッション（実装担当）の値です。計画を書いたセッションの値は、事実として記録します。レビューの `after` は、どの手順（Epic と Initiative では切り分け）の後かを指します。
 - SpecDock は、指す先があるか（規則 `execution-reference`）だけを調べます。モデルと推論の名前は、どんな文字列でもかまいません。
 
 ## リポジトリの型
@@ -268,5 +272,8 @@ tests: {
 	"T-03": {title: "既にあるときは止まる", verifies: ["F-01"]}
 }
 
-execution: sessions: impl: {task: "仕様化と実装", model: "<モデル>", effort: "<推論>"}
+execution: sessions: {
+	spec: {task: "仕様化（起動した側が選んだ値の記録）", model: "<モデル>", effort: "<推論>"}
+	impl: {task: "実装", model: "<モデル>", effort: "<推論>"}
+}
 ```
