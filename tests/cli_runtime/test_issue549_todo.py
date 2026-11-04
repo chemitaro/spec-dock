@@ -106,7 +106,16 @@ def test_a_task_lives_in_the_catalog_and_is_seen_from_another_worktree(world: Wr
     assert code == 0, done
     assert record_path.is_file() and json.loads(record_path.read_text(encoding="utf-8"))["status"] == "done"
     assert [changeset["paths"] for changeset in world.changesets()] == [[result["path"]], [result["path"]]]
-    for argv in (("show", todo_id), ("check",), ("settings",), ("list", "--status", "all")):
+    for argv in (
+        ("show", todo_id),
+        ("check",),
+        ("settings",),
+        ("list", "--status", "all"),
+        ("reopen", todo_id),
+        ("update", todo_id, "--title", "窓口に電話する（再）"),
+        ("snooze", todo_id, "--until", "1d"),
+        ("cancel", todo_id, "--reason", "不要になった"),
+    ):
         code, payload = todo(world, *argv)
         assert code == 0, (argv, payload)
     assert len(world.requests()) == before  # nothing reached GitHub
@@ -281,6 +290,7 @@ def test_readiness_code_never_reads_todos() -> None:
         "domain/canonical_readiness.py",
         "application/canonical_scope_read.py",
         "application/work_start.py",
+        "application/canonical_work.py",
     ):
         assert "todo" not in (root / relative).read_text(encoding="utf-8"), relative
 

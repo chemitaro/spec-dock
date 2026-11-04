@@ -63,6 +63,32 @@ def list_item(
     }
 
 
+def repository_row(
+    *,
+    repository: str | None,
+    catalog: str,
+    main_checkout: str,
+    hidden: bool,
+    status: str,
+    problem: Mapping[str, object] | None,
+    counts: Mapping[str, object] | None = None,
+    invalid_files: Sequence[str] = (),
+    conflict_copies: Sequence[str] = (),
+) -> dict[str, object]:
+    """One `repositories[]` row; `unreadable` and `duplicate` rows have no counts (iss-00550 D-03)."""
+    return {
+        "repository": repository,
+        "catalog": catalog,
+        "main_checkout": main_checkout,
+        "hidden": hidden,
+        "status": status,
+        "problem": dict(problem) if problem is not None else None,
+        "counts": dict(counts) if counts is not None else None,
+        "invalid_files": list(invalid_files),
+        "conflict_copies": list(conflict_copies),
+    }
+
+
 def todo_list_document(
     *,
     now: datetime,
@@ -106,8 +132,9 @@ def _marks(view: Mapping[str, object], record: Mapping[str, object]) -> str:
     return " ".join(marks) or "-"
 
 
-def _line(view: Mapping[str, object], record: Mapping[str, object]) -> str:
-    return f"{record.get('id')}  {_marks(view, record)}  {_local(record.get('due'))}  {record.get('title')}"
+def _line(view: Mapping[str, object], record: Mapping[str, object], ref: object = None) -> str:
+    name = ref or record.get("id")
+    return f"{name}  {_marks(view, record)}  {_local(record.get('due'))}  {record.get('title')}"
 
 
 def _rows(value: object) -> list[dict[str, Any]]:
@@ -122,14 +149,26 @@ def todo_text(command: str, result: Mapping[str, object]) -> list[str]:
     """Short lines for people; JSON carries everything."""
     if command == "todo list":
         lines = []
+        across = result.get("mode") == "all_repositories"
         for row in _rows(result.get("repositories")):
+            name = row.get("repository") or row.get("catalog")
+            problem = _object(row.get("problem"))
+            if row.get("status") == "unreadable":
+                lines.append(f"{name}: unreadable [{problem.get('code')}] {problem.get('message')}")
+                continue
+            if row.get("status") == "duplicate":
+                lines.append(f"{name}: duplicate {row.get('catalog')} ({problem.get('message')})")
+                continue
             counts = _object(row.get("counts"))
             lines.append(
-                f"{row.get('repository') or row.get('catalog')}: open={counts.get('open')} "
+                f"{name}: open={counts.get('open')} "
                 f"overdue={counts.get('overdue')} blocking={counts.get('blocking')} snoozed={counts.get('snoozed')}"
             )
         items = _rows(result.get("items"))
-        lines.extend(_line(_object(item.get("derived")), _object(item.get("todo"))) for item in items)
+        lines.extend(
+            _line(_object(item.get("derived")), _object(item.get("todo")), item.get("ref") if across else None)
+            for item in items
+        )
         if not items:
             lines.append("(no tasks)")
         return lines

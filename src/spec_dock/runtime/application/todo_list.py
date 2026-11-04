@@ -14,22 +14,25 @@ from typing import TYPE_CHECKING
 from spec_dock.runtime.application import todo_common
 from spec_dock.runtime.application.todo_check import conflict_warning
 from spec_dock.runtime.application.todo_common import open_repository, todo_handler
-from spec_dock.runtime.domain.todo_model import Filters, count_limits, derived, matches, order
+from spec_dock.runtime.domain.todo_model import Filters, count_limits, matches, order, tally
 from spec_dock.runtime.domain.todo_record import SCHEMA, TodoError, normalize_id, parent_id, validate
 from spec_dock.runtime.infra.dashboard_files import read_hidden
 from spec_dock.runtime.infra.file_publication import read_regular_file
 from spec_dock.runtime.presentation.command_data import FamilyData
 from spec_dock.runtime.presentation.envelope import Diagnostic, OperationResult
-from spec_dock.runtime.presentation.todo_document import list_item, todo_list_document, todo_view
+from spec_dock.runtime.presentation.todo_document import list_item, repository_row, todo_list_document, todo_view
 
 if TYPE_CHECKING:
     import argparse
+    from datetime import datetime
     from pathlib import Path
 
     from spec_dock.runtime.application.project_context import ProjectContext
     from spec_dock.runtime.application.todo_common import TodoRepository
+    from spec_dock.runtime.domain.todo_settings import Effective
     from spec_dock.runtime.infra.file_publication import FileSnapshot
-    from spec_dock.runtime.infra.todo_store import ReadAll, StoredRecord
+    from spec_dock.runtime.infra.github_structure import GithubRepository
+    from spec_dock.runtime.infra.todo_store import ReadAll, StoredRecord, TodoStore
 
 CHECK_STEP = "spec-dock todo check"
 
@@ -42,9 +45,8 @@ class Classified:
     warnings: tuple[Diagnostic, ...]
 
 
-def classify(repository: TodoRepository, read: ReadAll) -> Classified:
+def classify(store: TodoStore, read: ReadAll) -> Classified:
     """Valid v1 records, and the files that are not (each reported once, pointing to `todo check`)."""
-    store = repository.store
     valid: list[StoredRecord] = []
     invalid: list[str] = [store.relative(path) for path, _reason in read.invalid]
     for item in read.records:
@@ -85,7 +87,7 @@ def normalize_scope(value: str) -> str:
 def list_todos(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
     repository = open_repository(context, namespace)
     now = todo_common.utc_now()
-    classified = classify(repository, repository.store.read_all())
+    classified = classify(repository.store, repository.store.read_all())
     filters = Filters(
         status=namespace.status,
         scope=normalize_scope(namespace.scope) if namespace.scope else None,
@@ -105,40 +107,40 @@ def list_todos(namespace: argparse.Namespace, context: ProjectContext) -> Operat
     document = todo_list_document(
         now=now,
         filters=filters.to_json(),
-        repositories=[repository_row(repository, records, classified, now)],
+        repositories=[checkout_row(repository, records, classified, now)],
         items=items,
     )
     warnings = (*repository.warnings(), *classified.warnings)
     return OperationResult(namespace.command_path, "succeeded", FamilyData("todo", document), 0, warnings=warnings)
 
 
-def repository_row(
-    repository: TodoRepository, records: list[dict[str, object]], classified: Classified, now: object
-) -> dict[str, object]:
-    views = [derived(record, now) for record in records]  # type: ignore[arg-type]
-    open_records = [record for record in records if record.get("status") not in ("done", "cancelled")]
-    hidden = read_hidden(repository.state_root, repository.repository) if repository.repository is not None else False
+def counts_of(records: list[dict[str, object]], settings: Effective, now: datetime) -> dict[str, object]:
+    """A row's `counts`: the parent-task tally and the agent tasks against their limit (epic-00547 D-09, D-13)."""
     return {
-        "repository": repository.repository.key if repository.repository is not None else None,
-        "catalog": str(repository.catalog),
-        "main_checkout": str(repository.linked.layout.main_checkout),
-        "hidden": hidden,
-        "status": "ok",
-        "problem": None,
-        "counts": {
-            "open": len(open_records),
-            "blocking": sum(1 for view in views if view["blocking"]),
-            "overdue": sum(1 for view in views if view["overdue"]),
-            "snoozed": sum(1 for view in views if view["effective_status"] == "snoozed"),
-            "agent_parents": {
-                "count": count_limits(records).agent_parents,
-                "limit": repository.settings.value("parent_limit"),
-                "source": repository.settings.source("parent_limit"),
-            },
+        **tally(records, now),
+        "agent_parents": {
+            "count": count_limits(records).agent_parents,
+            "limit": settings.value("parent_limit"),
+            "source": settings.source("parent_limit"),
         },
-        "invalid_files": list(classified.invalid_files),
-        "conflict_copies": list(classified.conflict_copies),
     }
+
+
+def checkout_row(
+    repository: TodoRepository, records: list[dict[str, object]], classified: Classified, now: datetime
+) -> dict[str, object]:
+    hidden = read_hidden(repository.state_root, repository.repository) if repository.repository is not None else False
+    return repository_row(
+        repository=repository.repository.key if repository.repository is not None else None,
+        catalog=str(repository.catalog),
+        main_checkout=str(repository.linked.layout.main_checkout),
+        hidden=hidden,
+        status="ok",
+        problem=None,
+        counts=counts_of(records, repository.settings, now),
+        invalid_files=list(classified.invalid_files),
+        conflict_copies=list(classified.conflict_copies),
+    )
 
 
 @dataclass(frozen=True)
@@ -148,10 +150,10 @@ class LoadedRecord:
     record: dict[str, object]
 
 
-def load_record(repository: TodoRepository, todo_id: str) -> LoadedRecord:
+def load_record(store: TodoStore, todo_id: str) -> LoadedRecord:
     """The valid v1 record of a task or of a subtask's parent; anything else stops before a write."""
-    path = repository.store.find(todo_id)
-    relative = repository.store.relative(path)
+    path = store.find(todo_id)
+    relative = store.relative(path)
     try:
         snapshot = read_regular_file(path)
         record = json.loads(snapshot.payload.decode("utf-8"))
@@ -181,20 +183,36 @@ def _record_invalid(relative: str, reason: str) -> TodoError:
     )
 
 
-def record_conflicts(repository: TodoRepository, todo_id: str) -> tuple[Diagnostic, ...]:
+def record_conflicts(store: TodoStore, todo_id: str) -> tuple[Diagnostic, ...]:
     prefix = f"{parent_id(todo_id)}.conflict-"
     return tuple(
-        conflict_warning(repository.store.relative(path))
-        for path in repository.store.scan().conflict_copies
-        if path.name.startswith(prefix)
+        conflict_warning(store.relative(path)) for path in store.scan().conflict_copies if path.name.startswith(prefix)
     )
 
 
 @todo_handler
 def show_todo(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
     repository = open_repository(context, namespace)
-    todo_id = normalize_id(namespace.id)
-    loaded = load_record(repository, todo_id)
+    view, warnings = show_from_store(
+        repository.store,
+        repository.repository,
+        normalize_id(namespace.id),
+        now=todo_common.utc_now(),
+        warnings=repository.warnings(),
+    )
+    return OperationResult(namespace.command_path, "succeeded", FamilyData("todo", view), 0, warnings=warnings)
+
+
+def show_from_store(
+    store: TodoStore,
+    repository: GithubRepository | None,
+    todo_id: str,
+    *,
+    now: datetime,
+    warnings: tuple[Diagnostic, ...] = (),
+) -> tuple[dict[str, object], tuple[Diagnostic, ...]]:
+    """One task's result, shared by the checkout's `todo show ID` and `todo show REF` (iss-00550 D-05)."""
+    loaded = load_record(store, todo_id)
     subtasks = loaded.record.get("subtasks")
     if todo_id != parent_id(todo_id) and not any(
         isinstance(item, dict) and item.get("id") == todo_id
@@ -206,14 +224,8 @@ def show_todo(namespace: argparse.Namespace, context: ProjectContext) -> Operati
             details={"id": todo_id},
             next_step=f"spec-dock todo show {parent_id(todo_id)}",
         )
-    warnings = (*repository.warnings(), *record_conflicts(repository, todo_id))
-    view = todo_view(
-        loaded.record,
-        now=todo_common.utc_now(),
-        repository=repository.repository,
-        path=repository.store.relative(loaded.path),
-        warnings=warnings,
-    )
+    warnings = (*warnings, *record_conflicts(store, todo_id))
+    view = todo_view(loaded.record, now=now, repository=repository, path=store.relative(loaded.path), warnings=warnings)
     if view["derived"]["parent_closable"]:  # type: ignore[index]
         view["next_step"] = f"spec-dock todo done {parent_id(todo_id)}"
-    return OperationResult(namespace.command_path, "succeeded", FamilyData("todo", view), 0, warnings=warnings)
+    return view, warnings

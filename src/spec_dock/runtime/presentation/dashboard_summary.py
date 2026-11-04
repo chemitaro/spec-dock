@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Final
 from spec_dock.runtime.domain.dashboard_model import KINDS, STATES
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Mapping
 
     from spec_dock.runtime.domain.dashboard_model import DashboardModel, ScopeModel
 
@@ -38,7 +38,10 @@ def _items(model: DashboardModel, scope_ids: Iterable[str]) -> list[dict[str, ob
     return [_item(model.scopes[scope_id]) for scope_id in scope_ids]
 
 
-def summary_document(model: DashboardModel, *, hidden: bool, server: str | None) -> dict[str, object]:
+def summary_document(
+    model: DashboardModel, *, hidden: bool, server: str | None, todos: Mapping[str, object]
+) -> dict[str, object]:
+    """`todos` is `{status, open, blocking, overdue, problem}` of the repository's human tasks (epic-00547 D-15)."""
     scopes = list(model.scopes.values())
     by_state = {state: sum(1 for scope in scopes if scope.state == state) for state in STATES}
     by_kind = {
@@ -81,6 +84,7 @@ def summary_document(model: DashboardModel, *, hidden: bool, server: str | None)
         "paths": {scope.id: scope_path(model.repository, scope.id) for scope in sorted(scopes, key=lambda s: s.number)},
         "hidden": hidden,
         "server": server,
+        "todos": dict(todos),
     }
 
 
@@ -101,6 +105,13 @@ def summary_text(summary: dict[str, object], *, limit: int = 5) -> list[str]:
         assert isinstance(items, list)
         lines.append(f"{key} {len(items)}")
         lines.extend(f"  {item['id']} {item['title']} — {item['reason']}" for item in items[:limit])
+    todos = summary.get("todos")
+    if isinstance(todos, dict):
+        problem = todos.get("problem")
+        if todos.get("status") == "ok":
+            lines.append(f"todos open={todos['open']} blocking={todos['blocking']} overdue={todos['overdue']}")
+        elif isinstance(problem, dict):
+            lines.append(f"todos unavailable [{problem.get('code')}] {problem.get('message')}")
     if summary["server"]:
         lines.append(f"server={summary['server']}")
     return lines
