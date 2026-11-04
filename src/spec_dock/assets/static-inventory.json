@@ -378,7 +378,7 @@
     {
       "path": "spec-dock/docs/migration.md",
       "source": "spec_dock/docs/migration.md",
-      "sha256": "9574a6aeea664216ef485711a10e41cb28c15bf87265ec43a40397775e9778f1",
+      "sha256": "7355b2fef8dd8a27e95336657eb5ba9cbeaf7e521d68b4b5fbee8353c04c47a8",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [

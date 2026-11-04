@@ -103,9 +103,9 @@ SpecDock 0.5.0 は、`spec-dock/workspace.json` の `schema_version` が 4 の�
   - `dashboard service install`・`dashboard service status`・`dashboard service uninstall`（#530）：ログインのときに起動する常駐を、明示して入れたときだけ入れます（macOS は launchd、Linux は systemd のユーザーの単位。定期の同期の常駐とは別のラベル）。`installation update` や `canonical link` は入れません。
   - 版の更新の後、常駐は起動し直します（サーバーが終了コード75で終わり、launchd と systemd が新しい版で起動し直す）。前面の `dashboard serve` は、利用者が起動し直します。
 - 新しい契約：
-  - 画面の道 `/r/<host>/<owner>/<name>/scopes/<ID>`、`?embed=1`、`?focus=<ID>`、API、埋め込みの契約 `specdock.embed/v1`、`frame-ancestors`。CORS を許すのは `/ds/` と `/vendor/` だけです。詳しくは `reference_cli.md` の「ダッシュボードのサーバーの契約」。
+  - 画面の道 `/r/<host>/<owner>/<name>/scopes/<ID>`、`?embed=1`、API、埋め込みの契約 `specdock.embed/v1`、`frame-ancestors`。CORS を許すのは `/ds/` と `/vendor/` だけです。詳しくは `reference_cli.md` の「ダッシュボードのサーバーの契約」。
   - 主な新しいエラーのコード（各コマンドのほかのコードは `reference_cli.md` のコマンド表にあります）：`DASHBOARD_SERVICE_UNSUPPORTED`・`DASHBOARD_SERVICE_FAILED`（終了コード3）、`DASHBOARD_STATE_ROOT_INVALID`（終了コード2）。
-- 利用者の状態の置き場（`~/.local/state/spec-dock/`）に増えるもの：`dashboard/server.json`（`specdock.dashboard-server/v1`）、`dashboard/repositories.json`（`specdock.dashboard-repositories/v1`）、`dashboard/seen.json`（`specdock.dashboard-seen/v1`）、`dashboard/server.lock`。常駐を入れたときだけ、launchd の plist か systemd の単位と `dashboard/service.log` が増えます。
+- 利用者の状態の置き場（`~/.local/state/spec-dock/`）に増えるもの：`dashboard/server.json`（`specdock.dashboard-server/v1`）、`dashboard/repositories.json`（`specdock.dashboard-repositories/v1`）、`dashboard/seen.json`（`specdock.dashboard-seen/v1`）、`dashboard/server.lock`。常駐を入れたときだけ、launchd の plist か systemd の単位が増えます。`dashboard/service.log` が増えるのは launchd のときだけで、systemd では出力が journal（`journalctl --user -u spec-dock-dashboard`）に出ます。
 - 構造のスナップショットは版2になります（#537。PR の状態を持つ）。新しい版は版1も読みます。前の版に戻すと、一度取り直します。定期の同期は PR の状態を取るため、成功か rate limit の後はリポジトリごとに約2分に1回、ほかの失敗が続く間は60秒に1回、GitHub の GraphQL に問い合わせます（1回あたり約3ポイント）。
 - Markdown・PlantUML のダッシュボードの撤去（#533）：
   - `canonical status` の JSON から `dashboard` の項目と、`CANONICAL_DASHBOARD_OCCUPIED`・`CANONICAL_DASHBOARD_FAILED` の警告が消えます。
