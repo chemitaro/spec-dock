@@ -1,0 +1,39 @@
+{
+  "schema": "specdock.todo/v1",
+  "id": "T-7K3M",
+  "title": "窓口に電話する",
+  "kind": "todo",
+  "status": "open",
+  "created_at": "2026-11-04T10:00:00Z",
+  "updated_at": "2026-11-04T10:00:00Z",
+  "origin": {
+    "by": "human",
+    "role": null
+  },
+  "body": null,
+  "options": [],
+  "recommendation": null,
+  "reply_to": null,
+  "effort": null,
+  "due": "2026-11-04T14:00:00Z",
+  "snooze_until": null,
+  "scopes": {
+    "related": [],
+    "blocks": []
+  },
+  "links": [],
+  "tags": [],
+  "subtasks": [],
+  "resolution": null,
+  "history": [
+    {
+      "at": "2026-11-04T10:00:00Z",
+      "by": "human",
+      "role": null,
+      "action": "added",
+      "target": null,
+      "note": null,
+      "fields": []
+    }
+  ]
+}

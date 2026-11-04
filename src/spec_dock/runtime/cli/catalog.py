@@ -30,6 +30,8 @@ def _flag(name: str) -> ArgumentSpec:
 KINDS = ("initiative", "epic", "issue")
 STATES = ("open", "completed", "not-planned", "unknown")
 ARTIFACT_TYPES = ("blank", "research", "interview", "disc", "decision-candidate", "adr")
+TODO_KINDS = ("decide", "check", "operate", "act", "todo", "checklist")
+TODO_STATUSES = ("open", "snoozed", "done", "cancelled", "all")
 
 LEAF_PATHS: tuple[str, ...] = (
     "scope create initiative",
@@ -91,6 +93,16 @@ LEAF_PATHS: tuple[str, ...] = (
     "dashboard service install",
     "dashboard service status",
     "dashboard service uninstall",
+    "todo add",
+    "todo list",
+    "todo show",
+    "todo update",
+    "todo done",
+    "todo snooze",
+    "todo cancel",
+    "todo reopen",
+    "todo check",
+    "todo settings",
     "help",
     "completion",
 )
@@ -155,6 +167,16 @@ HELP_EFFECTS: dict[str, str] = {
     "dashboard service install": "Install the per-user service that starts the dashboard server at login and keeps it running (launchd or a systemd user service).",
     "dashboard service status": "Show whether the dashboard service is installed and loaded, whether a server runs, its URL and versions; no changes.",
     "dashboard service uninstall": "Stop and remove the dashboard service, its job file and its log; the periodic sync is untouched.",
+    "todo add": "Write one new human task (or a subtask into its task's file) under the catalog's todos/<YYYY-MM>/; nothing goes to GitHub.",
+    "todo list": "List this repository's human tasks from the catalog's todos/ (specdock.todo-list/v1, mode repository); no changes.",
+    "todo show": "Read one human task with its subtasks, remaining items and derived states; no changes.",
+    "todo update": "Change fields of one human task or a subtask's title in its file, recording the changed field names in history.",
+    "todo done": "Close one human task or subtask as done, writing its resolution and history; the file stays in place.",
+    "todo snooze": "Hide one open human task from the default list until a time; its file stays in place.",
+    "todo cancel": "Close one human task or subtask as cancelled with a reason; the file stays in place.",
+    "todo reopen": "Reopen a closed human task or subtask; the earlier answer stays in history.",
+    "todo check": "Check every file under the catalog's todos/ with the Python rules and, when cue is on PATH, cue vet; no changes.",
+    "todo settings": "Show the effective human-task settings and the layer each comes from (default, user, repository); no changes.",
     "help": "Print command help; no changes.",
     "completion": "Print shell completion without changing shell configuration.",
 }
@@ -289,6 +311,92 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
     "dashboard service install": (_arg("--port", type=int), _flag("--tailscale")),
     "dashboard service status": (),
     "dashboard service uninstall": (),
+    "todo add": (
+        _required("--title"),
+        _arg("--kind", choices=TODO_KINDS),
+        _arg("--by", choices=("agent", "human")),
+        _arg("--role"),
+        _arg("--body"),
+        _arg("--body-file"),
+        _arg("--option", action="append", metavar="KEY=TEXT"),
+        _arg("--recommend", metavar="KEY"),
+        _arg("--reason"),
+        _arg("--reply-to"),
+        _arg("--effort"),
+        _arg("--due", metavar="WHEN"),
+        _arg("--scope", action="append", metavar="ID"),
+        _arg("--blocks", action="append", metavar="ID"),
+        _arg("--link", action="append"),
+        _arg("--tag", action="append"),
+        _arg("--parent", metavar="ID"),
+        _arg("--item", action="append", metavar="TITLE"),
+    ),
+    "todo list": (
+        _arg("--status", choices=TODO_STATUSES, default="open"),
+        _arg("--scope", metavar="ID"),
+        _arg("--kind", choices=TODO_KINDS),
+        _arg("--tag"),
+        _flag("--blocking"),
+        _flag("--overdue"),
+    ),
+    "todo show": (_arg("id"),),
+    "todo update": (
+        _arg("id"),
+        _arg("--title"),
+        _arg("--body"),
+        _arg("--body-file"),
+        _arg("--kind", choices=TODO_KINDS),
+        _arg("--due", metavar="WHEN"),
+        _arg("--reply-to"),
+        _arg("--effort"),
+        _arg("--option", action="append", metavar="KEY=TEXT"),
+        _arg("--recommend", metavar="KEY"),
+        _arg("--reason"),
+        _arg("--add-scope", action="append", metavar="ID"),
+        _arg("--remove-scope", action="append", metavar="ID"),
+        _arg("--add-blocks", action="append", metavar="ID"),
+        _arg("--remove-blocks", action="append", metavar="ID"),
+        _arg("--add-tag", action="append"),
+        _arg("--remove-tag", action="append"),
+        _arg("--add-link", action="append"),
+        _arg("--remove-link", action="append"),
+        _arg("--note"),
+        _arg("--by", choices=("agent", "human")),
+        _arg("--role"),
+    ),
+    "todo done": (
+        _arg("id"),
+        _arg("--choice", metavar="KEY"),
+        _arg("--note"),
+        _arg("--record", metavar="PATH_OR_URL"),
+        _flag("--include-subtasks"),
+        _arg("--by", choices=("agent", "human")),
+        _arg("--role"),
+    ),
+    "todo snooze": (
+        _arg("id"),
+        _required("--until", metavar="WHEN"),
+        _arg("--due", metavar="WHEN"),
+        _arg("--note"),
+        _arg("--by", choices=("agent", "human")),
+        _arg("--role"),
+    ),
+    "todo cancel": (
+        _arg("id"),
+        _required("--reason"),
+        _flag("--include-subtasks"),
+        _arg("--by", choices=("agent", "human")),
+        _arg("--role"),
+    ),
+    "todo reopen": (
+        _arg("id"),
+        _arg("--due", metavar="WHEN"),
+        _arg("--note"),
+        _arg("--by", choices=("agent", "human")),
+        _arg("--role"),
+    ),
+    "todo check": (),
+    "todo settings": (),
     "help": (_arg("help_path", nargs="*"),),
     "completion": (_arg("shell", choices=("bash", "zsh", "fish")),),
 }
@@ -333,6 +441,12 @@ MUTATING_LEAF_PATHS = frozenset({
     "installation init",
     "installation update",
     "installation uninstall",
+    "todo add",
+    "todo update",
+    "todo done",
+    "todo snooze",
+    "todo cancel",
+    "todo reopen",
 })
 
 
@@ -408,6 +522,16 @@ HELP_PRECONDITIONS: dict[str, str] = {
     "dashboard service install": "No project is required. macOS (launchd) or Linux with a working systemd user manager; elsewhere DASHBOARD_SERVICE_UNSUPPORTED (exit 3) points to `spec-dock dashboard serve`. --port N is 1-65535 (default 47800). A launchctl/systemctl failure stops with DASHBOARD_SERVICE_FAILED (exit 3). Run it again to change --port or --tailscale.",
     "dashboard service status": "No project is required; on a PC without a service manager it reports supported=false.",
     "dashboard service uninstall": "No project is required; nothing installed is a success with removed=false.",
+    "todo add": "A schema-4 checkout whose catalog is linked (CANONICAL_NOT_LINKED otherwise). A person (--by human, the default) needs only --title; an agent (--by agent) also needs --role, --kind, --body or --body-file, --reply-to and --effort, and decide needs two --option KEY=TEXT and --recommend KEY --reason TEXT (TODO_INVALID, exit 2, lists details.missing). --due takes 30m, 4h, 2d (up to 30d), YYYY-MM-DD or ISO 8601 with a zone; without it the default_due setting applies. --parent ID adds a subtask (only --title; a subtask's subtask stops with TODO_NESTING_TOO_DEEP); --item TITLE needs --kind checklist. A Scope ID not in the saved snapshot warns TODO_SCOPE_UNKNOWN; going over a limit warns TODO_LIMIT_EXCEEDED and still writes.",
+    "todo list": "A schema-4 checkout whose catalog is linked. --status open (the default) hides snoozed tasks until their time; --scope ID matches related or blocking Scopes. Broken records and conflict copies are warnings (TODO_RECORD_INVALID, TODO_CONFLICT_COPY) and never stop the list.",
+    "todo show": "A schema-4 checkout whose catalog is linked; ID is t-xxxx or a subtask t-xxxx.N (its task is shown). TODO_NOT_FOUND, TODO_ID_AMBIGUOUS and TODO_RECORD_INVALID exit 3.",
+    "todo update": "A schema-4 checkout whose catalog is linked and a valid record (TODO_RECORD_INVALID, TODO_SCHEMA_UNSUPPORTED exit 3). A subtask ID takes only --title and --note. Nothing changed is reported as unchanged.",
+    "todo done": "A schema-4 checkout whose catalog is linked; the task must be open or snoozed (TODO_STATE_INVALID). Open subtasks stop it with TODO_SUBTASKS_OPEN unless --include-subtasks; --choice must be one of the options.",
+    "todo snooze": "A schema-4 checkout whose catalog is linked; only an open or snoozed task, never a subtask. --until takes the same forms as --due and must be in the future.",
+    "todo cancel": "A schema-4 checkout whose catalog is linked; --reason is required. Open subtasks stop it with TODO_SUBTASKS_OPEN unless --include-subtasks.",
+    "todo reopen": "A schema-4 checkout whose catalog is linked; only a done or cancelled task or subtask. A subtask of a closed task stops with TODO_PARENT_CLOSED.",
+    "todo check": "A schema-4 checkout whose catalog is linked. cue v0.17.1 or later on PATH adds cue vet; without it the warning TODO_CUE_SKIPPED says so and the Python check alone decides. Any error exits 7 with TODO_CHECK_FAILED.",
+    "todo settings": "No checkout is required. Inside a schema-4 checkout the link must be correct (CANONICAL_NOT_LINKED) and todos/settings.json is read; outside one the repository layer is not_applicable. The user layer is $XDG_CONFIG_HOME/spec-dock/config.json (or ~/.config/spec-dock/config.json); SpecDock never creates it.",
     "help": "No project is required.",
     "completion": "No project is required; choose bash, zsh, or fish.",
 }
@@ -441,6 +565,7 @@ _READS_BY_ROOT = {
     "installation": "Installed package inventory and the selected worktree's declaration and static file snapshots.",
     "canonical": "This clone's canonical catalog and checkout links, or one commit tree, as each command states.",
     "dashboard": "The repository's structure snapshot, the dashboard hidden marks and the server location record (only whether its pid is alive).",
+    "todo": "The catalog's todos/ records and todos/settings.json, the user settings file, the origin remote, the saved structure snapshot and the dashboard hidden marks.",
 }
 
 _DOES_NOT_BY_ROOT = {
@@ -455,6 +580,7 @@ _DOES_NOT_BY_ROOT = {
     "installation": "Does not change other worktrees, Scope data, Artifacts, Workbenches, direct selections or Git metadata.",
     "canonical": "Does not change GitHub Issues or the default branch.",
     "dashboard": "Does not contact GitHub or the dashboard server, refresh the snapshot, or write any file.",
+    "todo": "Does not contact GitHub, refresh the structure snapshot, change Scope state, dependencies or work start, move or delete a record, or write the user settings file.",
 }
 
 _JSON_DATA_BY_ROOT = {
@@ -468,6 +594,7 @@ _JSON_DATA_BY_ROOT = {
     "workspace": "Current observations, validity and findings.",
     "installation": "target, package_version, created_paths, changed_paths, retired_paths, backup_path and preservation checks.",
     "canonical": "The command's catalog, link, sync or check observations.",
+    "todo": "kind=todo. One task: todo (specdock.todo/v1 record), derived (effective_status, overdue, due_soon, blocking, parent_closable, open_subtasks, subtask_counts), ref, repository, path, warnings_detail. list: specdock.todo-list/v1 (schema, generated_at, mode, filters, repositories, items). check: valid, checked_files, errors (code, file, field, message, source), warnings, cue. settings: values {key: {value, source}}, layers.",
     "dashboard": "result is the specdock.dashboard-summary/v1 document: schema, repository, fetched_at, stale, counts, completion_ratio, awaiting_merge, in_progress, ready, blocked, cleanup, anomaly_count, pull_requests, paths, hidden, server.",
 }
 
@@ -492,6 +619,9 @@ def _example(leaf: str) -> str:
         "path": "<path>",
         "worktree_ref": "/absolute/worktree",
         "artifact_id": "<artifact-id>",
+        "id": "<task-id>",
+        "--until": "1d",
+        "--reason": "'<reason>'",
         "--backend": "github",
         "--title": "'Example title'",
         "--parent": "<parent-id>",
@@ -540,6 +670,10 @@ def _help_spec(leaf: str) -> HelpSpec:
         )
     elif leaf in {"help", "completion"}:
         target = "The CLI catalog; no repository is required."
+    elif leaf == "todo settings":
+        target = "The user settings file and, inside a checkout, this checkout's catalog todos/settings.json."
+    elif leaf.startswith("todo "):
+        target = "This checkout's catalog todos/ (one task by ID where the usage line has ID)."
     elif "target" in arguments:
         target = "The explicit Scope selector (or @current selection) in this worktree."
     elif "--scope" in arguments:

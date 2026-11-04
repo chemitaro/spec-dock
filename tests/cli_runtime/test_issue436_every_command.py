@@ -1,6 +1,6 @@
-"""Every public command runs canonical handling only (iss-00436, Epic G7; 53 leaves since 0.5.0, iss-00440; 54 with `dashboard summary`, iss-00528; 58 with `dashboard serve`, `hide`, `show`, `list`, iss-00529; 61 with `dashboard service install`, `status`, `uninstall`, iss-00530).
+"""Every public command runs canonical handling only (iss-00436, Epic G7; 53 leaves since 0.5.0, iss-00440; 54 with `dashboard summary`, iss-00528; 58 with `dashboard serve`, `hide`, `show`, `list`, iss-00529; 61 with `dashboard service install`, `status`, `uninstall`, iss-00530; 71 with the ten `todo` leaves, iss-00549).
 
-One linked schema-4 clone with the fake GitHub runs all 61 leaves once; no leaf answers with a refusal-only code. GitHub is the fake on PATH, the catalog
+One linked schema-4 clone with the fake GitHub runs all 71 leaves once; no leaf answers with a refusal-only code. GitHub is the fake on PATH, the catalog
 pushes to the temporary bare remote and the save wait of `work finish` runs on an injected clock.
 """
 
@@ -63,7 +63,7 @@ def test_every_leaf_has_a_route_in_canonical_mode() -> None:
         and path not in REPOSITORY_INDEPENDENT_HANDLERS
         and path not in MODE_INDEPENDENT
     ]
-    assert len(LEAF_PATHS) == 61
+    assert len(LEAF_PATHS) == 71
     assert unrouted == []
     # `dashboard serve`, `list` and `service` need no checkout: only the repository-independent table routes them.
     independent_only = {
@@ -73,9 +73,10 @@ def test_every_leaf_has_a_route_in_canonical_mode() -> None:
         "dashboard service install",
         "dashboard service status",
         "dashboard service uninstall",
+        "todo settings",
     }
     assert set(CANONICAL_HANDLERS) == set(LEAF_PATHS) - MODE_INDEPENDENT - independent_only
-    assert len(CANONICAL_HANDLERS) == 49
+    assert len(CANONICAL_HANDLERS) == 58
 
 
 # Removed in 0.5.0 (iss-00440, R-440-02): commands and arguments that canonical mode only refused.
@@ -298,6 +299,16 @@ def _argv(world: WriteWorld, tmp_path: Path) -> list[tuple[str, list[str]]]:
         ("dashboard service install", []),  # the suite's fake platform has no service manager: it stops, writes nothing
         ("dashboard service status", []),
         ("dashboard service uninstall", []),
+        ("todo add", ["--title", "人のタスク"]),
+        ("todo list", []),
+        ("todo show", ["t-0000"]),  # TODO_NOT_FOUND: the random ID of the add is not known here
+        ("todo update", ["t-0000", "--title", "x"]),
+        ("todo done", ["t-0000"]),
+        ("todo snooze", ["t-0000", "--until", "1d"]),
+        ("todo cancel", ["t-0000", "--reason", "x"]),
+        ("todo reopen", ["t-0000"]),
+        ("todo check", []),
+        ("todo settings", []),
         ("installation show", []),
         ("installation init", [str(tmp_path / "fresh-install"), "--dry-run"]),
         ("installation update", ["--dry-run"]),

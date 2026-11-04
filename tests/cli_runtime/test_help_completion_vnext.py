@@ -223,6 +223,11 @@ def test_every_leaf_completion_matches_yes_and_lock_acceptance(tmp_path: Path, s
         "canonical check",
         "dashboard summary",
         "dashboard list",
+        # iss-00549: the reading todo leaves take no --yes
+        "todo list",
+        "todo show",
+        "todo check",
+        "todo settings",
         # iss-00529: no --yes; serve runs until stopped, hide/show only toggle a per-user mark
         "dashboard serve",
         "dashboard hide",
@@ -234,7 +239,7 @@ def test_every_leaf_completion_matches_yes_and_lock_acceptance(tmp_path: Path, s
     }
     output = _run(tmp_path, "completion", shell)
     assert output.exit_code == 0
-    assert len(LEAF_PATHS) == 61 and readonly <= set(LEAF_PATHS)
+    assert len(LEAF_PATHS) == 71 and readonly <= set(LEAF_PATHS)
     for leaf in LEAF_PATHS:
         if shell == "fish":
             # Public registration lines belonging to this exact command path.

@@ -114,6 +114,16 @@ def _arguments(root: Path, tmp_path: Path) -> dict[str, list[str]]:
         "dashboard service install": [],
         "dashboard service status": [],
         "dashboard service uninstall": [],
+        "todo add": ["--title", "x"],
+        "todo list": [],
+        "todo show": ["t-0000"],
+        "todo update": ["t-0000", "--title", "x"],
+        "todo done": ["t-0000"],
+        "todo snooze": ["t-0000", "--until", "1d"],
+        "todo cancel": ["t-0000", "--reason", "x"],
+        "todo reopen": ["t-0000"],
+        "todo check": [],
+        "todo settings": [],
     }
 
 
@@ -139,7 +149,7 @@ def test_every_business_command_but_canonical_check_stops_on_a_schema_three_decl
     root = unmigrated_repository(tmp_path / "consumer")
     arguments = _arguments(root, tmp_path)
     assert set(arguments) == set(LEAF_PATHS) - UTILITIES - {"canonical check"}
-    assert len(arguments) == 58
+    assert len(arguments) == 68
     before = tree_digest(root)
     for leaf, extra in arguments.items():
         code, result = _run(capsys, root, leaf, extra)
