@@ -65,7 +65,7 @@ slices: {
 	}
 	"iss-00552": {
 		covers:  ["R-01"]
-		text:    "2026-11-04 利用者の要望で統括が追加。ダッシュボードに出すかどうかを、コマンド（`dashboard hide`／`show`）だけでなく、設定のファイルで決められるようにする。設定は epic-00547 の3段（初めの値 < 利用者の設定 `$XDG_CONFIG_HOME/spec-dock/config.json` < リポジトリの設定）と同じ仕組みに乗せ、その設計が決まってから着手する。`hide`／`show` との優先の関係を決める。"
+		text:    "2026-11-04 利用者の要望で統括が追加。ダッシュボードに出すかどうかを、コマンド（`dashboard hide`／`show`）だけでなく、設定のファイルで決められるようにする。設定は epic-00547 の3段（初めの値 < 利用者の設定 `$XDG_CONFIG_HOME/spec-dock/config.json` < リポジトリの設定）と同じ仕組みに乗せ、その設計が決まってから着手する。`hide`／`show` との優先の関係を決める。設定の仕組みは #549（PR #558）で入った（`specdock.config/v1`）。"
 		after:   ["iss-00534"]
 		session: "std"
 	}
