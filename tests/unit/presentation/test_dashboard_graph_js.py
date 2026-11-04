@@ -252,6 +252,9 @@ def _context() -> dict[str, Any]:
             node(31, "issue", parent=30),
             node(60, "initiative"),  # only a blocked Epic inside
             node(61, "epic", parent=60, blocked_by=(30,)),
+            node(80, "epic"),  # open with every child closed: a cleanup candidate, not the context of its children
+            closed(81, "issue", parent=80, closed_at=_at("10-20")),
+            closed(82, "issue", parent=80, closed_at=_at("10-21")),
         )
     )
 
@@ -264,6 +267,8 @@ def context(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
         "wait": {"deps": "wait"},
         "done": {"showDone": True},
         "focus8": {"focus": "epic-00008"},
+        "unfolded": {"fold": False},
+        "focus80": {"focus": "epic-00080"},
     }
     return _run(
         tmp_path_factory.mktemp("context"),
@@ -301,6 +306,11 @@ def test_the_default_view_keeps_done_scopes_under_open_parents(context: dict[str
     assert folded["nodes"] and all(item["id"] != "iss-00009" for item in folded["nodes"])
     assert {"iss-00009", "epic-00010", "iss-00011"} <= _ids(context, "done").keys()
     assert "iss-00009" in _ids(context, "focus8")  # narrowed to a done Epic: its children show
+    # the done children of an open Epic whose every child is done (a cleanup candidate) are not shown, folded or not
+    for key in ("tree", "unfolded"):
+        nodes = _ids(context, key)
+        assert "epic-00080" in nodes and not {"iss-00081", "iss-00082"} & nodes.keys(), key
+    assert {"iss-00081", "iss-00082"} <= _ids(context, "focus80").keys()
 
 
 def test_the_default_view_draws_finished_dependencies_between_shown_boxes(context: dict[str, Any]) -> None:

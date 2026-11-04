@@ -76,14 +76,14 @@ export function index(scopes) {
   return { byId, kids, ancestors, summary };
 }
 
-// iss-00556 D-01: a done Scope shows when its parent is open (the plan's progress), or when its parent is the focus;
+// iss-00556 D-01: a done Scope shows when its parent shows its done children (`showsDone`: open, or the focus);
 // a done Scope under a done parent, or without a parent, does not (unless it holds something shown: Epic R-12).
-function visibility(ix, opts, focus) {
+function visibility(ix, opts, showsDone) {
   const memo = new Map();
   const seen = new Set();
   const context = (s) => {
-    const p = s.parent_id && s.parent_id !== s.id ? ix.byId.get(s.parent_id) : null; // the same rule as showsDone
-    return !!p && (p.state !== "done" || p.id === focus);
+    const p = s.parent_id && s.parent_id !== s.id ? ix.byId.get(s.parent_id) : null;
+    return !!p && showsDone(p);
   };
   const visible = (s) => {
     if (memo.has(s.id)) return memo.get(s.id);
@@ -143,7 +143,8 @@ function chipBlock(key, list, ctx) {
 function folded(items, containerKey, ctx) {
   if (!ctx.opts.fold) return items.map((s) => ctx.node(s));
   // A closed parent with open descendants stays a frame (Epic R-12; the prototype's cleanup set skips it).
-  const folds = (s) => ctx.cleanup.has(s.id) && !s.keep_visible;
+  // The focus itself never folds: narrowing to a cleanup candidate shows what it holds (iss-00556).
+  const folds = (s) => ctx.cleanup.has(s.id) && !s.keep_visible && s.id !== ctx.focus;
   const keep = items.filter((s) => !folds(s));
   const fold = items.filter(folds);
   const blocks = keep.map((s) => ctx.node(s));
@@ -308,13 +309,15 @@ export function layout(scopes, cleanup, options = {}, gaps = {}) {
   if (opts.mode === "tree") opts.fold = false; // the tree shows every Scope as a box
   const ix = index(scopes);
   const focus = opts.focus && ix.byId.has(opts.focus) ? opts.focus : null;
-  const visibleBase = visibility(ix, opts, focus);
+  // A parent shows its done children with "done too", when it is the focus, or when it is open, except an open
+  // parent whose every descendant is done (a cleanup candidate: what it holds is no longer the plan's progress).
+  const finished = new Set((cleanup || []).filter((c) => c.code === "all_descendants_closed").map((c) => c.id));
+  const showsDone = (p) => opts.showDone || p.id === focus || (p.state !== "done" && !finished.has(p.id));
+  const visibleBase = visibility(ix, opts, showsDone);
   const inFocus = (s) => !focus || s.id === focus || ix.ancestors(s.id).includes(focus);
   const visible = (s) => inFocus(s) && (s.id === focus || visibleBase(s));
   const visibleKids = (s) => ix.kids.get(s.id).filter(visible);
-  // A parent shows its done children with "done too", when it is open, or when it is the focus (D-01).
-  const showsDone = (p) => opts.showDone || p.state !== "done" || p.id === focus;
-  const ctx = { opts, gaps, ix, cleanup: new Set((cleanup || []).map((c) => c.id)), visibleKids, showsDone };
+  const ctx = { opts, gaps, ix, focus, cleanup: new Set((cleanup || []).map((c) => c.id)), visibleKids, showsDone };
   ctx.node = (s) => {
     const kids = visibleKids(s);
     return s.kind === "issue" && !kids.length ? boxBlock(s, ctx) : frameBlock(s, kids, ctx);
