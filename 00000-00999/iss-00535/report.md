@@ -47,7 +47,12 @@ ID: "iss-00535"
 
 ### ゲート
 
-（attempt 02 の結果を書く）
+キャンペーン `iss-00535-g2`（作業ツリーの `.workbench/final-quality-gate/iss-00535-g2/`、Epic の要件の途中の変更を受けて g1 から作り直した）で、`a0ca82979`（origin/main `48e04934d` の取り込み後）に合格。
+
+- レビューの道：pass（coverage complete、P0 0・P1 0・P2 0・P3 3。P3 は下の「Residual Risks」）。
+- テストの道 attempt 01：`make lint` 0、`uv run pytest` 1（`test_the_250_scope_structure_routes_within_a_second` が 1014ms で上限 1000ms を超えた。対象の `views/graph/*`・`views/timeline/*` は main と同じで、ロードアベレージ約 40〜60 の負荷による。コードは直さない）。
+- テストの道 attempt 02（同じコミット）：`make lint` 0、`uv run pytest` 0（3669 passed, 7 skipped）。
+- 結果：`closure.md`。
 
 ## Residual Risks / Follow-ups
 
