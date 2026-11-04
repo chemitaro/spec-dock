@@ -8,7 +8,7 @@ steps: {
 	"S-03": {title: "詳しい画面の「文書」のタブ、検査の結果、進み具合（scope.js、scope.css）", realizes: ["R-01", "R-02", "R-03", "R-04", "F-01", "F-02"], status: "done", after: ["S-02"], session: "std"}
 	"S-04": {title: "起動し直しの知らせ（app.js、topbar.js）", realizes: ["R-05"], status: "done", session: "std"}
 	"S-05": {title: "reference_cli.md と static-inventory.json を直す", realizes: ["R-01", "R-03"], status: "done", after: ["S-02"], session: "std"}
-	"S-06": {title: "ヘッドレス Chrome で PC 幅と 390px、明るい・暗いを写し、report.md と artifacts に残す", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05"], status: "doing", after: ["S-03", "S-04"], session: "std"}
+	"S-06": {title: "ヘッドレス Chrome で PC 幅と 390px、明るい・暗いを写し、report.md と artifacts に残す", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05"], status: "done", after: ["S-03", "S-04"], session: "std"}
 }
 
 tests: {
