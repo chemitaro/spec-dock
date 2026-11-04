@@ -3,12 +3,12 @@ package spec
 goal: "詳しい画面で、CUE と Markdown の文書、報告、ADR をその場で描いて読め、検査の結果と計画の進み具合が出て、上の帯が前面の `serve` の起動し直しを促す。"
 
 steps: {
-	"S-01": {title: "文書の読み取りと覚え（dashboard_documents.py）と script_safe の公開", realizes: ["R-01", "R-02", "R-03", "R-04", "F-01", "F-03"], status: "todo", session: "std"}
-	"S-02": {title: "文書の道と Scope の API の details を足す（dashboard_http.py、dashboard_site.py）", realizes: ["R-01", "R-02", "R-03", "R-04", "F-02", "F-03"], status: "todo", after: ["S-01"], session: "std"}
-	"S-03": {title: "詳しい画面の「文書」のタブ、検査の結果、進み具合（scope.js、scope.css）", realizes: ["R-01", "R-02", "R-03", "R-04", "F-01", "F-02"], status: "todo", after: ["S-02"], session: "std"}
-	"S-04": {title: "起動し直しの知らせ（app.js、topbar.js）", realizes: ["R-05"], status: "todo", session: "std"}
-	"S-05": {title: "reference_cli.md と static-inventory.json を直す", realizes: ["R-01", "R-03"], status: "todo", after: ["S-02"], session: "std"}
-	"S-06": {title: "ヘッドレス Chrome で PC 幅と 390px、明るい・暗いを写し、report.md と artifacts に残す", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05"], status: "todo", after: ["S-03", "S-04"], session: "std"}
+	"S-01": {title: "文書の読み取りと覚え（dashboard_documents.py）と script_safe の公開", realizes: ["R-01", "R-02", "R-03", "R-04", "F-01", "F-03"], status: "done", session: "std"}
+	"S-02": {title: "文書の道と Scope の API の details を足す（dashboard_http.py、dashboard_site.py）", realizes: ["R-01", "R-02", "R-03", "R-04", "F-02", "F-03"], status: "done", after: ["S-01"], session: "std"}
+	"S-03": {title: "詳しい画面の「文書」のタブ、検査の結果、進み具合（scope.js、scope.css）", realizes: ["R-01", "R-02", "R-03", "R-04", "F-01", "F-02"], status: "done", after: ["S-02"], session: "std"}
+	"S-04": {title: "起動し直しの知らせ（app.js、topbar.js）", realizes: ["R-05"], status: "done", session: "std"}
+	"S-05": {title: "reference_cli.md と static-inventory.json を直す", realizes: ["R-01", "R-03"], status: "done", after: ["S-02"], session: "std"}
+	"S-06": {title: "ヘッドレス Chrome で PC 幅と 390px、明るい・暗いを写し、report.md と artifacts に残す", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05"], status: "doing", after: ["S-03", "S-04"], session: "std"}
 }
 
 tests: {
