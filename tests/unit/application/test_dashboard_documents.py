@@ -247,7 +247,10 @@ def test_without_cue_the_page_names_the_next_step_and_the_rest_continues(
     assert "CUE_NOT_FOUND" in response.body.decode() and "spec-dock scope check iss-00002" in response.body.decode()
     details = env.details("iss-00002")
     assert details["check"]["status"] == "failed" and details["check"]["code"] == "CUE_NOT_FOUND"
-    assert details["check"]["next_steps"][-1] == "spec-dock scope check iss-00002"
+    assert details["check"]["next_steps"] == [
+        "cue v0.17.1 以上を PATH に入れる（cue version で確かめる）",
+        "spec-dock scope check iss-00002",
+    ]
     assert details["progress"] is None
     assert details["catalog"] == "ok" and details["documents"][0]["key"] == "requirement"
 

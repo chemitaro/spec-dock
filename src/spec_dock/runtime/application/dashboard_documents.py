@@ -47,7 +47,7 @@ DRAWN_FILES: Final = (
 MARKDOWN_DOCUMENTS: Final = ("requirement.md", "design.md", "plan.md", "report.md")
 ADR_FOLDERS: Final = ("artifacts", "discussions")
 _ADR: Final = re.compile(r"(?:^|-)adr-.*\.md\Z", re.IGNORECASE)
-_TOOL_STEP: Final = "cue v0.17.1 以上を PATH に入れる（`cue version` で確かめる）"
+_TOOL_STEP: Final = "cue v0.17.1 以上を PATH に入れる（cue version で確かめる）"
 
 _Signature = tuple[tuple[object, ...] | None, ...]
 
