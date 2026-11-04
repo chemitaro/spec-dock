@@ -81,6 +81,12 @@ slices: {
 		after:   ["iss-00534"]
 		session: "std"
 	}
+	"iss-00568": {
+		covers:  ["R-09"]
+		text:    "2026-11-04 利用者が見つけた不具合。ダッシュボードの古さの警告（「30分前から更新されていません」）は、構造のスナップショットの `fetched_at` だけで判定している（`domain/dashboard_model.py` の STALE_AFTER）。定期の同期は、GitHub の変化を調べる probe（`probe.json` の `checked_at`）で変化がなければスナップショットを取り直さないため、構造に変化がない間は、同期が正常でも30分で警告が出る。古さを「最後に GitHub の構造を確かめた時刻」（スナップショットの取得と probe の確かめの新しいほう）で判定し、表示の『N分前に取得』も同じ時刻にそろえる。probe が失敗しているときは今のとおり古くなる。サーバー、`dashboard summary`、概況で同じ判定を使う。"
+		after:   ["iss-00534"]
+		session: "light"
+	}
 	"iss-00535": {
 		covers:  ["R-19", "R-25", "R-26", "F-10"]
 		text:    "第5波（段階2）。D-11 の文書の描画と計画の進み具合。あわせて、#530 の残り：API の `server.restart_required` が true のとき、画面の上の帯で前面の `serve` の起動し直しを促す。"
