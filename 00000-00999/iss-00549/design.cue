@@ -45,8 +45,9 @@ design: {
 			- ID：`new_id(taken, choose)`。`choose` は乱数の源（既定 `secrets.choice`、テストで固定）。20回続けて重なれば `TODO_ID_EXHAUSTED`。入力の ID は小文字にして受ける（サブタスクの `.n` も）。
 			- 状態の移り変わり（関数 `transition(record, action, …) -> record` が新しい `dict` を返す）：
 			  - `done`、`cancel`：`open`／`snoozed` から。閉じた記録には `TODO_STATE_INVALID`。開いたサブタスクがあれば `TODO_SUBTASKS_OPEN`、`--include-subtasks` なら同じ状態で閉じ、サブタスクごとに `subtask_done`／`subtask_cancelled` の経緯を足す。
+			  - サブタスクの `resolution.choice` は null だけ（選択肢は親のもの）。サブタスクの `done`／`cancel` は `--record` を書き、`--choice` と `--include-subtasks` を `TODO_INVALID` で断る。
 			  - `snooze`：`open`／`snoozed` の親から（延期し直してよい）。サブタスクは `TODO_INVALID`。
-			  - `reopen`：`done`／`cancelled` から。`resolution` と `snooze_until` を null にし、`status` を `open` に。期限は `--due` があれば書き換える。サブタスクの開き直しは、親が閉じていれば `TODO_PARENT_CLOSED`。
+			  - `reopen`：`done`／`cancelled` から。前の `resolution` を `reopened`（サブタスクは `subtask_reopened`）の経緯の欄 `resolution` に写してから、`resolution` と `snooze_until` を null にし、`status` を `open` に。期限は `--due` があれば書き換える。サブタスクの開き直しは、親が閉じていれば `TODO_PARENT_CLOSED`。
 			  - `update`：どの状態でも欄を直せる。`history` の `updated` の `fields` に、変えた欄の名前を並べる。変わらなければ書かない（結果は `unchanged`）。
 			  - 状態を変えるたびに `updated_at` を今にし、`snoozed` から出るときは `snooze_until` を null にする。
 			"""
