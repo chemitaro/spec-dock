@@ -24,7 +24,7 @@ ID: "iss-00535"
 - **覚え**：`ScopeDocuments` が (カタログ, ID) ごとに、Scope の種類と題名と、`requirement.cue`・`design.cue`・`plan.cue`・`explanation.html`・`requirement.md`・リポジトリの型（`<main のチェックアウト>/spec-dock/cue/*.cue`）の `(mtime_ns, size)` を鍵に描画を1つ覚える。5秒ごとの更新で `cue` を動かし続けない。
 - **文書**：`reference_cli.md`（提供側と dogfood の写し）の「ダッシュボードのサーバーの契約」に文書の道と起動し直しの知らせを足し、`static-inventory.json` の該当の行の sha256 を更新した（前の値 `891d64db…` を `known_old_sha256` の先頭に追加）。
 
-### 0.7.0 の移行の注記に要る契約の変更
+### 0.7.0 の移行の注記に要る契約の変更（main で 0.7.0 に上がったので、注記への追記は統括または後の Issue が行う）
 
 - 画面の道が増える：`/r/<host>/<owner>/<name>/scopes/<ID>/doc` と `…/scopes/<ID>/doc/<道>`（足すだけ。資料と同じ切り離し）。
 - `/api/v1/r/…/scopes/<ID>` の `details` に `spec`、`check`、`progress`、`adrs` と、文書ごとの `view` が増える（契約にしない画面の JSON）。
@@ -52,7 +52,10 @@ ID: "iss-00535"
 - レビューの道：pass（coverage complete、P0 0・P1 0・P2 0・P3 3。P3 は下の「Residual Risks」）。
 - テストの道 attempt 01：`make lint` 0、`uv run pytest` 1（`test_the_250_scope_structure_routes_within_a_second` が 1014ms で上限 1000ms を超えた。対象の `views/graph/*`・`views/timeline/*` は main と同じで、ロードアベレージ約 40〜60 の負荷による。コードは直さない）。
 - テストの道 attempt 02（同じコミット）：`make lint` 0、`uv run pytest` 0（3669 passed, 7 skipped）。
-- 結果：`closure.md`。
+- PR #566 が main と衝突したので origin/main `ca534fbe8`（#564 iss-00554、#565 iss-00553 の 0.7.0）を取り込んだ（`b75250486`。衝突は `dashboard_http.py` の `_repository_page` の1か所で、文書の道と `todos` の画面の道の両方を残した）。同じキャンペーンの attempt 03 で両方の道をやり直した。
+  - レビューの道：pass（coverage complete、P0 0・P1 0・P2 0・P3 3。attempt 01 と同じ）。
+  - テストの道：`make lint` 0、`uv run pytest` 0（3696 passed, 7 skipped）。
+- 最終の合格のコミットは `b75250486`。結果：`closure.md`。
 
 ## Residual Risks / Follow-ups
 
