@@ -135,6 +135,24 @@ SpecDock 0.5.0 は、`spec-dock/workspace.json` の `schema_version` が 4 の�
 - 前の版との同居：前の版の SpecDock が別の PC で同じカタログを同期しても、`todos/` はふつうのファイルとして保存と push がされ、検査に引っかかりません（前の版では `todo` のコマンドがないだけです）。
 - 戻し方：0.7.0 に問題があれば、パッケージを 0.6.0 に戻します。配布資産を 0.7.0 に上げた後なら、その更新の PR（版のファイル `spec-dock/system/spec-dock-version` を含む）を `git revert` して、配布資産を 0.6.0 のバイトに戻します。版のファイルだけを戻すと、0.6.0 の `canonical check` が 0.7.0 の資産を知らない変更として CI を止めます（0.6.0 の `installation update` も 0.7.0 のバイトを知らないので、戻す手段になりません）。カタログの `todos/` のファイルは残してかまいません（前の版のほかのコマンドに影響せず、版を上げ直せばそのまま読めます）。
 
+## 0.8.0 への更新
+
+0.8.0 は、ダッシュボードの文書の描画（#535）と人のタスクの画面（#554）を届ける版です。コマンドの数（71）、カタログの形式（format 1）、`workspace.json` の版（4）は変わりません。足すものだけで、0.7.0 のコマンドと API は変わりません。
+
+- パッケージを 0.8.0 に上げた後、各リポジトリで `spec-dock installation update --target <チェックアウト> --backup-dir <新しい外のディレクトリ> --yes` を実行して配布資産を上げ、通常の PR でコミットします。変わる配布資産は `docs/reference_cli.md`、`docs/authoring/cue.md`、Issue の計画の雛形 `templates/cue/issue/plan.cue`、この `docs/migration.md`、版のファイル `spec-dock/system/spec-dock-version`（0.8.0）の5つです。0.7.0 の配布資産のままでも動きます。CI の見本は版のファイルの版（0.8.0）の SpecDock を入れて動きます。
+- 文書の描画（#535）：Scope の詳しい画面の「文書」のタブで、仕様をその場で描いて読めます。
+  - 画面の道が足されます：`/r/<host>/<owner>/<name>/scopes/<ID>/doc`（`render_scope` の HTML）と `…/scopes/<ID>/doc/<道>`（`requirement.md`・`design.md`・`plan.md`・`report.md` と、`artifacts/`・`discussions/` の直下の名前に `adr-` を含む `.md`）。`sandbox="allow-scripts allow-popups"` の枠で示し、インターネットは使いません。
+  - API の `/api/v1/r/<repo>/scopes/<ID>` の `details` に、`spec`・`check`（検査の結果）・`progress`（計画の進み具合）・`adrs` と、文書ごとの `view` が足されます（画面のための JSON で、契約にはしません）。`cue` がないなどで検査できないときは `check.status: failed` と次の1手を示します。
+  - 前面の `serve` が古い版で動いていると、画面の上に起動し直しを促す帯（`SERVER_RESTART_REQUIRED`）が出ます。
+- 人のタスクの画面（#554）：見るだけで、書く口や完了のボタンはありません。
+  - API が足されます：`GET /api/v1/todos` と `GET /api/v1/r/<repo>/todos`（中身は `specdock.todo-list/v1`。`?status=open|snoozed|done|cancelled|all`、既定は `open`。ほかの値は 400 `DASHBOARD_TODO_FILTER_INVALID`）、`GET /api/v1/r/<repo>/todos/<ID>`（`todo show` と同じ1件の形。404 `TODO_NOT_FOUND`／`TODO_INVALID`、記録の誤りなどは 409 `TODO_RECORD_INVALID` など、503 はカタログが読めないとき）。`/api/v1/todos/revision` と、`structure`・`scopes/<ID>` の `todos` の項目は画面のためのもので、契約にしません。
+  - 画面の道が足されます：`/todos`、`/r/<repo>/todos`、`/r/<repo>/todos/<ID>`。上の帯に「人のタスク」のタブが出ます。
+  - 構造の図の箱、ボードのカード、詳しい画面の見出しに「人 n」の印（Epic と Initiative は配下も数えます）、詳しい画面に「人のタスク」のタブ、横断の概況の札に「人のタスク n」「期限切れ m」が出ます。`dashboard hide` やダッシュボードの設定で隠したリポジトリは、人のタスクの一覧と1件からも外れます。
+- 配布の文書の例の直し（#567）：`docs/authoring/cue.md` の CUE の書き方と、Issue の計画の雛形 `templates/cue/issue/plan.cue` の `execution` の例が、仕様化（`spec`）と実装（`impl`）の2つのセッションに分けた例になります。型・CLI・検査は変わりません（例だけの変更です）。
+- 古さの表示の直し（#568）：`dashboard summary` の `fetched_at`・`stale` と、API の `snapshot.fetched_at`・`age_seconds`・`stale` の意味が「最後に構造を確かめた時刻」（スナップショットの取得と、変更の確認（probe）のうち新しいほう）になります。構造に変化がない間に誤って「古い」と警告することがなくなります。欄の名前と型は変わりません。
+- 常駐のダッシュボードは、パッケージの版の更新の後に、自動で起動し直します（60秒ごとの版の確認。`dashboard service install` のやり直しは要りません）。前面の `serve` は自分で起動し直します。
+- 戻し方：0.8.0 に問題があれば、パッケージを 0.7.0 に戻します。配布資産を 0.8.0 に上げた後なら、その更新の PR（版のファイル `spec-dock/system/spec-dock-version` を含む）を `git revert` して、配布資産を 0.7.0 のバイトに戻します。版のファイルだけを戻すと、0.7.0 の `canonical check` が 0.8.0 の資産を知らない変更として CI を止めます。
+
 ## 新規導入
 
 ```sh
