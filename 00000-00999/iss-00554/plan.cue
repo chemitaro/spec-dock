@@ -13,7 +13,7 @@ steps: {
 	"S-05": {title: "画面：道、上の帯、`views/todos.js` と logic と css", realizes: ["R-01", "R-02", "R-03", "R-07"], status: "done", after: ["S-03"], session: "impl"}
 	"S-06": {title: "既存の画面の印：構造の図、ボード、詳しい画面のタブ、横断の概況", realizes: ["R-04", "R-05", "R-06"], status: "done", after: ["S-04", "S-05"], session: "impl"}
 	"S-07": {title: "一時の状態の置き場でサーバーを立て、ヘッドレス Chrome で PC 幅と 390px、明るい・暗いの写しを残す", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06"], status: "done", after: ["S-06"], session: "impl"}
-	"S-08": {title: "コードのレビュー、最終品質ゲート、report.md、PR と CI", realizes: ["R-01", "R-08"], status: "doing", after: ["S-07"], session: "impl"}
+	"S-08": {title: "コードのレビュー、最終品質ゲート、report.md、PR と CI", realizes: ["R-01", "R-08"], status: "done", after: ["S-07"], session: "impl"}
 }
 
 tests: {

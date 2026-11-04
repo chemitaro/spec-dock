@@ -36,16 +36,21 @@ ID: "iss-00554"
 
 - 仕様のレビュー（spec-reviewer opus/high）：round-1 で pass（P0/P1 なし。P2 3件・P3 1件は設計と計画に取り込んだ。`.workbench/spec-review/iss-00554/`）。
 - コードのレビュー（code-reviewer opus/high、標準と仕様の2人）：9e6d716c6 で2人とも pass（P0/P1 なし）。P2 2件（経緯の言葉の鍵、`todos/` のないカタログの覚え）を 7fe233237 で直し、テストを足した。
-- 全体のテスト（7fe233237）：`uv run pytest` 3626 passed、7 skipped。`make lint`（ruff、format、mypy）pass。
+- 全体のテスト（7fe233237）：`uv run pytest` 3626 passed、7 skipped。`make lint`（ruff、format、mypy）pass。最終のコミットの結果は「最終品質ゲート」の節。
+- origin/main とのマージ（e706f09c9）：`dashboard_http.py`・`dashboard_site.py`・`todo_aggregate.py` の競合を、両方の意味を残して解いた。循環の import は `DashboardSite.__init__` の中で `DashboardTodos` を import して断った。#562 の設定で隠したリポジトリは、人のタスクの一覧と1件からも外れる。
+- PR：https://github.com/chemitaro/spec-dock/pull/564（CI はすべて success、MERGEABLE／CLEAN）。
 - PC のヘッドレス Chrome（一時の状態の置き場 `.workbench/shots/env` に2つのリポジトリと8件のタスクを置き、このブランチのコードでサーバーを立てた。利用者の常駐のサーバーと `~/.local/state/spec-dock/` は使っていない）：全リポジトリ・リポジトリごと・1件・構造の図・ボード・Issue と Epic の詳しい画面のタブ・横断の概況の8画面を、PC 幅（1440px）と 390px、明るい・暗いで写した（32枚）。どの画面も横にはみ出さない（`scrollWidth - clientWidth = 0`）。期限切れは赤い帯・記号・「期限切れ（n時間超過）」で先頭の組に出る。構造の図の Issue の箱に「人 1」、Epic・Initiative の枠に「人 n 配下も」が出る。コンソールの誤りは、最初の画面の `/favicon.ico` の 404 だけ（既存の動き。推定）。
 - 写し：この Scope の `artifacts/`（`*--todos-all-pc-light.png` など32枚と `*--screenshots-report.json`）。
 - iPhone の Safari での確かめ：未実施（統括が利用者に頼む）。
 
 ## 最終品質ゲート
 
-- 合格：7fe233237（campaign `iss-00554-01`、attempt 01。closure は `.workbench/final-quality-gate/iss-00554-01/closure.md`）。
-- 審査（quality-gate-reviewer opus/high、1人）：pass、網羅 complete、P0 0・P1 0・P2 0・P3 1（画面側の『人のタスクが読めない』表示（横断の概況の札、詳しい画面のタブ）を確かめるものがない。情報のみ）。
-- テスト：`make lint` exit 0（ruff check、format、mypy pass）、`uv run pytest` exit 0（3626 passed、7 skipped）。同じコミット。
+- 合格：e706f09c9（campaign `iss-00554-01`、attempt 03。origin/main 48e04934d（#562 iss-00552 の表示の制御、#563 iss-00560）をマージした後のコミット。closure は `.workbench/final-quality-gate/iss-00554-01/closure.md`）。attempt 01（7fe233237）で一度閉じ、マージのため開き直した。
+- 審査（quality-gate-reviewer opus/high、1人）：pass、網羅 complete、P0 0・P1 0・P2 0・P3 1（画面側の『人のタスクが読めない』表示（横断の概況の札、詳しい画面のタブ）を確かめるものがない。情報のみ）。マージの競合の解き方と、#562 の設定で隠したリポジトリが人のタスクの一覧からも外れることも確かめられた。
+- テスト（e706f09c9）：`make lint` exit 0。`uv run pytest` は 2 failed、3674 passed、7 skipped。落ちたのは次の2つで、どちらも PC の負荷（load average 80〜128）による時間の失敗。ベース 0534cfe29 の木でも同じく落ち、この変更の差分の外にある。
+  - `tests/unit/presentation/test_dashboard_graph_js.py::test_the_250_scope_structure_routes_within_a_second`（上限 1 秒に対して 1673〜2060ms）
+  - `tests/cli_runtime/test_issue440_g3_worktree_bootstrap.py::test_bootstrap_timeout_keeps_applied_project_files_and_stops_its_child_group`（0.1 秒の timeout）
+- 代わりの証拠：PR #564 の CI が同じ e706f09c9 で、Provider CI（`make lint` と `uv run pytest` 全体）・SpecDock check・Commit identity のすべてで success。統括の判断（A）により、これを代わりの証拠としてゲートを閉じた。
 - ChatGPT のスキルは無効のため、補助の側はなし。
 
 ## Residual Risks / Follow-ups
