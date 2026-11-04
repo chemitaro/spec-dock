@@ -1,0 +1,331 @@
+{
+ "runs": [
+  {
+   "tag": "pc",
+   "view": "home",
+   "audit": {
+    "segments": 158,
+    "boxHits": 0,
+    "ownHits": 0,
+    "overlaps": 0,
+    "diagonal": 0,
+    "portShare": 0,
+    "trunkOverlaps": 0,
+    "failed": 0,
+    "list": [],
+    "edges": 50,
+    "iters": 1,
+    "ms": 24,
+    "unmapped": 0,
+    "widenLeft": 0,
+    "missing": 0,
+    "drift": 0,
+    "mode": "nest"
+   },
+   "opts": null,
+   "pressed": [
+    "deps:all",
+    "fold"
+   ],
+   "boxes": 102,
+   "doneShown": 73,
+   "doneUnderDone": [],
+   "doneLines": 57,
+   "waitLines": 18,
+   "roots": [
+    "init-00423",
+    "epic-00424",
+    "epic-00427",
+    "epic-00547",
+    "epic-00526",
+    "epic-00425",
+    "epic-00471",
+    "init-00039",
+    "epic-00343",
+    "epic-00107",
+    "epic-00054",
+    "init-00468",
+    "epic-00158",
+    "epic-00384",
+    "epic-00356",
+    "epic-00512",
+    "epic-00224",
+    "epic-00259",
+    "epic-00033",
+    "epic-00023",
+    "epic-00001",
+    "init-00079",
+    "epic-00080"
+   ],
+   "errors": []
+  },
+  {
+   "tag": "pc",
+   "view": "wait",
+   "audit": {
+    "segments": 36,
+    "boxHits": 0,
+    "ownHits": 0,
+    "overlaps": 0,
+    "diagonal": 0,
+    "portShare": 0,
+    "trunkOverlaps": 0,
+    "failed": 0,
+    "list": [],
+    "edges": 12,
+    "iters": 1,
+    "ms": 2,
+    "unmapped": 0,
+    "widenLeft": 0,
+    "missing": 0,
+    "drift": 0,
+    "mode": "nest"
+   },
+   "opts": {
+    "mode": "nest",
+    "showDone": false,
+    "deps": "wait",
+    "fold": true,
+    "legend": false
+   },
+   "pressed": [
+    "deps:wait",
+    "fold"
+   ],
+   "boxes": 102,
+   "doneShown": 73,
+   "doneUnderDone": [],
+   "doneLines": 0,
+   "waitLines": 15,
+   "roots": [
+    "init-00423",
+    "epic-00424",
+    "epic-00427",
+    "epic-00547",
+    "epic-00526",
+    "epic-00425",
+    "epic-00471",
+    "init-00039",
+    "epic-00343",
+    "epic-00107",
+    "epic-00054",
+    "init-00468",
+    "epic-00158",
+    "epic-00384",
+    "epic-00356",
+    "epic-00512",
+    "epic-00224",
+    "epic-00259",
+    "epic-00033",
+    "epic-00023",
+    "epic-00001",
+    "init-00079",
+    "epic-00080"
+   ]
+  },
+  {
+   "tag": "pc",
+   "view": "tree",
+   "audit": {
+    "segments": 60,
+    "boxHits": 0,
+    "ownHits": 0,
+    "overlaps": 0,
+    "diagonal": 0,
+    "portShare": 0,
+    "trunkOverlaps": 0,
+    "failed": 0,
+    "list": [],
+    "edges": 12,
+    "iters": 2,
+    "ms": 13,
+    "unmapped": 0,
+    "widenLeft": 0,
+    "missing": 0,
+    "drift": 0,
+    "mode": "tree"
+   },
+   "opts": {
+    "mode": "tree",
+    "showDone": false,
+    "deps": "wait",
+    "fold": true,
+    "legend": false
+   },
+   "pressed": [
+    "deps:wait"
+   ],
+   "boxes": 115,
+   "doneShown": 73,
+   "doneUnderDone": [],
+   "doneLines": 0,
+   "waitLines": 23,
+   "roots": []
+  },
+  {
+   "tag": "390",
+   "view": "home",
+   "audit": {
+    "segments": 158,
+    "boxHits": 0,
+    "ownHits": 0,
+    "overlaps": 0,
+    "diagonal": 0,
+    "portShare": 0,
+    "trunkOverlaps": 0,
+    "failed": 0,
+    "list": [],
+    "edges": 50,
+    "iters": 1,
+    "ms": 24,
+    "unmapped": 0,
+    "widenLeft": 0,
+    "missing": 0,
+    "drift": 0,
+    "mode": "nest"
+   },
+   "opts": null,
+   "pressed": [
+    "deps:all",
+    "fold"
+   ],
+   "boxes": 102,
+   "doneShown": 73,
+   "doneUnderDone": [],
+   "doneLines": 57,
+   "waitLines": 18,
+   "roots": [
+    "init-00423",
+    "epic-00424",
+    "epic-00427",
+    "epic-00547",
+    "epic-00526",
+    "epic-00425",
+    "epic-00471",
+    "init-00039",
+    "epic-00343",
+    "epic-00107",
+    "epic-00054",
+    "init-00468",
+    "epic-00158",
+    "epic-00384",
+    "epic-00356",
+    "epic-00512",
+    "epic-00224",
+    "epic-00259",
+    "epic-00033",
+    "epic-00023",
+    "epic-00001",
+    "init-00079",
+    "epic-00080"
+   ],
+   "errors": []
+  }
+ ],
+ "prefs": {},
+ "geo": {
+  "pc-initial": {
+   "view": [
+    0,
+    56,
+    1440,
+    900
+   ],
+   "world": [
+    0,
+    148,
+    3120,
+    4147
+   ],
+   "zoom": "88%",
+   "fits": false,
+   "scrollW": 1440,
+   "innerW": 1440
+  },
+  "pc-fit": {
+   "view": [
+    0,
+    56,
+    1440,
+    900
+   ],
+   "world": [
+    433,
+    152,
+    1007,
+    888
+   ],
+   "zoom": "16%",
+   "fits": true,
+   "scrollW": 1440,
+   "innerW": 1440
+  },
+  "pc-pan": {
+   "before": [
+    -1053,
+    -1535,
+    2493,
+    3009
+   ],
+   "after": [
+    -1653,
+    -1535,
+    1893,
+    3009
+   ],
+   "moved": 600
+  },
+  "390-initial": {
+   "view": [
+    0,
+    99,
+    390,
+    844
+   ],
+   "world": [
+    4,
+    147,
+    2628,
+    3510
+   ],
+   "zoom": "74%",
+   "fits": false,
+   "scrollW": 390,
+   "innerW": 390
+  },
+  "390-fit": {
+   "view": [
+    0,
+    99,
+    390,
+    844
+   ],
+   "world": [
+    8,
+    252,
+    382,
+    731
+   ],
+   "zoom": "11%",
+   "fits": true,
+   "scrollW": 390,
+   "innerW": 390
+  },
+  "390-pan": {
+   "before": [
+    -1578,
+    -1611,
+    1968,
+    2933
+   ],
+   "after": [
+    -1818,
+    -1611,
+    1728,
+    2933
+   ],
+   "moved": 240
+  }
+ },
+ "ok": true
+}
