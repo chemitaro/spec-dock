@@ -1,36 +1,25 @@
 package spec
 
-// 計画（Issue）。型 specdock/v1。
-// 作業しながら、手順の追加、変更、status の更新を、このファイルに直接書く。
+goal: "古さの判定を『最後に構造を確かめた時刻』にそろえる"
 
-// 目標（任意）。
-// goal: "..."
-
-// 実装の手順。番号（S-01、…）をキーにし、番号の順に並べる。
-// title と realizes（満たす要件・失敗の条件の番号）が必須。
-// status は todo（既定）、doing、done、dropped。after は先に済ませる手順の番号。
-// 1手順を1行に書き、status は title と realizes のすぐ後に置く。status の位置がそろうので一括で書き換えやすく、
-// 同じ手順に status を2つ書く誤りも防げる（同じ値の2つは CUE が黙ってまとめ、違う値なら誤りになる）。
-// すべての要件に、それを満たす手順が要る（dropped の手順は数えない）。
-// strict 以上では、dropped でない手順のすべてが、いずれかの番号に結び付く。
 steps: {
-	// "S-01": {title: "〜を作る", realizes: ["R-01"], status: "todo", after: ["..."], session: "impl"}
+	"S-01": {title: "確かめた時刻の関数と probe の読み取り（テスト先行）", realizes: ["R-01", "R-02", "F-01"], status: "todo"}
+	"S-02": {title: "モデル、summary、サーバー（署名を含む）に配線する", realizes: ["R-03", "R-04"], status: "todo", after: ["S-01"]}
+	"S-03": {title: "reference_cli.md と inventory を直す", realizes: ["R-04"], status: "todo", after: ["S-02"]}
 }
 
-// テスト。番号（T-01、…）をキーにする。title と verifies（確かめる要件・失敗の条件の番号）が必須。
-// standard 以上では、すべての要件に、strict 以上では、すべての失敗の条件に、確かめるテストが要る。
 tests: {
-	// "T-01": {title: "〜を確かめる", verifies: ["R-01"]}
+	"T-01": {title: "純関数の表：新しい probe、古い probe、エラー付き、未来、不正", verifies: ["R-01", "R-02", "F-01"]}
+	"T-02": {title: "probe.json がないか壊れているとき、build と summary が fetched_at で判定する", verifies: ["R-02", "F-01"]}
+	"T-03": {title: "summary と API の fetched_at と stale が一致し、probe の更新が次の要求で反映する", verifies: ["R-03"]}
+	"T-04": {title: "PR の状態と既存のテストが変わらない", verifies: ["R-04"]}
 }
 
-// 検証のしかた、戻し方、終わりの条件（任意）。critical では、手順があれば rollback が要る。
-// verification: "..."
-// rollback:     "..."
-// exit:         "..."
-
-// 実行の割り当て（任意）。手順の session は、ここのセッションの名前を指す。
-// レビューの after は、どの手順の後かを指す。モデルと推論の名前は、どんな文字列でもよい。
-// execution: {
-// 	sessions: impl: {task: "仕様化と実装", model: "...", effort: "...", rationale: "..."}
-// 	reviews: code: {role: "コードのレビュー", after: "S-01", model: "...", effort: "..."}
-// }
+verification: "`make lint` と `uv run pytest`（全体）。"
+execution: {
+	sessions: impl: {task: "仕様化と実装", model: "sonnet", effort: "medium", rationale: "policy §4 light の実装"}
+	reviews: {
+		spec: {role: "仕様のレビュー", after: "S-01", model: "opus", effort: "medium"}
+		code: {role: "コードのレビュー", after: "S-03", model: "sonnet", effort: "high"}
+	}
+}
