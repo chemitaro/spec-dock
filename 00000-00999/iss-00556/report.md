@@ -80,6 +80,15 @@ ID: "iss-00556"
 - このPCのほかのリポジトリの構造（読むだけ。[結果](artifacts/20261104t033409z-02--nowrap-node-audit-this-pc.json)）：既定の表示はすべて0件。taikyohiyou_project（線284本）の「終わったものも」と「すべての線」で、入れ子2通り（重なり2・5）と木2通り（各2。木は main でも同じ2件で、#544 で直さないと決めたもの）が残る。寄せを3〜6回で試し、4回が最も少ない。経路の作り方を変える必要があり、この Issue では直さない。
 - 上の「PC のヘッドレスの Chrome」の節の写し（`20261104t0216*`）は、折り返しをやめる前の `21d192a8d` のもの。
 
+### 最終品質ゲート 2（quality-gate-reviewer opus/high、1人。キャンペーン `fqg-iss-00556-2`。最終）
+
+- **合格のコミット：`f72217c76`**（範囲 `ae8c72456..f72217c76`、R-01〜R-07、worktree clean）。
+- レビュー：pass、P0 0・P1 0・P2 0・P3 2、coverage complete。
+- `make lint`：exit 0（ruff check、ruff format check、mypy）。
+- `uv run pytest`：exit 0（3522 passed、7 skipped、29分06秒）。
+- P3（情報のみ）：graph.js の v2 への保存を静的テストが見分けられない（ブラウザーで観測済み）。`active_at` のテストで完了と PR のマージの候補がほかの候補と同じ時刻で、見分けられない。
+- 記録：`.workbench/final-quality-gate/fqg-iss-00556-2/`（closure.md）。
+
 ### 最終品質ゲート 1（キャンペーン `fqg-iss-00556-1`、折り返しをやめる前）
 
 - **合格のコミット：`992a70150`**（範囲 `ae8c72456..992a70150`、worktree clean）。
@@ -94,7 +103,7 @@ ID: "iss-00556"
 
 ### PR
 
-- https://github.com/chemitaro/spec-dock/pull/557（base `main`、head `992a70150`）。マージは統括が行う。`work finish` はマージの後に統括が行う。
+- https://github.com/chemitaro/spec-dock/pull/557（base `main`、最終の head `f72217c76`）。マージは統括が行う。`work finish` はマージの後に統括が行う。
 
 ## Residual Risks / Follow-ups
 
