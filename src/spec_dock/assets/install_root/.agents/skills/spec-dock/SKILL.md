@@ -70,6 +70,16 @@ Read help, inspect the necessary preconditions, execute the in-scope command and
 - Sync observes current same-clone main/linked worktrees and their direct targets; it writes no cache, generation or projection and does not infer running agent processes. Use `--source github` for explicit live lifecycle observations.
 - Installation changes only known static resources in one worktree. Its skill files live only in the fixed SpecDock slots under `.agents/skills`; it never manages other skills, `.claude/skills` links or host configuration such as `.claude/settings.json`. Update/uninstall remove only known earlier `.claude/skills/spec-dock*` copies and skip a slot reached through a link. Init refuses existing destinations. Update/uninstall require verified external preservation for changes; unknown modified files require manual merge. Package updates are separate from static updates.
 
+## 人のタスク
+
+人にしかできない判断・確認・操作を、そのリポジトリのカタログの `todos/` に登録して追う（`spec-dock todo`。使い方、記録の形、設定、集約は `spec-dock/docs/todo.md`、引数と契約は `spec-dock/docs/reference_cli.md`）。GitHub には何も送らない。
+
+- 登録しない：会話の中で答えが返るもの（Claude Code や Codex の複数の質問も同じ）。PR のマージ待ち（ダッシュボードの表示を使う。意図して登録するのは妨げない）。作業者から統括への問いは Orca で行う。統括が答えられず人に上げるときだけ、統括が `decide` で登録する。
+- 登録する：答えを待ったままターンを終えるとき、人しかできない操作をすぐにしてもらえないとき、数日かかる確かめ、期限のある行為。`spec-dock todo add --by agent --role <役割> --kind <種類>`（`decide`、`check`、`operate`、`act`、`checklist` から選ぶ。`todo` は人だけ）で、`--body`（背景と問い。束にも要る）、`--reply-to`（答える場所）、`--effort`（所要時間）を書く。`decide` は選択肢と推奨を付ける。止める Scope があれば `--blocks <ID>` を付ける。登録してから、止まらない作業を続ける。
+- 束：1回の会話で全部の答えが返らない2つ以上の項目は、あらかじめ `--kind checklist` と `--item` で束にして登録する（束にも既定の期限が付く）。答えを受けるたびにサブタスクを閉じ、返事の終わりに `spec-dock todo show <親>` で残りを示す。1回の会話で終わる複数の問いは束にしない。
+- 閉じる：答えを受けた担当が `spec-dock todo done <ID> --record <原文の記録>` で閉じ、原文の記録（ファイルか URL）へのリンクを残す。統括は、始めるときに `spec-dock todo list` を読み、答えが出たのに閉じていないものを閉じる。
+- 守ること：秘密の値を書かない（操作のコマンドは書いてよい）。Claude Code の隔離セッション（`--worktree`）では、仕様と同じく読むだけにし、登録は統括に頼む。
+
 ## Documents and Artifacts
 
 Load only sources needed for the task: canonical metadata/docs, named direct-child Artifacts and rules, dependencies and applicable references under `spec-dock/docs/`. Use `workspace validate`, `workspace sync`, `active show` and relevant queries when verifying that changed surface.

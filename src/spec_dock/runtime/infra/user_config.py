@@ -1,6 +1,7 @@
-"""The user's SpecDock settings file `$XDG_CONFIG_HOME/spec-dock/config.json` (epic-00547 D-10).
+"""The user's SpecDock settings file `$XDG_CONFIG_HOME/spec-dock/config.json` (epic-00547 D-10) and a catalog's
+`dashboard.json` (iss-00552 D-02).
 
-SpecDock only reads it and never creates it. Other features may add sections next to `todo` later.
+SpecDock only reads them and never creates them. The file holds the `todo` and `dashboard` sections.
 """
 
 from __future__ import annotations
@@ -9,7 +10,15 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from spec_dock.runtime.domain.dashboard_visibility import (
+    REPOSITORY_FILE,
+    RepositoryDashboard,
+    UserDashboard,
+    parse_repository_dashboard,
+    parse_user_dashboard,
+)
 from spec_dock.runtime.domain.todo_settings import Layer, parse_layer
+from spec_dock.runtime.infra.github_structure import GithubRepository
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -42,3 +51,23 @@ def read_user_todo_settings(environ: Mapping[str, str] | None = None) -> Layer:
     path = user_config_path(environ)
     payload, error = read_optional(path)
     return parse_layer("user", str(path), payload, read_error=error)
+
+
+def repository_key(value: str) -> str:
+    return GithubRepository.parse(value).key
+
+
+def read_user_dashboard(path: Path | None = None) -> UserDashboard:
+    """The `dashboard` section of the user's settings file (`path` defaults to `user_config_path()`)."""
+    target = path if path is not None else user_config_path()
+    payload, error = read_optional(target)
+    return parse_user_dashboard(str(target), payload, key_of=repository_key, read_error=error)
+
+
+def read_repository_dashboard(catalog: Path) -> RepositoryDashboard:
+    """A catalog's `dashboard.json`; a link there is refused like a broken file."""
+    path = catalog / REPOSITORY_FILE
+    if path.is_symlink():
+        return parse_repository_dashboard(str(path), None, read_error="is a symbolic link")
+    payload, error = read_optional(path)
+    return parse_repository_dashboard(str(path), payload, read_error=error)

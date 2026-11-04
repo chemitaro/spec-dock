@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from spec_dock.runtime.domain.dashboard_model import SeenScope
-from spec_dock.runtime.infra.dashboard_files import read_hidden, read_server_url
+from spec_dock.runtime.infra.dashboard_files import read_server_url
 from spec_dock.runtime.infra.dashboard_store import (
     SEEN_KEEP,
     DashboardStateUnreadable,
@@ -36,7 +36,7 @@ OTHER = GithubRepository("o", "s")
 def test_hide_and_show_write_the_marks_atomically(tmp_path: Path) -> None:
     assert hide_repository(tmp_path, REPO, now=NOW) is True
     assert hide_repository(tmp_path, REPO, now=NOW) is False  # unchanged
-    assert read_hidden(tmp_path, REPO) and not read_hidden(tmp_path, OTHER)
+    assert hidden_repositories(tmp_path) == frozenset({REPO.key})
     document = json.loads((tmp_path / "dashboard" / "repositories.json").read_text())
     assert document == {
         "schema": "specdock.dashboard-repositories/v1",
@@ -45,7 +45,7 @@ def test_hide_and_show_write_the_marks_atomically(tmp_path: Path) -> None:
     assert hidden_repositories(tmp_path) == frozenset({"github.com/o/r"})
     assert show_repository(tmp_path, REPO) is True
     assert show_repository(tmp_path, REPO) is False
-    assert not read_hidden(tmp_path, REPO)
+    assert hidden_repositories(tmp_path) == frozenset()
     assert [p.name for p in (tmp_path / "dashboard").iterdir() if p.name.endswith(".tmp")] == []
 
 

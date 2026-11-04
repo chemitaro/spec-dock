@@ -4,7 +4,7 @@ canonical モードは、`spec-dock/workspace.json` の `schema_version` が 4 �
 
 SpecDock 0.4.0 から、canonical モードで新しく作る Scope は CUE の Scope（`requirement.cue`、`design.cue`、`plan.cue`、`explanation.html`、`report.md`）です。書き方と検査は [CUE Authoring Guide](authoring/cue.md) にあります。
 
-エージェントが守る規則は、配布するスキル（`.agents/skills/spec-dock/SKILL.md`）の「仕様の扱い」の節にあります。この文書は、利用者が用意と困ったときの扱いを知るためのものです。
+エージェントが守る規則は、配布するスキル（`.agents/skills/spec-dock/SKILL.md`）の「仕様の扱い」の節にあります。この文書は、利用者が用意と困ったときの扱いを知るためのものです。人のタスク（`spec-dock todo`）の使い方は[人のタスクの使い方](todo.md)にあります。
 
 ## モードと置き場
 
@@ -15,6 +15,7 @@ SpecDock 0.4.0 から、canonical モードで新しく作る Scope は CUE の 
   - 保証レベルの指定が必須です。`scope create` と `scope import github` には `--assurance <light|standard|strict|critical>` と `--assurance-reason <理由>` を付けます。新しい Scope は `spec-dock/templates/cue/<種類>/` から、`requirement.cue`、`design.cue`、`plan.cue`、`explanation.html`、`report.md` の一式で作られ、指定は `requirement.cue` の `assurance` だけに書かれます。
   - slug はありません（`scope create` と `scope import github` に `--slug` の引数はありません）。`scope import github` の `--title` は受け付けますが使わず、GitHub の題名で進めます（違えば警告 `CANONICAL_TITLE_IGNORED`）。
   - コマンドの入力は0埋めしなくてよい（`iss-454` は `iss-00454`）。表示と出力は0埋めの形です。
+- カタログには Scope のほかに、人のタスクの記録 `todos/<YYYY-MM>/t-xxxx.json` と設定 `todos/settings.json` があります（最初の `spec-dock todo add` が作る）。`todos/` は Scope のディレクトリでも置き場の誤りでもなく、`scope list`、`scope check`、`workspace validate`、`work finish` の検査は Scope のディレクトリだけを読みます。保存と同期は Scope の仕様と同じです。使い方は[人のタスクの使い方](todo.md)です。
 - 題名は GitHub の題名が正本です。日本語を含むどの言語でもよく、空でなく、制御文字を含まず、256文字以下です。題名を変えても、ID、ディレクトリ名、ブランチ名は変わりません。
 - 親子と依存は GitHub だけにあり、ディレクトリの位置には表れません。場所、親、子、依存は `spec-dock scope show <ID> --json`（`path`、`parent_id` など）で確かめます。
 - `spec-dock scope move <ID> --parent <親>` は GitHub の親だけを付け替えます。ディレクトリは動きません。
@@ -198,6 +199,23 @@ spec-dock canonical status --structure   # 上に加えて、Scope のディレ�
 | `CUE_SCHEMA_UNSUPPORTED` | 3（同上） | `requirement.cue` の `schema` の版を持つ SpecDock に上げる（持っている版を示す） |
 | `SCOPE_NOT_CUE` | 7（`scope render`） | Markdown の Scope は描けない。`requirement.md`、`design.md`、`plan.md` を直接読む |
 | `SCOPE_RENDER_INCOMPLETE` | 警告（`scope render`） | 評価が通らないので、検査の結果だけを描いた。`spec-dock scope check <ID>` の誤りを直してから、もう一度描く |
+| `TODO_INVALID`、`TODO_NESTING_TOO_DEEP` | 2（`todo add`、`todo update`など） | `details.problems` と `details.missing` のとおりに引数を直す（エージェントの登録は役割、種類、本文、答える場所、所要時間が要る。`decide` は選択肢2つ以上と推奨。サブタスクは1段だけ） |
+| `TODO_NOT_FOUND`、`TODO_ID_AMBIGUOUS` | 3 | `spec-dock todo list --status all` で ID を確かめ、完全な ID で実行する |
+| `TODO_STATE_INVALID`、`TODO_PARENT_CLOSED` | 3 | 今の状態（`todo show`）を確かめる。閉じたタスクの変更は `spec-dock todo reopen` で開き直してから |
+| `TODO_SUBTASKS_OPEN` | 3（`todo done`、`todo cancel`） | 開いたサブタスクを先に閉じるか、`--include-subtasks` を付ける |
+| `TODO_RECORD_INVALID`、`TODO_SCHEMA_UNSUPPORTED` | 3／警告（`todo list`） | 示した記録を `spec-dock todo check` で確かめ、手で壊れた欄を直す。知らない版なら SpecDock を更新する |
+| `TODO_ID_EXHAUSTED`、`TODO_WRITE_INCOMPLETE` | 3／6（partial） | `effects` と `todos/` の今の状態を確かめてから、同じコマンドを実行し直す |
+| `TODO_REGISTRY_UNREADABLE`、`TODO_REPOSITORY_UNKNOWN`、`TODO_REPOSITORY_UNREADABLE` | 3（`todo show REF`、`--all-repositories`）／警告（集約の行） | 登録簿に載っているか `spec-dock dashboard list` で確かめ、読めないリポジトリは、そのmainのチェックアウトで `spec-dock canonical link` |
+| `TODO_REPOSITORY_INVALID` | 2 | `--repository` と `REF` を `owner/name`、`github.com/owner/name`、`owner/name/t-xxxx` の形にする |
+| `TODO_CHECK_FAILED` | 7（`todo check`） | 示したファイルと欄を直し、もう一度 `spec-dock todo check` |
+| `TODO_LIMIT_EXCEEDED` | 警告（`todo add`） | 登録はされている。古い開いたタスクを閉じるか取り消す。目安は `todos/settings.json` か利用者の設定で変える |
+| `TODO_SCOPE_UNKNOWN` | 警告（`todo add`、`todo update`） | 保存した構造のスナップショットにない Scope の ID（スナップショットがないだけのこともある）。`spec-dock scope show <ID>` で確かめる。記録は与えたとおりに書かれている |
+| `TODO_SETTINGS_INVALID` | 警告 | 示した段（`todos/settings.json` か利用者の設定）を直す。壊れた段は丸ごと飛ばされ、下の段の値が効く |
+| `TODO_FILE_UNKNOWN` | 警告（`todo check`） | 記録でないファイルは読まれない。要らなければ `todos/` の外へ移す |
+| `TODO_REPOSITORY_DUPLICATE` | 警告（`todo list --all-repositories`） | 同じリポジトリの2つ目のクローン。最初の行だけが読まれる。登録簿は `spec-dock dashboard list` で確かめる |
+| `TODO_CUE_SKIPPED` | 警告（`todo check`） | `cue` v0.17.1 以上を PATH に入れる（なくても Python の検査で決まる） |
+| `TODO_CUE_FAILED` | 警告（`todo check`） | `cue version` が動くか確かめ、動かなければ入れ直す（`CUE_FAILED`、`CUE_TIMEOUT` と同じ。Python の検査の結果は有効） |
+| `TODO_CONFLICT_COPY` | 警告（`todo list`） | 別名ファイル（`*.conflict-*`）の中身を元の記録に統合し、別名ファイルを消す |
 | `DESIGN_SYSTEM_MISSING` | 警告（`scope render`）。`--design-system inline` では誤り（終了コード3、HTML を出さない） | このチェックアウトに `spec-dock/design-system/` がない。`spec-dock installation update` で入れる |
 | `CANONICAL_PROGRESS_MARK_FAILED` | 警告（`work start`、`work finish`） | GitHub で `spec-dock:in-progress` のラベルと担当者を確かめ、付け外す |
 | `READINESS_NOT_SATISFIED` | 3（`work start`） | `spec-dock dependency check <ID>` で止めているものを確かめ、前提を完了させる |

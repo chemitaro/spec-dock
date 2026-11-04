@@ -36,6 +36,7 @@ CURRENT_FIRST_READ_DESTINATIONS = frozenset({
     "cli-redesign-guide.html",
     "migration.md",
     "canonical.md",  # iss-00436: the canonical-mode guide is a current first read
+    "todo.md",  # iss-00551: the human-task guide is a current first read
     "authoring/overview.md",
 })
 REFERENCE_USE_DESTINATION_PREFIX = "reference-use:"

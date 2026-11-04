@@ -41,6 +41,14 @@ class DashboardServiceSpec(SchedulerSpec):
     port: int = DEFAULT_SERVICE_PORT
     tailscale: bool = False
     tailscale_dir: Path | None = None
+    # The install's absolute XDG_CONFIG_HOME, so the server reads the same settings file as the CLI (iss-00552).
+    config_home: Path | None = None
+
+    def environment(self, tail: str) -> dict[str, str]:
+        values = {"PATH": self.search_path(tail)}
+        if self.config_home is not None:
+            values["XDG_CONFIG_HOME"] = str(self.config_home)
+        return values
 
     def search_path(self, tail: str) -> str:
         directories = [str(self.git_dir)]
@@ -81,20 +89,23 @@ def dashboard_launchd_plist(spec: DashboardServiceSpec, *, label: str = DASHBOAR
         "ThrottleInterval": RESTART_SECONDS,
         "StandardOutPath": str(spec.log),
         "StandardErrorPath": str(spec.log),
-        "EnvironmentVariables": {"PATH": spec.search_path(LAUNCHD_PATH_TAIL)},
+        "EnvironmentVariables": spec.environment(LAUNCHD_PATH_TAIL),
     })
 
 
 def dashboard_systemd_unit(spec: DashboardServiceSpec) -> str:
     """One long-running service; its output goes to the journal (`journalctl --user -u spec-dock-dashboard`)."""
     command = " ".join(systemd_quote(argument, command=True) for argument in spec.arguments())
+    environment = "".join(
+        f"Environment={systemd_quote(f'{key}={value}')}\n" for key, value in spec.environment(SYSTEMD_PATH_TAIL).items()
+    )
     return (
         "[Unit]\n"
         "Description=SpecDock dashboard server\n"
         "[Service]\n"
         "Type=simple\n"
         "WorkingDirectory=%h\n"
-        f"Environment={systemd_quote('PATH=' + spec.search_path(SYSTEMD_PATH_TAIL))}\n"
+        f"{environment}"
         f"ExecStart={command}\n"
         "Restart=always\n"
         f"RestartSec={RESTART_SECONDS}\n"

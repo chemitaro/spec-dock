@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+import html
 import json
 import os
 from pathlib import Path
@@ -37,6 +38,7 @@ from spec_dock.runtime.application.dashboard_scope_details import (
 from spec_dock.runtime.application.todo_aggregate import registry_summary_todos
 from spec_dock.runtime.domain.canonical_layout import scope_relative
 from spec_dock.runtime.domain.dashboard_model import seen_scopes
+from spec_dock.runtime.domain.dashboard_visibility import REPOSITORY_FILE
 from spec_dock.runtime.infra.dashboard_assets import (
     AssetFile,
     content_type,
@@ -240,7 +242,7 @@ class DashboardHttp:
                 else self._plain(404, "this repository is not registered on this PC")
             )
         if found == "hidden":
-            page = _hidden_page(site.repository.slug)
+            page = _hidden_page(self._hidden_steps(site))
             if is_files:
                 return self._material(404, page, "text/html; charset=utf-8")
             return self._html(404, page, embed=embed)
@@ -348,13 +350,31 @@ class DashboardHttp:
                     404,
                     "DASHBOARD_REPOSITORY_HIDDEN",
                     "this repository is hidden from the dashboard",
-                    f"spec-dock dashboard show {site.repository.slug}",
+                    *self._hidden_steps(site),
                 )
             try:
                 return self._repository_api(request, site, parts[4:])
             except Exception as error:  # one repository's failure stays in its own response (R-03, F-12)
                 return self._error(500, "DASHBOARD_REPOSITORY_FAILED", f"{type(error).__name__}: {error}")
         return self._error(404, "DASHBOARD_NOT_FOUND", "no such API")
+
+    def _hidden_steps(self, site: SiteRepository) -> tuple[str, ...]:
+        """What shows the repository again: `dashboard show` for the mark, the settings file for the settings."""
+        visibility = self.site.visibility(site.key)
+        steps: list[str] = []
+        if visibility.mark:
+            steps.append(f"spec-dock dashboard show {site.repository.slug}")
+        if not visibility.config.visible:
+            steps.append("spec-dock dashboard list")
+            source = visibility.config.source
+            if source == "invalid":
+                paths = [problem.path for problem in visibility.config.problems]
+            elif source == "user":
+                paths = [str(self.site.user_config)]
+            else:
+                paths = [str(Path(catalog) / REPOSITORY_FILE) for catalog in site.catalogs]
+            steps.extend(f"edit {path}" for path in paths)
+        return tuple(steps)
 
     def _repositories(self) -> dict[str, object]:
         items = []
@@ -493,9 +513,11 @@ def _read_regular(root: Path, parts: Sequence[str]) -> bytes | None:
         return stream.read()
 
 
-def _hidden_page(slug: str) -> bytes:
+def _hidden_page(steps: tuple[str, ...]) -> bytes:
+    lines = "\n".join(html.escape(step) for step in steps)
     return (
         '<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>表示を止めたリポジトリ</title></head>'
         "<body><h1>このリポジトリの表示は止めてあります</h1>"
-        f"<p>表示に戻すには、次のコマンドを実行します。</p><pre>spec-dock dashboard show {slug}</pre></body></html>"
+        "<p>表示に戻すには、次の手順を行います（edit は、その設定のファイルの visible を直すことです）。</p>"
+        f"<pre>{lines}</pre></body></html>"
     ).encode()

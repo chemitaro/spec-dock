@@ -161,9 +161,9 @@ HELP_EFFECTS: dict[str, str] = {
     "canonical remove": "Remove this clone's catalog, links and sync registration after confirming nothing is unsaved.",
     "dashboard summary": "Read one repository's dashboard summary (specdock.dashboard-summary/v1), with its human-task counts, from local files; no changes.",
     "dashboard serve": "Serve the read-only dashboard of every shown registered repository in the foreground until Ctrl-C or SIGTERM.",
-    "dashboard hide": "Hide one repository from the dashboard; the periodic sync continues.",
-    "dashboard show": "Show a hidden repository on the dashboard again.",
-    "dashboard list": "List the registered repositories, whether each is shown or hidden, and the server URL; no changes.",
+    "dashboard hide": "Mark one repository hidden from the dashboard; the periodic sync continues.",
+    "dashboard show": "Remove the hidden mark of one repository; the dashboard settings may still hide it.",
+    "dashboard list": "List the registered repositories, whether each is shown or hidden and why (mark, settings and their source), and the server URL; no changes.",
     "dashboard service install": "Install the per-user service that starts the dashboard server at login and keeps it running (launchd or a systemd user service).",
     "dashboard service status": "Show whether the dashboard service is installed and loaded, whether a server runs, its URL and versions; no changes.",
     "dashboard service uninstall": "Stop and remove the dashboard service, its job file and its log; the periodic sync is untouched.",
@@ -519,8 +519,8 @@ HELP_PRECONDITIONS: dict[str, str] = {
     "dashboard summary": "Inside a schema-4 checkout REPOSITORY may be omitted (it comes from the origin remote); elsewhere pass owner/name or github.com/owner/name. The repository's structure snapshot must exist and be readable (DASHBOARD_SNAPSHOT_MISSING, DASHBOARD_SNAPSHOT_UNREADABLE, DASHBOARD_SNAPSHOT_UNSUPPORTED stop with exit 3). Works without a running dashboard server and for hidden repositories; it never contacts GitHub or the server. todos counts the repository's open (snoozed included), blocking and overdue parent tasks: inside a checkout whose link is correct from its catalog, otherwise from the registry's catalog; when they cannot be read todos.status is unavailable with a problem and the summary still succeeds.",
     "dashboard serve": "No project is required. Listens on 127.0.0.1 only, port 47800 by default (--port N; 0 picks a free port); --tailscale also listens on this PC's Tailscale IPv4 address from `tailscale ip -4` (DASHBOARD_TAILSCALE_UNAVAILABLE exits 3 when there is none). A used port stops with DASHBOARD_PORT_IN_USE (exit 3). When a server already runs, its URL is shown and the command exits 0.",
     "dashboard hide": "Inside a schema-4 checkout REPOSITORY may be omitted (it comes from the origin remote); elsewhere pass owner/name or github.com/owner/name. An unreadable marks file stops with DASHBOARD_STATE_UNREADABLE (exit 3) and is not overwritten.",
-    "dashboard show": "Inside a schema-4 checkout REPOSITORY may be omitted (it comes from the origin remote); elsewhere pass owner/name or github.com/owner/name. An unreadable marks file stops with DASHBOARD_STATE_UNREADABLE (exit 3) and is not overwritten.",
-    "dashboard list": "No project is required; it reads the registry of the state root.",
+    "dashboard show": "Inside a schema-4 checkout REPOSITORY may be omitted (it comes from the origin remote); elsewhere pass owner/name or github.com/owner/name. An unreadable marks file stops with DASHBOARD_STATE_UNREADABLE (exit 3) and is not overwritten. When the dashboard settings still hide the repository, hidden stays true, hidden_by names the source and DASHBOARD_HIDDEN_BY_CONFIG warns; fix the settings file shown by dashboard list.",
+    "dashboard list": "No project is required; it reads the registry of the state root. A repository is shown only when the settings show it (default true < the user settings file's dashboard.visible < its dashboard.repositories.<key>.visible < the catalog's dashboard.json, the repository layer winning) and it has no hidden mark. A broken settings file hides instead of being skipped (config.source invalid, listed in config_problems).",
     "dashboard service install": "No project is required. macOS (launchd) or Linux with a working systemd user manager; elsewhere DASHBOARD_SERVICE_UNSUPPORTED (exit 3) points to `spec-dock dashboard serve`. --port N is 1-65535 (default 47800). A launchctl/systemctl failure stops with DASHBOARD_SERVICE_FAILED (exit 3). Run it again to change --port or --tailscale.",
     "dashboard service status": "No project is required; on a PC without a service manager it reports supported=false.",
     "dashboard service uninstall": "No project is required; nothing installed is a success with removed=false.",
@@ -566,8 +566,8 @@ _READS_BY_ROOT = {
     "workspace": "Workspace declaration, the GitHub structure snapshot, the catalog, and explicitly requested remote observations.",
     "installation": "Installed package inventory and the selected worktree's declaration and static file snapshots.",
     "canonical": "This clone's canonical catalog and checkout links, or one commit tree, as each command states.",
-    "dashboard": "The repository's structure snapshot, the dashboard hidden marks, the server location record (only whether its pid is alive) and, for summary, the catalog registry and the catalog's todos/ records.",
-    "todo": "The catalog's todos/ records and todos/settings.json, the user settings file, the origin remote, the saved structure snapshot, the dashboard hidden marks and, for list --all-repositories/--repository and show REF, the catalog registry and every registered catalog's todos/.",
+    "dashboard": "The repository's structure snapshot, the dashboard hidden marks, the dashboard settings (the user settings file and each registered catalog's dashboard.json), the server location record (only whether its pid is alive) and, for summary, the catalog registry and the catalog's todos/ records.",
+    "todo": "The catalog's todos/ records and todos/settings.json, the user settings file, the origin remote, the saved structure snapshot, the dashboard hidden marks and settings (the user settings file and the catalogs' dashboard.json) and, for list --all-repositories/--repository and show REF, the catalog registry and every registered catalog's todos/.",
 }
 
 _DOES_NOT_BY_ROOT = {
@@ -837,6 +837,7 @@ def _help_spec(leaf: str) -> HelpSpec:
     elif leaf == "dashboard serve":
         reads = (
             "The registry, each shown repository's structure snapshot and catalog files, the hidden marks, the"
+            " dashboard settings (the user settings file and each registered catalog's dashboard.json), the"
             " dashboard seen records, and `tailscale ip -4`/`tailscale status --json` only with --tailscale."
         )
         writes = (
@@ -853,12 +854,19 @@ def _help_spec(leaf: str) -> HelpSpec:
         )
         confirmation = "No final confirmation is required; the command runs until Ctrl-C or SIGTERM."
     elif leaf in ("dashboard hide", "dashboard show"):
-        reads = "The hidden marks and the registry of the state root."
+        reads = (
+            "The hidden marks and the registry of the state root, and the dashboard settings (the user settings"
+            " file and each registered catalog's dashboard.json) for the final value."
+        )
         writes = "Only <state root>/dashboard/repositories.json (specdock.dashboard-repositories/v1), atomically under a lock."
         does_not = (
             "Does not stop the periodic sync, change the registry, the catalog or the repository, or contact GitHub."
         )
-        json_data = "repository, hidden, changed, registered."
+        json_data = (
+            "repository, hidden (the final value after the write), changed, registered, mark,"
+            " config {visible, source: default|user|repository|invalid}, hidden_by; show warns"
+            " DASHBOARD_HIDDEN_BY_CONFIG when the settings still hide the repository."
+        )
         confirmation = "No final confirmation is required; show undoes hide."
     elif leaf == "dashboard service install":
         target = "This user's dashboard service: ~/Library/LaunchAgents/io.github.chemitaro.spec-dock.dashboard.plist or ${XDG_CONFIG_HOME:-~/.config}/systemd/user/spec-dock-dashboard.service."
@@ -891,11 +899,16 @@ def _help_spec(leaf: str) -> HelpSpec:
         json_data = "scheduler, removed, path, log_removed."
         confirmation = "No final confirmation is required; `install` puts it back."
     elif leaf == "dashboard list":
-        reads = "The registry, the hidden marks and the server location record (only whether its pid is alive)."
+        reads = (
+            "The registry, the hidden marks, the dashboard settings (the user settings file and each registered"
+            " catalog's dashboard.json) and the server location record (only whether its pid is alive)."
+        )
         does_not = "Does not contact GitHub or the dashboard server, or write any file."
         json_data = (
-            "repositories[] (repository or null, catalog, main_checkout, hidden, served, problem, path, url),"
-            " server, registry_error, marks_unreadable (true: every repository is kept hidden)."
+            "repositories[] (repository or null, catalog, main_checkout, hidden, served, problem, path, url, mark,"
+            " config {visible, source: default|user|repository|invalid} or null, hidden_by), server,"
+            " registry_error, marks_unreadable (true: every repository is kept hidden),"
+            " config_problems[] (layer, path, reason)."
         )
         confirmation = "No final confirmation is required for this read-only leaf."
     elif leaf == "canonical check":

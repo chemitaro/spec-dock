@@ -12,11 +12,11 @@ import re
 from typing import TYPE_CHECKING
 
 from spec_dock.runtime.application import todo_common
+from spec_dock.runtime.application.dashboard_site import read_visibility
 from spec_dock.runtime.application.todo_check import conflict_warning
 from spec_dock.runtime.application.todo_common import open_repository, todo_handler
 from spec_dock.runtime.domain.todo_model import Filters, count_limits, matches, order, tally
 from spec_dock.runtime.domain.todo_record import SCHEMA, TodoError, normalize_id, parent_id, validate
-from spec_dock.runtime.infra.dashboard_files import read_hidden
 from spec_dock.runtime.infra.file_publication import read_regular_file
 from spec_dock.runtime.presentation.command_data import FamilyData
 from spec_dock.runtime.presentation.envelope import Diagnostic, OperationResult
@@ -129,7 +129,11 @@ def counts_of(records: list[dict[str, object]], settings: Effective, now: dateti
 def checkout_row(
     repository: TodoRepository, records: list[dict[str, object]], classified: Classified, now: datetime
 ) -> dict[str, object]:
-    hidden = read_hidden(repository.state_root, repository.repository) if repository.repository is not None else False
+    hidden = (
+        read_visibility(repository.state_root, repository.repository, repository.catalog).hidden
+        if repository.repository is not None
+        else False
+    )
     return repository_row(
         repository=repository.repository.key if repository.repository is not None else None,
         catalog=str(repository.catalog),
