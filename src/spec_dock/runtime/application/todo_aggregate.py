@@ -15,13 +15,13 @@ import shlex
 from typing import TYPE_CHECKING, Final
 
 from spec_dock.runtime.application import todo_common
+from spec_dock.runtime.application.dashboard_site import DashboardSite
 from spec_dock.runtime.application.todo_common import command_error, settings_warnings
 from spec_dock.runtime.application.todo_list import classify, counts_of, normalize_scope, show_from_store
 from spec_dock.runtime.domain.todo_model import Filters, matches, order, tally
 from spec_dock.runtime.domain.todo_record import TodoError, normalize_id
 from spec_dock.runtime.domain.todo_settings import resolve
 from spec_dock.runtime.infra.canonical_registry import RegistryUnreadable, read_registry
-from spec_dock.runtime.infra.dashboard_files import read_hidden
 from spec_dock.runtime.infra.github_structure import GithubRepository
 from spec_dock.runtime.infra.state_root import resolve_state_root
 from spec_dock.runtime.infra.todo_store import TodoStore
@@ -202,12 +202,13 @@ def _list_all(namespace: argparse.Namespace) -> OperationResult[object]:
         for row in select_catalogs(registry)
         if not wanted or (row.repository is not None and row.repository.key in wanted)
     ]
+    site = DashboardSite(state_root)  # the same answer as the dashboard server (iss-00552 D-05)
     collected = collect(
         rows,
         filters=filters,
         now=now,
         user_layer=user_layer,
-        hidden=lambda repository: read_hidden(state_root, repository),
+        hidden=lambda repository: site.visibility(repository.key).hidden,
     )
     warnings: list[Diagnostic] = [*settings_warnings((user_layer,)), *collected.warnings]
     seen = {row.repository.key for row in rows if row.repository is not None}

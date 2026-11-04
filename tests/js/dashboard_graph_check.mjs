@@ -1,6 +1,6 @@
 // The structure graph's node check (iss-00532 D-07). Run by tests/unit/presentation/test_dashboard_graph_js.py:
 //   node dashboard_graph_check.mjs <assets/dashboard directory> <request.json>
-// request.json = {documents: {name: structure API document}, checks: ["audit", "layout", "series"]}
+// request.json = {documents: {name: structure API document}, checks: ["audit", "layout", "order", "series"]}
 // Prints one JSON object with the results; the Python test asserts on it.
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
@@ -8,11 +8,11 @@ import path from "node:path";
 
 const [assets, requestPath] = process.argv.slice(2);
 const load = (rel) => import(pathToFileURL(path.join(assets, rel)).href);
-const { layout, routeLayout, graphInput } = await load("views/graph/layout.js");
+const { layout, routeLayout, graphInput, index, byActivity } = await load("views/graph/layout.js");
 const { audit } = await load("views/graph/router.js");
 const series = await load("views/timeline/series.js");
 const request = JSON.parse(readFileSync(requestPath, "utf8"));
-const out = { audit: [], layout: {}, series: {} };
+const out = { audit: [], layout: {}, series: {}, order: {} };
 if (request.prefs) {
   const { restorePrefs } = await load("views/graph/prefs.js");
   const { DEFAULTS } = await load("views/graph/layout.js");
@@ -25,6 +25,11 @@ function combos(doc) {
     for (const showDone of [false, true])
       for (const deps of ["wait", "all"])
         for (const fold of [true, false]) list.push({ mode, showDone, deps, fold });
+  // iss-00560: the groups wrap at the width seen at 100%: a PC (1400px) and a 390px phone (374px)
+  for (const width of [1400, 374])
+    for (const showDone of [false, true])
+      for (const deps of ["wait", "all"])
+        for (const fold of [true, false]) list.push({ mode: "nest", showDone, deps, fold, width });
   for (const s of doc.scopes) if (s.kind !== "issue" && s.state !== "done") list.push({ mode: "nest", showDone: false, deps: "all", fold: true, focus: s.id });
   return list;
 }
@@ -60,6 +65,15 @@ if (request.checks.includes("layout")) {
       };
     }
     out.layout[name] = result;
+  }
+}
+
+// The activity order of each parent's children (iss-00560: the order the groups start from).
+if (request.checks.includes("order")) {
+  for (const [name, doc] of Object.entries(request.documents)) {
+    const ix = index(doc.scopes);
+    const act = byActivity(ix);
+    out.order[name] = Object.fromEntries([...ix.kids].filter(([, k]) => k.length).map(([id, k]) => [id, k.slice().sort(act).map((s) => s.id)]));
   }
 }
 

@@ -82,3 +82,13 @@ def test_service_settings_reads_back_the_recorded_arguments() -> None:
     assert service_settings(["/x/spec-dock", "canonical", "sync", "--registered"]) is None
     assert service_settings(["/x/spec-dock", "dashboard", "serve", "--service", "--port", "nope"]) is None
     assert service_settings([]) is None
+
+
+def test_the_settings_directory_of_the_install_reaches_the_server() -> None:
+    """The server reads the same `$XDG_CONFIG_HOME/spec-dock/config.json` as the CLI that installed it (iss-00552)."""
+    spec = _spec(config_home=Path("/home/u/my config"))
+    document = plistlib.loads(dashboard_launchd_plist(spec))
+    assert document["EnvironmentVariables"]["XDG_CONFIG_HOME"] == "/home/u/my config"
+    assert 'Environment="XDG_CONFIG_HOME=/home/u/my config"' in dashboard_systemd_unit(spec).splitlines()
+    assert "XDG_CONFIG_HOME" not in plistlib.loads(dashboard_launchd_plist(_spec()))["EnvironmentVariables"]
+    assert "XDG_CONFIG_HOME" not in dashboard_systemd_unit(_spec())

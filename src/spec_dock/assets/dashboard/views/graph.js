@@ -44,6 +44,7 @@ const V = {
   ty: 0,
   fitted: false,
   sig: null,
+  width: 0, // the visible width at 100% the graph was last laid out for (iss-00560 R-03)
   EG: null, // the last routing: {layout, G, routes, widen, iters, unmapped, ms}
   ctx: null,
   root: null,
@@ -78,6 +79,9 @@ function savePrefs() {
 }
 
 const isPhone = () => (V.root?.clientWidth || innerWidth) <= PHONE;
+// The graph's visible width at 100% (px), where the groups of the layout wrap (iss-00560 D-05): the same 16px of
+// margin as the first view and "fit".
+const seenWidth = () => Math.max(1, (V.el?.view.clientWidth || innerWidth) - 16);
 const byId = (id) => V.ix?.byId.get(id);
 
 // --- Shell DOM ---------------------------------------------------------------------------------------------
@@ -153,7 +157,7 @@ function render(root, ctx) {
     V.desc = descendants(V.ix);
   }
   if (V.sel && !byId(V.sel)) select(null);
-  const sig = `${data.revision}|${JSON.stringify(V.opts)}|${focus}`;
+  const sig = `${data.revision}|${JSON.stringify(V.opts)}|${focus}|${seenWidth()}`;
   renderBar(focus);
   renderLegend();
   if (sig !== V.sig) {
@@ -162,6 +166,7 @@ function render(root, ctx) {
     if (!V.fitted) {
       V.fitted = true;
       whenStyled(() => {
+        relayout(); // the screen's CSS can change the width the first layout used
         initialView();
         applyT();
       });
@@ -277,7 +282,8 @@ const pos = (r) => `left:${r.x1}px;top:${r.y1}px;width:${r.x2 - r.x1}px;height:$
 
 function buildWorld(focus) {
   const t0 = performance.now();
-  const r = routeLayout(V.data.scopes, V.data.cleanup, { ...V.opts, focus });
+  V.width = seenWidth();
+  const r = routeLayout(V.data.scopes, V.data.cleanup, { ...V.opts, focus, width: V.width });
   V.EG = { ...r, ms: Math.round(performance.now() - t0) };
   const L = r.layout;
   const cleanup = cleanupOf();
@@ -625,8 +631,19 @@ function onKey(event) {
   }
 }
 
+// Only a change of the window's width lays the graph out again (iss-00560 R-03); zooming, panning and a change of the
+// height keep the layout. The zoom and the position stay.
+let resizeFrame = 0;
 function onResize() {
-  if (V.el && !V.el.view.hidden) applyT();
+  if (!V.el || V.el.view.hidden) return;
+  applyT();
+  cancelAnimationFrame(resizeFrame);
+  resizeFrame = requestAnimationFrame(relayout);
+}
+
+function relayout() {
+  if (!V.el || V.el.view.hidden || !V.data || !V.ctx || seenWidth() === V.width) return;
+  render(V.root, V.ctx);
 }
 
 // A tap or click on the graph (pointer events give both): select; on a phone the second tap on the selected box

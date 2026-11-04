@@ -107,7 +107,7 @@ def test_every_way_of_showing_the_representative_structures_draws_clean_lines(re
 
 def test_the_250_scope_structure_routes_within_a_second(representative: dict[str, Any]) -> None:
     runs = [run for run in representative["audit"] if run["name"] == "generated" and not run["opts"].get("focus")]
-    assert len(runs) == 16
+    assert len(runs) == 16 + 2 * 8  # and the nested ones at a PC's and a phone's width (iss-00560)
     assert max(run["ms"] for run in runs) < 1000
 
 
@@ -141,13 +141,21 @@ def _nodes(result: dict[str, Any], key: str) -> dict[str, dict[str, Any]]:
     return {item["id"]: item for item in result["layout"]["small"][key]["nodes"]}
 
 
-def test_prerequisites_sit_left_and_a_stage_keeps_the_recommended_order(small: dict[str, Any]) -> None:
+def _reading(nodes: dict[str, dict[str, Any]], ids: tuple[str, ...]) -> list[str]:
+    """The reading order: shelves from the top, left to right on a shelf."""
+    return sorted(ids, key=lambda i: (nodes[i]["y1"], nodes[i]["x1"]))
+
+
+def test_prerequisites_sit_left_and_what_follows_keeps_the_row(small: dict[str, Any]) -> None:
     nodes = _nodes(small, "home")
     assert nodes["iss-00002"]["x2"] < nodes["iss-00003"]["x1"]
-    # 22 has two waiting Scopes: first in the first stage of epic 20, then 21 and 23 by number
-    first = sorted((nodes[i] for i in ("iss-00021", "iss-00022", "iss-00023")), key=lambda item: item["y1"])
-    assert [item["id"] for item in first] == ["iss-00022", "iss-00021", "iss-00023"]
-    assert nodes["iss-00024"]["x1"] == nodes["iss-00025"]["x1"] > nodes["iss-00022"]["x2"]
+    assert nodes["iss-00002"]["y1"] == nodes["iss-00003"]["y1"]
+    # iss-00560: 22 and the two waiting for it are one group; one of them keeps 22's row, the other goes below
+    assert nodes["iss-00024"]["x1"] == nodes["iss-00025"]["x1"] == nodes["iss-00022"]["x2"] + 44
+    assert nodes["iss-00024"]["y1"] == nodes["iss-00022"]["y1"] < nodes["iss-00025"]["y1"]
+    # 21 and 23 wait for nothing: groups of their own, after the group of 22 (the recommended order), left to right
+    assert _reading(nodes, ("iss-00022", "iss-00021", "iss-00023")) == ["iss-00022", "iss-00021", "iss-00023"]
+    assert nodes["iss-00021"]["y1"] == nodes["iss-00023"]["y1"] == nodes["iss-00022"]["y1"]
 
 
 def test_seven_stages_stay_on_one_row(small: dict[str, Any]) -> None:
@@ -267,7 +275,7 @@ def _context() -> dict[str, Any]:
 
 
 def _wide() -> dict[str, Any]:
-    """An Epic of twelve Issues without dependencies, and twelve top-level Issues: wider than 1240px each."""
+    """An Epic of twelve Issues without dependencies, and twelve top-level Issues: wider than 1240px each in a row."""
     return document(
         snapshot(
             node(200, "epic"),
@@ -313,7 +321,11 @@ def context(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
         tmp_path_factory.mktemp("context"),
         {
             "documents": {"context": _context(), "missing": _missing_times(), "wide": _wide()},
-            "layouts": {"context": layouts, "missing": {"home": {}}, "wide": {"home": {}}},
+            "layouts": {
+                "context": layouts,
+                "missing": {"home": {}},
+                "wide": {"home": {}, "w1240": {"width": 1240}, "w1400": {"width": 1400}, "w374": {"width": 374}},
+            },
             "checks": ["layout", "audit"],
             "prefs": [
                 {"current": None, "legacy": None},
@@ -374,23 +386,25 @@ def test_the_default_view_draws_finished_dependencies_between_shown_boxes(contex
 def test_frames_follow_activity_and_boxes_put_done_below(context: dict[str, Any]) -> None:
     home = _ids(context, "home")
     roots = ("init-00001", "epic-00020", "epic-00030", "init-00060")
-    assert _top_down(home, roots) == ["init-00001", "epic-00020", "epic-00030", "init-00060"]
+    # iss-00560: the top level is shelves of groups too, read from the top and left to right
+    assert _reading(home, roots) == ["init-00001", "epic-00020", "epic-00030", "init-00060"]
     inside = ("epic-00002", "epic-00008", "epic-00012", "epic-00014")
-    order = sorted(inside, key=lambda i: (home[i]["y1"], home[i]["x1"]))
-    assert order == ["epic-00002", "epic-00014", "epic-00012", "epic-00008"]
-    # the finished prerequisite 3 sits in the stage left of 5, which waits for it (stages counting the done ones)
+    assert _reading(home, inside) == ["epic-00002", "epic-00014", "epic-00012", "epic-00008"]
+    # the finished prerequisite 3 sits left of 5, which waits for it, on its row (stages counting the done ones)
     assert home["iss-00003"]["x2"] < home["iss-00005"]["x1"]
-    first = ("iss-00003", "iss-00004", "iss-00006", "iss-00007")
-    assert len({home[i]["x1"] for i in first}) == 1
-    assert _top_down(home, first) == ["iss-00007", "iss-00006", "iss-00004", "iss-00003"]
+    assert home["iss-00003"]["y1"] == home["iss-00005"]["y1"]
+    # the groups in the activity order: open boxes by the recommended order, then the done ones, most recent first
+    assert _reading(home, ("iss-00007", "iss-00006", "iss-00004")) == ["iss-00007", "iss-00006", "iss-00004"]
     tree = _ids(context, "tree")
-    assert _top_down(tree, roots) == ["init-00001", "epic-00020", "epic-00030", "init-00060"]
-    # a closed parent with open children shows no done child: its stages are the open ones, so 92 (waiting only for
-    # the done 91) shares the first stage with 95, and 96 (waiting for 95) is the second (its open children are
-    # cleanup candidates: unfolded)
+    assert _top_down(tree, roots) == ["init-00001", "epic-00020", "epic-00030", "init-00060"]  # the tree: unchanged
+    # a closed parent with open children shows no done child: its dependencies are the open ones, so 92 (waiting
+    # only for the done 91) is a group of its own beside the group 95 -> 96 (its open children are cleanup
+    # candidates: unfolded)
     unfolded = _ids(context, "unfolded")
     assert "iss-00091" not in unfolded
-    assert unfolded["iss-00092"]["x1"] == unfolded["iss-00095"]["x1"] < unfolded["iss-00096"]["x1"]
+    assert unfolded["iss-00096"]["x1"] == unfolded["iss-00095"]["x2"] + 44
+    assert unfolded["iss-00092"]["x1"] == unfolded["iss-00096"]["x2"] + 14
+    assert unfolded["iss-00092"]["y1"] == unfolded["iss-00095"]["y1"] == unfolded["iss-00096"]["y1"]
 
 
 def test_scopes_without_times_are_the_oldest(context: dict[str, Any]) -> None:
@@ -419,12 +433,132 @@ def test_the_graph_saves_its_choices_under_the_new_key() -> None:
     assert "restorePrefs" in source and "PREFS_KEY" in source and "LEGACY_KEY" in source
 
 
-def test_a_wide_stage_stays_on_one_row_and_grows_to_the_right(context: dict[str, Any]) -> None:
-    """iss-00556 R-07: no wrapping at 1240px; the graph is panned sideways instead."""
-    nodes = {item["id"]: item for item in context["layout"]["wide"]["home"]["nodes"]}
-    for ids in ([f"iss-{n:05d}" for n in range(201, 213)], [f"iss-{n:05d}" for n in range(220, 232)]):
-        boxes = [nodes[i] for i in ids]
-        assert len({box["y1"] for box in boxes}) == 1
-        xs = sorted(box["x1"] for box in boxes)
-        assert xs[-1] - xs[0] > 1240
+def test_groups_without_dependencies_wrap_at_the_width_seen(context: dict[str, Any]) -> None:
+    """iss-00560 R-02: twelve Issues without dependencies wrap inside their Epic at the width it may use; without a
+    width the layout takes 1240px (F-01)."""
+    for key, width in (("home", 1240), ("w1240", 1240), ("w1400", 1400), ("w374", 374)):
+        nodes = {item["id"]: item for item in context["layout"]["wide"][key]["nodes"]}
+        for ids, room in (
+            ([f"iss-{n:05d}" for n in range(201, 213)], width - 48 - 24),  # inside an Epic: its 12px sides too
+            ([f"iss-{n:05d}" for n in range(220, 232)], width - 48),  # the top level
+        ):
+            boxes = [nodes[i] for i in ids]
+            shelves: dict[float, list[dict[str, Any]]] = {}
+            for box in boxes:
+                shelves.setdefault(box["y1"], []).append(box)
+            assert len(shelves) > 1, key
+            for shelf in shelves.values():
+                assert max(b["x2"] for b in shelf) - min(b["x1"] for b in shelf) <= room, key
+                assert len(shelf) == max(1, (room + 14) // (178 + 14)) or shelf is list(shelves.values())[-1], key
+    assert context["layout"]["wide"]["home"]["nodes"] == context["layout"]["wide"]["w1240"]["nodes"]
     assert not [run for run in context["audit"] if run["name"] == "wide" and any(run[key] for key in AUDIT_KEYS)]
+
+
+# --- iss-00560: what dependencies connect, on one row from left to right ----------------------------------------
+
+
+def _chains() -> dict[str, Any]:
+    """An Initiative like spec-dock's init-00423: 401 -> 402 -> 403 -> 404 (Epics), and beside them 405, also after
+    402, more active and wide; 406 and 402 wait for each other through done Issues (a cycle)."""
+    return document(
+        snapshot(
+            node(400, "initiative"),
+            closed(401, "epic", parent=400, closed_at=_at("10-20")),
+            closed(410, "issue", parent=401, closed_at=_at("10-20")),
+            node(402, "epic", parent=400, blocked_by=(401,)),
+            node(411, "issue", parent=402),
+            closed(414, "issue", parent=402, closed_at=_at("10-25")),
+            node(415, "issue", parent=402, blocked_by=(427,)),
+            node(403, "epic", parent=400, blocked_by=(402,)),
+            node(412, "issue", parent=403),
+            node(404, "epic", parent=400, blocked_by=(403,)),
+            node(413, "issue", parent=404),
+            node(405, "epic", parent=400, blocked_by=(402,)),
+            *(node(n, "issue", parent=405, in_progress=n == 420, updated_at=_at("11-03")) for n in range(420, 426)),
+            node(406, "epic", parent=400),
+            closed(427, "issue", parent=406, closed_at=_at("10-26")),
+            node(428, "issue", parent=406, blocked_by=(414,)),
+        )
+    )
+
+
+def _crossing() -> dict[str, Any]:
+    """One group whose first stage in the activity order (501 first) crosses: 501 -> 503, 501 -> 504, 503 -> 505,
+    502 -> 505."""
+    return document(
+        snapshot(
+            node(500, "epic"),
+            node(501, "issue", parent=500, in_progress=True, updated_at=_at("11-03")),
+            node(502, "issue", parent=500),
+            node(503, "issue", parent=500, blocked_by=(501,)),
+            node(504, "issue", parent=500, blocked_by=(501,)),
+            node(505, "issue", parent=500, blocked_by=(503, 502)),
+        )
+    )
+
+
+@pytest.fixture(scope="module")
+def rows(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
+    return _run(
+        tmp_path_factory.mktemp("rows"),
+        {
+            "documents": {"chains": _chains(), "crossing": _crossing()},
+            "layouts": {
+                "chains": {"home": {}, "w374": {"width": 374}, "done": {"showDone": True}},
+                "crossing": {"home": {}},
+            },
+            "checks": ["layout", "audit", "order"],
+        },
+    )
+
+
+def _at_key(result: dict[str, Any], name: str, key: str) -> dict[str, dict[str, Any]]:
+    return {item["id"]: item for item in result["layout"][name][key]["nodes"]}
+
+
+def test_a_chain_of_epics_stays_on_one_row(rows: dict[str, Any]) -> None:
+    for key in ("home", "w374", "done"):
+        nodes = _at_key(rows, "chains", key)
+        chain = [nodes[f"epic-{n:05d}"] for n in (401, 402, 403, 404)]
+        assert len({box["y1"] for box in chain}) == 1, key
+        assert all(a["x2"] < b["x1"] for a, b in pairwise(chain)), key
+        # what follows 402 and goes on (403) keeps its row; 405, more active but with nothing after it, goes below
+        assert nodes["epic-00405"]["y1"] > nodes["epic-00403"]["y2"], key
+        # packed: 404 sits one column gap right of 403, not right of the wide 405 on the row below
+        assert nodes["epic-00404"]["x1"] == nodes["epic-00403"]["x2"] + 44, key
+    home = _at_key(rows, "chains", "home")
+    assert home["epic-00405"]["x2"] > home["epic-00404"]["x1"]  # at a PC's width 405 is wider than 403
+
+
+def test_a_cycle_through_done_issues_keeps_the_chain(rows: dict[str, Any]) -> None:
+    """F-02: 402 and 406 wait for each other through done Issues; the one from the older sibling (402 -> 406) stays."""
+    nodes = _at_key(rows, "chains", "home")
+    assert {f"epic-{n:05d}" for n in range(401, 407)} <= nodes.keys()
+    assert nodes["epic-00402"]["x2"] < nodes["epic-00406"]["x1"]
+    assert nodes["epic-00406"]["x1"] == nodes["epic-00403"]["x1"]
+    pairs = {(p[0], p[1]) for e in rows["layout"]["chains"]["home"]["edges"] for p in e["pairs"]}
+    assert {("iss-00427", "iss-00415"), ("iss-00414", "iss-00428")} <= pairs  # both lines are still drawn
+    assert not [run for run in rows["audit"] if any(run[key] for key in AUDIT_KEYS)]
+
+
+def test_reordering_the_first_stage_removes_the_crossing(rows: dict[str, Any]) -> None:
+    assert rows["order"]["crossing"]["epic-00500"][:2] == ["iss-00501", "iss-00502"]  # 501 first in the activity order
+    nodes = _at_key(rows, "crossing", "home")
+    assert nodes["iss-00502"]["y1"] < nodes["iss-00501"]["y1"]
+    assert nodes["iss-00505"]["y1"] == nodes["iss-00502"]["y1"]
+    row = {i: nodes[i]["y1"] for i in nodes}
+    lines = [(p[0], p[1]) for e in rows["layout"]["crossing"]["home"]["edges"] for p in e["pairs"]]
+    crossing = [
+        (a, b)
+        for i, a in enumerate(lines)
+        for b in lines[i + 1 :]
+        if a[0] != b[0] and a[1] != b[1] and (row[a[0]] - row[b[0]]) * (row[a[1]] - row[b[1]]) < 0
+    ]
+    assert crossing == []
+
+
+def test_the_graph_lays_out_again_only_when_the_width_changes() -> None:
+    source = (ASSETS / "views" / "graph.js").read_text(encoding="utf-8")
+    assert "width: V.width" in source and "seenWidth()" in source
+    assert "|${seenWidth()}`" in source  # the width is part of what tells a new layout
+    assert "seenWidth() === V.width" in source  # a resize of the height or a zoom keeps the layout
