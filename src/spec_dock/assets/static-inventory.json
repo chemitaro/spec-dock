@@ -35,7 +35,7 @@
     {
       "path": ".agents/skills/spec-dock/SKILL.md",
       "source": "install_root/.agents/skills/spec-dock/SKILL.md",
-      "sha256": "15d98858572f976a35e893cc573f9ddd8e8e72400fc32ee5dc86b336bb453635",
+      "sha256": "590a184cf5e754a51b8cd21ec15774791f003255cc662975fd5f5c1fd6362fa9",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
@@ -48,7 +48,8 @@
         "22d8f04594a5209a8629d09ff6541628f18f4fb2bd979da05db23f8d9c4572a6",
         "66f2cdf90516f628dc5e3da0b0b8ddfc2b7dfd3cb4173833beaf131f5bf605ab",
         "dc2ef101d896dad3d679b1ba79526459d64724b0b40ca52df81a12b7c6169780",
-        "8cd5c9799a1815f5c5f0b552097b5be8e0d0364f451a6913942b5cb804eb6f23"
+        "8cd5c9799a1815f5c5f0b552097b5be8e0d0364f451a6913942b5cb804eb6f23",
+        "15d98858572f976a35e893cc573f9ddd8e8e72400fc32ee5dc86b336bb453635"
       ]
     },
     {
@@ -106,7 +107,7 @@
     {
       "path": "spec-dock/docs/README.md",
       "source": "spec_dock/docs/README.md",
-      "sha256": "2521d5b17e30e1f1346f4c8c610f3c471befb55cfe9e620c697f486f55691ca7",
+      "sha256": "d881f935af745f95d8251d7e46b5c013328bf61f02e3b5c1793964940980c63d",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
@@ -120,7 +121,8 @@
         "46df3129e70a6b3d13b7d7bcdef984eae95539c395050232bc3e1f8ecc30aa28",
         "3682d3ad38cc2a6225ebaaa782cd9c86f6112bd20514d02a109194c54dd821e5",
         "c0a292774a3a5a533adf75f5e916f48c90995609082201e51e18a854bb8e9f62",
-        "ea4fd81759933f90d8123505a1556cd7333e525c1554062f25e4d5973413182e"
+        "ea4fd81759933f90d8123505a1556cd7333e525c1554062f25e4d5973413182e",
+        "2521d5b17e30e1f1346f4c8c610f3c471befb55cfe9e620c697f486f55691ca7"
       ]
     },
     {
@@ -257,7 +259,7 @@
     {
       "path": "spec-dock/docs/canonical.md",
       "source": "spec_dock/docs/canonical.md",
-      "sha256": "a5c88cd4d24774390f276d17fc5f6a9b8bfdabd4a5468004bb45094cfaa7acad",
+      "sha256": "8f834573f1fbba720fe8b4ca597a77dc1aa19f878dd1c3292f420aa9f182978f",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
@@ -269,7 +271,8 @@
         "4ee1612fa7f5ccdfc51fbd3167f280ce6dd49283cf1e89a31bdb93fbd9689f2e",
         "dc8215fb6a6aeb9617969aee53c91ebc4928e2cd3198535ec16de13f272dacf8",
         "a7d54206fb0da46b74b25ff0e1b75c366270d88ac0cd5d8a92ac7416967d763f",
-        "5af6ae7a2fd4e9bac3269f2184fcf7013591f5cba616c0ef44302e8c361a0751"
+        "5af6ae7a2fd4e9bac3269f2184fcf7013591f5cba616c0ef44302e8c361a0751",
+        "a5c88cd4d24774390f276d17fc5f6a9b8bfdabd4a5468004bb45094cfaa7acad"
       ]
     },
     {
@@ -308,13 +311,14 @@
     {
       "path": "spec-dock/docs/guide.md",
       "source": "spec_dock/docs/guide.md",
-      "sha256": "0cece1bacafb99dedcbc1e6acb7093df204fae9662d313f968e726dc600e66de",
+      "sha256": "ff5c731f66f2e2f6c8e4bc7ef042349beb3767efbe7e7feb378b607eaf2a3bc0",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
         "ffe223494a62ace617adb8e092be122917e646e0c2b674c08993cd59f742dbe8",
         "de474364d5f574766e3e8fa4f3540b8aeb23680ea9c4c2681e2965d9ca96a39a",
-        "af078422a927023873a2cf959ac1d7ce63be75a3b618bc828671cc2a12b5dafc"
+        "af078422a927023873a2cf959ac1d7ce63be75a3b618bc828671cc2a12b5dafc",
+        "0cece1bacafb99dedcbc1e6acb7093df204fae9662d313f968e726dc600e66de"
       ]
     },
     {
@@ -554,6 +558,14 @@
       "known_old_sha256": [
         "e63c08ef5f332f963420eeb1780dcdb7bcd9f924beb80485bc2a3afb304f0abb"
       ]
+    },
+    {
+      "path": "spec-dock/docs/todo.md",
+      "source": "spec_dock/docs/todo.md",
+      "sha256": "bf150d87983cc86eddb6f08be003ef26f970a7b1ceb9e79c3c84f501f40e92f1",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
     },
     {
       "path": "spec-dock/scripts/README.md",
