@@ -61,9 +61,21 @@ ID: "iss-00556"
 - 同じ構造で、node の線の検査（16通りの組み合わせと、開いた Epic・Initiative への絞り込み24通り、計40通り）も問題0件、最大463ms。
 - 写しと結果：[PC](artifacts/20261104t021615z--pc-graph.png)、[PC 全体](artifacts/20261104t021615z-01--pc-graph-fit.png)、[PC の木・待っている線](artifacts/20261104t021616z--pc-graph-tree-wait.png)、[390px](artifacts/20261104t021616z-01--390-graph.png)、[ブラウザーの結果](artifacts/20261104t021616z-02--result.json)、[node の線の検査](artifacts/20261104t021616z-03--node-audit-real.json)、仕組み：[check.mjs](artifacts/20261104t021617z--check.mjs)、[setup.py](artifacts/20261104t021617z-01--setup.py)。`21d192a8d` の資源で実施（その後の `987e26f21` はテストだけ）。
 
-### 最終品質ゲート
+### 最終品質ゲート（quality-gate-reviewer opus/high、1人。キャンペーン `fqg-iss-00556-1`）
 
-（ゲートの後に書く）
+- **合格のコミット：`992a70150`**（範囲 `ae8c72456..992a70150`、worktree clean）。
+- attempt 01（`987e26f21`）：レビューは合格。テストの列は `make lint` の ruff（テストのファイルの書式2件）で不合格 → `ruff check --fix` と `ruff format` を当てて `992a70150` にした。
+- attempt 02（`992a70150`）：
+  - レビュー：pass、P0 0・P1 0・P2 0・P3 1、coverage complete。
+  - `make lint`：exit 0（ruff check、ruff format check、mypy すべて pass）。
+  - `uv run pytest`：exit 0（3521 passed、7 skipped、27分37秒）。
+- P3（情報のみ）：`graph.js` が v2 に保存し v2→v1 の順に読むことを静的テストでは見分けられない。振る舞いはヘッドレス Chrome で観測した（上の「前の版のキー」の確かめ）。
+- 補助の列：なし（ChatGPT 系のスキルは無効）。
+- 記録：`.workbench/final-quality-gate/fqg-iss-00556-1/`（campaign.json、attempts/01・02、review-response.md、closure.md）。
+
+### PR
+
+- https://github.com/chemitaro/spec-dock/pull/557（base `main`、head `992a70150`）。マージは統括が行う。`work finish` はマージの後に統括が行う。
 
 ## Residual Risks / Follow-ups
 
