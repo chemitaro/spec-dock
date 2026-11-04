@@ -42,6 +42,7 @@ ID: "iss-00550"
   - テストの側：合格。`make lint` は終了コード0。`uv run pytest` は終了コード0（3602 passed、7 skipped、27分36秒）。
   - 記録は `.workbench/final-quality-gate/iss-00550-g1/closure.md`。ChatGPT のレーンは使っていない（無効）。
 - `spec-dock scope check iss-00550`：誤り0、警告0。
+- PR：https://github.com/chemitaro/spec-dock/pull/559（head `1ee5bee82`）。CI（Provider CI、Commit identity、SpecDock check）はすべて success、GitHub は MERGEABLE／CLEAN（2026-11-04T05:47Z の観測。Actions と Commit Status だけを見た）。マージは利用者が行う。
 
 ## Residual Risks / Follow-ups
 
