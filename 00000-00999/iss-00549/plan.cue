@@ -16,7 +16,7 @@ steps: {
 	"S-08": {title: "CLI の葉、ヘルプ、ディスパッチ、テキストの出力", realizes: ["R-11", "F-03"], status: "done", after: ["S-07"], session: "impl"}
 	"S-09": {title: "カタログの検査が `todos/` を取り違えないことと、Scope の判定が変わらないことのテスト", realizes: ["R-09", "R-10"], status: "done", after: ["S-07"], session: "impl"}
 	"S-10": {title: "文書（`reference_cli.md`、`docs/README.md`、`cli-redesign-guide.html`）、inventory、dogfood の写し", realizes: ["R-11"], status: "done", after: ["S-08"], session: "impl"}
-	"S-11": {title: "コードのレビュー、最終品質ゲート、report.md、PR と CI", realizes: ["R-01", "R-02", "R-11"], status: "doing", after: ["S-09", "S-10"], session: "impl"}
+	"S-11": {title: "コードのレビュー、最終品質ゲート、report.md、PR と CI", realizes: ["R-01", "R-02", "R-11"], status: "done", after: ["S-09", "S-10"], session: "impl"}
 }
 
 tests: {
