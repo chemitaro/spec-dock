@@ -37,7 +37,13 @@ DESIGN_SYSTEM_BASE: Final = "/ds/"
 VENDOR_BASE: Final = "/vendor/"
 TIMEOUT: Final = 10.0
 ADR_LIMIT: Final = 100
-DRAWN_FILES: Final = ("requirement.cue", "design.cue", "plan.cue", "explanation.html")
+DRAWN_FILES: Final = (
+    "requirement.cue",
+    "design.cue",
+    "plan.cue",
+    "explanation.html",
+    "requirement.md",
+)  # .md: a format conflict
 MARKDOWN_DOCUMENTS: Final = ("requirement.md", "design.md", "plan.md", "report.md")
 ADR_FOLDERS: Final = ("artifacts", "discussions")
 _ADR: Final = re.compile(r"(?:^|-)adr-.*\.md\Z", re.IGNORECASE)

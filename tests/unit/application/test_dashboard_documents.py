@@ -368,3 +368,14 @@ def test_a_markdown_page_has_its_title_and_keeps_its_own_front_matter_readable(e
     assert '```yaml\n種別: 要件定義書\nID: "iss-00003"\n```' in source and source.count("\n---\n") == 1
     report = env.get(f"{BASE}/iss-00003/doc/report.md").body.decode()
     assert 'category: "報告"' in report and "```yaml" not in report
+
+
+@pytest.mark.usefixtures("real_cue")
+def test_adding_and_removing_requirement_md_draws_again(env: Env) -> None:
+    directory = place_sample(scope_dir(env.catalog, "iss-00002"), "issue-strict-complete")
+    assert env.details("iss-00002")["check"]["status"] == "ok"
+    (directory / "requirement.md").write_text("# old\n")
+    check = env.details("iss-00002")["check"]
+    assert check["status"] == "invalid" and [item["code"] for item in check["errors"]] == ["SCOPE_FORMAT_CONFLICT"]
+    (directory / "requirement.md").unlink()
+    assert env.details("iss-00002")["check"]["status"] == "ok"
