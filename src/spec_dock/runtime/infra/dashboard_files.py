@@ -8,20 +8,23 @@ sends a request, not even to a running server: it only checks whether the record
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import json
 import os
 from typing import TYPE_CHECKING, Final, Literal
 
+from spec_dock.runtime.domain.canonical_structure import SnapshotFormatError
 from spec_dock.runtime.domain.dashboard_snapshot import (
     ParsedSnapshot,
     SnapshotUnreadable,
     SnapshotUnsupported,
     parse_snapshot_document,
+    structure_confirmed_at,
 )
-from spec_dock.runtime.infra.github_snapshot import SNAPSHOT_FILE
+from spec_dock.runtime.infra.github_snapshot import PROBE_FILE, SNAPSHOT_FILE, ProbeRecord
 
 if TYPE_CHECKING:
+    from datetime import datetime
     from pathlib import Path
 
     from spec_dock.runtime.infra.github_structure import GithubRepository
@@ -41,13 +44,42 @@ class SnapshotRead:
     path: Path
     parsed: ParsedSnapshot | None = None
     detail: str | None = None
+    probe_checked_at: str | None = None  # the periodic sync's last check (probe.json); None when absent or unreadable
+    probe_failed: bool = False
+
+    def confirmed_at(self, now: datetime) -> str | None:
+        """When the structure was last confirmed against GitHub (iss-00568); None without a readable snapshot."""
+        if self.parsed is None:
+            return None
+        return structure_confirmed_at(self.parsed.snapshot.fetched_at, self.probe_checked_at, self.probe_failed, now)
 
 
 def snapshot_path(state_root: Path, repository: GithubRepository) -> Path:
     return state_root / "github" / repository.host / repository.owner / repository.name / SNAPSHOT_FILE
 
 
+def probe_path(state_root: Path, repository: GithubRepository) -> Path:
+    return snapshot_path(state_root, repository).with_name(PROBE_FILE)
+
+
+def _read_probe(state_root: Path, repository: GithubRepository) -> tuple[str | None, bool]:
+    """The probe's `checked_at` and whether it recorded an error; absent or unreadable gives (None, False)."""
+    try:
+        record = ProbeRecord.from_json(json.loads(probe_path(state_root, repository).read_bytes().decode("utf-8")))
+    except (OSError, UnicodeDecodeError, ValueError, SnapshotFormatError):
+        return None, False
+    return record.checked_at, record.last_error is not None
+
+
 def read_snapshot_file(state_root: Path, repository: GithubRepository) -> SnapshotRead:
+    read = _read_snapshot(state_root, repository)
+    if read.status != "ok":
+        return read
+    checked, failed = _read_probe(state_root, repository)
+    return replace(read, probe_checked_at=checked, probe_failed=failed)
+
+
+def _read_snapshot(state_root: Path, repository: GithubRepository) -> SnapshotRead:
     path = snapshot_path(state_root, repository)
     try:
         raw = path.read_bytes()

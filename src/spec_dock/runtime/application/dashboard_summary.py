@@ -77,7 +77,8 @@ def summarize(
             recovery=("spec-dock canonical status", "wait for the next periodic sync, or run spec-dock canonical sync"),
             details={"repository": repository.key, "path": str(read.path), "reason": read.detail},
         )
-    model = build_model(read.parsed.snapshot, now=now())
+    current = now()
+    model = build_model(read.parsed.snapshot, now=current, confirmed_at=read.confirmed_at(current))
     todos = (
         summary_todos(catalog[0], catalog[1], now=todo_now())
         if catalog is not None

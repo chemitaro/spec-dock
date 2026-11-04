@@ -18,12 +18,14 @@ from typing import TYPE_CHECKING, Literal
 
 from spec_dock.runtime.domain.canonical_structure import parse_timestamp
 from spec_dock.runtime.domain.dashboard_model import STALE_AFTER, build_model
+from spec_dock.runtime.domain.dashboard_snapshot import structure_confirmed_at
 from spec_dock.runtime.domain.dashboard_visibility import REPOSITORY_FILE, Visibility, resolve_config
 from spec_dock.runtime.infra.canonical_registry import RegistryUnreadable, read_registry, registry_path
 from spec_dock.runtime.infra.canonical_state import STATE_FILE, catalog_state_dir
 from spec_dock.runtime.infra.dashboard_files import (
     DASHBOARD_DIRECTORY,
     REPOSITORIES_FILE,
+    probe_path,
     read_snapshot_file,
     snapshot_path,
 )
@@ -98,11 +100,12 @@ class RepositoryView:
 
 @dataclass
 class _Cache:
-    signature: _Signature = None
+    signature: tuple[_Signature, _Signature] = (None, None)  # snapshot.json, probe.json
     status: ReadStatus = "missing"
     detail: str | None = None
     current: ParsedSnapshot | None = None
     last_good: ParsedSnapshot | None = None
+    probe: tuple[str | None, bool] = (None, False)  # probe.json: checked_at, recorded an error
     read: bool = False
 
 
@@ -292,23 +295,33 @@ class DashboardSite:
         path = snapshot_path(self.state_root, site.repository)
         with self._lock:
             cache = self._caches.setdefault(site.key, _Cache())
-            signature = _signature(path)
+            signature = (_signature(path), _signature(probe_path(self.state_root, site.repository)))
             if not cache.read or signature != cache.signature:
                 read = read_snapshot_file(self.state_root, site.repository)
                 cache.signature, cache.status, cache.detail, cache.read = signature, read.status, read.detail, True
                 cache.current = read.parsed
                 if read.status == "ok":
+                    cache.probe = (read.probe_checked_at, read.probe_failed)
+                if read.status == "ok":
                     cache.last_good = read.parsed
             status, detail = cache.status, cache.detail
             parsed = cache.current if status == "ok" else cache.last_good if status == "unreadable" else None
         now = self.now()
-        model = build_model(parsed.snapshot, now=now) if parsed is not None else None
+        model = (
+            build_model(
+                parsed.snapshot,
+                now=now,
+                confirmed_at=structure_confirmed_at(parsed.snapshot.fetched_at, *cache.probe, now),
+            )
+            if parsed is not None
+            else None
+        )
         return RepositoryView(site, status, parsed, detail, model, self._revision(site, signature, status, model, now))
 
     def _revision(
         self,
         site: SiteRepository,
-        signature: _Signature,
+        signature: tuple[_Signature, _Signature],
         status: ReadStatus,
         model: DashboardModel | None,
         now: datetime,
