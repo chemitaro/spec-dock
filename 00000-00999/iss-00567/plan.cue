@@ -14,8 +14,8 @@ package spec
 // すべての要件に、それを満たす手順が要る（dropped の手順は数えない）。
 // strict 以上では、dropped でない手順のすべてが、いずれかの番号に結び付く。
 steps: {
-	"S-01": {title: "テストを先に直す（雛形・文書の例と inventory の期待）", realizes: ["R-01", "R-02"], status: "todo", session: "impl"}
-	"S-02": {title: "cue.md と plan.cue 雛形の例を直し、写しと inventory を合わせる", realizes: ["R-01", "R-02"], status: "todo", after: ["S-01"], session: "impl"}
+	"S-01": {title: "テストを先に直す（雛形・文書の例と inventory の期待）", realizes: ["R-01", "R-02"], status: "done", session: "impl"}
+	"S-02": {title: "cue.md と plan.cue 雛形の例を直し、写しと inventory を合わせる", realizes: ["R-01", "R-02"], status: "done", after: ["S-01"], session: "impl"}
 }
 
 // テスト。番号（T-01、…）をキーにする。title と verifies（確かめる要件・失敗の条件の番号）が必須。
