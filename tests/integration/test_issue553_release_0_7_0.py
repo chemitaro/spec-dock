@@ -78,6 +78,10 @@ def test_the_migration_notes_describe_0_7_0_and_the_dogfood_copy_matches() -> No
         "cue",
         "specdock.graph.v2",
         "active_at",
+        "dashboard.json",
+        "specdock.dashboard-settings/v1",
+        "DASHBOARD_HIDDEN_BY_CONFIG",
+        "dashboard service install",
     ):
         assert token in section, token
     installed = ROOT / "spec-dock/docs/migration.md"
