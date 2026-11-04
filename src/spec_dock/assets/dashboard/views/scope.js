@@ -202,7 +202,7 @@ function documentEntries(details) {
     if (details.spec && item.name.endsWith(".cue")) continue;
     entries.push({ id: item.key, key: item.key, name: item.name, view: item.view, href: item.href, exists: item.exists });
   }
-  for (const adr of details.adrs || []) entries.push({ id: `adr:${adr.path}`, key: "adr", name: adr.name, view: adr.view, exists: true });
+  for (const adr of details.adrs || []) entries.push({ id: "adr:" + adr.path, key: "adr", name: adr.name, view: adr.view, exists: true });
   return entries;
 }
 
