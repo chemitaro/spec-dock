@@ -39,7 +39,46 @@ ID: "iss-00560"
 
 ## Verification
 
-（下に追記する）
+### 仕様のレビュー（spec-reviewer opus/high）
+
+- round 1：pass（P0 0・P1 0・P2 5：使える幅の定義が3通り、合流の丸め、交差の受入がない、折り返しの揺れ、Epic R-15 と移行の注記の引き渡し）。実データで分かった輪と詰めた横の設計の変更と合わせて、5件すべてを取り込んだ。
+- round 2：pass（P3 1件：開いた子孫を持つ終わった子の配下を待つ兄弟などでは、配置の段とモデルの `stage.open`（箱の段の印）がずれうる。情報。判断に記録）。
+- 記録：`.workbench/spec-review/iss-00560/`（packet、round-1・2 と検証の結果、review-response.md）。
+
+### テスト駆動
+
+- 先にテストを入れて、今の実装で7件が失敗することを確かめ（Red）、実装を入れて通した（Green）。
+- 足した・直したテスト（`tests/unit/presentation/test_dashboard_graph_js.py`、`tests/js/dashboard_graph_check.mjs`）：
+  - 4つの Epic のつながりが同じ行に左から右へ並び、後が続く分かれが行を受け継ぎ、同じ段の幅の広い枠があっても次が 44px で詰まる（W 既定、374、「終わったものも」）。
+  - 配下の終わった Issue どうしの輪があっても、例外なく、つながりが1行に並び、両方の線を描く。
+  - A→C、A→D、C→E、B→E で、最初の段の並べ直しで交差が0件。
+  - 依存のない12件が W = 1240／1400／374 で、使える幅（W − 48、Epic の中はさらに − 24）を超えずに折り返す。W なしは W = 1240 と同じ。
+  - `graph.js` が幅を渡し、合図に含め、幅が変わったときだけ描き直す（静的）。
+  - 線の検査の組み合わせに、入れ子の W = 1400・374（各8通り）を足した。代表のデータ（spec-dock、種 532・15・18）の全 217 通りで問題0件。種 532 は最大 約300ms。
+  - 既存の期待（同じ段の縦の並び、最上位の上から下、1行に広がる12件）を、新しい配置（読む順、まとまりの棚）に合わせた。
+
+### コードのレビュー（code-reviewer opus/high、axis both、範囲 `0534cfe29..8f2378218`）
+
+- pass、指摘0件（`.workbench/code-review/iss-00560/round-1b.json`。1回目はレビュアーが契約のスクリプトを見つけられない機械的な失敗で、再実行した）。
+
+### このPCの実データ（ヘッドレスの Chrome、`8f2378218`）
+
+- 一時の状態の置き場（`.workbench/iss-00560/browser/state`）に、このPCの `~/.local/state/spec-dock/github/github.com/chemitaro/spec-dock/snapshot.json`（319件。読むだけ）を写し、取得の時刻だけ今に動かし、`uv run spec-dock dashboard serve --port 18560 --state-root … --offline` で開いた。Chrome は `--disable-features=MacAppCodeSignClone` で起動し、`Browser.close` で閉じた。
+- 結果（`result.json` の `ok: true`）：
+  - init-00423 の epic-00425 → 427 → 471 → 526 が、PC（1440）、PC（1000）、390px のすべてで同じ行（図の y = 98）に左から右へ並ぶ（425: x 40、427: 320、471: 1898、526: 2178）。epic-00547 は 471 の下の行。
+  - `window.specdockEdgeAudit()` の違反0件（PC 1440、PC 1000、390px）。ブラウザーのエラー0件。ページの横のはみ出しなし。
+  - 拡大、縮小、100%、「全体」、窓の高さだけの変化では配置が変わらない。窓の幅を 1000px にすると並べ直し、1440px に戻すと元の配置に戻る。
+- node の routeLayout と audit（同じ実データ、W = 1424・374）：違反0件、60ms 前後。
+- 写しと結果：[PC](artifacts/20261104t070401z--pc-graph.png)、[PC 全体](artifacts/20261104t070401z-01--pc-graph-fit.png)、[PC 1000px 全体](artifacts/20261104t070402z--pc-1000-graph-fit.png)、[390px](artifacts/20261104t070402z-01--390-graph.png)、[390px 全体](artifacts/20261104t070403z--390-graph-fit.png)、[ブラウザーの結果](artifacts/20261104t070403z-01--result.json)、[node の結果](artifacts/20261104t070404z--node-real.txt)、仕組み：[check.mjs](artifacts/20261104t070404z-01--check.mjs)、[setup.py](artifacts/20261104t070404z-02--setup.py)、[cdp.mjs](artifacts/20261104t070405z--cdp.mjs)、[node-real.mjs](artifacts/20261104t070416z--node-real.mjs)。
+
+### 最終品質ゲート（quality-gate-reviewer opus/high、1人。キャンペーン `fqg-iss-00560-1`）
+
+- **合格のコミット：`8f2378218`**（範囲 `0534cfe29..8f2378218`、worktree clean）。
+- レビュー：pass、P0 0・P1 0・P2 0・P3 0、coverage complete（functional-correctness、requirements-closure、test-adequacy）。
+- `make lint`：exit 0（ruff check、ruff format check、mypy）。
+- `uv run pytest`：exit 0（3606 passed、7 skipped、34分40秒）。
+- 補助の列：なし（ChatGPT 系のスキルは無効）。
+- 記録：`.workbench/final-quality-gate/fqg-iss-00560-1/`（campaign.json、attempts/01、closure.md）。
 
 ## Residual Risks / Follow-ups
 
