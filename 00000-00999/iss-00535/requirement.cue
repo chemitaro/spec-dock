@@ -67,7 +67,7 @@ failures: {
 	}
 	"F-02": {
 		title: "文書のスクリプトや Markdown の中身が、画面と API に触れない"
-		text:  "文書の応答は、資料と同じ `Content-Security-Policy: sandbox allow-scripts allow-popups; frame-ancestors <埋め込みの許可>` を持ち（`allow-same-origin` なし）、画面の枠も同じ `sandbox` の属性を持つ。リンク、`..`、ディレクトリ、決まった名前でないファイルは、データを含まない 404 で断る。"
+		text:  "文書の応答は、資料と同じ `Content-Security-Policy: sandbox allow-scripts allow-popups; frame-ancestors <埋め込みの許可>` を持ち（`allow-same-origin` なし）、画面の枠も同じ `sandbox` の属性を持つ。リンク、ディレクトリ、決まった名前でないファイルは、データを含まない 404 で、`..` や空の道の区切りは共通の道の分解が 400 で断る。"
 		impact: "誤ると、文書に書かれたスクリプトが画面や API を読めるおそれがある"
 		recovery: "版を戻す。書き込みはないので、データは壊れない"
 	}
@@ -85,5 +85,5 @@ constraints: [
 
 decisions: [
 	"2026-11-04（実装の担当の判断）：CUE の Scope の検査と描画の結果は、Scope ごとに、3つの CUE のファイルと説明資料とリポジトリの型の時刻と大きさで覚え、Scope の API と文書の道で共有する（D-11 の「3つの CUE のファイルの時刻で結果を覚えておく」に、描画に効くほかのファイルを足した）",
-	"2026-11-04（実装の担当の判断）：ADR は、Artifact の決まり（`adr` の型の名前）に合わせ、`artifacts/` と `discussions/` の直下の、名前に `adr-` を含む `.md` とする",
+	"2026-11-04（実装の担当の判断）：ADR は、Artifact の決まり（`adr` の型の名前）に合わせ、`artifacts/` と `discussions/` の直下の、名前に `adr-` を含む `.md` とする。題名に `adr-` を含むほかの Artifact も拾うことがあるが、読むだけで害はないので受け入れる（仕様のレビュー P3）",
 ]

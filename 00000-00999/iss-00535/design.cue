@@ -12,12 +12,12 @@ design: {
 	"D-01": {
 		title: "文書の読み取りと覚え（`application/dashboard_documents.py`）"
 		text: """
-			- `ScopeDocuments`（サーバーの寿命のメモリ。ロックつき）が、`(カタログ, Scope ID)` ごとに、`requirement.cue`・`design.cue`・`plan.cue`・`explanation.html` とリポジトリの型（`<main のチェックアウト>/spec-dock/cue/*.cue`）の `(mtime_ns, size)` を鍵に、`render_scope` の結果（HTML、検査の報告、完全か）を1つ覚える。鍵が同じなら `cue` を動かさない。
+			- `ScopeDocuments`（サーバーの寿命のメモリ。ロックつき）が、`(カタログ, Scope ID)` ごとに、`requirement.cue`・`design.cue`・`plan.cue`・`explanation.html` とリポジトリの型（`<main のチェックアウト>/spec-dock/cue/*.cue`）の `(mtime_ns, size)` と、Scope の種類と題名（構造から来て描画に効く）を鍵に、`render_scope` の結果（HTML、検査の報告、完全か）を1つ覚える。鍵が同じなら `cue` を動かさない。
 			- `render_scope` は `design_system_base="/ds/"`、`vendor_base="/vendor/"`、Scope の種類（構造のモデルの `kind`）、題名で呼ぶ。`repository_root` は登録簿の `main_checkout`（`SiteRepository.checkout`）で、なければカタログを指す（リポジトリの型なし）。
 			- `CanonicalCommandError`（`CUE_NOT_FOUND`、`CUE_TIMEOUT` など）は覚えず、`failed` の結果（コード、文、次の1手）にする（F-01）。ほかの例外も同じ。
 			- `check(…)` は API 用の `details.check`（`status`：`ok`・`invalid`・`failed`・`markdown`、`complete`、`errors`・`warnings` の `{code, message, file}`、`next_steps`）と `details.progress` を返す。
 			- `progress(evaluation)`：`steps` の各値の `status`（既定 todo）を数え、`{total, done, doing, todo, dropped, doing_steps: [{id, title}]}`。`total` は dropped を除く。手順がなければ None。
-			- `markdown_page(directory, 道)`：許す道（`requirement.md`、`design.md`、`plan.md`、`report.md`、`artifacts/<ADR>`、`discussions/<ADR>`）の通常のファイルだけを、リンクをたどらずに読み、`wrap_page(script_safe(本文), design_system_base="/ds/", vendor_base="/vendor/")` に包む。
+			- `markdown_page(directory, 道)`：許す道（`requirement.md`、`design.md`、`plan.md`、`report.md`、`artifacts/<ADR>`、`discussions/<ADR>`）の通常のファイルだけを、リンクをたどらずに読み、`wrap_page(本文, design_system_base="/ds/", vendor_base="/vendor/")` に包む。
 			- `adr_documents(directory)`：`artifacts/` と `discussions/` の直下の通常のファイルで、名前が `.md` で終わり `adr-` を含むもの（名前の順、上限あり）。
 			"""
 		satisfies: ["R-01", "R-02", "R-03", "R-04", "F-01", "F-03"]
@@ -34,14 +34,14 @@ design: {
 	}
 	"D-03": {
 		title: "`wrap_page` と `script_safe` を公開の関数にする（`presentation/spec_page.py`）"
-		text:  "`_script_safe` を `script_safe` にし、中の呼び出しを直す。Markdown の本文は `script_safe` を通してから `wrap_page` に渡す（`</script` で枠の外に出ない）。"
+		text:  "`_script_safe` を `script_safe` にし、中の呼び出しを直す。`wrap_page` は中で本文を `script_safe` に通す（`</script` で枠の外に出ない）ので、Markdown の本文はそのまま渡す。"
 		satisfies: ["R-03", "F-02"]
 	}
 	"D-04": {
 		title: "詳しい画面の「文書」のタブと進み具合（`views/scope.js`、`views/scope.css`）"
 		text: """
 			- 「文書」のタブ：上に文書の札（CUE の Scope は「要件・設計・計画」の1枚、Markdown の Scope は3枚、報告、説明資料、ADR）。札を選ぶと問い合わせの `doc` に持ち、下の枠（`<iframe sandbox="allow-scripts allow-popups" referrerpolicy="no-referrer">`）にその文書を示す。既定は CUE の仕様、なければ最初にある文書。各札に「新しいタブで開く」。説明資料は今のとおり新しいタブだけ。
-			- 検査の結果：`details.check` の誤りと警告を、数と一覧（コード、文、ファイル）で示す。`failed` なら警告の囲みに理由と次の1手を示し、枠は描かない（F-01）。
+			- 検査の結果：`details.check` の誤りと警告を、数と一覧（コード、文、ファイル）で示す。`failed` なら警告の囲みに理由と次の1手を示し、「要件・設計・計画」の札を選んでいるときは枠を描かない（ほかの札の Markdown の文書は描く。F-01）。
 			- 進み具合：`details.progress` があれば、「概要」と「文書」のタブに、帯（終わった、作業中、未着手）と「n／m 終わった」、作業中の手順の一覧を示す。
 			"""
 		satisfies: ["R-01", "R-02", "R-03", "R-04", "F-01", "F-02"]
