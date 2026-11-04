@@ -63,6 +63,12 @@ slices: {
 		after:   ["iss-00530", "iss-00531", "iss-00532", "iss-00533", "iss-00544"]
 		session: "light"
 	}
+	"iss-00552": {
+		covers:  ["R-01"]
+		text:    "2026-11-04 利用者の要望で統括が追加。ダッシュボードに出すかどうかを、コマンド（`dashboard hide`／`show`）だけでなく、設定のファイルで決められるようにする。設定は epic-00547 の3段（初めの値 < 利用者の設定 `$XDG_CONFIG_HOME/spec-dock/config.json` < リポジトリの設定）と同じ仕組みに乗せ、その設計が決まってから着手する。`hide`／`show` との優先の関係を決める。"
+		after:   ["iss-00534"]
+		session: "std"
+	}
 	"iss-00535": {
 		covers:  ["R-19", "R-25", "R-26", "F-10"]
 		text:    "第5波（段階2）。D-11 の文書の描画と計画の進み具合。あわせて、#530 の残り：API の `server.restart_required` が true のとき、画面の上の帯で前面の `serve` の起動し直しを促す。"
