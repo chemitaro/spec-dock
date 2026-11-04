@@ -145,7 +145,7 @@ SpecDock 0.5.0 は、`spec-dock/workspace.json` の `schema_version` が 4 の�
   - API の `/api/v1/r/<repo>/scopes/<ID>` の `details` に、`spec`・`check`（検査の結果）・`progress`（計画の進み具合）・`adrs` と、文書ごとの `view` が足されます（画面のための JSON で、契約にはしません）。`cue` がないなどで検査できないときは `check.status: failed` と次の1手を示します。
   - 前面の `serve` が古い版で動いていると、画面の上に起動し直しを促す帯（`SERVER_RESTART_REQUIRED`）が出ます。
 - 人のタスクの画面（#554）：見るだけで、書く口や完了のボタンはありません。
-  - API が足されます：`GET /api/v1/todos` と `GET /api/v1/r/<repo>/todos`（中身は `specdock.todo-list/v1`。`?status=open|snoozed|done|cancelled|all`、既定は `open`。ほかの値は 400 `DASHBOARD_TODO_FILTER_INVALID`）、`GET /api/v1/r/<repo>/todos/<ID>`（`todo show` と同じ1件の形。404 `TODO_NOT_FOUND`、503 はカタログが読めないとき）。`/api/v1/todos/revision` と、`structure`・`scopes/<ID>` の `todos` の項目は画面のためのもので、契約にしません。
+  - API が足されます：`GET /api/v1/todos` と `GET /api/v1/r/<repo>/todos`（中身は `specdock.todo-list/v1`。`?status=open|snoozed|done|cancelled|all`、既定は `open`。ほかの値は 400 `DASHBOARD_TODO_FILTER_INVALID`）、`GET /api/v1/r/<repo>/todos/<ID>`（`todo show` と同じ1件の形。404 `TODO_NOT_FOUND`／`TODO_INVALID`、記録の誤りなどは 409 `TODO_RECORD_INVALID` など、503 はカタログが読めないとき）。`/api/v1/todos/revision` と、`structure`・`scopes/<ID>` の `todos` の項目は画面のためのもので、契約にしません。
   - 画面の道が足されます：`/todos`、`/r/<repo>/todos`、`/r/<repo>/todos/<ID>`。上の帯に「人のタスク」のタブが出ます。
   - 構造の図の箱、ボードのカード、詳しい画面の見出しに「人 n」の印（Epic と Initiative は配下も数えます）、詳しい画面に「人のタスク」のタブ、横断の概況の札に「人のタスク n」「期限切れ m」が出ます。`dashboard hide` やダッシュボードの設定で隠したリポジトリは、人のタスクの一覧と1件からも外れます。
 - 常駐のダッシュボードは、パッケージの版の更新の後に、自動で起動し直します（60秒ごとの版の確認。`dashboard service install` のやり直しは要りません）。前面の `serve` は自分で起動し直します。
