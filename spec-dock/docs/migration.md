@@ -91,6 +91,29 @@ SpecDock 0.5.0 は、`spec-dock/workspace.json` の `schema_version` が 4 の�
 - スキル `spec-dock-grill-with-docs` の `finalize-artifact.py` は、`spec-dock/initiatives` のカタログへのリンク越しの Artifact のパスを受け付けます。契約の変更はありません。
 - 戻し方：0.5.1 に問題があれば、パッケージを 0.5.0 に戻します。配布資産を 0.5.1 に上げた後なら、その更新の PR（版のファイル `spec-dock/system/spec-dock-version` を含む）を `git revert` して、配布資産を 0.5.0 のバイトに戻します。版のファイルだけを戻すと、0.5.0 の `canonical check` が 0.5.1 の資産を知らない変更として CI を止めます（0.5.0 の `installation update` も 0.5.1 のバイトを知らないので、戻す手段になりません）。
 
+## 0.6.0 への更新
+
+0.6.0 は、HTML のダッシュボードを届ける版です。canonical モード（宣言の版4）だけの版で、今までの Markdown・PlantUML のダッシュボードは撤去されました。
+
+- パッケージを 0.6.0 に上げた後、各リポジトリで `spec-dock installation update --target <チェックアウト> --backup-dir <新しい外のディレクトリ> --yes` を実行して配布資産を上げ、通常の PR でコミットします。0.5.1 の配布資産のままでも動きますが、`reference_cli.md`、`canonical.md`、`cli-redesign-guide.html`、`docs/README.md`、`.gitignore`、この `migration.md` が新しくなります。CI の見本は `spec-dock/system/spec-dock-version` の版（0.6.0）の SpecDock を入れて動きます。
+- 最初の1手：`spec-dock dashboard serve` を実行してブラウザーで開きます（既定は `http://127.0.0.1:47800`）。iPhone など別の端末からは `spec-dock dashboard serve --tailscale` で、Tailscale の住所にも待ち受けます。
+- 新しいコマンド（公開のコマンドは 53 から 61 になります）：
+  - `dashboard summary`（#528）：リポジトリの概況を JSON `specdock.dashboard-summary/v1` で返します。
+  - `dashboard serve`・`dashboard hide`・`dashboard show`・`dashboard list`（#529）：利用者ごとに1つのサーバーを `127.0.0.1:47800` で前面で動かし、登録した全リポジトリを見るだけで配ります。`hide` と `show` はリポジトリの表示を切り替え、`list` は登録を示します。
+  - `dashboard service install`・`dashboard service status`・`dashboard service uninstall`（#530）：ログインのときに起動する常駐を、明示して入れたときだけ入れます（macOS は launchd、Linux は systemd のユーザーの単位。定期の同期の常駐とは別のラベル）。`installation update` や `canonical link` は入れません。
+  - 版の更新の後、常駐は起動し直します（サーバーが終了コード75で終わり、launchd と systemd が新しい版で起動し直す）。前面の `dashboard serve` は、利用者が起動し直します。
+- 新しい契約：
+  - 画面の道 `/r/<host>/<owner>/<name>/scopes/<ID>`、`?embed=1`、API、埋め込みの契約 `specdock.embed/v1`、`frame-ancestors`。CORS を許すのは `/ds/` と `/vendor/` だけです。詳しくは `reference_cli.md` の「ダッシュボードのサーバーの契約」。
+  - 主な新しいエラーのコード（各コマンドのほかのコードは `reference_cli.md` のコマンド表にあります）：`DASHBOARD_SERVICE_UNSUPPORTED`・`DASHBOARD_SERVICE_FAILED`（終了コード3）、`DASHBOARD_STATE_ROOT_INVALID`（終了コード2）。
+- 利用者の状態の置き場（`~/.local/state/spec-dock/`）に増えるもの：`dashboard/server.json`（`specdock.dashboard-server/v1`）、`dashboard/repositories.json`（`specdock.dashboard-repositories/v1`）、`dashboard/seen.json`（`specdock.dashboard-seen/v1`）、`dashboard/server.lock`。常駐を入れたときだけ、launchd の plist か systemd の単位が増えます。`dashboard/service.log` が増えるのは launchd のときだけで、systemd では出力が journal（`journalctl --user -u spec-dock-dashboard`）に出ます。
+- 構造のスナップショットは版2になります（#537。PR の状態を持つ）。新しい版は版1も読みます。前の版に戻すと、一度取り直します。定期の同期は PR の状態を取るため、成功か rate limit の後はリポジトリごとに約2分に1回、ほかの失敗が続く間は60秒に1回、GitHub の GraphQL に問い合わせます（1回あたり約3ポイント）。
+- Markdown・PlantUML のダッシュボードの撤去（#533）：
+  - `canonical status` の JSON から `dashboard` の項目と、`CANONICAL_DASHBOARD_OCCUPIED`・`CANONICAL_DASHBOARD_FAILED` の警告が消えます。
+  - `canonical sync` の `dashboards_written` は常に0です（後の版で消す予定）。
+  - `canonical remove` は、5つのファイルを消しません。`state.json` に dashboard を書きません（前の版に戻しても読めます）。
+  - 配布の `spec-dock/.gitignore` から、`dashboard.md`・`tree.puml`・`tree-all.puml`・`deps-issues.puml`・`deps-raw.puml` の5つの名前が外れます。`installation update` の後、残っているこれらのファイルが `git status` に出ます。使わないので、消してかまいません（Git で管理していなければ、ただ消します）。
+- 戻し方：0.6.0 に問題があれば、常駐を入れていれば先に `spec-dock dashboard service uninstall` を実行し、パッケージを 0.5.1 に戻します。配布資産を 0.6.0 に上げた後なら、その更新の PR（版のファイル `spec-dock/system/spec-dock-version` を含む）を `git revert` して、配布資産を 0.5.1 のバイトに戻します。版のファイルだけを戻すと、0.5.1 の `canonical check` が 0.6.0 の資産を知らない変更として CI を止めます（0.5.1 の `installation update` も 0.6.0 のバイトを知らないので、戻す手段になりません）。
+
 ## 新規導入
 
 ```sh
