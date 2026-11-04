@@ -7,12 +7,12 @@ goal: "全リポジトリの集約の一覧、`todo show <REF>`、`dashboard sum
 
 steps: {
 	"S-01": {title: "仕様を書き、仕様のレビューを通す", realizes: ["R-20"], status: "done", session: "impl"}
-	"S-02": {title: "`tally` と `repository_row` に数え方と行を移し、`classify`／`load_record` を `TodoStore` で受ける形に割る", realizes: ["R-10", "R-11"], status: "todo", after: ["S-01"], session: "impl"}
-	"S-03": {title: "`select_catalogs`、`read_catalog`、集約の一覧、`todo show <REF>` とディスパッチ", realizes: ["R-10", "F-03"], status: "todo", after: ["S-02"], session: "impl"}
-	"S-04": {title: "`dashboard summary` とサーバーの summary の `todos`", realizes: ["R-11", "F-03"], status: "todo", after: ["S-03"], session: "impl"}
-	"S-05": {title: "iss-00549 のテストの穴を埋める", realizes: ["R-21"], status: "todo", after: ["S-01"], session: "impl"}
-	"S-06": {title: "CLI の引数とヘルプ、`reference_cli.md` と dogfood の写し、inventory", realizes: ["R-20"], status: "todo", after: ["S-03", "S-04"], session: "impl"}
-	"S-07": {title: "コードのレビュー、最終品質ゲート、report.md、PR と CI", realizes: ["R-10", "R-11", "R-20", "R-21"], status: "todo", after: ["S-05", "S-06"], session: "impl"}
+	"S-02": {title: "`tally` と `repository_row` に数え方と行を移し、`classify`／`load_record` を `TodoStore` で受ける形に割る", realizes: ["R-10", "R-11"], status: "done", after: ["S-01"], session: "impl"}
+	"S-03": {title: "`select_catalogs`、`read_catalog`、集約の一覧、`todo show <REF>` とディスパッチ", realizes: ["R-10", "F-03"], status: "done", after: ["S-02"], session: "impl"}
+	"S-04": {title: "`dashboard summary` とサーバーの summary の `todos`", realizes: ["R-11", "F-03"], status: "done", after: ["S-03"], session: "impl"}
+	"S-05": {title: "iss-00549 のテストの穴を埋める", realizes: ["R-21"], status: "done", after: ["S-01"], session: "impl"}
+	"S-06": {title: "CLI の引数とヘルプ、`reference_cli.md` と dogfood の写し、inventory", realizes: ["R-20"], status: "done", after: ["S-03", "S-04"], session: "impl"}
+	"S-07": {title: "コードのレビュー、最終品質ゲート、report.md、PR と CI", realizes: ["R-10", "R-11", "R-20", "R-21"], status: "doing", after: ["S-05", "S-06"], session: "impl"}
 }
 
 tests: {
