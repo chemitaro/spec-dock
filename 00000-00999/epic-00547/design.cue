@@ -18,7 +18,7 @@ current: """
 	- カタログに書くコマンドは、`application/canonical_catalog.catalog_changes`（`infra/catalog_lock.CatalogLock` の flock を最大10秒待ち、`CANONICAL_LOCK_BUSY`。形式の版を書く前に確かめ、同期のための changeset を残す）の中で、`infra/file_publication.publish_file`（記号のリンクを断り、一時のファイルから置き換える。`expected` で書く直前の中身の食い違いを断る）を使って書く（`canonical_artifact_write.py`）。リンクと形の確かめは `canonical_catalog.require_linked`（`CANONICAL_NOT_LINKED`）。
 	- 同期は、`*.conflict-<PC>-<時刻>` の写しを残し（`domain/canonical_sync_rules.conflict_copy_name`）、20件を超える削除と、秘密情報らしい中身と、10MB を超えるファイルを保留にする。`workspace validate` は衝突の写しを `CANONICAL_CONFLICT_COPY` の警告として示す。
 	- `cue` は `infra/cue_tool.py`（`locate_cue`、`CueTool.export`、`parse_cue_errors`）で呼ぶ。Scope の型は `src/spec_dock/cue/v1/*.cue`（`package spec`）で、`infra/cue_schemas.schema_directory` が `specdock/v<N>` だけを `cue/v<N>/` に写す。
-	- 登録簿 `<state_root>/canonical-registry.json`（`infra/canonical_registry.read_registry`）に、このPCで `canonical link` した全カタログが載る（`catalog`、`main_checkout`、`repository`。`repository` は null のことがあり、同じリポジトリの2つのクローンは2行になる）。
+	- 登録簿 `<state_root>/canonical-registry.json`（`infra/canonical_registry.read_registry`）に、このPCで `canonical link` した全カタログが載る（`catalog`、`main_checkout`、`repository`。`repository` は null のことがあり、同じリポジトリの2つのクローンは2行になる）。ただし `canonical link --no-schedule` でリンクしたカタログは、登録簿に載らない（定期の同期の対象でもない）。
 	- 利用者の設定のファイルはない（`workspace.json` は契約のファイル）。`XDG_CONFIG_HOME` は、常駐の設定のファイルの置き場を決めるのにだけ使っている（`infra/canonical_scheduling.py`、`infra/dashboard_service.py`）。
 	- `dashboard summary` と、サーバーの `/api/v1/r/<repo>/summary` は、どちらも `presentation/dashboard_summary.summary_document` で `specdock.dashboard-summary/v1` を作る（項目を足すのは版を変えずにできる）。今はユーザーごとの状態の置き場のファイルだけを読む。
 	- ダッシュボードのサーバー（`application/dashboard_http.py`、`dashboard_site.py`）は、画面の道 `/`、`/r/<repo>/{graph,board,timeline,scopes/<ID>}` と、API `/api/v1/repositories`、`/api/v1/r/<repo>/{summary,structure,scopes/<ID>,revision}` を持つ。画面は `src/spec_dock/assets/dashboard/`（`views/{overview,graph,board,timeline,scope}.js`）。`revision` は、スナップショットとカタログの同期の状態のファイルの時刻から作る。
@@ -40,7 +40,12 @@ design: {
 			- 閉じても、状態を変えるだけで、ファイルを動かさず、消さない（動かすと削除と追加になり、20件を超えると同期の保留に触れる）。v1 には記録を消すコマンドを作らない。
 			- リポジトリの設定：`<catalog>/todos/settings.json`（D-10）。
 			- Scope に結び付くタスクも、Scope のディレクトリには置かず、ID で結び付ける（D-11）。Scope の削除や `work finish` と絡まず、探す場所が1つで済む。
-			- 記録のファイルの名前は `^t-[0-9a-hjkmnp-tv-z]{4}\\.json$` だけ。`todos/` の下のほかのファイル（`*.conflict-*`、一時のファイル、手で置いたもの）は記録として読まず、`todo check` と `todo list` が警告する（D-06）。
+			- 記録のファイルは `todos/<YYYY-MM>/` の中の、名前が `^t-[0-9a-hjkmnp-tv-z]{4}\\.json$` のものだけ。ほかのファイルは記録として読まない。その扱い：
+			  - `todos/settings.json`：リポジトリの設定（D-10）。記録でないファイルとして警告しない。
+			  - `.` で始まる名前（`publish_file` の一時のファイルなど）と、OS が置くファイル（`canonical_sync_rules.is_os_junk`）：黙って飛ばす。
+			  - 衝突の写し（`*.conflict-*`）：`todo list`、`todo show`、`todo check` が警告 `TODO_CONFLICT_COPY` を出す（D-06）。
+			  - そのほか（手で置いたもの、名前の形が違うもの）：`todo check` だけが警告 `TODO_FILE_UNKNOWN` を出す。
+			  - どれも、そのリポジトリのほかの記録の読み取りを止めない（D-14）。
 			- GitHub には書かず、問い合わせもしない。Scope の ID の確かめも、保存したスナップショット（`SnapshotStore.load()`、ネットワークに触れない）だけで行う（D-11）。
 			- 層：`runtime/infra/todo_store.py`（道の組み立て、全記録の読み取り、ID の一覧、書き込み）。
 			"""
@@ -179,7 +184,7 @@ design: {
 			  3. リポジトリの設定：`<catalog>/todos/settings.json`。形は `{"schema": "specdock.todo-settings/v1", <鍵>: <値>}`。そのリポジトリの全 worktree と PC で共通（同期される）。
 			- どちらのファイルもなければ、初めの値を使う。ファイルが読めない、JSON でない、`schema` が違う、値の形が違うときは、そのファイル（段）を丸ごと飛ばし、警告 `TODO_SETTINGS_INVALID`（`details`：`path`、`layer`、`reason`）を出す。どの `todo` のコマンドも止まらない（R-08）。知らない鍵は無視する。
 			- 書くコマンドは作らない（利用者とエージェントがファイルを書く。リポジトリの設定はカタログのふつうのファイルなので、同期が保存する）。書き方と見本は、配布する文書（D-17）に書く。
-			- 表示：`spec-dock todo settings [--json]`。鍵ごとに `value` と `source`（`default`、`user`、`repository`）、段ごとに `path`、`state`（`missing`、`ok`、`invalid`）、`reason` を返す。チェックアウトの外では、リポジトリの段を `not_applicable` にする。`todo add` の件数の警告も、`source` を示す。
+			- 表示：`spec-dock todo settings [--json]`。鍵ごとに `value` と `source`（`default`、`user`、`repository`）、段ごとに `path`、`state`（`missing`、`ok`、`invalid`、`unavailable`、`not_applicable`）、`reason` を返す。どこでも動き、止まらない：schema 4 のチェックアウトの中で、リンクが正しければリポジトリの段を読む。リンクがない・正しくないときは、リポジトリの段を `unavailable`（`reason` と次の1手 `spec-dock canonical link`）にして、ほかの段で値を示す。チェックアウトの外では、リポジトリの段を `not_applicable` にする。`todo add` の件数の警告も、`source` を示す。
 			- 層：`domain/todo_settings.py`（重ね方と値の検査）、`infra/user_config.py`（利用者の設定の道と読み取り。読むだけで、作らない）、`infra/todo_store.py`（リポジトリの設定の読み取り）、`application/todo_settings.py`。
 			"""
 		satisfies: ["R-08"]
@@ -215,7 +220,7 @@ design: {
 			| `todo settings` | 効いている値と出どころ（D-10） |
 
 			- 書くコマンドは、そのチェックアウト（か `--project`）のリポジトリのカタログだけに書く。ほかのリポジトリのタスクを書くときは、そのリポジトリのチェックアウトで実行する。書くコマンドの `--by`／`--role` は、`history` と `resolution` の `by`／`role` になる。
-			- チェックアウトのいる道（`canonical_dispatch.CANONICAL_HANDLERS`）：`add`、`update`、`done`、`snooze`、`cancel`、`reopen`、`check`、`list`（`--all-repositories` なし）、`show ID`。チェックアウトがなくても動く道（`REPOSITORY_INDEPENDENT_HANDLERS`）：`list --all-repositories`／`--repository`、`show REF`、`settings`（リポジトリの段なし）。
+			- チェックアウトのいる道（`canonical_dispatch.CANONICAL_HANDLERS`）：`add`、`update`、`done`、`snooze`、`cancel`、`reopen`、`check`、`list`（`--all-repositories`／`--repository` なし）、`show ID`。チェックアウトがなくても動く道（`REPOSITORY_INDEPENDENT_HANDLERS`）：`list --all-repositories`／`--repository`、`show REF`、`settings`（いつもこの道で受け、チェックアウトの中ならリポジトリの段を読む。D-10。F-03 で止めない）。
 			- リンクとカタログの確かめ（F-03）：チェックアウトのいるコマンドは `require_linked` を通し、リンクがない、正しくない、カタログが読めないときは、何も書かずに今の `CANONICAL_NOT_LINKED`（次の1手 `spec-dock canonical link`）で止まる。書くコマンドは `catalog_changes` の中で形式の版も確かめる（`CANONICAL_FORMAT_UNSUPPORTED`）。
 			- GitHub：どの `todo` のコマンドも、構造のスナップショットの取り直しも GitHub への要求もしない（`--offline` と同じ動き。R-01 の受け入れを、`gh` の stub が呼ばれないテストで確かめる）。
 			- 見つからない ID は `TODO_NOT_FOUND`、閉じたものの延期などの許されない移り変わりは `TODO_STATE_INVALID`（どちらも終了コード3）。終了コードは今の決まり（入力の誤り2、前提の不足3、検査の失敗7）に従う。`--dry-run` は、書く前の検査までを行い、書く予定の記録を返す。
@@ -230,8 +235,9 @@ design: {
 			- `specdock.todo/v1`：記録のファイルそのもの（D-02）。CLI の1件の結果（`add`、`show`、`update`、`done`、`snooze`、`cancel`、`reopen`）の `data.result` は `{todo: <記録>, derived: {effective_status, overdue, due_soon, blocking, parent_closable, open_subtasks: [{id, title}], subtask_counts: {open, total}}, ref, repository, path, warnings_detail}`。`path` はカタログからの相対の道。
 			- `specdock.todo-list/v1`（`todo list` の `data.result`）：
 			  - `schema`、`generated_at`、`mode`（`repository` か `all_repositories`）、`filters`（受け取った絞り込み）。
-			  - `repositories`：`[{repository, catalog, main_checkout, hidden, status, problem, counts: {open, blocking, overdue, snoozed, agent_parents: {count, limit, source}}, invalid_files, conflict_copies}]`。`status` は `ok`、`unreadable`（`problem` に `code`、`message`、`next_step`）、`duplicate`（同じリポジトリの2つ目のクローン。D-14）。`hidden` はダッシュボードで隠しているか（D-14）。
+			  - `repositories`：`[{repository, catalog, main_checkout, hidden, status, problem, counts: {open, blocking, overdue, snoozed, agent_parents: {count, limit, source}}, invalid_files, conflict_copies}]`。`status` は `ok`（記録を読めた。形の正しくないファイルや衝突の写しがあっても `ok` で、`invalid_files` と `conflict_copies` にその道を並べる）、`unreadable`（カタログか `todos/` のディレクトリそのものが読めない。`problem` に `code`、`message`、`next_step`。そのリポジトリの `items` はない）、`duplicate`（同じリポジトリの2つ目のクローン。D-14）。`hidden` はダッシュボードで隠しているか（D-14）。
 			  - `items`：D-08 の並びで `[{ref, repository, path, derived, todo}]`（`derived` と `todo` は1件の結果と同じ）。
+			  - チェックアウトの中の `todo list`（`mode: repository`）も同じ形で、`repositories` は、そのチェックアウトのカタログの1行（`hidden` はダッシュボードの印を読んだ値、`main_checkout` はそのクローンの main のチェックアウト）。`mode: repository` の形は記録の形と CLI の中核の Issue が作り、`mode: all_repositories`（登録簿、`duplicate`）は集約の Issue が足す。
 			- 版の決まり（`specdock.dashboard-summary/v1` と同じ）：項目を足すのは版を変えずにできる。消すか意味を変えるときは版を上げる。外部の道具（個人のタスク管理、Company OS の nestboard）は、`schema` を見て読む。配布する `reference_cli.md` に契約として書く。
 			- 層：`presentation/todo_document.py`（`todo_view`、`todo_list_document`）。ダッシュボードの API（D-16）も、同じ関数で作る。
 			"""
@@ -241,13 +247,14 @@ design: {
 		title: "全リポジトリの集約（登録簿を読む）"
 		text: """
 			- `todo list --all-repositories` は、`read_registry(state_root)` の全部の行のカタログの `todos/` を、その場で読む（各カタログの worktree を直接読む。チェックアウトもサーバーもいらない。GitHub に問い合わせない）。読むのは記録と `settings.json` だけで、ロックは取らない。
-			- リポジトリごとの失敗を閉じ込める：カタログがない、ディレクトリが読めない、記録でない形のファイルが混ざる、などは、そのリポジトリの `repositories[].status` と `problem`（`next_step` は `spec-dock canonical link`（`main_checkout` で）か `spec-dock todo check`）に書き、ほかのリポジトリの分を返す。全体は成功（終了コード0）で、警告 `TODO_REPOSITORY_UNREADABLE` を出す（R-10、F-03）。形の正しくない1件のファイルは、`invalid_files` に数え、ほかの記録を返す。
+			- リポジトリごとの失敗を閉じ込める：カタログがない、カタログか `todos/` のディレクトリが読めない、ときだけ、そのリポジトリを `status: unreadable` と `problem`（`next_step` は `main_checkout` での `spec-dock canonical link`）にし、ほかのリポジトリの分を返す。全体は成功（終了コード0）で、警告 `TODO_REPOSITORY_UNREADABLE` を出す（R-10、F-03）。`todos/` がまだないのは失敗ではなく、0件の `ok`。
+			- ファイル単位の問題はリポジトリの失敗にしない（D-01）：形の正しくない記録や版の違う記録は `invalid_files` に、衝突の写しは `conflict_copies` に道を並べ（警告 `TODO_RECORD_INVALID`、`TODO_CONFLICT_COPY`。次の1手 `spec-dock todo check`）、そのリポジトリのほかの記録は `items` に返す。一時のファイルと OS のファイルは黙って飛ばす。
 			- 登録簿そのものが読めないときは `TODO_REGISTRY_UNREADABLE`（終了コード3）。登録簿が空なら、空の一覧。
 			- `repository` が null の行は、`repository: null`、`ref: null` で並べる。同じ `repository` の行が2つあれば（クローンが2つ）、`main_checkout` の道の順で最初の行を読み、2つ目は `status: duplicate` として読まない（ダッシュボードの `DASHBOARD_REPOSITORY_AMBIGUOUS` と違い、CLI では読めるほうを返す）。
 			- ダッシュボードで隠したリポジトリ（`dashboard hide`）も、CLI の集約には入れ、`hidden: true` を付ける（外部の道具が全部を読めるようにする）。画面は隠したものを出さない（D-16）。
 			- 件数の目安は、リポジトリごとに、そのリポジトリの設定と利用者の設定で決める。
 			- `todo show <owner>/<name>/t-xxxx` も、同じ読み方で1件を返す。
-			- 登録簿は PC ごとにあるので、集まるのは、このPCで `canonical link` したリポジトリだけ（文書に書く）。
+			- 集まるのは、このPCの登録簿に載ったリポジトリだけ（登録簿は PC ごとにあり、`canonical link --no-schedule` でリンクしたカタログは載らない）。文書に書き、`--no-schedule` のリポジトリでは、そのチェックアウトの中の `todo list` を使うよう示す。
 			- 層：`application/todo_list.py`（登録簿の行ごとの読み取りと閉じ込め）、`infra/todo_store.py`。
 			"""
 		satisfies: ["R-10", "F-03"]
@@ -256,7 +263,7 @@ design: {
 		title: "`dashboard summary` の拡張"
 		text: """
 			- `specdock.dashboard-summary/v1` に項目 `todos` を足す（版は変えない。epic-00427 D-05 の決まり）：`{status: "ok"|"unavailable", open, blocking, overdue, problem}`。数は D-08 の定義（開いている＝閉じていない、止めている、期限切れ）で、そのリポジトリの親のタスクを数える（サブタスクは数えない）。
-			- カタログの見つけ方：登録簿から、そのリポジトリの行のカタログを選ぶ（D-14 と同じ選び方）。行がない、カタログが読めないときは、`status: "unavailable"`、数は null、`problem` に理由と次の1手を書き、要約そのものは今までどおり成功する（人のタスクが読めなくても、構造の要約は返す）。
+			- カタログの見つけ方：`REPOSITORY` を省いてチェックアウトの中で実行したときは、そのチェックアウトのリンクが正しければ、そのカタログを読む（`--no-schedule` のリンクでも数が出る）。リンクが正しくないとき、または `REPOSITORY` を渡したときは、登録簿から、そのリポジトリの行のカタログを選ぶ（D-14 と同じ選び方）。どちらでもカタログが見つからない、読めないときは、`status: "unavailable"`、数は null、`problem` に理由と次の1手を書き、要約そのものは今までどおり成功する（人のタスクが読めなくても、構造の要約は返す）。
 			- `dashboard summary` は、今のユーザーごとの状態の置き場のファイルに加えて、カタログの `todos/` も読む（手元のファイルだけで、GitHub にもサーバーにも要求を送らない点は変えない）。`HELP_EFFECTS` と `reference_cli.md` を直す。
 			- サーバーの `/api/v1/r/<repo>/summary` も同じ `summary_document` で作るので、同じ数を返す。
 			- 層：`application/dashboard_summary.py`（カタログを選んで読む）、`application/todo_list.py`（数えるための読み取りを共有）、`domain/todo_model.py`（数え方）、`presentation/dashboard_summary.py`（`todos` の項目とテキストの1行）。

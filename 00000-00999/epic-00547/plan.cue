@@ -8,12 +8,12 @@ goal: "人のタスクの記録の形と `todo` の CLI、全リポジトリの�
 slices: {
 	"iss-99901": {
 		covers: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06", "R-07", "R-08", "R-09", "F-01", "F-02", "F-03"]
-		text:   "第1波。記録の形と型と設定、CLI の中核。D-01〜D-12 と D-18：置き場と `todo_store`、`specdock.todo/v1` の Python の型と書く前の検査、CUE の型 `#Todo` と `cue vet`、`todo check`、ID の採番、ロックと原子的な書き込みと衝突の写しの警告、サブタスクと束、期限と延期と並び、件数の警告、3段の設定と `todo settings`、Scope との結び付き（`evaluate_readiness` を変えないことの確かめを含む）、チェックアウトの中の `todo add|list|show|update|done|snooze|cancel|reopen|check|settings`（集約なし）と、1件の結果の形（D-13 の1件の部分）。`todos/` を Scope と取り違えないことのテスト（D-18）。`reference_cli.md` に10のコマンドと `specdock.todo/v1` を書く。epic-00427 に依存しない。"
+		text:   "第1波。記録の形と型と設定、CLI の中核。D-01〜D-12 と D-18：置き場と `todo_store`、`specdock.todo/v1` の Python の型と書く前の検査、CUE の型 `#Todo` と `cue vet`、`todo check`、ID の採番、ロックと原子的な書き込みと衝突の写しの警告、サブタスクと束、期限と延期と並び、件数の警告、3段の設定と `todo settings`、Scope との結び付き（`evaluate_readiness` を変えないことの確かめを含む）、チェックアウトの中の `todo add|list|show|update|done|snooze|cancel|reopen|check|settings`（集約なし）と、D-13 の1件の結果の形と `specdock.todo-list/v1` の `mode: repository` の形（R-06・R-07・R-09 の一覧での確かめに使う）。`todos/` を Scope と取り違えないことのテスト（D-18）。`reference_cli.md` に10のコマンドと `specdock.todo/v1`、`specdock.todo-list/v1`（`mode: repository`）を書く。epic-00427 に依存しない。"
 		session: "std"
 	}
 	"iss-99902": {
 		covers: ["R-10", "R-11", "F-03"]
-		text:   "第2波。集約と要約。D-13 の `specdock.todo-list/v1`、D-14 の `todo list --all-repositories`／`--repository` と `todo show <REF>`（登録簿を読み、リポジトリごとの失敗を閉じ込める）、D-15 の `dashboard summary` の `todos`（サーバーの summary の API も同じ数を返すこと）。`reference_cli.md` に契約を書く。epic-00427 の既存の `dashboard summary` を拡張するが、epic-00427 の残りの Issue には依存しない。"
+		text:   "第2波。集約と要約。D-13 の `specdock.todo-list/v1` に `mode: all_repositories`（登録簿、`hidden`、`duplicate`）を足し、D-14 の `todo list --all-repositories`／`--repository` と `todo show <REF>`（登録簿を読み、リポジトリごとの失敗を閉じ込める）、D-15 の `dashboard summary` の `todos`（サーバーの summary の API も同じ数を返すこと）。`reference_cli.md` に契約を書く。epic-00427 の既存の `dashboard summary` を拡張するが、epic-00427 の残りの Issue には依存しない。"
 		after: ["iss-99901"]
 		session: "std"
 	}
