@@ -112,7 +112,7 @@ design: {
 		title: "CUE の型（`#Todo`）と `todo check`"
 		text: """
 			- 型の定義：`src/spec_dock/cue/todo/v1/todo.cue`（`package todo`、`#Todo` と `#Subtask`、開いた構造 `...`）。D-02 の形と欄の間の決まりを、D-04 と同じに書く。パッケージのデータ（`cue/**/*.cue`）として wheel に入る。Scope の型（`cue/v1/`、`package spec`）とは別のディレクトリなので、Scope の評価に混ざらない（`schema_directory` は `specdock/v<N>` だけを写す。`shipped_schemas()` に `todo` が出ないことをテストで確かめる）。置き場は `infra/cue_schemas.todo_schema_path()` で返す。
-			- `infra/cue_tool.CueTool` に `vet(files, *, schema, expression, cwd, timeout)` を足す：`cue vet -c -d '#Todo' <todo.cue> <a.json> <b.json> …`。引数の長さを抑えるため、200ファイルごとに分けて呼ぶ。誤りは `parse_cue_errors` の位置からファイルに対応づける。
+			- `infra/cue_tool.CueTool` に `vet(files, *, schema, expression, cwd, timeout)` を足す：全部の記録を `{カタログからの相対の道: 記録}` の1つの JSON にまとめて標準入力で渡し、`cue vet -c -d '#Records' <todo.cue> -`（`#Records: [string]: #Todo`）で確かめる。誤りは、誤りの道の先頭の鍵でファイルに対応づける（2026-11-04 改め。cue v0.17.1 では複数のデータファイルを渡すと最初に誤ったファイルの誤りしか出ず、欄の間の規則の誤りは位置が JSON のファイルを指さないため。#549 の確かめ）。
 			- `spec-dock todo check [--json]`：そのリポジトリの `todos/` の全部を調べる。
 			  1. Python の検査（いつも）：各記録の `validate`、名前と `id` と年月の一致、ID の重なり（`TODO_ID_DUPLICATE`）、`settings.json` の形（D-10）、衝突の写し（`TODO_CONFLICT_COPY`、警告）、記録でないファイル（`TODO_FILE_UNKNOWN`、警告）、`schema` の版が違う記録（`TODO_SCHEMA_UNSUPPORTED`、誤り）。
 			  2. `cue vet`（`cue` v0.17.1 以上があるとき）：全部の記録を `#Todo` で一度に確かめる。`cue` がない、古いときは、警告 `TODO_CUE_SKIPPED`（`next_step` に入れ方）を出し、Python の検査だけで結果を決める（R-02）。`cue` が時間切れか失敗したときは、警告 `TODO_CUE_FAILED` で同じく扱う。
