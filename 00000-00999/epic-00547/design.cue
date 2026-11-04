@@ -184,7 +184,7 @@ design: {
 			  3. リポジトリの設定：`<catalog>/todos/settings.json`。形は `{"schema": "specdock.todo-settings/v1", <鍵>: <値>}`。そのリポジトリの全 worktree と PC で共通（同期される）。
 			- どちらのファイルもなければ、初めの値を使う。ファイルが読めない、JSON でない、`schema` が違う、値の形が違うときは、そのファイル（段）を丸ごと飛ばし、警告 `TODO_SETTINGS_INVALID`（`details`：`path`、`layer`、`reason`）を出す。どの `todo` のコマンドも止まらない（R-08）。知らない鍵は無視する。
 			- 書くコマンドは作らない（利用者とエージェントがファイルを書く。リポジトリの設定はカタログのふつうのファイルなので、同期が保存する）。書き方と見本は、配布する文書（D-17）に書く。
-			- 表示：`spec-dock todo settings [--json]`。鍵ごとに `value` と `source`（`default`、`user`、`repository`）、段ごとに `path`、`state`（`missing`、`ok`、`invalid`、`unavailable`、`not_applicable`）、`reason` を返す。どこでも動き、止まらない：schema 4 のチェックアウトの中で、リンクが正しければリポジトリの段を読む。リンクがない・正しくないときは、リポジトリの段を `unavailable`（`reason` と次の1手 `spec-dock canonical link`）にして、ほかの段で値を示す。チェックアウトの外では、リポジトリの段を `not_applicable` にする。`todo add` の件数の警告も、`source` を示す。
+			- 表示：`spec-dock todo settings [--json]`。鍵ごとに `value` と `source`（`default`、`user`、`repository`）、段ごとに `path`、`state`（`missing`、`ok`、`invalid`、`not_applicable`）、`reason` を返す。schema 4 のチェックアウトの中では、ほかの `todo` のコマンドと同じく `require_linked` を通してリポジトリの段を読み、リンクがない・正しくないときは `CANONICAL_NOT_LINKED`（次の1手 `spec-dock canonical link`）で止まる（F-03）。チェックアウトの外では、リポジトリがないので、リポジトリの段を `not_applicable` にして、初めの値と利用者の設定を示す。`todo add` の件数の警告も、`source` を示す。
 			- 層：`domain/todo_settings.py`（重ね方と値の検査）、`infra/user_config.py`（利用者の設定の道と読み取り。読むだけで、作らない）、`infra/todo_store.py`（リポジトリの設定の読み取り）、`application/todo_settings.py`。
 			"""
 		satisfies: ["R-08"]
@@ -220,7 +220,7 @@ design: {
 			| `todo settings` | 効いている値と出どころ（D-10） |
 
 			- 書くコマンドは、そのチェックアウト（か `--project`）のリポジトリのカタログだけに書く。ほかのリポジトリのタスクを書くときは、そのリポジトリのチェックアウトで実行する。書くコマンドの `--by`／`--role` は、`history` と `resolution` の `by`／`role` になる。
-			- チェックアウトのいる道（`canonical_dispatch.CANONICAL_HANDLERS`）：`add`、`update`、`done`、`snooze`、`cancel`、`reopen`、`check`、`list`（`--all-repositories`／`--repository` なし）、`show ID`。チェックアウトがなくても動く道（`REPOSITORY_INDEPENDENT_HANDLERS`）：`list --all-repositories`／`--repository`、`show REF`、`settings`（いつもこの道で受け、チェックアウトの中ならリポジトリの段を読む。D-10。F-03 で止めない）。
+			- チェックアウトのいる道（`canonical_dispatch.CANONICAL_HANDLERS`）：`add`、`update`、`done`、`snooze`、`cancel`、`reopen`、`check`、`list`（`--all-repositories`／`--repository` なし）、`show ID`。チェックアウトがなくても動く道（`REPOSITORY_INDEPENDENT_HANDLERS`）：`list --all-repositories`／`--repository`、`show REF`、`settings`（いつもこの道で受け、チェックアウトの中なら `require_linked` を通してリポジトリの段を読む。リンクが正しくなければ F-03 のとおり止まる。D-10）。
 			- リンクとカタログの確かめ（F-03）：チェックアウトのいるコマンドは `require_linked` を通し、リンクがない、正しくない、カタログが読めないときは、何も書かずに今の `CANONICAL_NOT_LINKED`（次の1手 `spec-dock canonical link`）で止まる。書くコマンドは `catalog_changes` の中で形式の版も確かめる（`CANONICAL_FORMAT_UNSUPPORTED`）。
 			- GitHub：どの `todo` のコマンドも、構造のスナップショットの取り直しも GitHub への要求もしない（`--offline` と同じ動き。R-01 の受け入れを、`gh` の stub が呼ばれないテストで確かめる）。
 			- 見つからない ID は `TODO_NOT_FOUND`、閉じたものの延期などの許されない移り変わりは `TODO_STATE_INVALID`（どちらも終了コード3）。終了コードは今の決まり（入力の誤り2、前提の不足3、検査の失敗7）に従う。`--dry-run` は、書く前の検査までを行い、書く予定の記録を返す。
