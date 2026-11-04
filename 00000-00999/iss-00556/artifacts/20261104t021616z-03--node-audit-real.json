@@ -1,0 +1,746 @@
+[
+ {
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "wait",
+   "fold": true
+  },
+  "edges": 12,
+  "iters": 3,
+  "ms": 16,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "wait",
+   "fold": false
+  },
+  "edges": 12,
+  "iters": 3,
+  "ms": 7,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true
+  },
+  "edges": 50,
+  "iters": 1,
+  "ms": 22,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": false
+  },
+  "edges": 50,
+  "iters": 1,
+  "ms": 13,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "nest",
+   "showDone": true,
+   "deps": "wait",
+   "fold": true
+  },
+  "edges": 12,
+  "iters": 3,
+  "ms": 7,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "nest",
+   "showDone": true,
+   "deps": "wait",
+   "fold": false
+  },
+  "edges": 12,
+  "iters": 3,
+  "ms": 14,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "nest",
+   "showDone": true,
+   "deps": "all",
+   "fold": true
+  },
+  "edges": 142,
+  "iters": 8,
+  "ms": 333,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "nest",
+   "showDone": true,
+   "deps": "all",
+   "fold": false
+  },
+  "edges": 207,
+  "iters": 7,
+  "ms": 463,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "tree",
+   "showDone": false,
+   "deps": "wait",
+   "fold": true
+  },
+  "edges": 12,
+  "iters": 2,
+  "ms": 10,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "tree",
+   "showDone": false,
+   "deps": "wait",
+   "fold": false
+  },
+  "edges": 12,
+  "iters": 2,
+  "ms": 8,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "tree",
+   "showDone": false,
+   "deps": "all",
+   "fold": true
+  },
+  "edges": 50,
+  "iters": 3,
+  "ms": 38,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "tree",
+   "showDone": false,
+   "deps": "all",
+   "fold": false
+  },
+  "edges": 50,
+  "iters": 3,
+  "ms": 36,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "tree",
+   "showDone": true,
+   "deps": "wait",
+   "fold": true
+  },
+  "edges": 12,
+  "iters": 2,
+  "ms": 20,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "tree",
+   "showDone": true,
+   "deps": "wait",
+   "fold": false
+  },
+  "edges": 12,
+  "iters": 2,
+  "ms": 20,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "tree",
+   "showDone": true,
+   "deps": "all",
+   "fold": true
+  },
+  "edges": 207,
+  "iters": 3,
+  "ms": 380,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "tree",
+   "showDone": true,
+   "deps": "all",
+   "fold": false
+  },
+  "edges": 207,
+  "iters": 3,
+  "ms": 360,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "init-00039"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00048"
+  },
+  "edges": 1,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00059"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00067"
+  },
+  "edges": 6,
+  "iters": 1,
+  "ms": 1,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00074"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00077"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "init-00079"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00080"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00090"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00112"
+  },
+  "edges": 25,
+  "iters": 6,
+  "ms": 10,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00158"
+  },
+  "edges": 10,
+  "iters": 1,
+  "ms": 1,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00270"
+  },
+  "edges": 5,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00283"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00295"
+  },
+  "edges": 13,
+  "iters": 1,
+  "ms": 1,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00312"
+  },
+  "edges": 7,
+  "iters": 1,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00356"
+  },
+  "edges": 9,
+  "iters": 1,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00365"
+  },
+  "edges": 8,
+  "iters": 1,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "init-00423"
+  },
+  "edges": 30,
+  "iters": 1,
+  "ms": 4,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00427"
+  },
+  "edges": 17,
+  "iters": 1,
+  "ms": 1,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "init-00468"
+  },
+  "edges": 20,
+  "iters": 1,
+  "ms": 3,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00471"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00512"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00526"
+  },
+  "edges": 0,
+  "iters": 0,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ },
+ {
+  "opts": {
+   "mode": "nest",
+   "showDone": false,
+   "deps": "all",
+   "fold": true,
+   "focus": "epic-00547"
+  },
+  "edges": 9,
+  "iters": 1,
+  "ms": 0,
+  "boxHits": 0,
+  "ownHits": 0,
+  "overlaps": 0,
+  "diagonal": 0,
+  "portShare": 0,
+  "trunkOverlaps": 0,
+  "failed": 0
+ }
+]
