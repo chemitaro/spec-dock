@@ -7,6 +7,7 @@
 - [導入・移行・保全](migration.md)
 - [CLI参照](reference_cli.md)
 - [canonical モードの使い方](canonical.md)
+- [人のタスク（`spec-dock todo`）の使い方](todo.md)
 - [人間向け説明HTML](cli-redesign-guide.html)
 - [命名参照](reference_naming.md)
 - [依存関係管理参照](reference_deps.md)
