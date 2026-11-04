@@ -156,6 +156,14 @@ def test_safe_markdown_never_passes_html_or_script_links(tmp_path: Path) -> None
     assert "<ol><li>one</li></ol>" in html and "<pre><code>&lt;img src=x onerror=alert(1)&gt;</code></pre>" in html
 
 
+def test_history_words_cover_every_record_action(tmp_path: Path) -> None:
+    source = (ASSETS.parents[1] / "runtime" / "domain" / "todo_record.py").read_text()
+    block = source[source.index("ACTIONS: Final = (") : source.index("UPDATABLE")]
+    actions = re.findall(r'"([a-z_]+)"', block)
+    out = _run("out.words = logic.ACTION_WORDS;", tmp_path)
+    assert actions and sorted(out["words"]) == sorted(actions)
+
+
 def test_routes_and_paths(tmp_path: Path) -> None:
     out = _run(
         """

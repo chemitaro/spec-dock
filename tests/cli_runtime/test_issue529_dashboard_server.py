@@ -355,8 +355,8 @@ def test_the_screens_have_the_shell_and_five_slots() -> None:
     for name in SCREEN_FILES:
         assert (ASSETS / name).is_file(), name
     table = (ASSETS / "views" / "index.js").read_text()
-    assert "export const VIEWS = { graph, board, timeline, scope, overview };" in table
-    for name in ("graph", "board", "timeline", "scope", "overview"):
+    assert "export const VIEWS = { graph, board, timeline, scope, overview, todos };" in table  # iss-00554 adds todos
+    for name in ("graph", "board", "timeline", "scope", "overview", "todos"):
         assert f'import {name} from "./{name}.js";' in table
         source = (ASSETS / "views" / f"{name}.js").read_text()
         assert "export default" in source and f'id: "{name}"' in source, name

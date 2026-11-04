@@ -64,7 +64,7 @@ def files_signature(catalog: Path) -> tuple[object, ...]:
             months = [(entry.name, _signature(entry)) for entry in sorted(root.iterdir()) if entry.is_dir()]
     except OSError:
         months = [("?", None)]
-    return (_signature(root), tuple(months), _signature(root / "settings.json"))
+    return (_signature(catalog), _signature(root), tuple(months), _signature(root / "settings.json"))
 
 
 def parse_status(value: str | None) -> str:
@@ -201,7 +201,10 @@ class DashboardTodos:
                 return cached[1]
         read = read_catalog(catalog, main_checkout, user_layer=read_user_todo_settings())
         with self._lock:
-            self._cache[str(catalog)] = (key, read)
+            if read.problem is None:  # an unreadable catalog is read again next time (it may be linked again)
+                self._cache[str(catalog)] = (key, read)
+            else:
+                self._cache.pop(str(catalog), None)
         return read
 
     def _site_read(self, site: SiteRepository) -> tuple[Selected | None, CatalogRead | None, dict[str, object] | None]:

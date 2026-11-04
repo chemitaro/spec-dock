@@ -211,6 +211,18 @@ def test_revision_follows_the_tasks_and_the_clock(env: Env, monkeypatch: pytest.
     assert body["items"][0]["derived"]["overdue"] is True
 
 
+def test_a_catalog_without_todos_that_breaks_or_heals_is_noticed(env: Env) -> None:
+    def summary() -> dict[str, Any]:
+        return env.json("/api/v1/r/github.com/o/r/structure")[1]["todos"]
+
+    assert summary()["status"] == "ok"  # no todos/ yet: zero tasks
+    moved = env.r.with_name("moved")
+    env.r.rename(moved)
+    assert summary()["status"] == "unavailable"
+    moved.rename(env.r)
+    assert summary()["status"] == "ok"
+
+
 # --- T-07: marks, lists and the summary on structure and scope -------------------------------------------------
 
 

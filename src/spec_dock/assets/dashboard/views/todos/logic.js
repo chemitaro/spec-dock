@@ -29,9 +29,12 @@ export const ACTION_WORDS = {
   snoozed: "延期",
   cancelled: "取り消し",
   reopened: "開き直し",
-  subtask_add: "サブタスクの追加",
+  // the record's action names (domain/todo_record.ACTIONS)
+  subtask_added: "サブタスクの追加",
   subtask_done: "サブタスクの完了",
-  subtask_cancel: "サブタスクの取り消し",
+  subtask_cancelled: "サブタスクの取り消し",
+  subtask_reopened: "サブタスクの開き直し",
+  subtask_updated: "サブタスクの更新",
 };
 
 // The group of one list item, from the server's derived states (the same rule as todo_model._group).
