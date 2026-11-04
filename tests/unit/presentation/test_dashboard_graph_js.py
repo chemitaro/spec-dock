@@ -8,6 +8,7 @@ runs along the tree's parent lines. On CI node must exist; elsewhere a missing n
 
 from __future__ import annotations
 
+from itertools import pairwise
 import json
 import os
 from pathlib import Path
@@ -154,7 +155,7 @@ def test_seven_stages_stay_on_one_row(small: dict[str, Any]) -> None:
     nodes = _nodes(small, "home")
     chain = [nodes[f"iss-{n:05d}"] for n in range(11, 18)]
     assert len({box["y1"] for box in chain}) == 1
-    assert all(a["x2"] < b["x1"] for a, b in zip(chain, chain[1:]))
+    assert all(a["x2"] < b["x1"] for a, b in pairwise(chain))
 
 
 def test_home_hides_done_keeps_closed_parents_and_folds_cleanup(small: dict[str, Any]) -> None:
