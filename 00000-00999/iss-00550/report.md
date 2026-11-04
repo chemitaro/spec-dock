@@ -35,9 +35,19 @@ ID: "iss-00550"
 
 ## Verification
 
-（ゲートの結果で埋める）
+- 仕様のレビュー（spec-reviewer opus/high）：1回目で合格（P0 0、P1 0、P2 2、P3 0）。P2 の2件（duplicate の行の `problem` の形、文書とヘルプの直す範囲）は仕様に反映した。記録は `.workbench/spec-review/iss-00550/`。
+- コードのレビュー（code-reviewer opus/high、規約の面と仕様の面の2人、`1f5c042..08e7648`）：どちらも合格（規約の面は P3 1、仕様の面は指摘0）。P3（`next_step` の道の引用）は `1311634a1` で直し、テストを足した。記録は `.workbench/code-review/iss-00550/`。
+- 最終品質ゲート（quality-gate-reviewer opus/high、1人、`1ee5bee82`、base は `origin/main` との merge-base `233008513`）：
+  - レビューの側：合格。範囲を見終え（coverage_complete）、P0 0、P1 0、P2 0、P3 2。
+  - テストの側：合格。`make lint` は終了コード0。`uv run pytest` は終了コード0（3602 passed、7 skipped、27分36秒）。
+  - 記録は `.workbench/final-quality-gate/iss-00550-g1/closure.md`。ChatGPT のレーンは使っていない（無効）。
+- `spec-dock scope check iss-00550`：誤り0、警告0。
 
 ## Residual Risks / Follow-ups
+
+ゲートの情報だけの指摘（直していない）：
+- P3：集約の `items` の同順位（同じ組・同じ期限・同じ作った時刻）の並びが、設計の「リポジトリの鍵、道の順」ではなく記録の ID で決まる。
+- P3：テキストの出力の `duplicate` の行の書式が、設計の `<repo>: duplicate (reads <カタログ>)` と少し違う（`<repo>: duplicate <カタログ> (<message>)`）。
 
 - 登録簿は PC ごとで、`canonical link --no-schedule` のカタログは集約に入らない（文書に書いた）。
 
