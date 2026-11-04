@@ -1,12 +1,18 @@
 // The top band (Epic D-07, R-03, R-09, R-17): brand and repository switcher (hidden when embedded), the three
 // screen tabs, a search slot (#531 fills it), the change count and the fetch time; notices go below the band.
 import { ago, esc, ic } from "./ui.js";
-import { repositoryPath, withEmbed } from "./route.js";
+import { repositoryPath, todosPath, withEmbed } from "./route.js";
 
 export const TABS = [
   ["graph", "構造の図", "layers"],
   ["board", "ボード", "table"],
   ["timeline", "時間の軸", "history"],
+  ["todos", "人のタスク", "person"], // iss-00554
+];
+// Without a repository: the overview and every repository's human tasks (iss-00554 D-05).
+export const ALL_TABS = [
+  ["overview", "/", "横断の概況", "globe"],
+  ["todos", "/todos", "人のタスク", "person"],
 ];
 
 export function renderTop(target, mobileTabs, state) {
@@ -16,9 +22,12 @@ export function renderTop(target, mobileTabs, state) {
   const tabs = repo
     ? TABS.map(
         ([view, label, icon]) =>
-          `<a class="tab" role="tab" data-nav href="${esc(withEmbed(repositoryPath(repo, view), route.embed))}" aria-selected="${current === view}">${ic(icon)}<span>${label}</span></a>`,
+          `<a class="tab" role="tab" data-nav href="${esc(withEmbed(view === "todos" ? todosPath(repo) : repositoryPath(repo, view), route.embed))}" aria-selected="${current === view}">${ic(icon)}<span>${label}</span></a>`,
       ).join("")
-    : "";
+    : ALL_TABS.map(
+        ([view, path, label, icon]) =>
+          `<a class="tab" role="tab" data-nav href="${esc(withEmbed(path, route.embed))}" aria-selected="${current === view}">${ic(icon)}<span>${label}</span></a>`,
+      ).join("");
   const items = (repositories || [])
     .map(
       (item) =>

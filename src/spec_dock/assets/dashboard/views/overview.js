@@ -45,6 +45,19 @@ function section(state, label, items, iconHtml) {
   return `<div class="sd-ov__sec" data-st="${state}"><h3>${iconHtml}${label}<b>${items.length}</b></h3><ul>${list}</ul></div>`;
 }
 
+// The card's human tasks (iss-00554 D-06; Epic R-13): open and overdue, the counts of `dashboard summary`.
+function todoFlags(structure) {
+  const todos = structure?.todos;
+  if (!todos) return "";
+  if (todos.status !== "ok") {
+    return `<span class="sd-badge" data-tone="warning" data-todos="unavailable" title="${esc(todos.problem?.message ?? "")}">${icon("person")}人のタスクが読めない</span>`;
+  }
+  return (
+    `<span class="sd-badge" data-tone="${todos.open ? "accent" : ""}" data-todos="open">${icon("person")}人のタスク ${esc(todos.open)}</span>` +
+    `<span class="sd-badge" data-tone="${todos.overdue ? "danger" : ""}" data-todos="overdue">${icon(todos.overdue ? "alert" : "clock")}期限切れ ${esc(todos.overdue)}</span>`
+  );
+}
+
 function repoCard(item, ctx) {
   const result = results.get(item.repository);
   const name = item.owner + "/" + item.name; // escaped where it is written
@@ -80,7 +93,7 @@ function repoCard(item, ctx) {
     body =
       `<div class="sd-ov__next">${section("merge", "マージ待ち", lane("awaiting_merge"), icon("branch"))}${section("doing", "作業中", lane("doing"), stateIcon("doing", false))}${section("ready", "着手できる", lane("ready"), stateIcon("ready", false))}</div>` +
       `<div class="sd-ov__counts">${stateCountList(counts, { done: false })}<span class="sd-cnt" data-st="merge" title="マージ待ち ${board.merge}">${icon("branch")}<span class="vh">マージ待ち</span>${board.merge}</span><span class="sd-ov__frac">${board.done}<small>／${board.total} 終わった</small></span></div>` +
-      `<div class="sd-ov__flags"><span class="sd-badge" data-tone="${board.blocked ? "danger" : ""}">${stateIcon("blocked", false)}止められている ${board.blocked}</span><span class="sd-badge" data-tone="${cleanup ? "warning" : ""}">${icon("box")}片付けの候補 ${cleanup}</span><span class="sd-badge" data-tone="${changes ? "accent" : ""}" data-changes="${changes}">${icon("bell")}変化 ${changes}</span></div>`;
+      `<div class="sd-ov__flags"><span class="sd-badge" data-tone="${board.blocked ? "danger" : ""}">${stateIcon("blocked", false)}止められている ${board.blocked}</span><span class="sd-badge" data-tone="${cleanup ? "warning" : ""}">${icon("box")}片付けの候補 ${cleanup}</span><span class="sd-badge" data-tone="${changes ? "accent" : ""}" data-changes="${changes}">${icon("bell")}変化 ${changes}</span>${todoFlags(structure)}</div>`;
   }
   return (
     `<a class="sd-ov" data-repo="${esc(item.repository)}" href="${esc(href)}"${warnings.some((warning) => warning.level !== "info") ? ' data-warn="1"' : ""}>` +

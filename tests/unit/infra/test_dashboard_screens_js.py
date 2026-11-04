@@ -74,7 +74,8 @@ def test_the_shell_only_gains_the_search_line() -> None:
 def test_the_screen_styles_stay_inside_the_three_screens() -> None:
     for name in ("parts.css",):
         text = (SHARED / name).read_text()
-        assert ':is([data-view="board"], [data-view="scope"], [data-view="overview"])' in text
+        # iss-00554: the human-task screens share the parts too
+        assert ':is([data-view="board"], [data-view="scope"], [data-view="overview"], [data-view="todos"])' in text
     for name in MINE:
         text = (VIEWS / f"{name}.css").read_text()
         selectors = [line for line in text.splitlines() if line and not line.startswith((" ", "}", "/*", "@"))]

@@ -223,14 +223,15 @@ function maxOpenStage(parentId) {
 function boxHtml(s, n) {
   const of = s.state !== "done" ? maxOpenStage(s.parent_id) : 1;
   const stg = of >= 2 ? M.stageMark(s.stage?.open, of) : "";
-  const label = `${s.id} ${s.title}。${STATES[s.state]?.label ?? s.state}（${s.reason?.text ?? ""}）${s.downstream ? `。後に続く ${s.downstream}件` : ""}`;
+  const human = M.humanCount(s);
+  const label = `${s.id} ${s.title}。${STATES[s.state]?.label ?? s.state}（${s.reason?.text ?? ""}）${s.downstream ? `。後に続く ${s.downstream}件` : ""}${human.count ? `。人のタスク ${human.count}件が止めている${human.descendants ? "（配下を含む）" : ""}` : ""}`;
   const frame = n.type === "tframe";
   let marks;
   if (frame) {
     const { cnt, total } = tally(s.id);
-    marks = `<div class="gx-marks">${M.sbar(cnt, total, 64)}${M.frac(cnt, total)}${M.counts(cnt)}${M.asMark(s.assurance)}${M.dnMark(s.downstream)}</div>`;
+    marks = `<div class="gx-marks">${M.sbar(cnt, total, 64)}${M.frac(cnt, total)}${M.counts(cnt)}${M.asMark(s.assurance)}${M.hmMark(s)}${M.dnMark(s.downstream)}</div>`;
   } else {
-    marks = `<div class="gx-marks">${M.asMark(s.assurance)}${M.prMark(s.pr)}${M.wtMark(s.state === "doing" ? s.branch : null)}${M.dnMark(s.downstream)}</div>`;
+    marks = `<div class="gx-marks">${M.asMark(s.assurance)}${M.prMark(s.pr)}${M.wtMark(s.state === "doing" ? s.branch : null)}${M.hmMark(s)}${M.dnMark(s.downstream)}</div>`;
   }
   return (
     `<div class="gx-box${frame ? " is-frame" : ""}" data-id="${esc(s.id)}" data-st="${s.state}" role="button" tabindex="0" aria-label="${esc(label)}" style="${pos(n)}">` +
@@ -253,7 +254,7 @@ function frameHtml(s, n, cleanup) {
   const meta =
     `<div class="gx-fm">${M.sbar(cnt, total, ini ? 150 : 84)}${M.frac(cnt, total)}${M.counts(cnt)}${M.asMark(s.assurance)}` +
     (cleanup.has(s.id) ? `<span class="cln" title="片付けの候補：${esc(cleanup.get(s.id).text)}" role="img" aria-label="片付けの候補">${ic("box")}</span>` : "") +
-    `${M.dnMark(s.downstream)}</div>`;
+    `${M.hmMark(s)}${M.dnMark(s.downstream)}</div>`;
   return (
     `<section class="gx-frame ${ini ? "gx-ini" : "gx-epic"}${n.compact ? " is-compact" : ""}" data-id="${esc(s.id)}" data-st="${s.state}" style="${pos(n)}">` +
     M.chgMark(s.change) +
@@ -445,7 +446,7 @@ function renderLegend() {
     `<div class="lg-grp"><h4>PR と CI</h4><ul>${li(`<span class="pr" data-pr="open">${ic("branch")}</span>`, "開いている")}${li(`<span class="pr" data-pr="draft">${ic("branch")}</span>`, "下書き")}${li(`<span class="pr" data-pr="merged">${ic("merge")}</span>`, "マージ済み")}${li(`<span class="pr" data-pr="closed">${ic("prClosed")}</span>`, "閉じた")}` +
     `${li('<span class="ci" data-ci="success"></span>', "CI 成功")}${li('<span class="ci" data-ci="failure"></span>', "CI 失敗")}${li('<span class="ci" data-ci="running"></span>', "CI 実行中")}${li(`<span class="mg" data-mg="ok">${ic("check")}</span>`, "マージできる")}${li(`<span class="mg" data-mg="conflict">${ic("zap")}</span>`, "衝突")}</ul></div>` +
     `<div class="lg-grp"><h4>保証</h4><ul>${M.AS_LEVELS.map((l) => li(M.asMark(l), l)).join("")}</ul></div>` +
-    `<div class="lg-grp"><h4>そのほか</h4><ul>${li('<span class="lg-chg"></span>', "前回から変化")}${li(`<span class="wt">${ic("folder")}</span>`, "worktree あり")}${li('<span class="stg">2</span>', "進める段")}${li(`<span class="dn">${ic("down")}3</span>`, "後に続く数")}${li(`<span class="cln">${ic("box")}</span>`, "片付けの候補")}${li('<span class="lg-line"></span>', "待っている依存", 1)}${li('<span class="lg-line is-done"></span>', "終わった依存", 1)}${li('<span class="lg-tree"></span>', "親子（木）", 1)}</ul></div>` +
+    `<div class="lg-grp"><h4>そのほか</h4><ul>${li('<span class="lg-chg"></span>', "前回から変化")}${li(`<span class="wt">${ic("folder")}</span>`, "worktree あり")}${li('<span class="stg">2</span>', "進める段")}${li(`<span class="dn">${ic("down")}3</span>`, "後に続く数")}${li(`<span class="hm">${ic("person")}人 2</span>`, "人のタスクが止めている数（枠は配下も）")}${li(`<span class="cln">${ic("box")}</span>`, "片付けの候補")}${li('<span class="lg-line"></span>', "待っている依存", 1)}${li('<span class="lg-line is-done"></span>', "終わった依存", 1)}${li('<span class="lg-tree"></span>', "親子（木）", 1)}</ul></div>` +
     `<div class="lg-grp"><h4>箱を選んだとき</h4><ul>${li('<span class="lg-box is-sel"></span>', "選んだ箱（1つだけ）")}${li('<span class="lg-line is-p1"></span>', "直接の依存", 1)}${li('<span class="lg-line is-p2"></span>', "間接（2段目より先）", 1)}${li('<span class="lg-line is-off"></span><span class="lg-box is-off"></span>', "関係ない")}${li(`<span class="rt lg-rt">${ic("target")}大もと</span>`, "大もとの待ち先")}${li(ic("arrowRight"), "矢印：選んだ箱へ入る線＝待ち先、出る線＝後に続く", 1)}</ul></div>` +
     `</div>`;
 }
@@ -467,6 +468,11 @@ function panelKv(s) {
   const of = maxOpenStage(s.parent_id);
   if (s.state !== "done" && of >= 2 && s.stage?.open) h += `<dt>段</dt><dd>${M.stageMark(s.stage.open, of)}${of}段のうち ${s.stage.open}段目</dd>`;
   if (s.downstream) h += `<dt>後に続く</dt><dd>${M.dnMark(s.downstream)}${s.downstream}件</dd>`;
+  const human = M.humanCount(s);
+  if (human.count) {
+    const tab = V.ctx.href(`${s.path}?tab=todos`);
+    h += `<dt>人のタスク</dt><dd>${M.hmMark(s)}<a data-nav href="${esc(tab)}">${human.count}件${human.descendants ? "（配下を含む）" : ""}を見る</a></dd>`;
+  }
   if (s.change) h += `<dt>変化</dt><dd><span class="lg-chg"></span>${esc(M.changeText(s.change))}</dd>`;
   const roots = V.path?.roots;
   if (roots?.size) h += `<dt>大もと</dt><dd>${[...roots].map((id) => `<button type="button" class="ds-docid" data-goto="${esc(id)}">${esc(id)}</button>`).join(" ")}</dd>`;

@@ -39,3 +39,10 @@ export async function markSeen(repository) {
   }).catch(() => null);
   return response?.ok ? response.json().catch(() => null) : null;
 }
+
+// The human tasks (iss-00554 D-04): read only, like everything else here.
+const statusQuery = (status) => (status && status !== "open" ? `?status=${encodeURIComponent(status)}` : "");
+export const todos = (status) => getJson(`/api/v1/todos${statusQuery(status)}`);
+export const todosRevision = () => getJson("/api/v1/todos/revision");
+export const repositoryTodos = (repository, status) => getJson(api(repository, "todos") + statusQuery(status));
+export const todo = (repository, todoId) => getJson(api(repository, `todos/${encodeURIComponent(todoId)}`));

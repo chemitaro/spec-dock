@@ -1,7 +1,7 @@
 // Small HTML parts shared by the board, the detail screen and the overview (iss-00531 D-05). Every user text
 // goes through esc(). State shapes come from the shell's core/ui.js (doing = half circle, ready = triangle,
 // blocked = octagon, unknown = diamond, done = grey check), so #531 and #532 draw the same marks.
-import { ASSURANCE_LEVELS, KIND_LABEL, PR_STATE_WORDS, STATES, chip, esc, ic, stateIcon } from "../../core/ui.js";
+import { ASSURANCE_LEVELS, KIND_LABEL, PR_STATE_WORDS, STATES, chip, esc, humanCount, humanMark, ic, stateIcon } from "../../core/ui.js";
 import {
   CHECK_WORDS,
   MERGEABLE_WORDS,
@@ -12,7 +12,7 @@ import {
   withoutEmbed,
 } from "./logic.js";
 
-export { chip, esc, stateIcon, STATES };
+export { chip, esc, humanCount, humanMark, stateIcon, STATES };
 
 
 // Kept as the screens' name for the shell's icons.
@@ -86,6 +86,8 @@ export function card(scope, ctx, { parent = null } = {}) {
   const meta = [];
   if (scope.pr) meta.push(prMark(scope.pr, { words: true }));
   if (scope.kind !== "issue" && scope.children?.length) meta.push(`<span>${esc(scope.children.length)}件の配下</span>`);
+  const human = humanCount(scope); // iss-00554 D-06: tasks of a person blocking it (and its subtree for a parent)
+  if (human.count) meta.push(humanMark(human.count, { descendants: human.descendants, cls: "sd-hm" }));
   if (scope.downstream) meta.push(downMark(scope.downstream));
   const parentLine = parent ? `<p class="sd-card__parent">${stateIcon(parent.state, false)}<span>${esc(parent.id)}</span><span>${esc(parent.title)}</span></p>` : "";
   return (
@@ -121,6 +123,7 @@ export function legend() {
     [`<span class="sd-mg" data-mg="mergeable">${icon("check")}</span><span class="sd-mg" data-mg="conflicting">${icon("zap")}</span>`, "マージできる・衝突"],
     [downMark(1).replace(/1<\/span>$/, "N</span>"), "後に続く N件"],
     [`<span class="sd-legend__chg"></span>`, "前回見たときから変わった"],
+    [humanMark(1, { cls: "sd-hm" }).replace(/1件/g, "N件").replace(/人 1/, "人 N"), "人のタスク N件が止めている（Epic と Initiative は配下も含む）"],
   ]
     .map(([mark, label]) => `<li>${mark}<span>${label}</span></li>`)
     .join("");
