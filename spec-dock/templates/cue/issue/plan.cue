@@ -28,9 +28,14 @@ tests: {
 // rollback:     "..."
 // exit:         "..."
 
-// 実行の割り当て（任意）。手順の session は、ここのセッションの名前を指す。
+// 実行の割り当て（任意）。手順の session は、実装のセッション（impl）を指す。
+// セッションのモデルと推論は起動のときに決まるので、計画で選べるのは、計画の後に起動するセッション（実装担当）の値。
+// 計画を書いたセッション（spec）の値は、事実として記録する。
 // レビューの after は、どの手順の後かを指す。モデルと推論の名前は、どんな文字列でもよい。
 // execution: {
-// 	sessions: impl: {task: "仕様化と実装", model: "...", effort: "...", rationale: "..."}
+// 	sessions: {
+// 		spec: {task: "仕様化（起動した側が選んだ値の記録）", model: "...", effort: "...", rationale: "<起動した側と根拠>"}
+// 		impl: {task: "実装", model: "...", effort: "...", rationale: "..."}
+// 	}
 // 	reviews: code: {role: "コードのレビュー", after: "S-01", model: "...", effort: "..."}
 // }

@@ -59,7 +59,7 @@ def test_the_inventory_and_the_dogfood_copy_follow_and_accept_the_previous_bytes
     }
     entry = entries[TEMPLATE]
     assert entry["sha256"] == hashlib.sha256(PROVIDER.read_bytes()).hexdigest()
-    assert entry["known_old_sha256"] == [PREVIOUS_SHA256]
+    assert PREVIOUS_SHA256 in entry["known_old_sha256"]
     assert hashlib.sha256(PREVIOUS.read_bytes()).hexdigest() == PREVIOUS_SHA256
     assert (ROOT / TEMPLATE).read_bytes() == PROVIDER.read_bytes()
 

@@ -437,6 +437,16 @@ def test_stale_is_strictly_more_than_thirty_minutes() -> None:
     assert build_model(snapshot(node(1, "issue"), fetched_at=old), now=NOW).stale
 
 
+def test_confirmed_at_drives_fetched_at_and_stale_but_not_the_pull_request_status() -> None:
+    old = (NOW - timedelta(minutes=31)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    recent = (NOW - timedelta(minutes=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    structure = snapshot(node(1, "issue"), fetched_at=old)
+    assert build_model(structure, now=NOW).stale
+    model = build_model(structure, now=NOW, confirmed_at=recent)
+    assert not model.stale and model.fetched_at == recent
+    assert model.pull_request_status == build_model(structure, now=NOW).pull_request_status
+
+
 # T-13 -----------------------------------------------------------------------------------------------------
 
 

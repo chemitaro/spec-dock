@@ -72,6 +72,20 @@ class PullRequestInfo:
 NO_PULL_REQUESTS: Final = PullRequestInfo(None, None, {})
 
 
+def structure_confirmed_at(fetched_at: str, probe_checked_at: str | None, probe_failed: bool, now: datetime) -> str:
+    """When GitHub's structure was last confirmed (iss-00568): the newer of the snapshot's `fetched_at` and a clean
+    probe's `checked_at`. A probe that recorded an error, an unreadable time or one in the future confirms nothing."""
+    if probe_checked_at is None or probe_failed:
+        return fetched_at
+    try:
+        checked = parse_timestamp(probe_checked_at)
+        if checked > now or checked <= parse_timestamp(fetched_at):
+            return fetched_at
+    except ValueError:
+        return fetched_at
+    return probe_checked_at
+
+
 @dataclass(frozen=True)
 class ParsedSnapshot:
     snapshot: StructureSnapshot

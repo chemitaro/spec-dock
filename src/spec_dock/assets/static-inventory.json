@@ -136,13 +136,14 @@
     {
       "path": "spec-dock/docs/authoring/cue.md",
       "source": "spec_dock/docs/authoring/cue.md",
-      "sha256": "9111026224270819dac9fbfa76425f720cae48f409dfc0d2264352beb9c4d3d3",
+      "sha256": "af386b3c6dcdcdc0770ed3b2e94d456cc112402904f01fdf9ee45138c91d896a",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
         "a4593015a9dc78bff46204436f02ba0ecc49cf3e13de5d9b33cd28e958451d28",
         "c674b205dce51b30766e60dd1302aedf8672e2facefda4aaa47f37d7499ec88e",
-        "7260427edba1ece13a97f9d726f841df04b18c8582e8f6319ef164636fc50d91"
+        "7260427edba1ece13a97f9d726f841df04b18c8582e8f6319ef164636fc50d91",
+        "9111026224270819dac9fbfa76425f720cae48f409dfc0d2264352beb9c4d3d3"
       ]
     },
     {
@@ -405,10 +406,11 @@
     {
       "path": "spec-dock/docs/reference_cli.md",
       "source": "spec_dock/docs/reference_cli.md",
-      "sha256": "566aa52a4406909bdfe0b4dcac87a93c9f88e4315f07a080708f8dd84b1dff6a",
+      "sha256": "eddb0f0b931d1bd723d0eced7ba8408bedf191994849e43eeca717cca442eb5c",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
+        "566aa52a4406909bdfe0b4dcac87a93c9f88e4315f07a080708f8dd84b1dff6a",
         "790ff437cb0dc7519b63f92b2587a714a4214c566a7a9ae15c03ff56b698d7a5",
         "891d64db9c0c0b360fe4ebfcbd4634b21ab0d3b6b423abfb108133556167aec5",
         "0240f61f48682ff0cab09cdc4a1afb3515523b5aa8aa301693d9c12ed525a467",
@@ -964,11 +966,12 @@
     {
       "path": "spec-dock/templates/cue/issue/plan.cue",
       "source": "spec_dock/templates/cue/issue/plan.cue",
-      "sha256": "274a58e86c6420363df98d2ff0722867a881c8730ef516dc6958c4cfbb11912a",
+      "sha256": "3117deb53b37fe0a1868cec22e9a8779f7baecffbc0fdf6702ba6c55aaff12a0",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
-        "08b4c2fd41459117329ac84713218c6bb0b22521ff6252388e3b4fe34d89d034"
+        "08b4c2fd41459117329ac84713218c6bb0b22521ff6252388e3b4fe34d89d034",
+        "274a58e86c6420363df98d2ff0722867a881c8730ef516dc6958c4cfbb11912a"
       ]
     },
     {

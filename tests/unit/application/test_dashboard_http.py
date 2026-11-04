@@ -137,6 +137,37 @@ def test_revision_steps_while_stale(env: Env) -> None:
     assert site.view(site.repositories()[0]).revision != first
 
 
+def _write_probe(env: Env, checked_at: str, last_error: dict[str, str] | None = None) -> Path:
+    path = snapshot_file(env.state, "github.com/o/r").with_name("probe.json")
+    path.write_text(json.dumps({"version": 1, "checked_at": checked_at, "etags": {}, "last_error": last_error}))
+    return path
+
+
+def test_a_recent_probe_keeps_an_unchanged_structure_fresh_in_the_api_and_the_summary(env: Env) -> None:
+    write_snapshot(env.state, sample(fetched_at="2026-11-04T10:00:00Z"))
+    _status, body = env.json("/api/v1/r/github.com/o/r/structure")
+    assert body["snapshot"]["stale"] is True and "SNAPSHOT_STALE" in _codes(body)
+    first = env.site.view(env.site.repositories()[0]).revision
+    _write_probe(env, "2026-11-04T11:59:00Z")
+    _status, body = env.json("/api/v1/r/github.com/o/r/structure")
+    assert body["snapshot"]["stale"] is False and "SNAPSHOT_STALE" not in _codes(body)
+    assert body["snapshot"]["fetched_at"] == "2026-11-04T11:59:00Z" and body["snapshot"]["age_seconds"] == 60
+    assert env.site.view(env.site.repositories()[0]).revision != first
+    cli = summarize("dashboard summary", GithubRepository("o", "r"), state_root=env.state, now=lambda: NOW)
+    result = cli.data.result  # type: ignore[attr-defined]
+    assert result["stale"] is False and result["fetched_at"] == "2026-11-04T11:59:00Z"
+
+
+def test_a_failing_or_broken_probe_does_not_hide_a_stale_structure(env: Env) -> None:
+    write_snapshot(env.state, sample(fetched_at="2026-11-04T10:00:00Z"))
+    _write_probe(env, "2026-11-04T11:59:00Z", {"code": "X", "message": "m", "at": "2026-11-04T11:59:00Z"})
+    _status, body = env.json("/api/v1/r/github.com/o/r/structure")
+    assert body["snapshot"]["stale"] is True and body["snapshot"]["fetched_at"] == "2026-11-04T10:00:00Z"
+    _write_probe(env, "2026-11-04T11:59:00Z").write_text("{broken")
+    _status, body = env.json("/api/v1/r/github.com/o/r/structure")
+    assert body["snapshot"]["stale"] is True
+
+
 def test_an_unreadable_registry_keeps_the_last_listing(env: Env) -> None:
     assert len(env.site.repositories()) == 2
     (env.state / "canonical-registry.json").write_text("{broken")

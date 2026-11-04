@@ -10,6 +10,7 @@ from spec_dock.runtime.domain.dashboard_snapshot import (
     SnapshotUnreadable,
     SnapshotUnsupported,
     parse_snapshot_document,
+    structure_confirmed_at,
 )
 from tests.support.dashboard import NOW, node, snapshot
 
@@ -143,3 +144,32 @@ def test_malformed_documents_are_unreadable(mutate) -> None:
 def test_a_non_object_document_is_unreadable() -> None:
     with pytest.raises(SnapshotUnreadable):
         parse_snapshot_document([], repository="github.com/o/r")
+
+
+# iss-00568 T-01: the time the structure was last confirmed -------------------------------------------------
+
+
+def _ago(minutes: int) -> str:
+    return (NOW - timedelta(minutes=minutes)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+@pytest.mark.parametrize(
+    ("fetched", "checked", "failed", "expected"),
+    [
+        (31, 1, False, 1),  # a recent probe keeps an unchanged structure fresh
+        (31, 31, False, 31),
+        (5, 20, False, 5),  # a probe older than the snapshot adds nothing
+        (31, 1, True, 31),  # a failing probe is not a confirmation
+        (31, None, False, 31),
+    ],
+)
+def test_structure_confirmed_at_takes_the_newer_of_snapshot_and_clean_probe(
+    fetched: int, checked: int | None, failed: bool, expected: int
+) -> None:
+    checked_at = _ago(checked) if checked is not None else None
+    assert structure_confirmed_at(_ago(fetched), checked_at, failed, NOW) == _ago(expected)
+
+
+@pytest.mark.parametrize("bad", ["not-a-time", "2026-11-04T13:00:00Z"])
+def test_structure_confirmed_at_ignores_an_invalid_or_future_probe_time(bad: str) -> None:
+    assert structure_confirmed_at(_ago(31), bad, False, NOW) == _ago(31)
