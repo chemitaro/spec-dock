@@ -13,7 +13,7 @@ steps: {
 	"S-06": {title: "ボードの「終わった」の列の並びを、既存のテスト（`test_board_columns_follow_lanes_and_rank` の newest first）で確かめる", realizes: ["R-06"], status: "done", session: "impl"}
 	"S-07": {title: "PC のヘッドレスの Chrome で、このPCの spec-dock の実際のスナップショットを PC の幅と 390px で写し、`edgeAudit` を確かめ、report.md と artifacts に残す。移行の注記の材料を PR の本文と統括への報告に書く", realizes: ["R-01", "R-02", "R-03"], status: "done", after: ["S-02", "S-03", "S-04", "S-05"], session: "impl"}
 	"S-08": {title: "折り返しをやめ（`wrapBlock`、`colsBlock`）、経路の寄せを4回にし、「全体」と拡大縮小の下限を収めるのに要る倍率まで下げる", realizes: ["R-07"], status: "done", session: "impl"}
-	"S-09": {title: "このPCの実際の構造で、PC と 390px の初めの表示・「全体」・横のドラッグと `edgeAudit` を確かめ、写しを report.md に足し、テストとゲートを最終のコミットでやり直す", realizes: ["R-07"], status: "todo", after: ["S-08"], session: "impl"}
+	"S-09": {title: "このPCの実際の構造で、PC と 390px の初めの表示・「全体」・横のドラッグと `edgeAudit` を確かめ、写しを report.md に足し、コードのレビューを範囲全体でやり直し、テストとゲートを最終のコミットでやり直す", realizes: ["R-07"], status: "done", after: ["S-08"], session: "impl"}
 }
 
 tests: {
@@ -37,7 +37,7 @@ execution: {
 	sessions: impl: {task: "仕様化と実装（Orca の worker）", model: "opus", effort: "medium", rationale: "policy §4 standard の実装（epic-00427 の session std）"}
 	reviews: {
 		spec: {role: "仕様のレビュー", after: "S-01", model: "opus", effort: "high"}
-		code: {role: "コードのレビュー", after: "S-07", model: "opus", effort: "high"}
-		gate: {role: "最終品質ゲート", after: "S-07", model: "opus", effort: "high"}
+		code: {role: "コードのレビュー（R-07 の後に、範囲全体でやり直す）", after: "S-08", model: "opus", effort: "high"}
+		gate: {role: "最終品質ゲート（最終のコミットで）", after: "S-09", model: "opus", effort: "high"}
 	}
 }

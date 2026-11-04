@@ -6,11 +6,12 @@ goals: [
 	"既定の表示で、開いた枠の中の進み具合（終わった Scope と終わった依存）を図に残す",
 	"並びを活動順にし、依存の左右の段の考え方（前のものを左）を保ち、出ている終わった依存も左から右へ並べる",
 	"前に保存した見せ方が新しい既定を打ち消さないようにする",
+	"図を折り返さず右へ広げ、横に動かして見る形にする（R-07、D-07）",
 ]
 
 current: "`graph/layout.js` の `visibility` は、`showDone` か、開いているか、見える子を持つ Scope だけを出す。`DEFAULTS` は `{showDone: false, deps: \"wait\"}`。`byStageRank` は段、`rank`、番号の順で並べ、最上位は Initiative を先に `rank` の順。`graph.js` は `specdock.graph.v1` の `mode`・`showDone`・`deps`・`fold`・`legend` を読む。構造の API に最後に動いた時刻はない。"
 
-target: "`visibility` は親が開いている終わった Scope も出す。`DEFAULTS.deps` は `\"all\"`。並びは段の中で活動順（枠は組と最近の順、箱は開いたものを推奨順、終わったものを最近の順）。見せ方は `specdock.graph.v2` に保存し、v1 からは一部だけ引き継ぐ。API の各 Scope に `active_at` がある。"
+target: "`visibility` は親が開いている終わった Scope も出す。`DEFAULTS.deps` は `\"all\"`。並びは段の中で活動順（枠は組と最近の順、箱は開いたものを推奨順、終わったものを最近の順）。見せ方は `specdock.graph.v2` に保存し、v1 からは一部だけ引き継ぐ。API の各 Scope に `active_at` がある。図は折り返さず右へ広がり、「全体」はどれだけ広くても全体を収める。"
 
 design: {
 	"D-01": {
@@ -28,7 +29,7 @@ design: {
 	}
 	"D-02": {
 		title: "依存の線の既定（`DEFAULTS.deps = \"all\"`）"
-		text: "`DEFAULTS` を `{mode: \"nest\", showDone: false, deps: \"all\", fold: true, focus: null}` にする。`pairs` は今のまま、図に出ている箱・枠・畳んだまとまりの間だけ線を作り、終わった依存は `done: true`（画面の `is-done`、薄い線）になる。`deps: \"wait\"` は今のまま終わった依存を除く。経路と線の検査（`router.js`、`routeLayout`）は変えない。"
+		text: "`DEFAULTS` を `{mode: \"nest\", showDone: false, deps: \"all\", fold: true, focus: null}` にする。`pairs` は今のまま、図に出ている箱・枠・畳んだまとまりの間だけ線を作り、終わった依存は `done: true`（画面の `is-done`、薄い線）になる。`deps: \"wait\"` は今のまま終わった依存を除く。経路と線の検査（`routeLayout`）の仕組みは変えない（`router.js` の寄せの回数だけを D-07 で変える）。"
 		satisfies: ["R-02"]
 	}
 	"D-03": {
