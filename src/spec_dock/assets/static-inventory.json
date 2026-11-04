@@ -35,7 +35,7 @@
     {
       "path": ".agents/skills/spec-dock/SKILL.md",
       "source": "install_root/.agents/skills/spec-dock/SKILL.md",
-      "sha256": "590a184cf5e754a51b8cd21ec15774791f003255cc662975fd5f5c1fd6362fa9",
+      "sha256": "c7e4fdb1f6bfd4d66a0586c19b35dce3abd46723b5742ba0401ae2c182bd3235",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
@@ -259,7 +259,7 @@
     {
       "path": "spec-dock/docs/canonical.md",
       "source": "spec_dock/docs/canonical.md",
-      "sha256": "8f834573f1fbba720fe8b4ca597a77dc1aa19f878dd1c3292f420aa9f182978f",
+      "sha256": "dd91f171c43e7532c5e608148a22e7c1d4e18f63ee46c2cc55a242d52db71df6",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
@@ -562,7 +562,7 @@
     {
       "path": "spec-dock/docs/todo.md",
       "source": "spec_dock/docs/todo.md",
-      "sha256": "bf150d87983cc86eddb6f08be003ef26f970a7b1ceb9e79c3c84f501f40e92f1",
+      "sha256": "fce675f168ced68ec44a9c517509e7d400141e7bd6ea16f0c13d08b34f995169",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": []

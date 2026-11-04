@@ -208,7 +208,13 @@ spec-dock canonical status --structure   # 上に加えて、Scope のディレ�
 | `TODO_REGISTRY_UNREADABLE`、`TODO_REPOSITORY_UNKNOWN`、`TODO_REPOSITORY_UNREADABLE` | 3（`todo show REF`、`--all-repositories`）／警告（集約の行） | 登録簿に載っているか `spec-dock dashboard list` で確かめ、読めないリポジトリは、そのmainのチェックアウトで `spec-dock canonical link` |
 | `TODO_REPOSITORY_INVALID` | 2 | `--repository` と `REF` を `owner/name`、`github.com/owner/name`、`owner/name/t-xxxx` の形にする |
 | `TODO_CHECK_FAILED` | 7（`todo check`） | 示したファイルと欄を直し、もう一度 `spec-dock todo check` |
-| `TODO_LIMIT_EXCEEDED`、`TODO_SCOPE_UNKNOWN`、`TODO_SETTINGS_INVALID`、`TODO_FILE_UNKNOWN`、`TODO_REPOSITORY_DUPLICATE`、`TODO_CUE_SKIPPED`、`TODO_CUE_FAILED` | 警告 | 古い開いたタスクを閉じる、Scope の ID を直す、`todos/settings.json` か利用者の設定を直す、示したファイルを確かめる、`cue` v0.17.1 以上を入れる |
+| `TODO_LIMIT_EXCEEDED` | 警告（`todo add`） | 登録はされている。古い開いたタスクを閉じるか取り消す。目安は `todos/settings.json` か利用者の設定で変える |
+| `TODO_SCOPE_UNKNOWN` | 警告（`todo add`、`todo update`） | 保存した構造のスナップショットにない Scope の ID（スナップショットがないだけのこともある）。`spec-dock scope show <ID>` で確かめる。記録は与えたとおりに書かれている |
+| `TODO_SETTINGS_INVALID` | 警告 | 示した段（`todos/settings.json` か利用者の設定）を直す。壊れた段は丸ごと飛ばされ、下の段の値が効く |
+| `TODO_FILE_UNKNOWN` | 警告（`todo check`） | 記録でないファイルは読まれない。要らなければ `todos/` の外へ移す |
+| `TODO_REPOSITORY_DUPLICATE` | 警告（`todo list --all-repositories`） | 同じリポジトリの2つ目のクローン。最初の行だけが読まれる。登録簿は `spec-dock dashboard list` で確かめる |
+| `TODO_CUE_SKIPPED` | 警告（`todo check`） | `cue` v0.17.1 以上を PATH に入れる（なくても Python の検査で決まる） |
+| `TODO_CUE_FAILED` | 警告（`todo check`） | `cue version` が動くか確かめ、動かなければ入れ直す（`CUE_FAILED`、`CUE_TIMEOUT` と同じ。Python の検査の結果は有効） |
 | `TODO_CONFLICT_COPY` | 警告（`todo list`） | 別名ファイル（`*.conflict-*`）の中身を元の記録に統合し、別名ファイルを消す |
 | `DESIGN_SYSTEM_MISSING` | 警告（`scope render`）。`--design-system inline` では誤り（終了コード3、HTML を出さない） | このチェックアウトに `spec-dock/design-system/` がない。`spec-dock installation update` で入れる |
 | `CANONICAL_PROGRESS_MARK_FAILED` | 警告（`work start`、`work finish`） | GitHub で `spec-dock:in-progress` のラベルと担当者を確かめ、付け外す |

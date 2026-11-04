@@ -29,7 +29,7 @@ spec-dock todo cancel t-7k3m --reason "不要になった"
 spec-dock todo reopen t-7k3m
 ```
 
-- 種類（`--kind`）は `decide`（選ぶ）、`check`（確かめる）、`operate`（操作する）、`act`（期限のある行為）、`todo`（そのほか）、`checklist`（会話の束）です。
+- 種類（`--kind`）は `decide`（選ぶ）、`check`（確かめる）、`operate`（操作する）、`act`（期限のある行為）、`todo`（そのほか。人が登録するものだけで、`--by agent --kind todo` は `TODO_INVALID`）、`checklist`（会話の束）です。エージェントが選ぶのは `decide`、`check`、`operate`、`act`、`checklist` です。
 - ID は `t-` と4文字、サブタスクは `t-xxxx.1` です。大文字で入力しても受けます。
 - 期限（`--due`）は `30m`、`4h`、`2d`、`YYYY-MM-DD`、時間帯つきの ISO 8601 で書きます。過去の時刻は `TODO_INVALID` です。
 - 開いたサブタスクがある親は、`todo done` が `TODO_SUBTASKS_OPEN` で止まります。全部閉じてから、か `--include-subtasks` を付けます。
