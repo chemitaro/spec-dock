@@ -132,14 +132,20 @@ class DashboardSite:
 
     # --- Listing ----------------------------------------------------------------------------------------------
 
-    def _listing_signature(self, entries: tuple[RegistryEntry, ...]) -> _ListingSignature:
+    def _file_signatures(self) -> tuple[_Signature, _Signature, _Signature]:
         marks = self.state_root / DASHBOARD_DIRECTORY / REPOSITORIES_FILE
-        settings = tuple(_signature(Path(entry.catalog) / REPOSITORY_FILE) for entry in entries)
-        return (_signature(registry_path(self.state_root)), _signature(marks), _signature(self.user_config), settings)
+        return (_signature(registry_path(self.state_root)), _signature(marks), _signature(self.user_config))
+
+    @staticmethod
+    def _settings_signatures(entries: tuple[RegistryEntry, ...]) -> tuple[_Signature, ...]:
+        return tuple(_signature(Path(entry.catalog) / REPOSITORY_FILE) for entry in entries)
 
     def _refresh_listing(self) -> _Listing:
+        # Every signature is taken before its file is read: a write during the read then leaves a signature
+        # that differs from the file and the next request reads again (a later one would keep stale contents).
         listing = self._listing
-        if listing.signature is not None and listing.signature == self._listing_signature(listing.entries):
+        files = self._file_signatures()
+        if listing.signature is not None and listing.signature == (*files, self._settings_signatures(listing.entries)):
             return listing
         entries = listing.entries
         error: str | None = None
@@ -168,6 +174,7 @@ class DashboardSite:
             hidden, marks_read = listing.hidden, True
         else:
             hidden, marks_read = frozenset(served), False
+        settings = self._settings_signatures(entries)
         user = read_user_dashboard(self.user_config)
         visibility: dict[str, Visibility] = {}
         problems: list[ConfigProblem] = []
@@ -180,7 +187,7 @@ class DashboardSite:
             problems.extend(resolve_config(user, (), "").problems)
         problems.sort(key=lambda problem: (problem.layer != "user", problem.path))
         self._listing = _Listing(
-            self._listing_signature(entries),
+            (*files, settings),
             entries,
             hidden,
             error,

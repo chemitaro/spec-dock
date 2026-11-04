@@ -837,6 +837,7 @@ def _help_spec(leaf: str) -> HelpSpec:
     elif leaf == "dashboard serve":
         reads = (
             "The registry, each shown repository's structure snapshot and catalog files, the hidden marks, the"
+            " dashboard settings (the user settings file and each registered catalog's dashboard.json), the"
             " dashboard seen records, and `tailscale ip -4`/`tailscale status --json` only with --tailscale."
         )
         writes = (
@@ -853,12 +854,19 @@ def _help_spec(leaf: str) -> HelpSpec:
         )
         confirmation = "No final confirmation is required; the command runs until Ctrl-C or SIGTERM."
     elif leaf in ("dashboard hide", "dashboard show"):
-        reads = "The hidden marks and the registry of the state root."
+        reads = (
+            "The hidden marks and the registry of the state root, and the dashboard settings (the user settings"
+            " file and each registered catalog's dashboard.json) for the final value."
+        )
         writes = "Only <state root>/dashboard/repositories.json (specdock.dashboard-repositories/v1), atomically under a lock."
         does_not = (
             "Does not stop the periodic sync, change the registry, the catalog or the repository, or contact GitHub."
         )
-        json_data = "repository, hidden, changed, registered."
+        json_data = (
+            "repository, hidden (the final value after the write), changed, registered, mark,"
+            " config {visible, source: default|user|repository|invalid}, hidden_by; show warns"
+            " DASHBOARD_HIDDEN_BY_CONFIG when the settings still hide the repository."
+        )
         confirmation = "No final confirmation is required; show undoes hide."
     elif leaf == "dashboard service install":
         target = "This user's dashboard service: ~/Library/LaunchAgents/io.github.chemitaro.spec-dock.dashboard.plist or ${XDG_CONFIG_HOME:-~/.config}/systemd/user/spec-dock-dashboard.service."
@@ -891,11 +899,16 @@ def _help_spec(leaf: str) -> HelpSpec:
         json_data = "scheduler, removed, path, log_removed."
         confirmation = "No final confirmation is required; `install` puts it back."
     elif leaf == "dashboard list":
-        reads = "The registry, the hidden marks and the server location record (only whether its pid is alive)."
+        reads = (
+            "The registry, the hidden marks, the dashboard settings (the user settings file and each registered"
+            " catalog's dashboard.json) and the server location record (only whether its pid is alive)."
+        )
         does_not = "Does not contact GitHub or the dashboard server, or write any file."
         json_data = (
-            "repositories[] (repository or null, catalog, main_checkout, hidden, served, problem, path, url),"
-            " server, registry_error, marks_unreadable (true: every repository is kept hidden)."
+            "repositories[] (repository or null, catalog, main_checkout, hidden, served, problem, path, url, mark,"
+            " config {visible, source: default|user|repository|invalid} or null, hidden_by), server,"
+            " registry_error, marks_unreadable (true: every repository is kept hidden),"
+            " config_problems[] (layer, path, reason)."
         )
         confirmation = "No final confirmation is required for this read-only leaf."
     elif leaf == "canonical check":

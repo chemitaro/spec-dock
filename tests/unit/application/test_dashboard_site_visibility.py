@@ -178,3 +178,22 @@ def test_direct_urls_name_the_step_that_shows_the_repository(env: Env) -> None:
     body = json.loads(_get(http, f"/api/v1/r/{R}/structure").body)
     assert body["error"]["next_steps"][0] == "spec-dock dashboard list"
     assert "spec-dock dashboard show o/r" not in body["error"]["next_steps"]
+
+
+def test_a_write_during_the_read_is_read_on_the_next_request(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+    from spec_dock.runtime.application import dashboard_site
+
+    env.user({"visible": True})
+    original = dashboard_site.read_user_dashboard
+    calls: list[int] = []
+
+    def read_then_change(path: Path | None = None) -> object:
+        found = original(path)
+        if not calls:
+            calls.append(1)
+            env.user({"visible": False})  # another process edits the file right after this read
+        return found
+
+    monkeypatch.setattr(dashboard_site, "read_user_dashboard", read_then_change)
+    assert env.shown() == [R, S]  # the read saw the old contents
+    assert env.shown() == []  # the next request notices the change
