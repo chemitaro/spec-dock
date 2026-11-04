@@ -6,7 +6,7 @@ package spec
 goal: "人のタスクの記録の形、2段の検査、置き場、設定、`todo` の10のコマンド（集約なし）と、その文書を、テスト駆動で作り、レビューとゲートを通して main への PR をマージできる状態にする。"
 
 steps: {
-	"S-01": {title: "仕様を書き、仕様のレビューを通す", realizes: ["R-11"], status: "doing", session: "impl"}
+	"S-01": {title: "仕様を書き、仕様のレビューを通す", realizes: ["R-11"], status: "done", session: "impl"}
 	"S-02": {title: "記録の形、ID、移り変わり、検査（`domain/todo_record.py`）", realizes: ["R-03", "R-04", "F-01"], status: "todo", after: ["S-01"], session: "impl"}
 	"S-03": {title: "期限、派生の状態、並び、件数、絞り込み（`domain/todo_model.py`）", realizes: ["R-06", "R-07", "R-09"], status: "todo", after: ["S-02"], session: "impl"}
 	"S-04": {title: "3段の設定（`domain/todo_settings.py`、`infra/user_config.py`）", realizes: ["R-08"], status: "todo", after: ["S-01"], session: "impl"}

@@ -18,7 +18,7 @@ assurance: {
 purpose: "人のタスクを、各リポジトリのカタログの `todos/` に1件1つの JSON で置き、`spec-dock todo` の10のコマンドで、チェックアウトの中から登録・一覧・詳しく・更新・完了・延期・取り消し・開き直し・検査・設定の確かめができるようにする（全リポジトリの集約は iss-00550）。"
 
 background: """
-	- 親の Epic（epic-00547）の要件・設計・計画は承認済み。この Issue は、その第1波（記録の形と型と設定、CLI の中核）。設計の正本は Epic の design.cue の D-01〜D-12 と D-18 で、この Issue の design.cue は、それを実装の単位に割り、Epic が決めていない細部を決める。
+	- 親の Epic（epic-00547）の要件・設計・計画は承認済み。この Issue は、その第1波（記録の形と型と設定、CLI の中核）。設計の正本は Epic の design.cue の D-01〜D-13 と D-18 で、この Issue の design.cue は、それを実装の単位に割り、Epic が決めていない細部を決める。
 	- 集約（`todo list --all-repositories`、`--repository`、`todo show <REF>`、`mode: all_repositories`）と `dashboard summary` の数は iss-00550、スキルの規則と `docs/todo.md` は iss-00551、版と `migration.md` は iss-00553、画面は iss-00554。
 	"""
 
@@ -150,7 +150,7 @@ failures: {
 }
 
 constraints: [
-	"Epic の design.cue の D-01〜D-12、D-18 に従う。食い違いは統括に知らせ、仮の判断は report.md と PR に書く",
+	"Epic の design.cue の D-01〜D-13、D-18 に従う。食い違いは統括に知らせ、仮の判断は report.md と PR に書く",
 	"カタログの形式（format 1）、`workspace.json` の版、構造のスナップショット、`evaluate_readiness`、ほかのコマンドの契約を変えない",
 	"版の番号と `migration.md` を変えない（iss-00553）。ダッシュボードの画面（`assets/dashboard/`）と `dashboard summary` を触らない",
 	"テストは一時のディレクトリと `XDG_CONFIG_HOME`／`XDG_STATE_HOME` と `gh` の stub で閉じ、利用者の設定のファイルを作らない",

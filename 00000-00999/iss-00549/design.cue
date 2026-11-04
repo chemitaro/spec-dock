@@ -1,7 +1,7 @@
 package spec
 
 // 設計（Issue）。型 specdock/v1。
-// 正本は Epic（epic-00547）の design.cue の D-01〜D-12 と D-18。ここでは、それを実装の単位に割り、Epic が決めていない細部を決める。
+// 正本は Epic（epic-00547）の design.cue の D-01〜D-13 と D-18。ここでは、それを実装の単位に割り、Epic が決めていない細部を決める。
 // Epic の番号は「Epic D-xx」と書く。コードの場所は 2026-11-04 の main（0.6.0、ae8c72456）で確かめた。
 
 goals: [
@@ -29,7 +29,7 @@ design: {
 		text: """
 			Epic D-02、D-03、D-04 のとおり。細部：
 
-			- 記録は JSON の `dict` のまま扱う（型は開いているので、知らない欄を読み、書き換えるときに残す）。新しい記録は、D-02 の全部の欄を必ず書き、値がないものは `null`（`body`、`recommendation`、`reply_to`、`effort`、`snooze_until`、`resolution`）か空の配列（`options`、`links`、`tags`、`subtasks`、`history` を除く）にする。
+			- 記録は JSON の `dict` のまま扱う（型は開いているので、知らない欄を読み、書き換えるときに残す）。新しい記録は、Epic D-02 の全部の欄を必ず書き、値がないものは `null`（`body`、`recommendation`、`reply_to`、`effort`、`snooze_until`、`resolution`）か空の配列（`options`、`links`、`tags`、`subtasks`、`history` を除く）にする。
 			- `validate(record) -> tuple[Problem, ...]`（`Problem(field, message)`、`field` はドットでつないだ道。例 `subtasks.1.status`）。調べること：
 			  - `schema` が `specdock.todo/v1`（違えば検査を進めず、呼び出し側が `TODO_SCHEMA_UNSUPPORTED` にする）。
 			  - `id`：`^t-[0-9a-hjkmnp-tv-z]{4}$`。`title`：文字列、空白だけでない、改行なし、200文字まで（サブタスクも同じ）。
@@ -38,7 +38,7 @@ design: {
 			  - `origin`：`by` は `agent` か `human`、`role` は文字列か null。エージェントは `role`、`body`、`reply_to` が空白だけでない文字列、`effort` が `^[1-9][0-9]*(m|h|d)$`。`decide` のエージェントは `options` が2つ以上で `recommendation` が null でない。
 			  - `options`：`{key, text}` の配列。`key` は `^[A-Za-z0-9][A-Za-z0-9_.-]*$` で重ならない、`text` は空白だけでない。`recommendation`：null か `{key, reason}`、`key` は `options` のどれか、`reason` は空白だけでない。
 			  - `status: snoozed` なら `snooze_until` が時刻。`done`、`cancelled` なら `resolution` が `{at, by, role, choice, note, record}`（`choice` は null か `options` の `key`、`cancelled` は `note` が空白だけでない）。`open`、`snoozed` なら `resolution` は null。
-			  - `scopes`：`{related, blocks}`、各要素は `^(init|epic|iss)-[0-9]{5}$`。`links`、`tags`：空白だけでない文字列の配列。
+			  - `scopes`：`{related, blocks}`、各要素は `^(init|epic|iss)-([0-9]{5}|[1-9][0-9]{5,})$`（`domain/ids.CANONICAL_ID_RE` と同じ）。`links`、`tags`：空白だけでない文字列の配列。
 			  - `subtasks`：`{id, title, status, created_at, updated_at, resolution}`。`id` は `<親の id>.<1以上の数>` で重ならない。`status` は `open`、`done`、`cancelled`。閉じたものは `resolution` があり、開いたものは null。
 			  - `history`：`{at, by, role, action, target, note, fields}`。`action` は Epic D-02 の11の値。`fields` は文字列の配列。
 			- エージェントの必須の欄が欠けたときは、`Problem` に加えて欄の名前を `missing` に集める（`todo add` の `details.missing`。Epic R-03 の受け入れ）。
@@ -71,7 +71,7 @@ design: {
 			Epic D-01、D-06 のとおり。
 
 			- `TodoStore(catalog)`：`todos/`、`todos/settings.json`、`todos/<YYYY-MM>/<ID>.json` の道。
-			- `scan()`：`todos/` の下の、`^[0-9]{4}-(0[1-9]|1[0-2])$` の名前のディレクトリの中のファイルを分ける。記録（`^t-[0-9a-hjkmnp-tv-z]{4}\\.json$`）、衝突の写し（名前に `.conflict-` を含む）、黙って飛ばすもの（`.` で始まる、`is_os_junk`）、知らないもの（そのほか。`todos/` の直下の `settings.json` 以外のファイルと、年月の形でないディレクトリも）。`todos/` がなければ全部が空。
+			- `scan()`：`todos/` の下の、`^[0-9]{4}-(0[1-9]|1[0-2])$` の名前のディレクトリの中のファイルを分ける。記録（`^t-[0-9a-hjkmnp-tv-z]{4}\\.json$`）、衝突の写し（名前に `.conflict-` を含む。`todos/` の直下の `settings.conflict-*.json` も）、黙って飛ばすもの（`.` で始まる、`is_os_junk`）、知らないもの（そのほか。`todos/` の直下の `settings.json` 以外のファイルと、年月の形でないディレクトリも）。`todos/` がなければ全部が空。
 			- `read_all()`：各記録を `read_regular_file` で読み、JSON の object なら `(path, snapshot, record)`、読めない・JSON でない・object でないものは `invalid` に理由つきで分ける。1つの失敗がほかを止めない。ロックは取らない。
 			- `find(todo_id)`：ID（サブタスクなら親の ID）の記録の道。2つの年月にあれば `TODO_ID_AMBIGUOUS`（`details.paths`）、なければ `TODO_NOT_FOUND`。
 			- `write_new(path, record)`：`create_missing_parents` で年月のディレクトリを作り、`publish_file(path, payload)`。`write_replace(path, record, expected)`：ロックの中で読んだ `FileSnapshot` を `expected` に渡す。一時のファイルの名前は `.<ID>.json.<乱数>.tmp`（`.` で始まるので記録として読まれない）。中身は `json.dumps(record, ensure_ascii=False, indent=2) + "\\n"`、鍵の順は記録の順のまま。
@@ -138,7 +138,7 @@ design: {
 			- `cue/todo/v1/todo.cue`：`package todo`。`#Todo`、`#Subtask`、`#Resolution`、`#History` と `#Records: [string]: #Todo`。D-01 の規則を同じに書き、すべての構造を `...` で開く。欄の間の規則は `if` と内側の `_` の欄（例 `_recommendation_known`）で書く。
 			- `infra/cue_schemas.todo_schema_path()`：パッケージの `cue/todo/v1/todo.cue`。`shipped_schemas()` は `specdock/v<N>` だけなので `todo` が出ない（テストで確かめる）。
 			- `CueTool.vet(schema_file, data, *, expression, cwd, timeout)`：`cue vet -c -d <expression> <schema_file> json: -` に、`data`（JSON の文字列）を標準入力で渡す。終了コードと標準エラーを返す。
-			- `todo check`：Python の検査（記録ごとの `validate`、名前と `id` と年月（`created_at` の年月）の一致、`TODO_ID_DUPLICATE`、`settings.json`、`TODO_CONFLICT_COPY`、`TODO_FILE_UNKNOWN`、`TODO_SCHEMA_UNSUPPORTED`、読めない・JSON でない記録）の後、`cue` があれば、版の合う object の記録全部を `{<カタログからの相対の道>: 記録}` の1つの JSON にして `#Records` で確かめる。誤りの道の先頭の鍵をファイルに対応づけ、`source: cue` の誤り（`TODO_CUE_INVALID`）にする。`cue` がない・古ければ警告 `TODO_CUE_SKIPPED`（`next_step` に入れ方）、時間切れか失敗（終了コード1でない、または誤りの道がどのファイルにも対応しない）なら警告 `TODO_CUE_FAILED`。
+			- `todo check`：Python の検査の後に `cue vet`。Python の検査のコード：誤りは、読めない・JSON の object でない・`validate` に通らない記録（`TODO_RECORD_INVALID`、欄ごと）、名前と `id` と年月（`created_at` の年月）が合わない記録（`TODO_RECORD_MISPLACED`）、年月の違う同じ ID（`TODO_ID_DUPLICATE`）、版の違う記録（`TODO_SCHEMA_UNSUPPORTED`）。警告は、衝突の写し（`TODO_CONFLICT_COPY`）、記録でないファイル（`TODO_FILE_UNKNOWN`）、壊れた設定（`TODO_SETTINGS_INVALID`。ほかのコマンドと同じく止めない）。`cue` があれば、版の合う object の記録全部を `{<カタログからの相対の道>: 記録}` の1つの JSON にして `#Records` で確かめる。誤りの道の先頭の鍵をファイルに対応づけ、`source: cue` の誤り（`TODO_CUE_INVALID`）にする。`cue` がない・古ければ警告 `TODO_CUE_SKIPPED`（`next_step` に入れ方）、時間切れか失敗（終了コード1でない、または誤りの道がどのファイルにも対応しない）なら警告 `TODO_CUE_FAILED`。
 			- 誤りがあれば `failed`、終了コード7、`TODO_CHECK_FAILED`。結果は `{valid, checked_files, errors: [{code, file, field, message, source}], warnings, cue: {status, version}}`。記録がなければ「記録がない」で成功。
 			- 見本：`tests/fixtures/todo/valid/*.json` と `invalid/*.json`。1つのテストが、全部を Python の検査と `cue vet` の両方にかけ、ファイルごとの通る・通らないが一致し、`valid` は通り `invalid` は通らないことを確かめる（`cue` は CI にある。ない PC では `tests/support/cue.py` のとおりテストが失敗して入れ方を示す）。
 			"""
