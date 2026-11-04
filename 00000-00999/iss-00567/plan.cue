@@ -14,13 +14,15 @@ package spec
 // すべての要件に、それを満たす手順が要る（dropped の手順は数えない）。
 // strict 以上では、dropped でない手順のすべてが、いずれかの番号に結び付く。
 steps: {
-	// "S-01": {title: "〜を作る", realizes: ["R-01"], status: "todo", after: ["..."], session: "impl"}
+	"S-01": {title: "テストを先に直す（雛形・文書の例と inventory の期待）", realizes: ["R-01", "R-02"], status: "todo", session: "impl"}
+	"S-02": {title: "cue.md と plan.cue 雛形の例を直し、写しと inventory を合わせる", realizes: ["R-01", "R-02"], status: "todo", after: ["S-01"], session: "impl"}
 }
 
 // テスト。番号（T-01、…）をキーにする。title と verifies（確かめる要件・失敗の条件の番号）が必須。
 // standard 以上では、すべての要件に、strict 以上では、すべての失敗の条件に、確かめるテストが要る。
 tests: {
-	// "T-01": {title: "〜を確かめる", verifies: ["R-01"]}
+	"T-01": {title: "例が spec と impl に分かれ、実装の session を指す", verifies: ["R-01"]}
+	"T-02": {title: "起動時に決まる旨の一言がある", verifies: ["R-02"]}
 }
 
 // 検証のしかた、戻し方、終わりの条件（任意）。critical では、手順があれば rollback が要る。
@@ -30,7 +32,10 @@ tests: {
 
 // 実行の割り当て（任意）。手順の session は、ここのセッションの名前を指す。
 // レビューの after は、どの手順の後かを指す。モデルと推論の名前は、どんな文字列でもよい。
-// execution: {
-// 	sessions: impl: {task: "仕様化と実装", model: "...", effort: "...", rationale: "..."}
-// 	reviews: code: {role: "コードのレビュー", after: "S-01", model: "...", effort: "..."}
-// }
+execution: {
+	sessions: {
+		spec: {task: "仕様化（起動した側が選んだ値の記録）", model: "sonnet", effort: "medium", rationale: "統括が light の実装として起動した値"}
+		impl: {task: "実装", model: "sonnet", effort: "medium", rationale: "統括の依頼（policy §4 light）"}
+	}
+	reviews: code: {role: "コードのレビュー", after: "S-02", model: "sonnet", effort: "high"}
+}
