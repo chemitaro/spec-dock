@@ -197,14 +197,17 @@ def test_an_unreadable_catalog_is_reported_and_the_others_are_returned(
         world,
         [
             (MAIN, world.catalog, world.main),
-            ("github.com/o/gone", world.tmp_path / "gone" / "catalog", world.tmp_path / "gone"),
+            ("github.com/o/gone", world.tmp_path / "gone" / "catalog", world.tmp_path / "my gone"),
             ("github.com/o/file", broken, broken.parent),
         ],
     )
     code, payload = outside_run(world.capsys, "todo", "list", "--all-repositories")
     assert code == 0, payload
     rows = {row["repository"]: row for row in payload["data"]["result"]["repositories"]}
-    for name, checkout in (("github.com/o/gone", world.tmp_path / "gone"), ("github.com/o/file", broken.parent)):
+    for name, checkout in (
+        ("github.com/o/gone", f"'{world.tmp_path / 'my gone'}'"),
+        ("github.com/o/file", broken.parent),
+    ):
         assert rows[name]["status"] == "unreadable" and rows[name]["counts"] is None
         assert rows[name]["problem"]["code"] == "TODO_REPOSITORY_UNREADABLE"
         assert rows[name]["problem"]["next_step"] == f"spec-dock --project {checkout} canonical link"

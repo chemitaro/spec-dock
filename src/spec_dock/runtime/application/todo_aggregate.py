@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 import os
 from pathlib import Path
+import shlex
 from typing import TYPE_CHECKING, Final
 
 from spec_dock.runtime.application import todo_common
@@ -126,7 +127,7 @@ def unreadable_problem(catalog: Path, main_checkout: str, reason: str) -> dict[s
     return {
         "code": UNREADABLE,
         "message": f"the catalog {catalog} cannot be read: {reason}",
-        "next_step": f"spec-dock --project {main_checkout} canonical link",
+        "next_step": f"spec-dock --project {shlex.quote(main_checkout)} canonical link",
     }
 
 
