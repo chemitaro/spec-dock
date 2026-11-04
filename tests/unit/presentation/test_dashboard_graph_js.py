@@ -304,9 +304,18 @@ def context(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
             "checks": ["layout", "audit"],
             "prefs": [
                 {"current": None, "legacy": None},
-                {"current": None, "legacy": {"mode": "tree", "showDone": True, "deps": "wait", "fold": False, "legend": True}},
-                {"current": {"mode": "nest", "showDone": True, "deps": "wait", "fold": True, "legend": False}, "legacy": {"mode": "tree"}},
-                {"current": {"mode": "box", "showDone": "yes", "deps": "some", "fold": 1, "legend": None}, "legacy": None},
+                {
+                    "current": None,
+                    "legacy": {"mode": "tree", "showDone": True, "deps": "wait", "fold": False, "legend": True},
+                },
+                {
+                    "current": {"mode": "nest", "showDone": True, "deps": "wait", "fold": True, "legend": False},
+                    "legacy": {"mode": "tree"},
+                },
+                {
+                    "current": {"mode": "box", "showDone": "yes", "deps": "some", "fold": 1, "legend": None},
+                    "legacy": None,
+                },
                 {"current": [1, 2], "legacy": "x"},
             ],
         },
@@ -343,7 +352,7 @@ def test_the_default_view_draws_finished_dependencies_between_shown_boxes(contex
     def pairs(key: str) -> dict[tuple[str, str], bool]:
         return {(p[0], p[1]): e["done"] for e in context["layout"]["context"][key]["edges"] for p in e["pairs"]}
 
-    assert pairs("home")[("iss-00003", "iss-00005")] is True
+    assert pairs("home")["iss-00003", "iss-00005"] is True
     assert ("iss-00003", "iss-00005") not in pairs("wait")
     dirty = [run for run in context["audit"] if any(run[key] for key in AUDIT_KEYS)]
     assert dirty == []
