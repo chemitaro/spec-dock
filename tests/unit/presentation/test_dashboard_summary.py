@@ -27,9 +27,15 @@ def structure():
     )
 
 
+TODOS = {"status": "ok", "open": 3, "blocking": 1, "overdue": 2, "problem": None}
+
+
 def summary(**options):
     model = build_model(prs(structure(), pr(30, "iss-00003", checks="failure")), now=NOW)
-    return model, summary_document(model, hidden=options.get("hidden", False), server=options.get("server"))
+    todos = options.get("todos", TODOS)
+    return model, summary_document(
+        model, hidden=options.get("hidden", False), server=options.get("server"), todos=todos
+    )
 
 
 def test_the_summary_has_every_contract_field() -> None:
@@ -51,7 +57,9 @@ def test_the_summary_has_every_contract_field() -> None:
         "paths",
         "hidden",
         "server",
+        "todos",
     ]
+    assert document["todos"] == TODOS
     assert document["schema"] == SUMMARY_SCHEMA == "specdock.dashboard-summary/v1"
     assert (document["repository"], document["fetched_at"], document["stale"]) == (
         "github.com/o/r",
@@ -106,10 +114,11 @@ def test_the_same_input_gives_the_same_document_and_hidden_is_passed_through() -
 
 def test_an_empty_structure_has_no_completion_ratio_and_text_lines_render() -> None:
     model = build_model(snapshot(), now=NOW)
-    document = summary_document(model, hidden=False, server=None)
+    document = summary_document(model, hidden=False, server=None, todos=TODOS)
     counts = document["counts"]
     assert isinstance(counts, dict)
     assert document["completion_ratio"] is None and counts["total"] == 0
     lines = summary_text(summary()[1])
     assert lines[0] == "repository=github.com/o/r fetched_at=2026-11-04T11:50:00Z"
     assert "awaiting_merge 1" in lines and any("iss-00003 Merge me" in line for line in lines)
+    assert "todos open=3 blocking=1 overdue=2" in lines

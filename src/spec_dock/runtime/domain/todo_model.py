@@ -155,6 +155,17 @@ def order(records: Iterable[Mapping[str, object]], now: datetime) -> list[Mappin
     return sorted(records, key=key)
 
 
+def tally(records: Iterable[Mapping[str, object]], now: datetime) -> dict[str, int]:
+    """Parent tasks that are open (snoozed included), blocking, overdue and snoozed (epic-00547 D-08, D-15)."""
+    views = [(record, derived(record, now)) for record in records]
+    return {
+        "open": sum(1 for record, _view in views if not _closed(record)),
+        "blocking": sum(1 for _record, view in views if view["blocking"]),
+        "overdue": sum(1 for _record, view in views if view["overdue"]),
+        "snoozed": sum(1 for _record, view in views if view["effective_status"] == "snoozed"),
+    }
+
+
 @dataclass(frozen=True)
 class LimitCounts:
     agent_parents: int
@@ -184,6 +195,7 @@ class Filters:
     tag: str | None = None
     blocking: bool = False
     overdue: bool = False
+    repositories: tuple[str, ...] = ()  # `--repository` keys (iss-00550); matching rows is the aggregator's job
 
     def to_json(self) -> dict[str, object]:
         return {
@@ -193,6 +205,7 @@ class Filters:
             "tag": self.tag,
             "blocking": self.blocking,
             "overdue": self.overdue,
+            "repositories": list(self.repositories),
         }
 
 

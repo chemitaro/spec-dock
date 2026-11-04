@@ -130,7 +130,7 @@ def _scope_warnings(repository: TodoRepository, scope_ids: Sequence[str]) -> lis
 
 
 def _limit_warnings(repository: TodoRepository, todo_id: str) -> list[Diagnostic]:
-    records = [item.record for item in classify(repository, repository.store.read_all()).valid]
+    records = [item.record for item in classify(repository.store, repository.store.read_all()).valid]
     counts = count_limits(records)
     settings = repository.settings
     warnings = []
@@ -274,7 +274,7 @@ def add_todo(namespace: argparse.Namespace, context: ProjectContext) -> Operatio
             )
 
         def build_subtask() -> tuple[Path, dict[str, object], FileSnapshot | None, bool]:
-            loaded = load_record(repository, parent)
+            loaded = load_record(repository.store, parent)
             record = transition(loaded.record, "subtask_add", now=stamp, by=by, role=role, title=namespace.title)
             return loaded.path, record, loaded.snapshot, True
 
@@ -347,7 +347,7 @@ def _transition_command(
     values = options(now)
 
     def build() -> tuple[Path, dict[str, object], FileSnapshot | None, bool]:
-        loaded = load_record(repository, todo_id)
+        loaded = load_record(repository.store, todo_id)
         record = transition(loaded.record, action, now=stamp, by=by, role=role, target=_target(todo_id), **values)  # type: ignore[arg-type]
         return loaded.path, record, loaded.snapshot, record != loaded.record
 
@@ -462,7 +462,7 @@ def update_todo(namespace: argparse.Namespace, context: ProjectContext) -> Opera
     }
 
     def build() -> tuple[Path, dict[str, object], FileSnapshot | None, bool]:
-        loaded = load_record(repository, todo_id)
+        loaded = load_record(repository.store, todo_id)
         current = loaded.record
         if target is not None:
             record = transition(

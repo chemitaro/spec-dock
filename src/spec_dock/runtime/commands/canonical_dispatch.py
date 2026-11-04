@@ -55,6 +55,7 @@ from spec_dock.runtime.application.dashboard_service import (
 )
 from spec_dock.runtime.application.dashboard_summary import summarize_checkout, summarize_named
 from spec_dock.runtime.application.project_context import ProjectContext
+from spec_dock.runtime.application.todo_aggregate import list_all, show_ref
 from spec_dock.runtime.application.todo_check import check_todos
 from spec_dock.runtime.application.todo_commands import (
     add_todo,
@@ -146,6 +147,8 @@ REPOSITORY_INDEPENDENT_HANDLERS: dict[str, RepositoryIndependentHandler] = {
     "dashboard service install": install_service,
     "dashboard service status": service_status,
     "dashboard service uninstall": uninstall_service,
+    "todo list": list_all,
+    "todo show": show_ref,
     "todo settings": show_settings,
 }
 

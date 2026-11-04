@@ -10,7 +10,10 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Final
 
+from spec_dock.runtime.application import todo_common
+from spec_dock.runtime.application.canonical_catalog import require_linked
 from spec_dock.runtime.application.canonical_errors import CanonicalCommandError
+from spec_dock.runtime.application.todo_aggregate import registry_summary_todos, summary_todos
 from spec_dock.runtime.domain.dashboard_model import build_model
 from spec_dock.runtime.infra.dashboard_files import read_hidden, read_server_url, read_snapshot_file
 from spec_dock.runtime.infra.github_structure import GithubRepository, repository_for_checkout
@@ -36,13 +39,20 @@ def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _todo_now() -> datetime:
+    return todo_common.utc_now()
+
+
 def summarize(
     command: str,
     repository: GithubRepository,
     *,
     state_root: Path | None = None,
     now: Callable[[], datetime] = _utc_now,
+    catalog: tuple[Path, str] | None = None,
+    todo_now: Callable[[], datetime] = _todo_now,
 ) -> OperationResult[object]:
+    """`catalog` is (catalog, main checkout) of a correctly linked checkout; otherwise the registry chooses."""
     root = state_root if state_root is not None else resolve_state_root()
     read = read_snapshot_file(root, repository)
     if read.status == "missing":
@@ -67,7 +77,12 @@ def summarize(
             details={"repository": repository.key, "path": str(read.path), "reason": read.detail},
         )
     model = build_model(read.parsed.snapshot, now=now())
-    summary = summary_document(model, hidden=read_hidden(root, repository), server=read_server_url(root))
+    todos = (
+        summary_todos(catalog[0], catalog[1], now=todo_now())
+        if catalog is not None
+        else registry_summary_todos(root, repository, now=todo_now())
+    )
+    summary = summary_document(model, hidden=read_hidden(root, repository), server=read_server_url(root), todos=todos)
     return OperationResult(command, "succeeded", FamilyData("dashboard", summary), 0)
 
 
@@ -101,4 +116,9 @@ def summarize_checkout(namespace: argparse.Namespace, context: ProjectContext) -
             exit_code=2,
             details={"reason": str(error)},
         ) from error
-    return summarize(namespace.command_path, repository)
+    try:
+        linked = require_linked(context, timeout=namespace.timeout)
+        catalog: tuple[Path, str] | None = (linked.catalog, str(linked.layout.main_checkout))
+    except CanonicalCommandError:  # not linked here: the registry chooses the catalog (Epic D-15)
+        catalog = None
+    return summarize(namespace.command_path, repository, catalog=catalog)

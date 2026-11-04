@@ -159,7 +159,7 @@ HELP_EFFECTS: dict[str, str] = {
     "canonical restore": "Restore held deletions or paths from the catalog HEAD; no commit.",
     "canonical resume": "Resume a paused catalog after the user decided how to treat the remote.",
     "canonical remove": "Remove this clone's catalog, links and sync registration after confirming nothing is unsaved.",
-    "dashboard summary": "Read one repository's dashboard summary (specdock.dashboard-summary/v1) from local files; no changes.",
+    "dashboard summary": "Read one repository's dashboard summary (specdock.dashboard-summary/v1), with its human-task counts, from local files; no changes.",
     "dashboard serve": "Serve the read-only dashboard of every shown registered repository in the foreground until Ctrl-C or SIGTERM.",
     "dashboard hide": "Hide one repository from the dashboard; the periodic sync continues.",
     "dashboard show": "Show a hidden repository on the dashboard again.",
@@ -168,8 +168,8 @@ HELP_EFFECTS: dict[str, str] = {
     "dashboard service status": "Show whether the dashboard service is installed and loaded, whether a server runs, its URL and versions; no changes.",
     "dashboard service uninstall": "Stop and remove the dashboard service, its job file and its log; the periodic sync is untouched.",
     "todo add": "Write one new human task (or a subtask into its task's file) under the catalog's todos/<YYYY-MM>/; nothing goes to GitHub.",
-    "todo list": "List this repository's human tasks from the catalog's todos/ (specdock.todo-list/v1, mode repository); no changes.",
-    "todo show": "Read one human task with its subtasks, remaining items and derived states; no changes.",
+    "todo list": "List this repository's human tasks from the catalog's todos/, or every registered repository's with --all-repositories (specdock.todo-list/v1); no changes.",
+    "todo show": "Read one human task (by ID here, or by REF owner/name/t-xxxx from the registry) with its subtasks, remaining items and derived states; no changes.",
     "todo update": "Change fields of one human task or a subtask's title in its file, recording the changed field names in history.",
     "todo done": "Close one human task or subtask as done, writing its resolution and history; the file stays in place.",
     "todo snooze": "Hide one open human task from the default list until a time; its file stays in place.",
@@ -338,8 +338,10 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
         _arg("--tag"),
         _flag("--blocking"),
         _flag("--overdue"),
+        _flag("--all-repositories"),
+        _arg("--repository", action="append", metavar="REPOSITORY"),
     ),
-    "todo show": (_arg("id"),),
+    "todo show": (_arg("id", metavar="ID|REF"),),
     "todo update": (
         _arg("id"),
         _arg("--title"),
@@ -514,7 +516,7 @@ HELP_PRECONDITIONS: dict[str, str] = {
     "canonical restore": "A linked schema-4 checkout; every named path must be held (changes.holds) and exist in the catalog HEAD. Without paths, every held deletion is restored.",
     "canonical resume": "A linked schema-4 checkout whose catalog is paused; --adopt-remote for remote_rewritten or merge_failed, --push-local for remote_deleted.",
     "canonical remove": "A schema-4 checkout of a clone with a main checkout; stops before writing on unsaved or unpushed changes or on ignored files other than .runtime/ in the catalog. Without --yes it only reports the plan.",
-    "dashboard summary": "Inside a schema-4 checkout REPOSITORY may be omitted (it comes from the origin remote); elsewhere pass owner/name or github.com/owner/name. The repository's structure snapshot must exist and be readable (DASHBOARD_SNAPSHOT_MISSING, DASHBOARD_SNAPSHOT_UNREADABLE, DASHBOARD_SNAPSHOT_UNSUPPORTED stop with exit 3). Works without a running dashboard server and for hidden repositories; it never contacts GitHub or the server.",
+    "dashboard summary": "Inside a schema-4 checkout REPOSITORY may be omitted (it comes from the origin remote); elsewhere pass owner/name or github.com/owner/name. The repository's structure snapshot must exist and be readable (DASHBOARD_SNAPSHOT_MISSING, DASHBOARD_SNAPSHOT_UNREADABLE, DASHBOARD_SNAPSHOT_UNSUPPORTED stop with exit 3). Works without a running dashboard server and for hidden repositories; it never contacts GitHub or the server. todos counts the repository's open (snoozed included), blocking and overdue parent tasks: inside a checkout whose link is correct from its catalog, otherwise from the registry's catalog; when they cannot be read todos.status is unavailable with a problem and the summary still succeeds.",
     "dashboard serve": "No project is required. Listens on 127.0.0.1 only, port 47800 by default (--port N; 0 picks a free port); --tailscale also listens on this PC's Tailscale IPv4 address from `tailscale ip -4` (DASHBOARD_TAILSCALE_UNAVAILABLE exits 3 when there is none). A used port stops with DASHBOARD_PORT_IN_USE (exit 3). When a server already runs, its URL is shown and the command exits 0.",
     "dashboard hide": "Inside a schema-4 checkout REPOSITORY may be omitted (it comes from the origin remote); elsewhere pass owner/name or github.com/owner/name. An unreadable marks file stops with DASHBOARD_STATE_UNREADABLE (exit 3) and is not overwritten.",
     "dashboard show": "Inside a schema-4 checkout REPOSITORY may be omitted (it comes from the origin remote); elsewhere pass owner/name or github.com/owner/name. An unreadable marks file stops with DASHBOARD_STATE_UNREADABLE (exit 3) and is not overwritten.",
@@ -523,8 +525,8 @@ HELP_PRECONDITIONS: dict[str, str] = {
     "dashboard service status": "No project is required; on a PC without a service manager it reports supported=false.",
     "dashboard service uninstall": "No project is required; nothing installed is a success with removed=false.",
     "todo add": "A schema-4 checkout whose catalog is linked (CANONICAL_NOT_LINKED otherwise). A person (--by human, the default) needs only --title; an agent (--by agent) also needs --role, --kind, --body or --body-file, --reply-to and --effort, and decide needs two --option KEY=TEXT and --recommend KEY --reason TEXT (TODO_INVALID, exit 2, lists details.missing). --due takes 30m, 4h, 2d (up to 30d), YYYY-MM-DD or ISO 8601 with a zone; without it the default_due setting applies. --parent ID adds a subtask (only --title; a subtask's subtask stops with TODO_NESTING_TOO_DEEP); --item TITLE needs --kind checklist. A Scope ID not in the saved snapshot warns TODO_SCOPE_UNKNOWN; going over a limit warns TODO_LIMIT_EXCEEDED and still writes.",
-    "todo list": "A schema-4 checkout whose catalog is linked. --status open (the default) hides snoozed tasks until their time; --scope ID matches related or blocking Scopes. Broken records and conflict copies are warnings (TODO_RECORD_INVALID, TODO_CONFLICT_COPY) and never stop the list.",
-    "todo show": "A schema-4 checkout whose catalog is linked; ID is t-xxxx or a subtask t-xxxx.N (its task is shown). TODO_NOT_FOUND, TODO_ID_AMBIGUOUS and TODO_RECORD_INVALID exit 3.",
+    "todo list": "A schema-4 checkout whose catalog is linked, except with --all-repositories or --repository REPOSITORY (repeatable; implies --all-repositories), which read every catalog of this PC's registry without a checkout: a catalog that cannot be read is a row with status unreadable (TODO_REPOSITORY_UNREADABLE), a second clone a row with status duplicate (TODO_REPOSITORY_DUPLICATE), an unregistered --repository warns TODO_REPOSITORY_UNKNOWN, an unreadable registry stops with TODO_REGISTRY_UNREADABLE (exit 3) and a malformed REPOSITORY with TODO_REPOSITORY_INVALID (exit 2). --status open (the default) hides snoozed tasks until their time; --scope ID matches related or blocking Scopes. Broken records and conflict copies are warnings (TODO_RECORD_INVALID, TODO_CONFLICT_COPY) and never stop the list.",
+    "todo show": "A schema-4 checkout whose catalog is linked; ID is t-xxxx or a subtask t-xxxx.N (its task is shown). REF (owner/name/t-xxxx or github.com/owner/name/t-xxxx) needs no checkout and reads the registry's catalog of that repository: TODO_REPOSITORY_UNKNOWN, TODO_REPOSITORY_UNREADABLE and TODO_REGISTRY_UNREADABLE exit 3, TODO_REPOSITORY_INVALID exits 2. TODO_NOT_FOUND, TODO_ID_AMBIGUOUS and TODO_RECORD_INVALID exit 3.",
     "todo update": "A schema-4 checkout whose catalog is linked and a valid record (TODO_RECORD_INVALID, TODO_SCHEMA_UNSUPPORTED exit 3). A subtask ID takes only --title and --note. Nothing changed is reported as unchanged.",
     "todo done": "A schema-4 checkout whose catalog is linked; the task must be open or snoozed (TODO_STATE_INVALID). Open subtasks stop it with TODO_SUBTASKS_OPEN unless --include-subtasks; --choice must be one of the options.",
     "todo snooze": "A schema-4 checkout whose catalog is linked; only an open or snoozed task, never a subtask. --until takes the same forms as --due and must be in the future.",
@@ -564,8 +566,8 @@ _READS_BY_ROOT = {
     "workspace": "Workspace declaration, the GitHub structure snapshot, the catalog, and explicitly requested remote observations.",
     "installation": "Installed package inventory and the selected worktree's declaration and static file snapshots.",
     "canonical": "This clone's canonical catalog and checkout links, or one commit tree, as each command states.",
-    "dashboard": "The repository's structure snapshot, the dashboard hidden marks and the server location record (only whether its pid is alive).",
-    "todo": "The catalog's todos/ records and todos/settings.json, the user settings file, the origin remote, the saved structure snapshot and the dashboard hidden marks.",
+    "dashboard": "The repository's structure snapshot, the dashboard hidden marks, the server location record (only whether its pid is alive) and, for summary, the catalog registry and the catalog's todos/ records.",
+    "todo": "The catalog's todos/ records and todos/settings.json, the user settings file, the origin remote, the saved structure snapshot, the dashboard hidden marks and, for list --all-repositories/--repository and show REF, the catalog registry and every registered catalog's todos/.",
 }
 
 _DOES_NOT_BY_ROOT = {
@@ -595,7 +597,7 @@ _JSON_DATA_BY_ROOT = {
     "installation": "target, package_version, created_paths, changed_paths, retired_paths, backup_path and preservation checks.",
     "canonical": "The command's catalog, link, sync or check observations.",
     "todo": "kind=todo. One task: todo (specdock.todo/v1 record), derived (effective_status, overdue, due_soon, blocking, parent_closable, open_subtasks, subtask_counts), ref, repository, path, warnings_detail. list: specdock.todo-list/v1 (schema, generated_at, mode, filters, repositories, items). check: valid, checked_files, errors (code, file, field, message, source), warnings, cue. settings: values {key: {value, source}}, layers.",
-    "dashboard": "result is the specdock.dashboard-summary/v1 document: schema, repository, fetched_at, stale, counts, completion_ratio, awaiting_merge, in_progress, ready, blocked, cleanup, anomaly_count, pull_requests, paths, hidden, server.",
+    "dashboard": "result is the specdock.dashboard-summary/v1 document: schema, repository, fetched_at, stale, counts, completion_ratio, awaiting_merge, in_progress, ready, blocked, cleanup, anomaly_count, pull_requests, paths, hidden, server, todos {status, open, blocking, overdue, problem}.",
 }
 
 
@@ -672,6 +674,10 @@ def _help_spec(leaf: str) -> HelpSpec:
         target = "The CLI catalog; no repository is required."
     elif leaf == "todo settings":
         target = "The user settings file and, inside a checkout, this checkout's catalog todos/settings.json."
+    elif leaf == "todo list":
+        target = "This checkout's catalog todos/, or with --all-repositories/--repository every catalog of the registry in the state root."
+    elif leaf == "todo show":
+        target = "One task by ID in this checkout's catalog todos/, or by REF in that repository's registered catalog."
     elif leaf.startswith("todo "):
         target = "This checkout's catalog todos/ (one task by ID where the usage line has ID)."
     elif "target" in arguments:

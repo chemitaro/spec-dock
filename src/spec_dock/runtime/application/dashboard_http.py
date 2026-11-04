@@ -26,6 +26,7 @@ from spec_dock.runtime.application.dashboard_scope_details import (
     read_structure_facts,
     scope_facts,
 )
+from spec_dock.runtime.application.todo_aggregate import registry_summary_todos
 from spec_dock.runtime.domain.canonical_layout import scope_relative
 from spec_dock.runtime.domain.dashboard_model import seen_scopes
 from spec_dock.runtime.infra.dashboard_assets import (
@@ -346,7 +347,8 @@ class DashboardHttp:
             return self._error(
                 503, code, f"the structure snapshot of {view.repository.repository.slug} is {view.status}", *steps
             )
-        return self._json(200, summary_document(view.model, hidden=False, server=self.local_url))
+        todos = registry_summary_todos(self.site.state_root, view.repository.repository, now=self.now())
+        return self._json(200, summary_document(view.model, hidden=False, server=self.local_url, todos=todos))
 
     # --- Seen (D-07) -------------------------------------------------------------------------------------------
 
