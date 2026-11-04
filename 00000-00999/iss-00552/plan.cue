@@ -13,7 +13,7 @@ steps: {
 	"S-05": {title: "`dashboard list`／`hide`／`show` と文字の出力（D-04）", realizes: ["R-03", "R-04"], status: "done", after: ["S-04"], session: "impl"}
 	"S-06": {title: "要約と `todo list` の `hidden`（D-05）", realizes: ["R-06"], status: "done", after: ["S-04"], session: "impl"}
 	"S-07": {title: "文書、ヘルプ、inventory、dogfood の写し（D-06）", realizes: ["R-07"], status: "done", after: ["S-05"], session: "impl"}
-	"S-08": {title: "コードのレビュー、最終品質ゲート、report.md、PR と CI", realizes: ["R-07"], status: "doing", after: ["S-06", "S-07"], session: "impl"}
+	"S-08": {title: "コードのレビュー、最終品質ゲート、report.md、PR と CI", realizes: ["R-07"], status: "done", after: ["S-06", "S-07"], session: "impl"}
 }
 
 tests: {
