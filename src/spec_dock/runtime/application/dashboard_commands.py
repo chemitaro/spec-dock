@@ -2,8 +2,8 @@
 
 `serve` runs in the foreground until Ctrl-C or SIGTERM. `hide`/`show` write only the per-user hidden marks;
 the registry, the catalog and the periodic sync are untouched, so a hidden repository keeps syncing. `list`
-reads the registry, the marks and the server location record (only whether its pid is alive). None of them
-sends a request to GitHub.
+reads the registry, the marks, the dashboard settings (iss-00552) and the server location record (only whether
+its pid is alive). None of them writes a settings file or sends a request to GitHub.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ import time
 from typing import TYPE_CHECKING
 
 from spec_dock.runtime.application.canonical_errors import CanonicalCommandError
-from spec_dock.runtime.application.dashboard_site import DashboardSite
+from spec_dock.runtime.application.dashboard_site import DashboardSite, read_visibility
 from spec_dock.runtime.application.dashboard_summary import parse_repository
 from spec_dock.runtime.application.project_context import require_migrated, resolve_git_context
 from spec_dock.runtime.domain.dashboard_service import (
@@ -39,16 +39,18 @@ from spec_dock.runtime.infra.git_process import GitProcessError
 from spec_dock.runtime.infra.github_structure import repository_for_checkout
 from spec_dock.runtime.infra.state_root import resolve_state_root
 from spec_dock.runtime.presentation.command_data import FamilyData
-from spec_dock.runtime.presentation.envelope import OperationResult
+from spec_dock.runtime.presentation.envelope import Diagnostic, OperationResult
 
 if TYPE_CHECKING:
     import argparse
     from collections.abc import Callable
 
     from spec_dock.runtime.application.project_context import ProjectContext
+    from spec_dock.runtime.domain.dashboard_visibility import Visibility
     from spec_dock.runtime.infra.github_structure import GithubRepository
 
 DASHBOARD_STATE_UNREADABLE = "DASHBOARD_STATE_UNREADABLE"
+DASHBOARD_HIDDEN_BY_CONFIG = "DASHBOARD_HIDDEN_BY_CONFIG"
 
 
 def stop_on_schema_three(namespace: argparse.Namespace, cwd: Path) -> None:
@@ -60,8 +62,8 @@ def stop_on_schema_three(namespace: argparse.Namespace, cwd: Path) -> None:
     require_migrated(root)
 
 
-def _result(command: str, data: dict[str, object]) -> OperationResult[object]:
-    return OperationResult(command, "succeeded", FamilyData("dashboard", data), 0)
+def _result(command: str, data: dict[str, object], warnings: tuple[Diagnostic, ...] = ()) -> OperationResult[object]:
+    return OperationResult(command, "succeeded", FamilyData("dashboard", data), 0, warnings=warnings)
 
 
 # --- serve -----------------------------------------------------------------------------------------------------
@@ -78,7 +80,10 @@ def _announce(server: DashboardServer, write: Callable[[str], object]) -> list[s
         lines.append("only this PC can open it; the repositories shown:")
     lines.extend(f"  {key}  {server.urls.local.rstrip('/')}/r/{key}/" for key in shown)
     if not shown:
-        lines.append("  (none: register one with `spec-dock canonical link`, or `spec-dock dashboard show`)")
+        lines.append(
+            "  (none: register one with `spec-dock canonical link`, or `spec-dock dashboard show`;"
+            " `spec-dock dashboard list` shows what hides each)"
+        )
     lines.append("stop with Ctrl-C")
     write("\n".join(lines) + "\n")
     return shown
@@ -239,10 +244,24 @@ def _mark(command: str, repository: GithubRepository, root: Path) -> OperationRe
             details={"path": str(error.path), "reason": error.reason},
         ) from None
     registered = any(row.repository == repository.key for row in DashboardSite(root).rows())
-    return _result(
-        command,
-        {"repository": repository.key, "hidden": hide, "changed": changed, "registered": registered},
-    )
+    visibility = read_visibility(root, repository)
+    final = visibility.to_json()
+    warnings: tuple[Diagnostic, ...] = ()
+    if not hide and visibility.hidden:
+        problems = [problem.to_json() for problem in visibility.config.problems]
+        warnings = (
+            Diagnostic(
+                DASHBOARD_HIDDEN_BY_CONFIG,
+                f"{repository.key} stays hidden: the dashboard settings hide it ({visibility.config.source});"
+                " see `spec-dock dashboard list`",
+                {"repository": repository.key, "hidden_by": final["hidden_by"], "config_problems": problems},
+            ),
+        )
+    data: dict[str, object] = {"repository": repository.key, **final, "changed": changed, "registered": registered}
+    return _result(command, {key: data[key] for key in _MARK_FIELDS}, warnings)
+
+
+_MARK_FIELDS = ("repository", "hidden", "changed", "registered", "mark", "config", "hidden_by")
 
 
 def mark_named(namespace: argparse.Namespace, cwd: Path) -> OperationResult[object] | None:
@@ -284,6 +303,7 @@ def list_repositories(
             "main_checkout": row.main_checkout,
             "hidden": row.hidden,
             "served": row.served,
+            **_visibility_fields(row.visibility),
             "problem": row.problem,
             "path": path,
             "url": f"{server.rstrip('/')}{path}" if server and path and row.served else None,
@@ -293,5 +313,13 @@ def list_repositories(
         "server": server,
         "registry_error": site.registry_error(),
         "marks_unreadable": site.marks_unreadable(),
+        "config_problems": [problem.to_json() for problem in site.config_problems()],
     }
     return _result(namespace.command_path, data)
+
+
+def _visibility_fields(visibility: Visibility | None) -> dict[str, object]:
+    if visibility is None:  # a row whose repository is unknown is never served
+        return {"mark": False, "config": None, "hidden_by": []}
+    found = visibility.to_json()
+    return {"mark": found["mark"], "config": found["config"], "hidden_by": found["hidden_by"]}

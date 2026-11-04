@@ -149,6 +149,7 @@ def install(namespace: argparse.Namespace, cwd: Path) -> OperationResult[object]
             port=port,
             tailscale=bool(namespace.tailscale),
             tailscale_dir=_tailscale_dir(environment),
+            config_home=_config_home(environment),
         )
         dashboard_dir(root).mkdir(parents=True, exist_ok=True)  # launchd does not create the log's directory
         outcome = service.ensure(spec)
@@ -247,3 +248,9 @@ def uninstall(namespace: argparse.Namespace, cwd: Path) -> OperationResult[objec
     }
     effect = Effect("dashboard.service", "succeeded" if removed else "unchanged", str(service.path))
     return _result(command, data, (effect,))
+
+
+def _config_home(environment: RuntimeEnvironment) -> Path | None:
+    """The absolute XDG_CONFIG_HOME of this install, which the server must read its settings under (iss-00552)."""
+    value = environment.environ.get("XDG_CONFIG_HOME", "")
+    return Path(value) if value and Path(value).is_absolute() else None

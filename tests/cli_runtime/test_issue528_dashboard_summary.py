@@ -114,7 +114,8 @@ def test_server_url_needs_a_live_pid_and_hidden_marks_are_read(state: Path, caps
     (dashboard / "server.json").write_text(json.dumps(record))
     (dashboard / "repositories.json").write_text("{broken")
     summary = _run(capsys, "dashboard", "summary", "o/r")[1]["data"]["result"]
-    assert (summary["server"], summary["hidden"]) == (None, False)
+    # Unreadable marks hide, as on the dashboard server (iss-00552 R-06; before, the summary read them as none).
+    assert (summary["server"], summary["hidden"]) == (None, True)
 
 
 def test_version_2_pull_requests_reach_the_summary(state: Path, capsys: pytest.CaptureFixture[str]) -> None:

@@ -287,6 +287,9 @@ def test_hide_show_and_list_outside_a_checkout(state: Path, capsys: pytest.Captu
         "hidden": True,
         "changed": True,
         "registered": True,
+        "mark": True,
+        "config": {"visible": True, "source": "default"},
+        "hidden_by": ["mark"],
     }
     assert _run(capsys, "dashboard", "hide", "github.com/o/s")[1]["data"]["result"]["changed"] is False
     assert (state / "canonical-registry.json").read_bytes() == registry  # the sync keeps its registration
