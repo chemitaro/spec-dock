@@ -13,6 +13,7 @@ import { LEGACY_KEY, PREFS_KEY, restorePrefs } from "./graph/prefs.js";
 
 const { esc, ic, stateIcon, STATES } = M;
 const PHONE = 640;
+const RESIZE_SETTLE = 200; // ms the window's size must hold before the graph is laid out again (iss-00575)
 // Why there is no graph (F-01). The reason and the next step are in the shell's notices above.
 export function emptyText(data) {
   if (!data) return "このリポジトリの構造を読めませんでした。";
@@ -81,6 +82,9 @@ const isPhone = () => (V.root?.clientWidth || innerWidth) <= PHONE;
 // The graph's visible width at 100% (px), where the groups of the layout wrap (iss-00560 D-05): the same 16px of
 // margin as the first view and "fit".
 const seenWidth = () => Math.max(1, (V.el?.view.clientWidth || innerWidth) - 16);
+// iss-00575: and its visible height with the same margin (the toolbar's own height, which comes and goes with the
+// selection, is left out so that the layout stays): the top level wraps where the whole graph shows largest in it.
+const seenHeight = () => Math.max(1, (V.el?.view.clientHeight || innerHeight) - 16);
 const byId = (id) => V.ix?.byId.get(id);
 
 // --- Shell DOM ---------------------------------------------------------------------------------------------
@@ -159,7 +163,7 @@ function render(root, ctx) {
   // The Scopes moving now key the world too: past their 30 minutes the boxes are drawn again, still (iss-00574 D-04).
   const now = Date.now();
   const live = data.scopes.filter((s) => s.state === "doing" && M.isLive(M.movedAt(s, V.ix.byId), now)).map((s) => s.id);
-  const sig = `${data.revision}|${JSON.stringify(V.opts)}|${focus}|${live.join(",")}|${seenWidth()}`;
+  const sig = `${data.revision}|${JSON.stringify(V.opts)}|${focus}|${live.join(",")}|${seenWidth()}|${seenHeight()}`;
   renderBar(focus);
   renderLegend();
   if (sig !== V.sig) {
@@ -285,7 +289,8 @@ const pos = (r) => `left:${r.x1}px;top:${r.y1}px;width:${r.x2 - r.x1}px;height:$
 function buildWorld(focus) {
   const t0 = performance.now();
   V.width = seenWidth();
-  const r = routeLayout(V.data.scopes, V.data.cleanup, { ...V.opts, focus, width: V.width });
+  V.height = seenHeight();
+  const r = routeLayout(V.data.scopes, V.data.cleanup, { ...V.opts, focus, width: V.width, height: V.height });
   V.EG = { ...r, ms: Math.round(performance.now() - t0) };
   const L = r.layout;
   const cleanup = cleanupOf();
@@ -639,18 +644,19 @@ function onKey(event) {
   }
 }
 
-// Only a change of the window's width lays the graph out again (iss-00560 R-03); zooming, panning and a change of the
-// height keep the layout. The zoom and the position stay.
-let resizeFrame = 0;
+// Only a change of the room the graph is seen in, its width or height, lays it out again (iss-00560 R-03, iss-00575
+// R-03), once the resizing has stopped; zooming, panning, new data and the routing's widening keep the layout.
+// The zoom and the position stay.
+let resizeTimer = 0;
 function onResize() {
   if (!V.el || V.el.view.hidden) return;
   applyT();
-  cancelAnimationFrame(resizeFrame);
-  resizeFrame = requestAnimationFrame(relayout);
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(relayout, RESIZE_SETTLE);
 }
 
 function relayout() {
-  if (!V.el || V.el.view.hidden || !V.data || !V.ctx || seenWidth() === V.width) return;
+  if (!V.el || V.el.view.hidden || !V.data || !V.ctx || (seenWidth() === V.width && seenHeight() === V.height)) return;
   render(V.root, V.ctx);
 }
 

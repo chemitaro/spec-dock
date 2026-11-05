@@ -449,7 +449,46 @@ function childrenBlock(parent, kids, ctx, avail) {
     }
   });
   if (loose.length) items.push(chipBlock(`${key}.f`, loose, ctx));
-  return shelfBlock(key, items, ctx, avail, parent ? BASE.wrapRow : BASE.world);
+  // iss-00575: the top level wraps where the whole graph shows largest in the view (when it has a height to fit)
+  const room = !parent && !ctx.breaks && ctx.opts.height > 0 ? widestRoom(items, ctx.opts, avail) : avail;
+  return shelfBlock(key, items, ctx, room, parent ? BASE.wrapRow : BASE.world);
+}
+
+// Shelves of the blocks in order, wrapping where one would pass `cap`: the width and the height of the whole.
+function shelved(blocks, cap) {
+  let w = 0;
+  let h = 0;
+  let row = null;
+  for (const b of blocks) {
+    if (!row || (row.n && row.w + BASE.wrapCol + b.w > cap)) {
+      if (row) h += row.h + BASE.world;
+      row = { w: 0, h: 0, n: 0 };
+    }
+    row.w = row.n ? row.w + BASE.wrapCol + b.w : b.w;
+    row.h = Math.max(row.h, b.h);
+    row.n++;
+    w = Math.max(w, row.w);
+  }
+  return { w, h: h + (row ? row.h : 0) };
+}
+
+// The width the top level may use (iss-00575 R-01): every cut of the order is a candidate (the widths of the first k
+// blocks side by side); the one whose whole graph shows at the largest zoom in the view wins, as "fit" would zoom
+// (at most 100%). A tie goes to the smaller whole, then to the narrower row. The blocks keep their own widths.
+function widestRoom(blocks, opts, avail) {
+  const seenW = Number(opts.width) > 0 ? Number(opts.width) : WRAP_WIDTH;
+  const seenH = Number(opts.height);
+  if (seenH >= seenW) return avail; // a tall view (a phone) stacks them, as the groups wrap at the width seen
+  const m = 2 * SIZE.margin;
+  let best = null;
+  let run = 0;
+  blocks.forEach((b, k) => {
+    run += (k ? BASE.wrapCol : 0) + b.w;
+    const { w, h } = shelved(blocks, run);
+    const zoom = Math.min(1, seenW / (w + m), seenH / (h + m));
+    if (!best || zoom > best.zoom + 1e-9 || (Math.abs(zoom - best.zoom) <= 1e-9 && w * h < best.area)) best = { zoom, area: w * h, cap: run };
+  });
+  return best ? best.cap : seenW;
 }
 
 function frameBlock(s, kids, ctx, avail) {
@@ -520,8 +559,9 @@ function flatten(block, ox, oy, path, out) {
  * Lay the Scopes out.
  * @param scopes  structure API `scopes`
  * @param cleanup structure API `cleanup` ([{id, code, text}])
- * @param options {mode: "nest"|"tree", showDone, deps: "all"|"wait"|"none", fold, focus, width} — width: the graph's
- *                visible width at 100% (px), where the groups wrap (WRAP_WIDTH when absent)
+ * @param options {mode: "nest"|"tree", showDone, deps: "all"|"wait"|"none", fold, focus, width, height} — width: the graph's
+ *                visible width at 100% (px), where the groups wrap (WRAP_WIDTH when absent); height: its visible
+ *                height (px), with which the top level wraps where the whole shows largest (iss-00575; none: at width)
  * @param gaps    extra pixels per gap key (from earlier routing rounds)
  */
 export function layout(scopes, cleanup, options = {}, gaps = {}) {
