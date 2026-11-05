@@ -65,6 +65,7 @@ ID: "iss-00574"
 ### PR
 
 - [#577](https://github.com/chemitaro/spec-dock/pull/577)（`main` へ、head `c3d08dedd`、`Refs #574`・`Refs #573`）。作る直前に `origin/main` を取り込み直す必要はなかった（`b290da02a` から進んでいない）。
+- CI（head `c3d08dedd`、観測 2026-11-05T15:13Z）：SpecDock check、Commit identity、Provider CI がすべて success。GitHub は OPEN・下書きでない・MERGEABLE・CLEAN。観測は Actions と Commit Status だけ（外の CheckRun は範囲外）。マージは利用者が行う。
 
 ## Residual Risks / Follow-ups
 
