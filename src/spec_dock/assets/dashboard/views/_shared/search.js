@@ -2,7 +2,7 @@
 // 骨組みの app.js が render() のたびに mountSearch(slot, …) を呼ぶ。上の帯は描き直されるので、部品はここで
 // 1回だけ作り、新しい #search-slot へ移す。骨組みは5秒ごとに上の帯だけを描き直し、そのときは mountSearch を
 // 呼ばないので、上の帯を MutationObserver で見張って付け直す（入力の値とフォーカスを保つ）。
-import { esc, ic, stateIcon } from "../../core/ui.js";
+import { esc, ic, stateMark } from "../../core/ui.js";
 import { searchScopes } from "./logic.js";
 
 let box = null; // the persistent search element
@@ -97,6 +97,13 @@ function close(element, clear) {
   element.querySelector(".sd-search__open").setAttribute("aria-expanded", "false");
 }
 
+// The Scopes of the shown structure by ID, for a parent's ring (iss-00574); remade only when the data changes.
+let mapped = { data: null, byId: new Map() };
+function byIdOf(data) {
+  if (mapped.data !== data) mapped = { data, byId: new Map((data?.scopes || []).map((item) => [item.id, item])) };
+  return mapped.byId;
+}
+
 function go(element, scope) {
   close(element, true);
   current.navigate?.(scope.path);
@@ -129,7 +136,7 @@ function paint(element) {
     ? results
         .map(
           (item, index) =>
-            `<li role="option" id="sd-search-${index}" data-index="${index}" aria-selected="${index === active}">${stateIcon(item.state)}<span class="ds-docid">${esc(item.id)}</span><span class="sd-search__t">${esc(item.title)}</span></li>`,
+            `<li role="option" id="sd-search-${index}" data-index="${index}" aria-selected="${index === active}">${stateMark(item, byIdOf(current.data))}<span class="ds-docid">${esc(item.id)}</span><span class="sd-search__t">${esc(item.title)}</span></li>`,
         )
         .join("")
     : `<li class="sd-search__none" role="presentation">見つからない</li>`;

@@ -29,6 +29,11 @@ from spec_dock.runtime.application.dashboard_documents import (
     is_cue_scope,
     markdown_page,
 )
+from spec_dock.runtime.application.dashboard_progress import (
+    PlanProgressCache,
+    issues_in_progress,
+    read_plan_progress,
+)
 from spec_dock.runtime.application.dashboard_scope_details import (
     StructureFactsCache,
     read_scope_details,
@@ -124,6 +129,7 @@ class DashboardHttp:
         self.started_at = started_at
         self.now = now
         self.facts = StructureFactsCache()  # iss-00544 D-02: assurance levels remembered across requests
+        self.progress = PlanProgressCache()  # iss-00574 D-07: plan counts remembered across requests
         self.documents = ScopeDocuments()  # iss-00535 D-01: drawings remembered by their files' times
 
     # --- Headers -----------------------------------------------------------------------------------------------
@@ -424,8 +430,15 @@ class DashboardHttp:
             ids = sorted(view.model.scopes) if view.model is not None else []
             readings = read_structure_facts(site, ids, self.facts)  # iss-00544 D-02
             todos = self.site.todos.annotations(site, view.model)  # iss-00554 D-03
+            progress = read_plan_progress(site, issues_in_progress(view.model), self.progress)  # iss-00574 D-07
             document = structure_document(
-                view, now=self.now(), baseline=baseline, latest=latest, readings=readings, todos=todos
+                view,
+                now=self.now(),
+                baseline=baseline,
+                latest=latest,
+                readings=readings,
+                todos=todos,
+                progress=progress,
             )
             return self._json(200, document)
         if op == ["summary"]:
@@ -445,8 +458,17 @@ class DashboardHttp:
                 details = self._document_details(site, view.model.scopes[op[1]], details)  # iss-00535 D-02
             one = {op[1]: scope_facts(details)} if details is not None else None
             scope_todos = self.site.todos.annotations(site, view.model) if known else None
+            doing = [op[1]] if op[1] in issues_in_progress(view.model) else []
+            one_progress = read_plan_progress(site, doing, self.progress, prune=False) if doing else None
             scope_json = scope_document(
-                view, op[1], baseline=baseline, details=details, readings=one, todos=scope_todos, now=self.now()
+                view,
+                op[1],
+                baseline=baseline,
+                details=details,
+                readings=one,
+                todos=scope_todos,
+                now=self.now(),
+                progress=one_progress,
             )
             if scope_json is None:
                 return self._error(404, "DASHBOARD_SCOPE_UNKNOWN", f"{op[1]} is not in this repository's structure")
