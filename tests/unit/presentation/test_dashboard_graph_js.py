@@ -339,12 +339,24 @@ def context(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
     return _run(
         tmp_path_factory.mktemp("context"),
         {
-            "documents": {"context": _context(), "missing": _missing_times(), "wide": _wide(), "inits": _initiatives(), "chain": _init_chain()},
+            "documents": {
+                "context": _context(),
+                "missing": _missing_times(),
+                "wide": _wide(),
+                "inits": _initiatives(),
+                "chain": _init_chain(),
+            },
             "layouts": {
                 "context": layouts,
                 "missing": {"home": {}},
                 "wide": {"home": {}, "w1240": {"width": 1240}, "w1400": {"width": 1400}, "w374": {"width": 374}},
-                "inits": {"home": {}, "w1400": {"width": 1400}, "w1000": {"width": 1000}, "w374": {"width": 374}, "gapped": {"width": 1400}},
+                "inits": {
+                    "home": {},
+                    "w1400": {"width": 1400},
+                    "w1000": {"width": 1000},
+                    "w374": {"width": 374},
+                    "gapped": {"width": 1400},
+                },
                 "chain": {"w1400": {"width": 1400}},
             },
             "gaps": {"inits": {"gapped": {"all.x": 12, "all.y": 12, "wcroot": 30}}},
