@@ -12,7 +12,65 @@ ID: "iss-00578"
 
 ## Outcome
 
-（実装の後に書く）
+- 原因：配線の寄せ（`router.js` の `nudgePass`）が、箱の上下の空きを通る範囲の広い線分を介して、別々の列の間の
+  線分を1つの束にまとめ、束の詰めの超え（別の通り道の鎖を含む）を、そのまま広げの量にしていた。広げる組も束の中の
+  別々の通り道から選んでいたので、広げても解けず、配置（`routeLayout`）が10回まで列の間を足し続けた（下の「原因の調べ」）。
+- 直し方（`src/spec_dock/assets/dashboard/views/graph/router.js` だけ）：
+  - D-01 `lacking()`：広げの量を、線分ごとに、自分の通り道（動ける範囲）の中の手前の線分だけの鎖で数え直し、
+    その線分の両側の障害物の組に求める。
+  - D-02：動かない線分との前後を入る余地で決め、押されて自分の範囲を超える線分があれば、押している鎖の中の逃げられる
+    線分を奥へ回して詰め直す（12回まで、押されの合計が減らなければ戻してやめる）。重なりうる組を束ごとに一度だけ数える。
+- テスト：線の多い合成の構造（`tests/support/dashboard_graph.py` の `many_lines()`、epic-02233 と同じ依存の形）と、
+  列の間を測る検査（`tests/js/dashboard_graph_check.mjs` の `passages`）、
+  `test_the_passage_between_stage_columns_fits_the_lines_that_pass`。合成の構造を代表の構造の線の検査にも加えた。
+- 配置の決まり（R-15）、`layout.js`、公開の契約は変えていない。
+
+## 実データの列の間（直す前と後）
+
+測り方：`.workbench/iss-00578/scripts/stats.mjs`。各まとまりの隣り合う段の列の間の幅と、そこを縦に通る線の位置の数 n。
+「超え」は 幅 − max(44, 8n + 12)。幅はページの見える幅（ウィンドウ − 16）。
+
+| 構造・表し方 | 直す前：最大の超え（その列の間の幅 / n） | 直した後 | 直す前の回数 → 後 | 時間 前 → 後 |
+|---|---|---|---|---|
+| taikyohiyou、1440 | **426**（534 / 12、epic-02233 列2→3） | 2（70 / 7） | 10 → 4 | 222 → 135ms |
+| taikyohiyou、1000 | 28（72 / 2） | 26（110 / 9） | 10 → 3 | 159 → 63ms |
+| taikyohiyou、390 | 87（131 / 4） | 8（76 / 7） | 10 → 4 | 135 → 72ms |
+| taikyohiyou、1440、終わったものも | **720**（772 / 5） | 19（79 / 6） | 10 → 3 | 1744 → 567ms |
+| taikyohiyou、1440、畳まない | 158（202 / 3） | 49（117 / 7） | 10 → 3 | 152 → 84ms |
+| taikyohiyou、1000、終わったものも | **542**（626 / 9） | 17（85 / 7） | 10 → 4 | 1307 → 744ms |
+| spec-dock、1440 | 0 | 0 | 1 → 1 | 21 → 18ms |
+| spec-dock、1000 | **446**（490 / 1、epic-00158） | 0 | 1 → 1 | 14 → 10ms |
+| spec-dock、390 | 0 | 0 | 0 → 0 | 5 → 4ms |
+| spec-dock、1440、終わったものも | 10 | 10 | 4 → 3 | 259 → 185ms |
+
+epic-02233（taikyohiyou、1440）の列の間：直す前 62 / **534** / **270** / 78 / 62 / 44 / 80、直した後 70 / 78 / 86 / 78 / 44 / 44 / 44。
+
+線の検査（実データ、検査の組み合わせ 49 と 55）：taikyohiyou で違反の残る組み合わせ 9 → 4（どれも直す前からある、終わった
+ものも出す表し方の近すぎる車線。ツリー 2 件と入れ子 2 件）、spec-dock は 0 → 0。全組み合わせの配線時間の合計は
+taikyohiyou 20.5 → 14.7 秒、spec-dock 3.9 → 1.9 秒。いちばん遅いのは直す前からツリーの終わったものも出す表し方
+（346 本、10 回で収まらない）で 4.9 → 4.4 秒。
+
+## 写し（ダーク、headless Chrome、`spec-dock dashboard serve --port 18578 --offline`）
+
+状態の置き場は `~/.local/state/spec-dock/` の写し（`.workbench/iss-00578/browser/state`）。直す前は HEAD
+`b290da02a` の資産、直した後は修正の資産（編集可能な開発の環境の `uv run spec-dock` が `src/` を配る）。
+
+| 幅 | taikyohiyou 直す前 | taikyohiyou 直した後 | spec-dock 直す前 | spec-dock 直した後 |
+|---|---|---|---|---|
+| 1440 | [前](artifacts/20261105t154040z-02--graph-before-taikyohiyou-project-1440.png) | [後](artifacts/20261105t154038z-04--graph-after-taikyohiyou-project-1440.png) | [前](artifacts/20261105t154039z-02--graph-before-spec-dock-1440.png) | [後](artifacts/20261105t154038z--graph-after-spec-dock-1440.png) |
+| 1000 | [前](artifacts/20261105t154040z--graph-before-taikyohiyou-project-1000.png) | [後](artifacts/20261105t154038z-02--graph-after-taikyohiyou-project-1000.png) | [前](artifacts/20261105t154039z-01--graph-before-spec-dock-1000.png) | [後](artifacts/20261105t154037z--graph-after-spec-dock-1000.png) |
+| 390 | [前](artifacts/20261105t154040z-03--graph-before-taikyohiyou-project-390.png) | [後](artifacts/20261105t154039z--graph-after-taikyohiyou-project-390.png) | [前](artifacts/20261105t154039z-03--graph-before-spec-dock-390.png) | [後](artifacts/20261105t154038z-01--graph-after-spec-dock-390.png) |
+
+epic-02233 の枠（1440）：[直す前](artifacts/20261105t154040z-01--graph-before-taikyohiyou-project-1440-epic-02233.png)
+（列2と列3の間が空く）、[直した後](artifacts/20261105t154038z-03--graph-after-taikyohiyou-project-1440-epic-02233.png)。
+spec-dock の既定の表示（1440、390）は、直す前も列の間が詰まっていたので、写しはほぼ同じ。1000 の直す前は
+epic-00158 の中に 490 の列の間がある（node の測り。写しの画面の中に入るかは確かめていない）。
+
+## 合成の構造（テスト）
+
+`many_lines()` の 34 の組み合わせ（入れ子と木、終わったもの、畳む、幅 1400・374、焦点）で、直す前の最大の超えは
+910（954 / 9）、直した後は 41（焦点を epic-00601 に当てた表示の 125 / 9）。ほかは 0〜2。線の検査の違反は、直す前
+18 組み合わせ（もとからの近すぎる車線。木の表し方も含む）、直した後 0。
 
 ## 原因の調べ（S-01）
 
@@ -55,7 +113,7 @@ ID: "iss-00578"
   鎖は解けないので、同じ要求が回ごとに出て、量が積み重なった。
 - 形が変わる理由：束がつながるかは、箱の上下の空き（行の高さ）、見える幅（折り返し）、終わったものの表示、
   畳むかどうかで変わる。直す前のコードで、幅 984 では最大の超えが 68、1424 では 490、終わったものも出す 1424 では
-  728 だった（下の表）。
+  728 だった（上の「実データの列の間」の表）。
 
 ## Verification
 
