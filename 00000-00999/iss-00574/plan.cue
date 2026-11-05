@@ -10,8 +10,8 @@ steps: {
 	"S-03": {title: "状態の色の札と付け替え（`app.css`、`parts.css`、`graph.css`、`todos.css`、`todos.js`、`scope.js`、`overview.js`、`board.js`）を、コントラストのテスト先行で入れる", realizes: ["R-01", "R-02"], status: "done", after: ["S-01"], session: "impl"}
 	"S-04": {title: "`core/ui.js` の形、`progressRing`、`stateMark` と時刻の関数を、node のテスト先行で入れ、印の見本の golden を新しい形で書き直す", realizes: ["R-01", "R-03", "R-04", "R-05", "F-02"], status: "done", after: ["S-01"], session: "impl"}
 	"S-05": {title: "画面に組み込む（構造の図、要点、詳しい画面は動かす。ボード、概況、検索、人のタスクは動かさない）。点滅の CSS と `app.js` の30分の境目", realizes: ["R-03", "R-04", "R-05"], status: "done", after: ["S-03", "S-04"], session: "impl"}
-	"S-06": {title: "PC のヘッドレスの Chrome で写しを撮り、artifacts と report.md に残す", realizes: ["R-02", "R-05", "R-07"], status: "doing", after: ["S-02", "S-05"], session: "impl"}
-	"S-07": {title: "コードのレビュー、最終品質ゲート（`make lint`、`uv run pytest`）、PR と CI", realizes: ["R-01", "R-06"], status: "todo", after: ["S-06"], session: "impl"}
+	"S-06": {title: "PC のヘッドレスの Chrome で写しを撮り、artifacts と report.md に残す", realizes: ["R-02", "R-05", "R-07"], status: "done", after: ["S-02", "S-05"], session: "impl"}
+	"S-07": {title: "コードのレビュー、最終品質ゲート（`make lint`、`uv run pytest`）、PR と CI", realizes: ["R-01", "R-06"], status: "doing", after: ["S-06"], session: "impl"}
 }
 
 tests: {
