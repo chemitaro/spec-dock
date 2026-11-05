@@ -13,6 +13,7 @@ steps: {
 	"S-06": {title: "実データ（taikyohiyou_project と spec-dock）の 1440、1000、390 の写しと数字を、直す前と後で report.md に残す", realizes: ["R-01", "R-05"], status: "done", after: ["S-05"], session: "impl"}
 	"S-07": {title: "上下の原因を確かめる（行の高さ、入口の格子、箱を伸ばす回の広げ）", realizes: ["R-05"], status: "done", after: ["S-05"], session: "impl"}
 	"S-08": {title: "行の帯を測る検査と、行の帯の上限のテストを書き、修正の前に落ちることを確かめる", realizes: ["R-05", "R-02"], status: "done", after: ["S-07"], session: "impl"}
+	"S-10": {title: "枠の外への遠回りの原因を確かめ、枠の外へ出る線を数える検査を足し、寄せの目指す範囲を枠の中に限り、範囲の広い線分を A* の位置にとどめる", realizes: ["R-06", "R-03", "F-04"], status: "done", after: ["S-09"], session: "impl"}
 	"S-09": {title: "線の多い入口の辺を S おきに置き、箱を伸ばす回は通り道を広げない。寄せの後に近すぎる組の不足を求める", realizes: ["R-05", "R-02", "R-03", "F-02", "F-03"], status: "done", after: ["S-08"], session: "impl"}
 }
 
@@ -20,6 +21,7 @@ tests: {
 	"T-01": {title: "線の多い合成の構造の、すべての表し方で、列の間が上限 max(44, 8n + 12) + 24 以下である（修正の前は落ちる）", verifies: ["R-01", "R-02"]}
 	"T-02": {title: "代表の構造と合成の構造のすべての組み合わせで、線の検査の違反が0である（動かない線分の押されが残らない）", verifies: ["R-03", "F-02", "F-03"]}
 	"T-03": {title: "250件の生成の構造の配線が、どれも1000ms 未満である", verifies: ["R-04"]}
+	"T-05": {title: "代表の構造と合成の構造のすべての組み合わせで frameExits が 0 である（修正の前のコードは spec-dock のスナップショットで落ちる）", verifies: ["R-06", "F-04"]}
 	"T-04": {title: "線の多い合成の構造の、すべての表し方で、行の帯が上限 max(12, 8n + 12) + 24 以下である（修正の前は落ちる）", verifies: ["R-05", "R-02"]}
 }
 
