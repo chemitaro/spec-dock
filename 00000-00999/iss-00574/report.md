@@ -48,6 +48,14 @@ ID: "iss-00574"
 - 結果（[result.json](artifacts/20261105t134404z-03--result.json)）：PC・390px × 明るい・暗いの4通りで、図の点滅は動いている Issue（iss-00003 4／8、iss-00008 計画なし、iss-00012 すべて終わった）と親だけで、止まっている iss-00004（2時間）・iss-00009（1時間）にはない。ボード・概況・人のタスクの点滅は0件。要点と詳しい画面の表紙に「2時間動きなし」。動いている iss-00003 の表紙は点滅し、「動きなし」はない。`prefers-reduced-motion: reduce` で重ねの `animation-name` が `none`、不透明度0。ブラウザーのエラー0件、横のはみ出しなし。
 - 写し：構造の図 [PC 明るい](artifacts/20261105t134401z--pc-light-graph.png)・[PC 暗い](artifacts/20261105t134401z-01--pc-dark-graph.png)・[390 明るい](artifacts/20261105t134401z-02--390-light-graph.png)・[390 暗い](artifacts/20261105t134401z-03--390-dark-graph.png)、要点 [明るい](artifacts/20261105t134402z--pc-light-panel.png)・[暗い](artifacts/20261105t134402z-01--pc-dark-panel.png)、ボード [PC](artifacts/20261105t134402z-02--pc-light-board.png)・[390](artifacts/20261105t134402z-03--390-light-board.png)、概況 [明るい](artifacts/20261105t134402z-04--pc-light-overview.png)・[暗い](artifacts/20261105t134403z--pc-dark-overview.png)、詳しい画面 [動きなし](artifacts/20261105t134403z-01--pc-light-scope-idle.png)・[動いている（暗い）](artifacts/20261105t134403z-02--pc-dark-scope-live.png)、人のタスク [PC](artifacts/20261105t134403z-03--pc-light-todos.png)・[390 暗い](artifacts/20261105t134404z--390-dark-todos.png)、[箱の印の3倍の拡大（上から明るい：消えた・現れた、暗い：消えた・現れた）](artifacts/20261105t134404z-01--zoom-sheet.png)、[縮めた動き](artifacts/20261105t134404z-02--pc-light-graph-reduced-motion.png)。
 
+- 要点の理由の行の印を直した後（`c3d08dedd`）に同じ確かめをやり直し、すべて合格（[result](artifacts/20261105t135030z--result-c3d08dedd.json)）。
+
+### コードのレビュー（code-reviewer opus/high、約束と仕様の2人、範囲 `b290da02a..c050e7bd7`）
+
+- 約束の面：合格。P2 1件（型なしの `plan.cue` の `status` が配列・辞書だと数え上げで例外になり、構造の API が500になる）→ 文字列のときだけ数え、ほかは todo にした（テストを足した）。P3 1件（`parts.js` の冒頭の説明が古い形のまま）→ 直した。
+- 仕様の面：合格（1回目の結果は必須の項目が抜けた機械的な誤りで、同じレビュアーが書き直した）。P2 1件（要点の理由の行の印が外枠だけ）→ `stateMark`（`motion: true`）で描き、静的テストで箱・理由の行・札を確かめるようにした。
+- 直しは `c3d08dedd`。`make lint` の誤り（ruff 5件、整形、mypy 2件）も同じコミットで直した。
+
 ## Residual Risks / Follow-ups
 
 - マージ待ちの列と札は今のまま（accent の青）で、着手できるの深い青と近い。状態ではないので変えていない（枝の印で見分けられる）。
