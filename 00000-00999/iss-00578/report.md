@@ -158,11 +158,15 @@ iss-02253 の高さは 344 → 207、配線の回数は 10（収まらない）�
   `layout.js` に戻すと落ち（3 failed）、修正で通る（23 passed）。
 - コードのレビュー（code-review、code-reviewer sonnet / high、axis both）：`b290da02a..f3c11245a` で合格、指摘 0。
   `.workbench/code-review/iss-00578/round-1.json`。
-- `origin/main`（#574、PR #577）を取り込んだマージ `8c5f01fa4`（衝突なし）。
-- 最終品質ゲート（final-quality-gate、quality-gate-reviewer opus / high、1人）：`8c5f01fa4` で合格。
-  レビュー pass（P0・P1 0、P3 1：この報告の数字の書き誤り 910 → 870。直した）、`make lint` exit 0、
-  `uv run pytest -q -p no:cacheprovider` exit 0（3748 passed、7 skipped、2156 秒）。
-  `.workbench/final-quality-gate/iss-00578/closure.md`。
+- `origin/main` の取り込み：#574（PR #577）を `8c5f01fa4` で、#575（PR #576、`layout.js` の最上位の並べ方）を
+  `3d9bcc54b` で取り込んだ（どちらも衝突なし。取り込んだ後のグラフのテスト 28 件通過）。
+- 最終品質ゲート1回目（`8c5f01fa4`、quality-gate-reviewer opus / high、1人）：合格。レビュー pass（P0・P1 0、P3 1：
+  この報告の数字の書き誤り 910 → 870。直した）、`make lint` exit 0、`uv run pytest -q -p no:cacheprovider` exit 0
+  （3748 passed、7 skipped）。`.workbench/final-quality-gate/iss-00578/closure.md`。
+- 最終品質ゲート2回目（取り込んだ後の `3d9bcc54b`、同じ形）：合格。レビュー pass（P0〜P3 0。出力の形の誤り1回は
+  機械的な失敗として書き直し）、`make lint` exit 0、`uv run pytest -q -p no:cacheprovider` exit 0（3753 passed、
+  7 skipped、1826 秒）。`.workbench/final-quality-gate/iss-00578-2/closure.md`。
+- 写しと数字は、取り込んだ後の `3d9bcc54b` で取り直した（上の節）。
 
 ## Residual Risks / Follow-ups
 
