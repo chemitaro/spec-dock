@@ -26,10 +26,11 @@ function combos(doc) {
       for (const deps of ["wait", "all"])
         for (const fold of [true, false]) list.push({ mode, showDone, deps, fold });
   // iss-00560: the groups wrap at the width seen at 100%: a PC (1400px) and a 390px phone (374px)
-  for (const width of [1400, 374])
+  // iss-00575: and with the view's height too, where the top level wraps where the whole shows largest
+  for (const [width, height] of [[1400], [374], [1400, 760], [1900, 940]])
     for (const showDone of [false, true])
       for (const deps of ["wait", "all"])
-        for (const fold of [true, false]) list.push({ mode: "nest", showDone, deps, fold, width });
+        for (const fold of [true, false]) list.push({ mode: "nest", showDone, deps, fold, width, height });
   for (const s of doc.scopes) if (s.kind !== "issue" && s.state !== "done") list.push({ mode: "nest", showDone: false, deps: "all", fold: true, focus: s.id });
   return list;
 }

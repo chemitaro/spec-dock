@@ -26,9 +26,6 @@ export const SIZE = {
 const BASE = { world: 28, body: 12, wrapRow: 14, wrapCol: 14, cols: 44, col: 12, treeRow: 14, treeIndent: 0 };
 // The width seen at 100% when the page does not say (the node check): the wrap before iss-00556 (iss-00560 F-01).
 export const WRAP_WIDTH = 1240;
-// iss-00575: the widths the top level's Initiatives were narrowed to are kept in the wraps (so the routing's
-// widening cannot change them).
-const SHARES_KEY = "root#shares";
 
 // iss-00556: finished dependencies between what is shown are drawn by default (faint), the waiting ones stand out.
 export const DEFAULTS = { mode: "nest", showDone: false, deps: "all", fold: true, focus: null };
@@ -432,10 +429,6 @@ function shelfBlock(key, items, ctx, avail, rowBase) {
 }
 
 // The children of one parent (null: the top level), placed by the groups their dependencies connect.
-// At the top level (iss-00575) an Initiative that nothing connects may be laid out narrower than the whole width: when
-// it would not fit on the row beside what is already there, it is made again for the room left, if that fits and is
-// not taller than stacking it under the row would make. So the Initiatives share rows where they can. The widths chosen are kept in the wraps, so
-// the routing's widening cannot change them.
 function childrenBlock(parent, kids, ctx, avail) {
   const key = parent ? parent.id : "root";
   const all = parent ? ctx.showsDone(parent) : ctx.opts.showDone;
@@ -443,50 +436,59 @@ function childrenBlock(parent, kids, ctx, avail) {
   const list = kids.slice().sort(act);
   const edges = siblingEdges(list, ctx.ix, all);
   const stage = stagesOf(list, edges);
-  const comps = components(list, edges);
-  const narrowable = (members) => !parent && members.length === 1 && members[0].kind === "initiative" && !folds(members[0], ctx);
-  const make = (shares) => {
-    const items = [];
-    const loose = []; // groups that fold whole: one folded group at the end
-    comps.forEach((members, g) => {
-      if (members.every((s) => folds(s, ctx))) loose.push(...members);
-      else if (members.length === 1) items.push({ block: ctx.node(members[0], shares?.[g] || avail), g, kid: members[0] });
-      else {
-        const inside = new Set(members.map((s) => s.id));
-        const own = edges.filter(([a, b]) => inside.has(a) && inside.has(b));
-        members.sort((a, b) => stage(a) - stage(b) || act(a, b));
-        items.push({ block: gridBlock(`${key}~${g}`, members, own, stage, ctx, avail), g });
-      }
-    });
-    if (loose.length) items.push({ block: chipBlock(`${key}.f`, loose, ctx), g: -1 });
-    return items;
-  };
-  let shares = null;
-  if (!parent) {
-    const fixed = ctx.breaks?.get(SHARES_KEY);
-    if (fixed) shares = Object.fromEntries(fixed.map(([g, w]) => [g, w]));
+  const items = [];
+  const loose = []; // groups that fold whole: one folded group at the end
+  components(list, edges).forEach((members, g) => {
+    if (members.every((s) => folds(s, ctx))) loose.push(...members);
+    else if (members.length === 1) items.push(ctx.node(members[0], avail));
     else {
-      shares = {};
-      let row = { w: 0, h: 0, n: 0 };
-      for (const it of make(null)) {
-        const room = avail - row.w - BASE.wrapCol;
-        if (row.n && row.w + BASE.wrapCol + it.block.w > avail) {
-          const members = comps[it.g];
-          if (it.g >= 0 && narrowable(members) && room >= SIZE.minFrameW.initiative) {
-            const again = ctx.node(it.kid, room);
-            if (again.w <= room && again.h <= row.h + BASE.world + it.block.h) {
-              shares[it.g] = room;
-              it.block = again;
-            }
-          }
-          if (!shares[it.g] && row.w + BASE.wrapCol + it.block.w > avail) row = { w: 0, h: 0, n: 0 };
-        }
-        row = { w: row.n ? row.w + BASE.wrapCol + it.block.w : it.block.w, h: Math.max(row.h, it.block.h), n: row.n + 1 };
-      }
+      const inside = new Set(members.map((s) => s.id));
+      const own = edges.filter(([a, b]) => inside.has(a) && inside.has(b));
+      members.sort((a, b) => stage(a) - stage(b) || act(a, b));
+      items.push(gridBlock(`${key}~${g}`, members, own, stage, ctx, avail));
     }
-    ctx.wraps.set(SHARES_KEY, Object.entries(shares).map(([g, w]) => [Number(g), w]));
+  });
+  if (loose.length) items.push(chipBlock(`${key}.f`, loose, ctx));
+  // iss-00575: the top level wraps where the whole graph shows largest in the view (when it has a height to fit)
+  const room = !parent && !ctx.breaks && ctx.opts.height > 0 ? widestRoom(items, ctx.opts, avail) : avail;
+  return shelfBlock(key, items, ctx, room, parent ? BASE.wrapRow : BASE.world);
+}
+
+// Shelves of the blocks in order, wrapping where one would pass `cap`: the width and the height of the whole.
+function shelved(blocks, cap) {
+  let w = 0;
+  let h = 0;
+  let row = null;
+  for (const b of blocks) {
+    if (!row || (row.n && row.w + BASE.wrapCol + b.w > cap)) {
+      if (row) h += row.h + BASE.world;
+      row = { w: 0, h: 0, n: 0 };
+    }
+    row.w = row.n ? row.w + BASE.wrapCol + b.w : b.w;
+    row.h = Math.max(row.h, b.h);
+    row.n++;
+    w = Math.max(w, row.w);
   }
-  return shelfBlock(key, make(shares).map((it) => it.block), ctx, avail, parent ? BASE.wrapRow : BASE.world);
+  return { w, h: h + (row ? row.h : 0) };
+}
+
+// The width the top level may use (iss-00575 R-01): every cut of the order is a candidate (the widths of the first k
+// blocks side by side); the one whose whole graph shows at the largest zoom in the view wins, as "fit" would zoom
+// (at most 100%). A tie goes to the smaller whole, then to the narrower row. The blocks keep their own widths.
+function widestRoom(blocks, opts, avail) {
+  const seenW = Number(opts.width) > 0 ? Number(opts.width) : WRAP_WIDTH;
+  const seenH = Number(opts.height);
+  if (seenH >= seenW) return avail; // a tall view (a phone) stacks them, as the groups wrap at the width seen
+  const m = 2 * SIZE.margin;
+  let best = null;
+  let run = 0;
+  blocks.forEach((b, k) => {
+    run += (k ? BASE.wrapCol : 0) + b.w;
+    const { w, h } = shelved(blocks, run);
+    const zoom = Math.min(1, seenW / (w + m), seenH / (h + m));
+    if (!best || zoom > best.zoom + 1e-9 || (Math.abs(zoom - best.zoom) <= 1e-9 && w * h < best.area)) best = { zoom, area: w * h, cap: run };
+  });
+  return best ? best.cap : seenW;
 }
 
 function frameBlock(s, kids, ctx, avail) {
@@ -557,8 +559,9 @@ function flatten(block, ox, oy, path, out) {
  * Lay the Scopes out.
  * @param scopes  structure API `scopes`
  * @param cleanup structure API `cleanup` ([{id, code, text}])
- * @param options {mode: "nest"|"tree", showDone, deps: "all"|"wait"|"none", fold, focus, width} — width: the graph's
- *                visible width at 100% (px), where the groups wrap (WRAP_WIDTH when absent)
+ * @param options {mode: "nest"|"tree", showDone, deps: "all"|"wait"|"none", fold, focus, width, height} — width: the graph's
+ *                visible width at 100% (px), where the groups wrap (WRAP_WIDTH when absent); height: its visible
+ *                height (px), with which the top level wraps where the whole shows largest (iss-00575; none: at width)
  * @param gaps    extra pixels per gap key (from earlier routing rounds)
  */
 export function layout(scopes, cleanup, options = {}, gaps = {}) {

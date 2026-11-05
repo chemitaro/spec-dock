@@ -107,7 +107,9 @@ def test_every_way_of_showing_the_representative_structures_draws_clean_lines(re
 
 def test_the_250_scope_structure_routes_within_a_second(representative: dict[str, Any]) -> None:
     runs = [run for run in representative["audit"] if run["name"] == "generated" and not run["opts"].get("focus")]
-    assert len(runs) == 16 + 2 * 8  # and the nested ones at a PC's and a phone's width (iss-00560)
+    assert (
+        len(runs) == 16 + 4 * 8
+    )  # and the nested ones at a PC's and a phone's width (iss-00560), with a height (iss-00575)
     assert max(run["ms"] for run in runs) < 1000
 
 
@@ -352,12 +354,12 @@ def context(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
                 "wide": {"home": {}, "w1240": {"width": 1240}, "w1400": {"width": 1400}, "w374": {"width": 374}},
                 "inits": {
                     "home": {},
-                    "w1400": {"width": 1400},
-                    "w1000": {"width": 1000},
-                    "w374": {"width": 374},
-                    "gapped": {"width": 1400},
+                    "w1400": {"width": 1400, "height": 760},
+                    "w1920": {"width": 1920, "height": 1080},
+                    "w374": {"width": 374, "height": 800},
+                    "gapped": {"width": 1400, "height": 760},
                 },
-                "chain": {"w1400": {"width": 1400}},
+                "chain": {"w1400": {"width": 1400, "height": 760}},
             },
             "gaps": {"inits": {"gapped": {"all.x": 12, "all.y": 12, "wcroot": 30}}},
             "checks": ["layout", "audit"],
@@ -591,14 +593,7 @@ def test_reordering_the_first_stage_removes_the_crossing(rows: dict[str, Any]) -
     assert crossing == []
 
 
-def test_the_graph_lays_out_again_only_when_the_width_changes() -> None:
-    source = (ASSETS / "views" / "graph.js").read_text(encoding="utf-8")
-    assert "width: V.width" in source and "seenWidth()" in source
-    assert "|${seenWidth()}`" in source  # the width is part of what tells a new layout
-    assert "seenWidth() === V.width" in source  # a resize of the height or a zoom keeps the layout
-
-
-# --- iss-00575: the Initiatives sit side by side where they fit ---------------------------------------------------
+# --- iss-00575: the top level wraps where the whole graph shows largest in the view -----------------------------
 
 
 def _frames(context: dict[str, Any], key: str) -> list[dict[str, Any]]:
@@ -606,55 +601,54 @@ def _frames(context: dict[str, Any], key: str) -> list[dict[str, Any]]:
     return [nodes[f"iss-{600 + k * 10 + 2:05d}"] for k in range(4)]  # the first Issue of each Initiative
 
 
-def test_initiatives_sit_side_by_side_at_a_pc_width(context: dict[str, Any]) -> None:
-    """iss-00575 R-01: at 1400px two Initiatives share a row, without overlapping; none passes the width. At 1000px
-    the room left beside one is under the narrowest an Initiative takes, so they stay stacked."""
-    for key, width in (("w1400", 1400), ("w1000", 1000)):
-        firsts = _frames(context, key)
-        rows: dict[float, list[dict[str, Any]]] = {}
-        for item in firsts:
-            rows.setdefault(item["y1"], []).append(item)
-        assert max(len(r) for r in rows.values()) == (2 if width == 1400 else 1), key
-        assert all(item["x2"] <= width - 24 for item in firsts), key
-        for r in rows.values():
-            for a, b in pairwise(sorted(r, key=lambda item: item["x1"])):
-                assert a["x2"] < b["x1"], key
+def _rows(layout: dict[str, Any], prefix: str = "init-") -> list[list[str]]:
+    frames = [n for n in layout["nodes"] if n["type"] == "frame" and n["id"].startswith(prefix)]
+    by_row: dict[float, list[dict[str, Any]]] = {}
+    for frame in frames:
+        by_row.setdefault(frame["y1"], []).append(frame)
+    return [[f["id"] for f in sorted(r, key=lambda f: f["x1"])] for _, r in sorted(by_row.items())]
 
 
-def test_initiatives_stack_in_one_column_at_a_phone_width(context: dict[str, Any]) -> None:
+def test_initiatives_wrap_where_the_whole_shows_largest(context: dict[str, Any]) -> None:
+    """iss-00575 R-01: four alike Initiatives show largest two by two in a wide view (1400x760 and 1920x1080); they
+    keep their own widths, none overlaps, and the order is the activity order."""
+    for key in ("w1400", "w1920"):
+        layout = context["layout"]["inits"][key]
+        assert _rows(layout) == [["init-00600", "init-00610"], ["init-00620", "init-00630"]], key
+        widths = {n["x2"] - n["x1"] for n in layout["nodes"] if n["type"] == "frame" and n["id"].startswith("init-")}
+        assert len(widths) == 1, key  # not narrowed: every Initiative keeps its natural width
+
+
+def test_initiatives_stack_in_a_tall_view(context: dict[str, Any]) -> None:
+    """R-01: a view taller than wide (a phone) keeps one column."""
+    assert _rows(context["layout"]["inits"]["w374"]) == [[f"init-{600 + k * 10:05d}"] for k in range(4)]
     firsts = _frames(context, "w374")
-    assert len({item["y1"] for item in firsts}) == 4
     assert len({item["x1"] for item in firsts}) == 1
 
 
-def test_initiatives_go_left_to_right_in_the_activity_order(context: dict[str, Any]) -> None:
-    """R-02: the reading order (row, then left to right) at a PC's width is the order of the single column."""
-    wide = [i["id"] for i in sorted(_frames(context, "w1400"), key=lambda item: (item["y1"], item["x1"]))]
-    narrow = [i["id"] for i in sorted(_frames(context, "w374"), key=lambda item: item["y1"])]
-    assert wide == narrow
-    assert not [run for run in context["audit"] if run["name"] == "inits" and any(run[key] for key in AUDIT_KEYS)]
+def test_without_a_height_the_top_level_wraps_at_the_width_seen(context: dict[str, Any]) -> None:
+    """The layout of iss-00560 stays when the page gives no height."""
+    assert len(_rows(context["layout"]["inits"]["home"])) == 4
 
 
-def test_a_chain_of_initiatives_keeps_its_row_and_is_not_narrowed(context: dict[str, Any]) -> None:
-    """iss-00575 R-02: what depends on an Initiative sits right of it on its row, at the width it has on its own."""
+def test_a_chain_of_initiatives_is_one_block_on_one_row(context: dict[str, Any]) -> None:
+    """R-02: what depends on an Initiative sits right of it on its row; the cut never falls inside the chain."""
     nodes = {item["id"]: item for item in context["layout"]["chain"]["w1400"]["nodes"]}
     first, second, alone = (nodes[i] for i in ("init-00700", "init-00710", "init-00720"))
     assert first["y1"] == second["y1"] and first["x2"] < second["x1"]
     assert alone["y1"] > first["y2"]
-    assert (first["x2"] - first["x1"]) == (second["x2"] - second["x1"]) == (alone["x2"] - alone["x1"])
-    assert context["layout"]["chain"]["w1400"]["wraps"]["root#shares"] == []
 
 
-def test_the_widths_taken_stay_when_the_routing_widens_the_gaps(context: dict[str, Any]) -> None:
-    """R-03: with gaps added the Initiatives keep the widths they were narrowed to, and the rows they share."""
+def test_the_rows_stay_when_the_routing_widens_the_gaps(context: dict[str, Any]) -> None:
+    """R-03: with gaps added the Initiatives keep the rows they were cut into."""
     plain, gapped = (context["layout"]["inits"][k] for k in ("w1400", "gapped"))
-    assert plain["wraps"]["root#shares"] == gapped["wraps"]["root#shares"] != []
+    assert _rows(plain) == _rows(gapped)
+    assert len(_rows(plain)) == 2
 
-    def rows(layout: dict[str, Any]) -> list[list[str]]:
-        frames = [n for n in layout["nodes"] if n["type"] == "frame" and n["id"].startswith("init-")]
-        by_row: dict[float, list[dict[str, Any]]] = {}
-        for frame in frames:
-            by_row.setdefault(frame["y1"], []).append(frame)
-        return [[f["id"] for f in sorted(r, key=lambda f: f["x1"])] for _, r in sorted(by_row.items())]
 
-    assert rows(plain) == rows(gapped)
+def test_the_graph_lays_out_again_when_the_room_it_is_seen_in_changes() -> None:
+    source = (ASSETS / "views" / "graph.js").read_text(encoding="utf-8")
+    assert "width: V.width, height: V.height" in source and "seenWidth()" in source and "seenHeight()" in source
+    assert "|${seenWidth()}|${seenHeight()}`" in source  # the width and the height tell a new layout
+    assert "seenWidth() === V.width && seenHeight() === V.height" in source  # a zoom keeps the layout
+    assert "setTimeout(relayout, RESIZE_SETTLE)" in source  # once the resizing has stopped
