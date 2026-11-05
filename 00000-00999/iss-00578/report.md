@@ -37,8 +37,9 @@ ID: "iss-00578"
 ## 数字の取り方
 
 - 「直す前」は `origin/main`（`16b54a1da`。#576 の最上位の並べ方と #577 を含む）の `router.js`／`layout.js`、
-  「直した後」はこの枝の `3d9bcc54b`（`origin/main` を取り込んだ後）。どちらもページと同じく、見える幅と高さ
-  （ウィンドウ 1440×900 → 1424×743、1000×800 → 984×643、390×844 → 374×581。headless Chrome で測った `.gx-view` − 16）を渡す。
+  「直した後」はこの枝の最終の `a74637053`（`origin/main` を取り込み、枠の外への遠回りを直した後）。どちらもページと
+  同じく、見える幅と高さ（ウィンドウ 1440×900 → 1424×743、1000×800 → 984×643、390×844 → 374×581。headless Chrome で
+  測った `.gx-view` − 16）を渡す。
 - データ：taikyohiyou は動いているサーバーの構造（`fetched_at` 2026-11-05T15:50:39Z、iss-02284 を含む。利用者の写しと
   同じ形）、spec-dock は同じサーバーの構造（15:12）、合成の構造は `many_lines()`。
 - 「超え」は 幅 − max(基本, 8n + 12)。基本は列が 44、行が 12。n は列の間を縦に通る線の位置の数、または行の帯を
@@ -49,62 +50,63 @@ ID: "iss-00578"
 
 | 幅 | 帯 | 直す前（main） | 直した後 |
 |---|---|---|---|
-| 1440 | iss-02252 → iss-02251 | **388**（横の線 14、要る幅 124） | 103（13、116） |
-| 1440 | iss-02238 → iss-02248 | **356**（12、108） | 71（9、84） |
-| 1440 | iss-02251 → iss-02236 | 138（2、28） | 34（1、20） |
-| 1000 | iss-02252 → iss-02251 | **263**（14、124） | 116（12、108） |
-| 1000 | iss-02238 → iss-02248 | **231**（12、108） | 84（8、76） |
-| 390 | iss-02252 → iss-02251 | **287**（14、124） | 103（11、100） |
-| 390 | iss-02238 → iss-02248 | **255**（12、108） | 71（7、68） |
+| 1440 | iss-02252 → iss-02251 | **388**（横の線 14、要る幅 124） | 106（13、116） |
+| 1440 | iss-02238 → iss-02248 | **356**（12、108） | 74（9、84） |
+| 1440 | iss-02251 → iss-02236 | 138（2、28） | 37（1、20） |
+| 1000 | iss-02252 → iss-02251 | **263**（14、124） | 106（14、124） |
+| 1000 | iss-02238 → iss-02248 | **231**（12、108） | 74（10、92） |
+| 390 | iss-02252 → iss-02251 | **287**（14、124） | 106（13、116） |
+| 390 | iss-02238 → iss-02248 | **255**（12、108） | 74（9、84） |
 
-iss-02253 の高さは 344 → 207、配線の回数は 10（収まらない）→ 4〜5。
+iss-02253 の高さは 344 → 207、配線の回数は 10（収まらない）→ 4〜6。
 
 ## 列の間（直す前と後）
 
 | 構造・表し方 | 直す前：最大の超え（幅 / n） | 直した後 | 回数 前 → 後 | 時間 前 → 後 |
 |---|---|---|---|---|
-| taikyohiyou、1440 | **1112**（1188 / 8、epic-02233） | 10（62 / 5） | 10 → 4 | 200 → 102ms |
-| taikyohiyou、1000 | **170**（270 / 11） | 16（84 / 7） | 10 → 5 | 113 → 79ms |
-| taikyohiyou、390 | **230**（338 / 12） | 14（66 / 5） | 10 → 4 | 118 → 64ms |
-| taikyohiyou、1440、終わったものも | **884**（968 / 9、epic-01860） | 18（70 / 5） | 10 → 6 | 1298 → 903ms |
-| taikyohiyou、1440、畳まない | **640**（716 / 8） | 16（76 / 6） | 10 → 4 | 94 → 50ms |
-| spec-dock、1440 | **446**（490 / 1、epic-00158） | 0 | 1 → 2 | 17 → 22ms |
+| taikyohiyou、1440 | **1112**（1188 / 8、epic-02233） | 36（96 / 6） | 10 → 4 | 200 → 126ms |
+| taikyohiyou、1000 | **170**（270 / 11） | 18（102 / 9） | 10 → 6 | 113 → 83ms |
+| taikyohiyou、390 | **230**（338 / 12） | 9（77 / 7） | 10 → 4 | 118 → 64ms |
+| taikyohiyou、1440、終わったものも | **884**（968 / 9、epic-01860） | 26（70 / 0） | 10 → 10 | 1298 → 1253ms |
+| taikyohiyou、1440、畳まない | **640**（716 / 8） | 36（96 / 6） | 10 → 3 | 94 → 42ms |
+| spec-dock、1440 | **446**（490 / 1、epic-00158） | 0 | 1 → 2 | 17 → 21ms |
 | spec-dock、1000 | 0 | 0 | 1 → 1 | 8 → 8ms |
 | spec-dock、390 | 0 | 0 | 0 → 0 | 3 → 3ms |
-| spec-dock、1440、終わったものも | **457**（501 / 1） | 2（54 / 5） | 10 → 4 | 425 → 199ms |
+| spec-dock、1440、終わったものも | **457**（501 / 1） | 10（54 / 4） | 10 → 4 | 425 → 213ms |
 
 ## 全組み合わせ（検査 `passages` と線の検査）
 
-| 構造 | 列：最大の超え 前 → 後 | 行の帯：前 → 後 | 線の検査の違反のある組み合わせ 前 → 後 | 配線の時間の合計 前 → 後 |
+| 構造 | 列：最大の超え 前 → 後 | 行の帯：前 → 後 | 近すぎる車線のある組み合わせ（本数の合計） 前 → 後 | 配線の時間の合計 前 → 後 |
 |---|---|---|---|---|
-| taikyohiyou（65 通り） | 2808 → 36 | 748（線 29） → 608（線 0） | 14 → 10 | 24.1 → 22.6 秒 |
-| spec-dock（71 通り） | 906 → 14 | 706（線 0） → 706（線 0） | 0 → 0 | 4.2 → 3.4 秒 |
-| 合成の構造（50 通り） | 870 → 10 | 151（線 15） → 10 | 26 → 0 | 2.6 → 1.6 秒 |
+| taikyohiyou（65 通り） | 2808 → 56 | 748（線 29） → 608（線 0） | 14（35） → 9（11） | 23.2 → 22.5 秒 |
+| spec-dock（71 通り） | 906 → 22 | 706（線 0） → 706（線 0） | 0 → 0 | 4.1 → 3.0 秒 |
+| 合成の構造（50 通り） | 870 → 10 | 151（線 15） → 2 | 26（34） → 0 | 2.5 → 1.1 秒 |
 
 - 行の帯の後に残る 608／706 は線の通らない帯（Initiative の格子で、同じ行の高い Epic の枠に合わせて行が高くなる）で、
-  行をそろえる配置の決まりによる（この Issue の対象外。decisions）。
-- taikyohiyou に残る線の検査の違反は、どれも直す前からある、終わったものも出す表し方などの近すぎる車線（1〜3 本）。
-- いちばん遅いのは、直す前からツリーの終わったものも出す表し方（346 本、10 回で収まらない）で 4.2 → 4.8 秒。
+  行をそろえる配置の決まりによる（この Issue の対象外。decisions）。列の後に残る 56（100 / 0）も、線の通らない列の間。
+- taikyohiyou に残る近すぎる車線は、どれも直す前からある、終わったものも出す表し方などのもの（1〜3 本）。
+- いちばん遅いのは、直す前からツリーの終わったものも出す表し方（346 本、10 回で収まらない）で、4〜5 秒。
+- 枠の外へ出る線（frameExits）は、下の「枠の外への遠回り」の節。
 
 ## 写し（ダーク、headless Chrome、`spec-dock dashboard serve --port 18578 --offline`）
 
 状態の置き場は `~/.local/state/spec-dock/` の写し（`.workbench/iss-00578/browser/state`、taikyohiyou のスナップショット
 `fetched_at` 2026-11-05T16:04:42Z）。直す前は `origin/main` の `router.js`／`layout.js` を一時的に置いて撮り、直した後は
-`3d9bcc54b` の資産で撮った（編集可能な開発の環境の `uv run spec-dock` が `src/` を配る）。「前」「後」はウィンドウの
+`a74637053` の資産で撮った（編集可能な開発の環境の `uv run spec-dock` が `src/` を配る）。「前」「後」はウィンドウの
 写し。「枠」は epic-02233 の枠の切り抜きで、枠が入るまで画面の高さだけを伸ばし（#575 から、高さで最上位の並びが
 変わるので、最上位の並びはウィンドウの写しと違う。Epic の中の配置は幅だけで決まる）、図を CSS の `translate` で
 左へずらして撮った（配置は変えない）。画面の幅で切れる。
 
 | 幅 | taikyohiyou 直す前 | taikyohiyou 直した後 | spec-dock 直す前 | spec-dock 直した後 |
 |---|---|---|---|---|
-| 1440 | [前](artifacts/20261105t165717z-01--graph-before-taikyohiyou-project-1440.png)・[枠](artifacts/20261105t165717z--graph-before-taikyohiyou-project-1440-epic-02233.png) | [後](artifacts/20261105t165715z--graph-after-taikyohiyou-project-1440.png)・[枠](artifacts/20261105t165714z-03--graph-after-taikyohiyou-project-1440-epic-02233.png) | [前](artifacts/20261105t165716z--graph-before-spec-dock-1440.png) | [後](artifacts/20261105t165713z-01--graph-after-spec-dock-1440.png) |
-| 1000 | [前](artifacts/20261105t165716z-03--graph-before-taikyohiyou-project-1000.png)・[枠](artifacts/20261105t165716z-02--graph-before-taikyohiyou-project-1000-epic-02233.png) | [後](artifacts/20261105t165714z-02--graph-after-taikyohiyou-project-1000.png)・[枠](artifacts/20261105t165714z-01--graph-after-taikyohiyou-project-1000-epic-02233.png) | [前](artifacts/20261105t165715z-03--graph-before-spec-dock-1000.png) | [後](artifacts/20261105t165713z--graph-after-spec-dock-1000.png) |
-| 390 | [前](artifacts/20261105t165717z-03--graph-before-taikyohiyou-project-390.png)・[枠](artifacts/20261105t165717z-02--graph-before-taikyohiyou-project-390-epic-02233.png) | [後](artifacts/20261105t165715z-02--graph-after-taikyohiyou-project-390.png)・[枠](artifacts/20261105t165715z-01--graph-after-taikyohiyou-project-390-epic-02233.png) | [前](artifacts/20261105t165716z-01--graph-before-spec-dock-390.png) | [後](artifacts/20261105t165714z--graph-after-spec-dock-390.png) |
+| 1440 | [前](artifacts/20261105t184550z-01--graph-before-taikyohiyou-project-1440.png)・[枠](artifacts/20261105t184550z--graph-before-taikyohiyou-project-1440-epic-02233.png) | [後](artifacts/20261105t184548z-01--graph-after-taikyohiyou-project-1440.png)・[枠](artifacts/20261105t184548z--graph-after-taikyohiyou-project-1440-epic-02233.png) | [前](artifacts/20261105t184549z--graph-before-spec-dock-1440.png) | [後](artifacts/20261105t184547z--graph-after-spec-dock-1440.png) |
+| 1000 | [前](artifacts/20261105t184549z-03--graph-before-taikyohiyou-project-1000.png)・[枠](artifacts/20261105t184549z-02--graph-before-taikyohiyou-project-1000-epic-02233.png) | [後](artifacts/20261105t184547z-03--graph-after-taikyohiyou-project-1000.png)・[枠](artifacts/20261105t184547z-02--graph-after-taikyohiyou-project-1000-epic-02233.png) | [前](artifacts/20261105t184548z-04--graph-before-spec-dock-1000.png) | [後](artifacts/20261105t184546z--graph-after-spec-dock-1000.png) |
+| 390 | [前](artifacts/20261105t184550z-03--graph-before-taikyohiyou-project-390.png)・[枠](artifacts/20261105t184550z-02--graph-before-taikyohiyou-project-390-epic-02233.png) | [後](artifacts/20261105t184548z-03--graph-after-taikyohiyou-project-390.png)・[枠](artifacts/20261105t184548z-02--graph-after-taikyohiyou-project-390-epic-02233.png) | [前](artifacts/20261105t184549z-01--graph-before-spec-dock-390.png) | [後](artifacts/20261105t184547z-01--graph-after-spec-dock-390.png) |
 
 ## 合成の構造（テスト）
 
 `many_lines()` の組み合わせで、直す前の最大の超えは列 870（954 / 9）、行の帯 151（283 / 15）、直した後は列 10、
-行の帯 10。線の検査の違反は、直す前 26 組み合わせ（もとからの近すぎる車線。木の表し方も含む）、直した後 0。
+行の帯 2。線の検査の違反は、直す前 26 組み合わせ（もとからの近すぎる車線。木の表し方も含む）、直した後 0。
 テストの上限の余白は 24（3車線分）。
 
 ## 枠の外への遠回り（PR #579 の確認、R-06）
@@ -136,7 +138,7 @@ iss-02253 の高さは 344 → 207、配線の回数は 10（収まらない）�
 | spec-dock スナップショット（テスト、71 通り） | 6 → 5 → **0** | 0 → 0 → 0 |
 | 合成の構造（50 通り） | 0 → 0 → 0 | 34 → 0 → 0 |
 
-taikyohiyou 17:44 の近すぎる車線は 7 → 12 に増えた（どれも終わったものも出す表し方で 1 本ずつ、または木の表し方）。
+taikyohiyou 17:44 の近すぎる車線の合計は 7 → 12 に増えた（増えた分は、終わったものも出す表し方の組み合わせ）。
 26px までのはみ出し（枠の下の余白に車線が入りきらないもの。spec-dock の実データで最大 22px）は数えない（F-04）。
 
 ## 原因の調べ（S-01）
@@ -198,8 +200,12 @@ taikyohiyou 17:44 の近すぎる車線は 7 → 12 に増えた（どれも終�
 - 最終品質ゲート2回目（取り込んだ後の `3d9bcc54b`、同じ形）：合格。レビュー pass（P0〜P3 0。出力の形の誤り1回は
   機械的な失敗として書き直し）、`make lint` exit 0、`uv run pytest -q -p no:cacheprovider` exit 0（3753 passed、
   7 skipped、1826 秒）。`.workbench/final-quality-gate/iss-00578-2/closure.md`。
-- 写しと数字は、取り込んだ後の `3d9bcc54b` で取り直した（上の節）。
-- PR：https://github.com/chemitaro/spec-dock/pull/579（head `3d9bcc54b`、base main）。CI（Provider CI、SpecDock check、
+- 最終品質ゲート3回目（枠の外への遠回りを直した `a74637053`）：合格。レビュー pass（P0・P1 0、P2 1：この報告の
+  数字と写しが前のコミットのもの、P3 1：`fineEntries` の名前の残り。どちらも直した）、`make lint` exit 0、
+  `uv run pytest -q -p no:cacheprovider` exit 0（3753 passed、7 skipped、1861 秒）。
+  `.workbench/final-quality-gate/iss-00578-3/closure.md`。
+- 写しと数字は、最終の `a74637053` で取り直した（上の節）。
+- PR：https://github.com/chemitaro/spec-dock/pull/579（head `a74637053`、base main）。CI（Provider CI、SpecDock check、
   Commit identity）は合格、GitHub はマージできる状態（2026-11-05T17:43:36Z の観測。Actions と Commit Status の範囲）。
   マージと `work finish` は統括と利用者が行う。
 
