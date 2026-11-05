@@ -492,3 +492,26 @@ def test_reading_everything_writes_nothing_but_seen(env: Env) -> None:
     ):
         assert env.get(path).status == 200, path
     assert tree() == before
+
+
+# --- iss-00572: the mark, and the table-of-contents ground of a document ---------------------------------------
+
+
+def test_favicon_is_the_mark_and_the_shell_points_at_it(env: Env) -> None:
+    for path in ("/favicon.ico", "/assets/favicon.svg"):
+        response = env.get(path)
+        assert response.status == 200 and response.header("content-type") == "image/svg+xml", path
+        assert response.body.startswith(b"<svg")
+    assert b'<link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">' in env.get("/").body
+    assert env.get("/favicon.ico/x").status == 404
+
+
+def test_a_document_page_lays_the_toc_ground_over_the_whole_column(env: Env) -> None:
+    directory = scope_dir(env.r, "iss-00002")
+    (directory / "report.md").write_text("# Report\n\nbody\n", encoding="utf-8")
+    response = env.get("/r/github.com/o/r/scopes/iss-00002/doc/report.md")
+    assert response.status == 200
+    page = response.body.decode("utf-8")
+    assert page.count('<style id="sd-toc-ground">') == 1
+    assert page.index('id="sd-toc-ground"') < page.index("</head>")
+    assert "min-width: 1180px" in page and ".ds-layout { background: linear-gradient(" in page

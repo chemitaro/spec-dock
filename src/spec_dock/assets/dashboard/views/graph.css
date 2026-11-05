@@ -216,6 +216,9 @@
 
 @container app (max-width: 640px) {
   .gx .gx-bar { display: contents; }
+  /* iss-00572: the graph starts under the band of marks, which has its own ground, so no frame line shows below it */
+  .gx { background: var(--ds-bg-2); }
+  .gx .gx-view { top: 46px; border-top: 1px solid var(--ds-border); }
   .gx .gx-bar .gx-next { position: absolute; z-index: 10; top: 8px; left: 8px; right: 8px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
   .gx .nx { height: 30px; padding: 0 9px 0 7px; font-size: 12px; }
   .gx .nx span.lab, .gx .nx-grp__lab .lab { display: none; }

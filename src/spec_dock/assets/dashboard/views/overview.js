@@ -84,6 +84,8 @@ function repoCard(item, ctx) {
     ? `<span class="sd-ov__time"${stale ? ' data-state="stale"' : ""} title="GitHub から構造を取得した時刻：${esc(snapshot.fetched_at)}">${esc(ago(age))}に取得</span>`
     : `<span class="sd-ov__time" data-state="stale">取得なし</span>`;
   let body = "";
+  // iss-00572: a repository whose structure was read but holds no Scope says so (not a head with nothing under it)
+  if (structure && !scopes.length) body = `<p class="sd-muted sd-ov__none">Scope はまだありません</p>`;
   if (scopes.length) {
     const issues = scopes.filter((scope) => scope.kind === "issue");
     const lane = (name) => issues.filter((scope) => scope.lane === name).sort(byRank);

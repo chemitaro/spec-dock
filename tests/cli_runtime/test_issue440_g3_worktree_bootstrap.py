@@ -154,16 +154,18 @@ def test_bootstrap_timeout_keeps_applied_project_files_and_stops_its_child_group
 ) -> None:
     root, other = pair
     (other / "Makefile").write_text(
-        "init:\n\t@printf 'partial effect' > before-timeout\n\t@sleep 0.5; touch after-timeout\n", encoding="utf-8"
+        "init:\n\t@printf 'partial effect' > before-timeout\n\t@sleep 2; touch after-timeout\n", encoding="utf-8"
     )
-    code, result = _bootstrap(capsys, root, other, "--yes", "--timeout", "0.1")
+    # iss-00572: the timeout also bounds native Git preflight, so 0.1s expired before the hook started on a loaded PC.
+    # 1.0s leaves room for that, and the hook still outlasts it.
+    code, result = _bootstrap(capsys, root, other, "--yes", "--timeout", "1.0")
     assert code == 6, result
     assert (other / "before-timeout").read_bytes() == b"partial effect"
     assert result["data"]["result"]["observed"]["started"] is True
     assert result["data"]["result"]["observed"]["timed_out"] is True
     assert result["effects"] == [{"kind": "worktree-bootstrap", "status": "unknown", "target": str(other)}]
     assert result["recovery"]["can_resume"] is False and result["recovery"]["can_rollback"] is False
-    time.sleep(0.7)
+    time.sleep(1.5)
     assert not (other / "after-timeout").exists() and not (root / ".git/spec-dock").exists()
 
 

@@ -36,9 +36,18 @@ function combos(doc) {
 }
 
 function check(name, doc, opts) {
-  const t0 = performance.now();
-  const r = routeLayout(doc.scopes, doc.cleanup, opts);
-  const ms = performance.now() - t0;
+  // iss-00572: the time is the CPU time of this process (not the wall clock, which a loaded PC stretches), and the least of
+  // three runs of the asserted ones (the routing is deterministic, so the runs differ only by what the machine did meanwhile).
+  let r;
+  let ms = Infinity;
+  // only the runs whose time is asserted (the 250-Scope structure without a focus) are repeated
+  const repeats = name === "generated" && !opts.focus ? 3 : 1;
+  for (let i = 0; i < repeats; i++) {
+    const c0 = process.cpuUsage();
+    r = routeLayout(doc.scopes, doc.cleanup, opts);
+    const c = process.cpuUsage(c0);
+    ms = Math.min(ms, (c.user + c.system) / 1000);
+  }
   const res = audit(
     r.routes.map((rt) => ({ pts: rt.pts, failed: rt.failed, ka: r.G.obs[r.G.edges[rt.ei].a].key, kz: r.G.obs[r.G.edges[rt.ei].z].key })),
     r.G.obs,

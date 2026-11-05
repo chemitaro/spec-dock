@@ -41,7 +41,7 @@ def _run(tmp_path: Path, request: dict[str, Any]) -> dict[str, Any]:
     path = tmp_path / "request.json"
     path.write_text(json.dumps(request), encoding="utf-8")
     result = subprocess.run(
-        [_node(), str(CHECK), str(ASSETS), str(path)], capture_output=True, text=True, timeout=300, check=False
+        [_node(), str(CHECK), str(ASSETS), str(path)], capture_output=True, text=True, timeout=1800, check=False
     )
     assert result.returncode == 0, result.stderr
     return json.loads(result.stdout)
@@ -108,6 +108,7 @@ def test_every_way_of_showing_the_representative_structures_draws_clean_lines(re
 
 
 def test_the_250_scope_structure_routes_within_a_second(representative: dict[str, Any]) -> None:
+    # iss-00572: "ms" is the node process's CPU time, the least of three runs, so a loaded PC does not stretch it.
     runs = [run for run in representative["audit"] if run["name"] == "generated" and not run["opts"].get("focus")]
     assert (
         len(runs) == 16 + 4 * 8
