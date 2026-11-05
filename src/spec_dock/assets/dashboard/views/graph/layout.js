@@ -8,7 +8,7 @@
 // group is a grid of stages (left to right) and rows, where what follows sits on the row of what it follows; the
 // groups go left to right in the activity order (iss-00556 D-03) and wrap at the width seen at 100%, never inside a
 // group.
-import { audit, portSpan, route } from "./router.js";
+import { audit, portNeed, route } from "./router.js";
 
 export const SIZE = {
   boxW: 178,
@@ -688,7 +688,9 @@ export function graphInput(L) {
     .filter((n) => n.type === "frame")
     .map((n) => ({ x1: n.x1, y1: n.y1, x2: n.x2, y2: n.y2, cls: n.kind === "initiative" ? "ini" : n.state === "done" ? "done" : "epic", id: n.id }));
   const edges = L.edges.map((e) => ({ a: at.get(e.a), z: at.get(e.z), done: e.done, pairs: e.pairs }));
-  return { obs, frames, edges, bounds: { x1: 0, y1: 0, x2: L.width, y2: L.height } };
+  // nested: in the nested layout a crowded entry side takes a port every lane (a tall box widens its whole row) and a run
+  // through empty space keeps its routed place (iss-00578)
+  return { obs, frames, edges, bounds: { x1: 0, y1: 0, x2: L.width, y2: L.height }, nested: !tree };
 }
 
 /**
@@ -729,22 +731,11 @@ export function gapFor(G, axis, a, b, tree = false) {
   return [...new Set([own(pa, true), own(pb, false)].filter(Boolean))];
 }
 
-// Sides whose lines would sit closer than a lane: how much taller the box or the frame's heading must be.
+// Sides whose lines would sit closer than a lane: how much taller the box or the frame's heading must be (the router
+// counts the ports a side can take; a crowded entry side takes one every lane, iss-00578).
 function portRoom(G) {
-  const count = new Map();
-  for (const e of G.edges) {
-    count.set(`${e.a}R`, (count.get(`${e.a}R`) || 0) + 1);
-    count.set(`${e.z}L`, (count.get(`${e.z}L`) || 0) + 1);
-  }
   const add = {};
-  for (const [side, k] of count) {
-    const o = G.obs[parseInt(side, 10)];
-    const need = portSpan(k) - (o.p2 - o.p1);
-    if (k > 1 && need > 0.5 && !o.lane) {
-      const key = `grow:${o.key}`;
-      add[key] = Math.max(add[key] || 0, Math.ceil(need));
-    }
-  }
+  for (const [i, need] of portNeed(G)) add[`grow:${G.obs[i].key}`] = need;
   return add;
 }
 
@@ -783,7 +774,10 @@ export function routeLayout(scopes, cleanup, options = {}, start = {}) {
       break;
     }
     const now = new Set();
-    for (const w of res.widen) {
+    // A round whose sides lack ports routed lines from squeezed ends: grow the boxes first and judge the channels in the
+    // next round (iss-00578: widening from such a round stays and leaves a gap wider than the lines that pass).
+    const growing = Object.keys(add).length > 0;
+    for (const w of growing ? [] : res.widen) {
       const sig = `${w.axis}|${G.obs[w.oa]?.key ?? w.oa}|${G.obs[w.ob]?.key ?? w.ob}`;
       now.add(sig);
       let keys = gapFor(G, w.axis, w.oa, w.ob, L.opts.mode === "tree");
