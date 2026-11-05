@@ -7,6 +7,8 @@
 
 .gx .st-ico { width: 15px; height: 15px; flex: none; color: var(--st); }
 .gx .st-ico .on { stroke: var(--ds-bg); fill: none; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+/* 作業中の輪は、箱と枠の頭で少し大きく描き、区切りと点滅を読めるようにする（iss-00574 R-05） */
+.gx :is(.gx-r1, .gx-fh) > .st-ico[data-st="doing"] { width: 19px; height: 19px; margin: -2px 0; }
 .gx .as { display: inline-flex; align-items: flex-end; gap: 1.5px; height: 11px; }
 .gx .as i { width: 3px; border-radius: 1px; background: var(--ds-surface-3); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ds-border-2) 45%, transparent); }
 .gx .as i:nth-child(1) { height: 4px; } .gx .as i:nth-child(2) { height: 6.5px; } .gx .as i:nth-child(3) { height: 9px; } .gx .as i:nth-child(4) { height: 11px; }

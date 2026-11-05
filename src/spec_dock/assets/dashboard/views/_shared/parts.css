@@ -27,11 +27,15 @@
   /* the state tones (iss-00574 D-02): blocked is yellow, unknown purple */
   & .sd-badge[data-tone="blocked"] { --tone-bg: var(--sd-blocked-bg); --tone-line: var(--sd-blocked-line); --tone-ink: var(--sd-blocked-ink); }
   & .sd-badge[data-tone="unknown"] { --tone-bg: var(--sd-unknown-bg); --tone-line: var(--sd-unknown-line); --tone-ink: var(--sd-unknown-ink); }
+  & .sd-badge[data-tone="doing"] { --tone-bg: var(--sd-doing-bg); --tone-line: var(--sd-doing-line); --tone-ink: var(--sd-doing-ink); }
+  & .sd-badge[data-tone="ready"] { --tone-bg: var(--sd-ready-bg); --tone-line: var(--sd-ready-line); --tone-ink: var(--sd-ready-ink); }
   & .sd-callout { --tone: var(--ds-note); --tone-bg: var(--ds-note-bg); --tone-line: var(--ds-note-line); --tone-ink: var(--ds-note-ink); display: flex; gap: 10px; align-items: flex-start; margin: 0 0 12px; padding: 10px 14px; border: 1px solid var(--tone-line); border-left: 4px solid var(--tone); border-radius: var(--ds-radius); background: var(--tone-bg); font-size: 13px; }
   & .sd-callout[data-tone="warning"] { --tone: var(--ds-warn); --tone-bg: var(--ds-warn-bg); --tone-line: var(--ds-warn-line); --tone-ink: var(--ds-warn-ink); }
   & .sd-callout[data-tone="danger"] { --tone: var(--ds-danger); --tone-bg: var(--ds-danger-bg); --tone-line: var(--ds-danger-line); --tone-ink: var(--ds-danger-ink); }
   & .sd-callout[data-tone="blocked"] { --tone: var(--sd-blocked); --tone-bg: var(--sd-blocked-bg); --tone-line: var(--sd-blocked-line); --tone-ink: var(--sd-blocked-ink); }
   & .sd-callout[data-tone="unknown"] { --tone: var(--sd-unknown); --tone-bg: var(--sd-unknown-bg); --tone-line: var(--sd-unknown-line); --tone-ink: var(--sd-unknown-ink); }
+  & .sd-callout[data-tone="doing"] { --tone: var(--sd-doing); --tone-bg: var(--sd-doing-bg); --tone-line: var(--sd-doing-line); --tone-ink: var(--sd-doing-ink); }
+  & .sd-callout[data-tone="ready"] { --tone: var(--sd-ready); --tone-bg: var(--sd-ready-bg); --tone-line: var(--sd-ready-line); --tone-ink: var(--sd-ready-ink); }
   & .sd-callout > .ds-icon, & .sd-callout > .st-ico { flex: none; margin-top: .2em; color: var(--tone); font-size: 17px; width: 17px; height: 17px; }
   & .sd-callout > .st-ico { color: var(--st, var(--tone)); }
   & .sd-callout p { margin: 0; min-width: 0; color: var(--ds-text-2); }

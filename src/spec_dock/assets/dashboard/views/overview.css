@@ -23,6 +23,7 @@
   & .sd-ov__sec h3 .ds-icon { color: var(--ds-accent); font-size: 13px; }
   & .sd-ov__sec ul { list-style: none; margin: 0; padding: 0 0 0 4px; border-left: 3px solid var(--st-line); min-width: 0; }
   & .sd-ov__sec li { padding: 2px 0 2px 8px; font-size: 13.5px; font-weight: 650; line-height: 1.5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  & .sd-ov__sec li .st-ico { width: 14px; height: 14px; margin-right: 5px; vertical-align: -2px; } /* iss-00574: the ring of an Issue in progress */
   & .sd-ov__sec li small { color: var(--ds-faint); font-family: var(--ds-font-mono); font-size: 11px; margin-right: 6px; font-weight: 600; }
   & .sd-ov__sec .sd-none { color: var(--ds-faint); font-weight: 500; font-size: 12.5px; }
   & .sd-ov__counts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding-top: 10px; border-top: 1px solid var(--ds-border); }

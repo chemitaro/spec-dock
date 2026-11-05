@@ -136,7 +136,10 @@ def test_blocking_marks_are_yellow_not_danger() -> None:
 def test_reduced_motion_hides_only_the_blinking_overlay() -> None:
     assert re.search(r'\.st-ico\[data-live="1"\] \.sd-nx \{[^}]*animation: sd-next', APP_CSS)
     reduced = re.findall(r"@media \(prefers-reduced-motion: reduce\) \{(.*?)\n\}", APP_CSS, re.S)
-    assert any(re.search(r"\.st-ico \.sd-nx \{[^}]*animation: none[^}]*opacity: 0", block) for block in reduced)
+    # the reduced rule must win over the blinking rule: the same selector (an attribute selector raises it)
+    assert any(
+        re.search(r'\.st-ico\[data-live="1"\] \.sd-nx[^{]*\{[^}]*animation: none[^}]*opacity: 0', block) for block in reduced
+    )
 
 
 def test_list_screens_never_ask_for_motion_and_every_screen_draws_with_state_mark() -> None:
@@ -222,7 +225,7 @@ def test_the_ring_shows_the_plan_steps(tmp_path: Path) -> None:
         segments = _segments(cases[key])
         assert len(segments) == total, key
         assert [cls for cls, _ in segments] == ["f"] * done + ["t"] * (total - done), key
-        assert all(width == (3.2 if cls == "f" else 2) for cls, width in segments), key
+        assert all(width == (3.6 if cls == "f" else 1.4) for cls, width in segments), key
         assert "sd-nx" not in cases[key]
     # more than 12 steps: a track circle and one arc of the done part
     assert len(_segments(cases["e"])) == 1 and 'class="t"' in cases["e"] and "<circle" in cases["e"]
@@ -230,10 +233,10 @@ def test_the_ring_shows_the_plan_steps(tmp_path: Path) -> None:
     for key in ("f", "g"):
         assert "<path" not in cases[key] and cases[key].count("<circle") == 1
     live = out["live"]
-    assert _segments(live["b"])[-1] == ("sd-nx f", 3.2) and len(_segments(live["b"])) == 9
+    assert _segments(live["b"])[-1] == ("sd-nx f", 3.6) and len(_segments(live["b"])) == 9
     assert re.search(r'<circle class="sd-nx"[^>]*r="3"', live["c"])  # all done: the center dot blinks
     assert "sd-nx" in live["e"]
-    assert re.search(r'<circle class="sd-nx"[^>]*stroke-width="3.2"', live["f"])  # an overlay, not the outline
+    assert re.search(r'<circle class="sd-nx"[^>]*stroke-width="3.6"', live["f"])  # an overlay, not the outline
     assert 'aria-label="作業中（手順 4／8 終わった）"' in out["label"]
     assert 'aria-label="作業中（配下 2／5 終わった）"' in out["epic"]
 

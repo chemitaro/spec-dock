@@ -54,7 +54,7 @@ export const ic = (name, cls = "") =>
   `<svg class="ds-icon${cls ? " " + cls : ""}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${ICONS[name] || ""}</svg>`;
 
 // The progress ring of a Scope in progress (iss-00574 D-03): one segment per plan step (dropped ones left out), the
-// done ones thick in the state color, the rest thin in the track color; past 12 steps one arc of the done part; with
+// done ones thick (3.6) in the state color, the rest thin (1.4) in the track color, so they differ by width too; past 12 steps one arc of the done part; with
 // no steps the outline only. `live` adds the one overlay that blinks (`.sd-nx`): the next segment, the next part of
 // the arc, the center dot when every step is done, or a thick ring over the outline.
 const RING = 8.6;
@@ -71,23 +71,23 @@ const CENTER = '<circle class="sd-nx" cx="12" cy="12" r="3" fill="currentColor"/
 export function progressRing(progress, { live = false } = {}) {
   const total = Math.max(0, Math.floor(progress?.total || 0));
   const done = Math.min(Math.max(0, Math.floor(progress?.done || 0)), total);
-  if (!total) return ring("o", 2.4) + (live ? ring("sd-nx", 3.2) : "");
+  if (!total) return ring("o", 2.4) + (live ? ring("sd-nx", 3.6) : "");
   if (total <= 12) {
     let out = "";
     let next = "";
     for (let i = 0; i < total; i++) {
       const a0 = (i / total) * TAU + GAP / 2;
       const a1 = ((i + 1) / total) * TAU - GAP / 2;
-      out += i < done ? arc(a0, a1, "f", 3.2) : arc(a0, a1, "t", 2, TRACK);
-      if (live && i === done) next = arc(a0, a1, "sd-nx f", 3.2);
+      out += i < done ? arc(a0, a1, "f", 3.6) : arc(a0, a1, "t", 1.4, TRACK);
+      if (live && i === done) next = arc(a0, a1, "sd-nx f", 3.6);
     }
     return out + next + (live && done === total ? CENTER : "");
   }
   const end = (done / total) * TAU;
-  let out = ring("t", 2, TRACK);
-  if (done === total) out += ring("f", 3.2);
-  else if (done) out += arc(0, end, "f", 3.2);
-  if (live) out += done === total ? CENTER : arc(end, ((done + 1) / total) * TAU, "sd-nx f", 3.2);
+  let out = ring("t", 1.4, TRACK);
+  if (done === total) out += ring("f", 3.6);
+  else if (done) out += arc(0, end, "f", 3.6);
+  if (live) out += done === total ? CENTER : arc(end, ((done + 1) / total) * TAU, "sd-nx f", 3.6);
   return out;
 }
 

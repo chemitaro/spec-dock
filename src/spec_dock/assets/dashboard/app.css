@@ -224,7 +224,7 @@ svg.ds-icon { width: 1em; height: 1em; flex: none; fill: none; stroke: currentCo
 .st-ico[data-live="1"] .sd-nx { animation: sd-next 2s ease-in-out infinite; }
 @keyframes sd-next { 0%, 100% { opacity: .15; } 50% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
-  .st-ico .sd-nx { animation: none; opacity: 0; }
+  .st-ico[data-live="1"] .sd-nx, .st-ico .sd-nx { animation: none; opacity: 0; }
 }
 .chip { display: inline-flex; align-items: center; gap: .35em; padding: .08em .55em .08em .4em; border-radius: 4px; background: var(--st-bg); color: var(--st-ink); border: 1px solid var(--st-line); font-size: 12.5px; font-weight: 700; line-height: 1.6; white-space: nowrap; }
 
