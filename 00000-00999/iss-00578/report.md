@@ -167,6 +167,9 @@ iss-02253 の高さは 344 → 207、配線の回数は 10（収まらない）�
   機械的な失敗として書き直し）、`make lint` exit 0、`uv run pytest -q -p no:cacheprovider` exit 0（3753 passed、
   7 skipped、1826 秒）。`.workbench/final-quality-gate/iss-00578-2/closure.md`。
 - 写しと数字は、取り込んだ後の `3d9bcc54b` で取り直した（上の節）。
+- PR：https://github.com/chemitaro/spec-dock/pull/579（head `3d9bcc54b`、base main）。CI（Provider CI、SpecDock check、
+  Commit identity）は合格、GitHub はマージできる状態（2026-11-05T17:43:36Z の観測。Actions と Commit Status の範囲）。
+  マージと `work finish` は統括と利用者が行う。
 
 ## Residual Risks / Follow-ups
 
