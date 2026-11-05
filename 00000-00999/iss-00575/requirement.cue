@@ -38,7 +38,7 @@ requirements: {
 	"R-03": {
 		title: "幅が変わったときだけ並べ直す"
 		text:  "並べ直しは、見えている幅が変わったときだけ行う。線の配線で通路を広げる間は、最初に決めた幅のままにする。"
-		acceptance: ["edgeAudit の違反が、代表的な構造のすべての見せ方で0のまま", "配線の広げ直しの前後で、Initiative の幅が変わらない"]
+		acceptance: ["edgeAudit の違反が、代表的な構造のすべての見せ方で0のまま", "配線の広げ直しの前後で、割り当てた幅（wraps の root#shares）と、Initiative が並ぶ行が変わらない"]
 	}
 }
 
