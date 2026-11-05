@@ -26,6 +26,9 @@ export const SIZE = {
 const BASE = { world: 28, body: 12, wrapRow: 14, wrapCol: 14, cols: 44, col: 12, treeRow: 14, treeIndent: 0 };
 // The width seen at 100% when the page does not say (the node check): the wrap before iss-00556 (iss-00560 F-01).
 export const WRAP_WIDTH = 1240;
+// iss-00575: the widths the top level's Initiatives were narrowed to are kept in the wraps (so the routing's
+// widening cannot change them).
+const SHARES_KEY = "root#shares";
 
 // iss-00556: finished dependencies between what is shown are drawn by default (faint), the waiting ones stand out.
 export const DEFAULTS = { mode: "nest", showDone: false, deps: "all", fold: true, focus: null };
@@ -429,6 +432,10 @@ function shelfBlock(key, items, ctx, avail, rowBase) {
 }
 
 // The children of one parent (null: the top level), placed by the groups their dependencies connect.
+// At the top level (iss-00575) an Initiative that nothing connects may be laid out narrower than the whole width: when
+// it would not fit on the row beside what is already there, it is made again for the room left, if that fits and is
+// not taller than stacking it under the row would make. So the Initiatives share rows where they can. The widths chosen are kept in the wraps, so
+// the routing's widening cannot change them.
 function childrenBlock(parent, kids, ctx, avail) {
   const key = parent ? parent.id : "root";
   const all = parent ? ctx.showsDone(parent) : ctx.opts.showDone;
@@ -436,20 +443,50 @@ function childrenBlock(parent, kids, ctx, avail) {
   const list = kids.slice().sort(act);
   const edges = siblingEdges(list, ctx.ix, all);
   const stage = stagesOf(list, edges);
-  const items = [];
-  const loose = []; // groups that fold whole: one folded group at the end
-  components(list, edges).forEach((members, g) => {
-    if (members.every((s) => folds(s, ctx))) loose.push(...members);
-    else if (members.length === 1) items.push(ctx.node(members[0], avail));
+  const comps = components(list, edges);
+  const narrowable = (members) => !parent && members.length === 1 && members[0].kind === "initiative" && !folds(members[0], ctx);
+  const make = (shares) => {
+    const items = [];
+    const loose = []; // groups that fold whole: one folded group at the end
+    comps.forEach((members, g) => {
+      if (members.every((s) => folds(s, ctx))) loose.push(...members);
+      else if (members.length === 1) items.push({ block: ctx.node(members[0], shares?.[g] || avail), g, kid: members[0] });
+      else {
+        const inside = new Set(members.map((s) => s.id));
+        const own = edges.filter(([a, b]) => inside.has(a) && inside.has(b));
+        members.sort((a, b) => stage(a) - stage(b) || act(a, b));
+        items.push({ block: gridBlock(`${key}~${g}`, members, own, stage, ctx, avail), g });
+      }
+    });
+    if (loose.length) items.push({ block: chipBlock(`${key}.f`, loose, ctx), g: -1 });
+    return items;
+  };
+  let shares = null;
+  if (!parent) {
+    const fixed = ctx.breaks?.get(SHARES_KEY);
+    if (fixed) shares = Object.fromEntries(fixed.map(([g, w]) => [g, w]));
     else {
-      const inside = new Set(members.map((s) => s.id));
-      const own = edges.filter(([a, b]) => inside.has(a) && inside.has(b));
-      members.sort((a, b) => stage(a) - stage(b) || act(a, b));
-      items.push(gridBlock(`${key}~${g}`, members, own, stage, ctx, avail));
+      shares = {};
+      let row = { w: 0, h: 0, n: 0 };
+      for (const it of make(null)) {
+        const room = avail - row.w - BASE.wrapCol;
+        if (row.n && row.w + BASE.wrapCol + it.block.w > avail) {
+          const members = comps[it.g];
+          if (it.g >= 0 && narrowable(members) && room >= SIZE.minFrameW.initiative) {
+            const again = ctx.node(it.kid, room);
+            if (again.w <= room && again.h <= row.h + BASE.world + it.block.h) {
+              shares[it.g] = room;
+              it.block = again;
+            }
+          }
+          if (!shares[it.g] && row.w + BASE.wrapCol + it.block.w > avail) row = { w: 0, h: 0, n: 0 };
+        }
+        row = { w: row.n ? row.w + BASE.wrapCol + it.block.w : it.block.w, h: Math.max(row.h, it.block.h), n: row.n + 1 };
+      }
     }
-  });
-  if (loose.length) items.push(chipBlock(`${key}.f`, loose, ctx));
-  return shelfBlock(key, items, ctx, avail, parent ? BASE.wrapRow : BASE.world);
+    ctx.wraps.set(SHARES_KEY, Object.entries(shares).map(([g, w]) => [Number(g), w]));
+  }
+  return shelfBlock(key, make(shares).map((it) => it.block), ctx, avail, parent ? BASE.wrapRow : BASE.world);
 }
 
 function frameBlock(s, kids, ctx, avail) {

@@ -285,6 +285,16 @@ def _wide() -> dict[str, Any]:
     )
 
 
+def _initiatives() -> dict[str, Any]:
+    """iss-00575: four Initiatives of one Epic of four Issues each, and a fifth with a chain of two Epics."""
+    nodes: list[Any] = []
+    for k in range(4):
+        base = 600 + k * 10
+        nodes += [node(base, "initiative"), node(base + 1, "epic", parent=base)]
+        nodes += [node(base + 2 + i, "issue", parent=base + 1) for i in range(4)]
+    return document(snapshot(*nodes))
+
+
 def _missing_times() -> dict[str, Any]:
     """Scopes without `active_at` (and a done one without `closed_at`): the oldest in the activity order (F-01)."""
     doc = document(
@@ -320,11 +330,12 @@ def context(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
     return _run(
         tmp_path_factory.mktemp("context"),
         {
-            "documents": {"context": _context(), "missing": _missing_times(), "wide": _wide()},
+            "documents": {"context": _context(), "missing": _missing_times(), "wide": _wide(), "inits": _initiatives()},
             "layouts": {
                 "context": layouts,
                 "missing": {"home": {}},
                 "wide": {"home": {}, "w1240": {"width": 1240}, "w1400": {"width": 1400}, "w374": {"width": 374}},
+                "inits": {"home": {}, "w1400": {"width": 1400}, "w1000": {"width": 1000}, "w374": {"width": 374}},
             },
             "checks": ["layout", "audit"],
             "prefs": [
@@ -562,3 +573,40 @@ def test_the_graph_lays_out_again_only_when_the_width_changes() -> None:
     assert "width: V.width" in source and "seenWidth()" in source
     assert "|${seenWidth()}`" in source  # the width is part of what tells a new layout
     assert "seenWidth() === V.width" in source  # a resize of the height or a zoom keeps the layout
+
+
+# --- iss-00575: the Initiatives sit side by side where they fit ---------------------------------------------------
+
+
+def _frames(context: dict[str, Any], key: str) -> list[dict[str, Any]]:
+    nodes = {item["id"]: item for item in context["layout"]["inits"][key]["nodes"]}
+    return [nodes[f"iss-{600 + k * 10 + 2:05d}"] for k in range(4)]  # the first Issue of each Initiative
+
+
+def test_initiatives_sit_side_by_side_at_a_pc_width(context: dict[str, Any]) -> None:
+    """iss-00575 R-01: at 1400px two Initiatives share a row, without overlapping; none passes the width. At 1000px
+    the room left beside one is under the narrowest an Initiative takes, so they stay stacked."""
+    for key, width in (("w1400", 1400), ("w1000", 1000)):
+        firsts = _frames(context, key)
+        rows: dict[float, list[dict[str, Any]]] = {}
+        for item in firsts:
+            rows.setdefault(item["y1"], []).append(item)
+        assert max(len(r) for r in rows.values()) == (2 if width == 1400 else 1), key
+        assert all(item["x2"] <= width - 24 for item in firsts), key
+        for r in rows.values():
+            for a, b in pairwise(sorted(r, key=lambda item: item["x1"])):
+                assert a["x2"] < b["x1"], key
+
+
+def test_initiatives_stack_in_one_column_at_a_phone_width(context: dict[str, Any]) -> None:
+    firsts = _frames(context, "w374")
+    assert len({item["y1"] for item in firsts}) == 4
+    assert len({item["x1"] for item in firsts}) == 1
+
+
+def test_initiatives_go_left_to_right_in_the_activity_order(context: dict[str, Any]) -> None:
+    """R-02: the reading order (row, then left to right) at a PC's width is the order of the single column."""
+    wide = [i["id"] for i in sorted(_frames(context, "w1400"), key=lambda item: (item["y1"], item["x1"]))]
+    narrow = [i["id"] for i in sorted(_frames(context, "w374"), key=lambda item: item["y1"])]
+    assert wide == narrow
+    assert not [run for run in context["audit"] if run["name"] == "inits" and any(run[key] for key in AUDIT_KEYS)]
