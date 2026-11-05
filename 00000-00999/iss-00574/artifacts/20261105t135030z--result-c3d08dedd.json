@@ -1,0 +1,1029 @@
+{
+ "runs": [
+  {
+   "tag": "pc-light",
+   "view": "graph",
+   "live": [
+    "init-00001",
+    "epic-00002",
+    "epic-00010",
+    "iss-00003",
+    "iss-00008",
+    "iss-00012"
+   ],
+   "liveCount": 6,
+   "rings": {
+    "iss-00003": {
+     "f": 4,
+     "t": 4,
+     "nx": 1,
+     "label": "作業中（手順 4／8 終わった）"
+    },
+    "iss-00004": {
+     "f": 2,
+     "t": 3,
+     "nx": 0,
+     "label": "作業中（手順 2／5 終わった）"
+    },
+    "iss-00008": {
+     "f": 0,
+     "t": 0,
+     "nx": 1,
+     "label": "作業中"
+    },
+    "iss-00009": {
+     "f": 1,
+     "t": 1,
+     "nx": 0,
+     "label": "作業中（手順 9／14 終わった）"
+    },
+    "iss-00012": {
+     "f": 3,
+     "t": 0,
+     "nx": 1,
+     "label": "作業中（手順 3／3 終わった）"
+    },
+    "epic-00002": {
+     "f": 1,
+     "t": 6,
+     "nx": 1,
+     "label": "作業中（配下 1／7 終わった）"
+    },
+    "init-00001": {
+     "f": 1,
+     "t": 8,
+     "nx": 1,
+     "label": "作業中（配下 1／9 終わった）"
+    }
+   },
+   "anim": {
+    "name": "sd-next",
+    "opacity": "0.599467"
+   },
+   "idle": [],
+   "color": "rgb(11, 138, 74)",
+   "overflow": false
+  },
+  {
+   "tag": "pc-light",
+   "view": "panel",
+   "live": [
+    "init-00001",
+    "epic-00002",
+    "epic-00010",
+    "iss-00003",
+    "iss-00008",
+    "iss-00012"
+   ],
+   "liveCount": 6,
+   "rings": {
+    "iss-00003": {
+     "f": 4,
+     "t": 4,
+     "nx": 1,
+     "label": "作業中（手順 4／8 終わった）"
+    },
+    "iss-00004": {
+     "f": 2,
+     "t": 3,
+     "nx": 0,
+     "label": "作業中（手順 2／5 終わった）"
+    },
+    "iss-00008": {
+     "f": 0,
+     "t": 0,
+     "nx": 1,
+     "label": "作業中"
+    },
+    "iss-00009": {
+     "f": 1,
+     "t": 1,
+     "nx": 0,
+     "label": "作業中（手順 9／14 終わった）"
+    },
+    "iss-00012": {
+     "f": 3,
+     "t": 0,
+     "nx": 1,
+     "label": "作業中（手順 3／3 終わった）"
+    },
+    "epic-00002": {
+     "f": 1,
+     "t": 6,
+     "nx": 1,
+     "label": "作業中（配下 1／7 終わった）"
+    },
+    "init-00001": {
+     "f": 1,
+     "t": 8,
+     "nx": 1,
+     "label": "作業中（配下 1／9 終わった）"
+    }
+   },
+   "anim": {
+    "name": "sd-next",
+    "opacity": "0.43205"
+   },
+   "idle": [
+    "2時間動きなし"
+   ],
+   "color": "rgb(11, 138, 74)",
+   "overflow": false
+  },
+  {
+   "tag": "pc-light",
+   "view": "board",
+   "live": [],
+   "liveCount": 0,
+   "rings": {
+    "iss-00003": null,
+    "iss-00004": null,
+    "iss-00008": null,
+    "iss-00009": null,
+    "iss-00012": null,
+    "epic-00002": null,
+    "init-00001": null
+   },
+   "anim": null,
+   "idle": [],
+   "color": "rgb(11, 138, 74)",
+   "overflow": false
+  },
+  {
+   "tag": "pc-light",
+   "view": "overview",
+   "live": [],
+   "liveCount": 0,
+   "rings": {
+    "iss-00003": null,
+    "iss-00004": null,
+    "iss-00008": null,
+    "iss-00009": null,
+    "iss-00012": null,
+    "epic-00002": null,
+    "init-00001": null
+   },
+   "anim": null,
+   "idle": [],
+   "color": "rgb(11, 138, 74)",
+   "overflow": false
+  },
+  {
+   "tag": "pc-light",
+   "view": "scope-idle",
+   "live": [],
+   "liveCount": 0,
+   "rings": {
+    "iss-00003": null,
+    "iss-00004": null,
+    "iss-00008": null,
+    "iss-00009": null,
+    "iss-00012": null,
+    "epic-00002": null,
+    "init-00001": null
+   },
+   "anim": null,
+   "idle": [
+    "2時間動きなし"
+   ],
+   "color": "rgb(11, 138, 74)",
+   "overflow": false
+  },
+  {
+   "tag": "pc-light",
+   "view": "scope-live",
+   "live": [
+    "sd-cover"
+   ],
+   "liveCount": 1,
+   "rings": {
+    "iss-00003": null,
+    "iss-00004": null,
+    "iss-00008": null,
+    "iss-00009": null,
+    "iss-00012": null,
+    "epic-00002": null,
+    "init-00001": null
+   },
+   "anim": {
+    "name": "sd-next",
+    "opacity": "0.550651"
+   },
+   "idle": [],
+   "color": "rgb(11, 138, 74)",
+   "overflow": false
+  },
+  {
+   "tag": "pc-light",
+   "view": "todos",
+   "live": [],
+   "liveCount": 0,
+   "rings": {
+    "iss-00003": null,
+    "iss-00004": null,
+    "iss-00008": null,
+    "iss-00009": null,
+    "iss-00012": null,
+    "epic-00002": null,
+    "init-00001": null
+   },
+   "anim": null,
+   "idle": [],
+   "color": null,
+   "overflow": false
+  },
+  {
+   "tag": "pc-light",
+   "view": "errors",
+   "errors": [],
+   "evalErrors": []
+  },
+  {
+   "tag": "390-light",
+   "view": "graph",
+   "live": [
+    "init-00001",
+    "epic-00002",
+    "epic-00010",
+    "iss-00003",
+    "iss-00008",
+    "iss-00012"
+   ],
+   "liveCount": 6,
+   "rings": {
+    "iss-00003": {
+     "f": 4,
+     "t": 4,
+     "nx": 1,
+     "label": "作業中（手順 4／8 終わった）"
+    },
+    "iss-00004": {
+     "f": 2,
+     "t": 3,
+     "nx": 0,
+     "label": "作業中（手順 2／5 終わった）"
+    },
+    "iss-00008": {
+     "f": 0,
+     "t": 0,
+     "nx": 1,
+     "label": "作業中"
+    },
+    "iss-00009": {
+     "f": 1,
+     "t": 1,
+     "nx": 0,
+     "label": "作業中（手順 9／14 終わった）"
+    },
+    "iss-00012": {
+     "f": 3,
+     "t": 0,
+     "nx": 1,
+     "label": "作業中（手順 3／3 終わった）"
+    },
+    "epic-00002": {
+     "f": 1,
+     "t": 6,
+     "nx": 1,
+     "label": "作業中（配下 1／7 終わった）"
+    },
+    "init-00001": {
+     "f": 1,
+     "t": 8,
+     "nx": 1,
+     "label": "作業中（配下 1／9 終わった）"
+    }
+   },
+   "anim": {
+    "name": "sd-next",
+    "opacity": "0.575176"
+   },
+   "idle": [],
+   "color": "rgb(11, 138, 74)",
+   "overflow": false
+  },
+  {
+   "tag": "390-light",
+   "view": "panel",
+   "live": [
+    "init-00001",
+    "epic-00002",
+    "epic-00010",
+    "iss-00003",
+    "iss-00008",
+    "iss-00012"
+   ],
+   "liveCount": 6,
+   "rings": {
+    "iss-00003": {
+     "f": 4,
+     "t": 4,
+     "nx": 1,
+     "label": "作業中（手順 4／8 終わった）"
+    },
+    "iss-00004": {
+     "f": 2,
+     "t": 3,
+     "nx": 0,
+     "label": "作業中（手順 2／5 終わった）"
+    },
+    "iss-00008": {
+     "f": 0,
+     "t": 0,
+     "nx": 1,
+     "label": "作業中"
+    },
+    "iss-00009": {
+     "f": 1,
+     "t": 1,
+     "nx": 0,
+     "label": "作業中（手順 9／14 終わった）"
+    },
+    "iss-00012": {
+     "f": 3,
+     "t": 0,
+     "nx": 1,
+     "label": "作業中（手順 3／3 終わった）"
+    },
+    "epic-00002": {
+     "f": 1,
+     "t": 6,
+     "nx": 1,
+     "label": "作業中（配下 1／7 終わった）"
+    },
+    "init-00001": {
+     "f": 1,
+     "t": 8,
+     "nx": 1,
+     "label": "作業中（配下 1／9 終わった）"
+    }
+   },
+   "anim": {
+    "name": "sd-next",
+    "opacity": "0.454986"
+   },
+   "idle": [
+    "2時間動きなし"
+   ],
+   "color": "rgb(11, 138, 74)",
+   "overflow": false
+  },
+  {
+   "tag": "390-light",
+   "view": "board",
+   "live": [],
+   "liveCount": 0,
+   "rings": {
+    "iss-00003": null,
+    "iss-00004": null,
+    "iss-00008": null,
+    "iss-00009": null,
+    "iss-00012": null,
+    "epic-00002": null,
+    "init-00001": null
+   },
+   "anim": null,
+   "idle": [],
+   "color": "rgb(11, 138, 74)",
+   "overflow": false
+  },
+  {
+   "tag": "390-light",
+   "view": "overview",
+   "live": [],
+   "liveCount": 0,
+   "rings": {
+    "iss-00003": null,
+    "iss-00004": null,
+    "iss-00008": null,
+    "iss-00009": null,
+    "iss-00012": null,
+    "epic-00002": null,
+    "init-00001": null
+   },
+   "anim": null,
+   "idle": [],
+   "color": "rgb(11, 138, 74)",
+   "overflow": false
+  },
+  {
+   "tag": "390-light",
+   "view": "scope-idle",
+   "live": [],
+   "liveCount": 0,
+   "rings": {
+    "iss-00003": null,
+    "iss-00004": null,
+    "iss-00008": null,
+    "iss-00009": null,
+    "iss-00012": null,
+    "epic-00002": null,
+    "init-00001": null
+   },
+   "anim": null,
+   "idle": [
+    "2時間動きなし"
+   ],
+   "color": "rgb(11, 138, 74)",
+   "overflow": false
+  },
+  {
+   "tag": "390-light",
+   "view": "scope-live",
+   "live": [
+    "sd-cover"
+   ],
+   "liveCount": 1,
+   "rings": {
+    "iss-00003": null,
+    "iss-00004": null,
+    "iss-00008": null,
+    "iss-00009": null,
+    "iss-00012": null,
+    "epic-00002": null,
+    "init-00001": null
+   },
+   "anim": {
+    "name": "sd-next",
+    "opacity": "0.550802"
+   },
+   "idle": [],
+   "color": "rgb(11, 138, 74)",
+   "overflow": false
+  },
+  {
+   "tag": "390-light",
+   "view": "todos",
+   "live": [],
+   "liveCount": 0,
+   "rings": {
+    "iss-00003": null,
+    "iss-00004": null,
+    "iss-00008": null,
+    "iss-00009": null,
+    "iss-00012": null,
+    "epic-00002": null,
+    "init-00001": null
+   },
+   "anim": null,
+   "idle": [],
+   "color": null,
+   "overflow": false
+  },
+  {
+   "tag": "390-light",
+   "view": "errors",
+   "errors": [],
+   "evalErrors": []
+  },
+  {
+   "tag": "pc-dark",
+   "view": "graph",
+   "live": [
+    "init-00001",
+    "epic-00002",
+    "epic-00010",
+    "iss-00003",
+    "iss-00008",
+    "iss-00012"
+   ],
+   "liveCount": 6,
+   "rings": {
+    "iss-00003": {
+     "f": 4,
+     "t": 4,
+     "nx": 1,
+     "label": "作業中（手順 4／8 終わった）"
+    },
+    "iss-00004": {
+     "f": 2,
+     "t": 3,
+     "nx": 0,
+     "label": "作業中（手順 2／5 終わった）"
+    },
+    "iss-00008": {
+     "f": 0,
+     "t": 0,
+     "nx": 1,
+     "label": "作業中"
+    },
+    "iss-00009": {
+     "f": 1,
+     "t": 1,
+     "nx": 0,
+     "label": "作業中（手順 9／14 終わった）"
+    },
+    "iss-00012": {
+     "f": 3,
+     "t": 0,
+     "nx": 1,
+     "label": "作業中（手順 3／3 終わった）"
+    },
+    "epic-00002": {
+     "f": 1,
+     "t": 6,
+     "nx": 1,
+     "label": "作業中（配下 1／7 終わった）"
+    },
+    "init-00001": {
+     "f": 1,
+     "t": 8,
+     "nx": 1,
+     "label": "作業中（配下 1／9 終わった）"
+    }
+   },
+   "anim": {
+    "name": "sd-next",
+    "opacity": "0.599543"
+   },
+   "idle": [],
+   "color": "rgb(61, 220, 132)",
+   "overflow": false
+  },
+  {
+   "tag": "pc-dark",
+   "view": "panel",
+   "live": [
+    "init-00001",
+    "epic-00002",
+    "epic-00010",
+    "iss-00003",
+    "iss-00008",
+    "iss-00012"
+   ],
+   "liveCount": 6,
+   "rings": {
+    "iss-00003": {
+     "f": 4,
+     "t": 4,
+     "nx": 1,
+     "label": "作業中（手順 4／8 終わった）"
+    },
+    "iss-00004": {
+     "f": 2,
+     "t": 3,
+     "nx": 0,
+     "label": "作業中（手順 2／5 終わった）"
+    },
+    "iss-00008": {
+     "f": 0,
+     "t": 0,
+     "nx": 1,
+     "label": "作業中"
+    },
+    "iss-00009": {
+     "f": 1,
+     "t": 1,
+     "nx": 0,
+     "label": "作業中（手順 9／14 終わった）"
+    },
+    "iss-00012": {
+     "f": 3,
+     "t": 0,
+     "nx": 1,
+     "label": "作業中（手順 3／3 終わった）"
+    },
+    "epic-00002": {
+     "f": 1,
+     "t": 6,
+     "nx": 1,
+     "label": "作業中（配下 1／7 終わった）"
+    },
+    "init-00001": {
+     "f": 1,
+     "t": 8,
+     "nx": 1,
+     "label": "作業中（配下 1／9 終わった）"
+    }
+   },
+   "anim": {
+    "name": "sd-next",
+    "opacity": "0.432084"
+   },
+   "idle": [
+    "2時間動きなし"
+   ],
+   "color": "rgb(61, 220, 132)",
+   "overflow": false
+  },
+  {
+   "tag": "pc-dark",
+   "view": "board",
+   "live": [],
+   "liveCount": 0,
+   "rings": {
+    "iss-00003": null,
+    "iss-00004": null,
+    "iss-00008": null,
+    "iss-00009": null,
+    "iss-00012": null,
+    "epic-00002": null,
+    "init-00001": null
+   },
+   "anim": null,
+   "idle": [],
+   "color": "rgb(61, 220, 132)",
+   "overflow": false
+  },
+  {
+   "tag": "pc-dark",
+   "view": "overview",
+   "live": [],
+   "liveCount": 0,
+   "rings": {
+    "iss-00003": null,
+    "iss-00004": null,
+    "iss-00008": null,
+    "iss-00009": null,
+    "iss-00012": null,
+    "epic-00002": null,
+    "init-00001": null
+   },
+   "anim": null,
+   "idle": [],
+   "color": "rgb(61, 220, 132)",
+   "overflow": false
+  },
+  {
+   "tag": "pc-dark",
+   "view": "scope-idle",
+   "live": [],
+   "liveCount": 0,
+   "rings": {
+    "iss-00003": null,
+    "iss-00004": null,
+    "iss-00008": null,
+    "iss-00009": null,
+    "iss-00012": null,
+    "epic-00002": null,
+    "init-00001": null
+   },
+   "anim": null,
+   "idle": [
+    "2時間動きなし"
+   ],
+   "color": "rgb(61, 220, 132)",
+   "overflow": false
+  },
+  {
+   "tag": "pc-dark",
+   "view": "scope-live",
+   "live": [
+    "sd-cover"
+   ],
+   "liveCount": 1,
+   "rings": {
+    "iss-00003": null,
+    "iss-00004": null,
+    "iss-00008": null,
+    "iss-00009": null,
+    "iss-00012": null,
+    "epic-00002": null,
+    "init-00001": null
+   },
+   "anim": {
+    "name": "sd-next",
+    "opacity": "0.599464"
+   },
+   "idle": [],
+   "color": "rgb(61, 220, 132)",
+   "overflow": false
+  },
+  {
+   "tag": "pc-dark",
+   "view": "todos",
+   "live": [],
+   "liveCount": 0,
+   "rings": {
+    "iss-00003": null,
+    "iss-00004": null,
+    "iss-00008": null,
+    "iss-00009": null,
+    "iss-00012": null,
+    "epic-00002": null,
+    "init-00001": null
+   },
+   "anim": null,
+   "idle": [],
+   "color": null,
+   "overflow": false
+  },
+  {
+   "tag": "pc-dark",
+   "view": "errors",
+   "errors": [],
+   "evalErrors": []
+  },
+  {
+   "tag": "390-dark",
+   "view": "graph",
+   "live": [
+    "init-00001",
+    "epic-00002",
+    "epic-00010",
+    "iss-00003",
+    "iss-00008",
+    "iss-00012"
+   ],
+   "liveCount": 6,
+   "rings": {
+    "iss-00003": {
+     "f": 4,
+     "t": 4,
+     "nx": 1,
+     "label": "作業中（手順 4／8 終わった）"
+    },
+    "iss-00004": {
+     "f": 2,
+     "t": 3,
+     "nx": 0,
+     "label": "作業中（手順 2／5 終わった）"
+    },
+    "iss-00008": {
+     "f": 0,
+     "t": 0,
+     "nx": 1,
+     "label": "作業中"
+    },
+    "iss-00009": {
+     "f": 1,
+     "t": 1,
+     "nx": 0,
+     "label": "作業中（手順 9／14 終わった）"
+    },
+    "iss-00012": {
+     "f": 3,
+     "t": 0,
+     "nx": 1,
+     "label": "作業中（手順 3／3 終わった）"
+    },
+    "epic-00002": {
+     "f": 1,
+     "t": 6,
+     "nx": 1,
+     "label": "作業中（配下 1／7 終わった）"
+    },
+    "init-00001": {
+     "f": 1,
+     "t": 8,
+     "nx": 1,
+     "label": "作業中（配下 1／9 終わった）"
+    }
+   },
+   "anim": {
+    "name": "sd-next",
+    "opacity": "0.575119"
+   },
+   "idle": [],
+   "color": "rgb(61, 220, 132)",
+   "overflow": false
+  },
+  {
+   "tag": "390-dark",
+   "view": "panel",
+   "live": [
+    "init-00001",
+    "epic-00002",
+    "epic-00010",
+    "iss-00003",
+    "iss-00008",
+    "iss-00012"
+   ],
+   "liveCount": 6,
+   "rings": {
+    "iss-00003": {
+     "f": 4,
+     "t": 4,
+     "nx": 1,
+     "label": "作業中（手順 4／8 終わった）"
+    },
+    "iss-00004": {
+     "f": 2,
+     "t": 3,
+     "nx": 0,
+     "label": "作業中（手順 2／5 終わった）"
+    },
+    "iss-00008": {
+     "f": 0,
+     "t": 0,
+     "nx": 1,
+     "label": "作業中"
+    },
+    "iss-00009": {
+     "f": 1,
+     "t": 1,
+     "nx": 0,
+     "label": "作業中（手順 9／14 終わった）"
+    },
+    "iss-00012": {
+     "f": 3,
+     "t": 0,
+     "nx": 1,
+     "label": "作業中（手順 3／3 終わった）"
+    },
+    "epic-00002": {
+     "f": 1,
+     "t": 6,
+     "nx": 1,
+     "label": "作業中（配下 1／7 終わった）"
+    },
+    "init-00001": {
+     "f": 1,
+     "t": 8,
+     "nx": 1,
+     "label": "作業中（配下 1／9 終わった）"
+    }
+   },
+   "anim": {
+    "name": "sd-next",
+    "opacity": "0.454978"
+   },
+   "idle": [
+    "2時間動きなし"
+   ],
+   "color": "rgb(61, 220, 132)",
+   "overflow": false
+  },
+  {
+   "tag": "390-dark",
+   "view": "board",
+   "live": [],
+   "liveCount": 0,
+   "rings": {
+    "iss-00003": null,
+    "iss-00004": null,
+    "iss-00008": null,
+    "iss-00009": null,
+    "iss-00012": null,
+    "epic-00002": null,
+    "init-00001": null
+   },
+   "anim": null,
+   "idle": [],
+   "color": "rgb(61, 220, 132)",
+   "overflow": false
+  },
+  {
+   "tag": "390-dark",
+   "view": "overview",
+   "live": [],
+   "liveCount": 0,
+   "rings": {
+    "iss-00003": null,
+    "iss-00004": null,
+    "iss-00008": null,
+    "iss-00009": null,
+    "iss-00012": null,
+    "epic-00002": null,
+    "init-00001": null
+   },
+   "anim": null,
+   "idle": [],
+   "color": "rgb(61, 220, 132)",
+   "overflow": false
+  },
+  {
+   "tag": "390-dark",
+   "view": "scope-idle",
+   "live": [],
+   "liveCount": 0,
+   "rings": {
+    "iss-00003": null,
+    "iss-00004": null,
+    "iss-00008": null,
+    "iss-00009": null,
+    "iss-00012": null,
+    "epic-00002": null,
+    "init-00001": null
+   },
+   "anim": null,
+   "idle": [
+    "2時間動きなし"
+   ],
+   "color": "rgb(61, 220, 132)",
+   "overflow": false
+  },
+  {
+   "tag": "390-dark",
+   "view": "scope-live",
+   "live": [
+    "sd-cover"
+   ],
+   "liveCount": 1,
+   "rings": {
+    "iss-00003": null,
+    "iss-00004": null,
+    "iss-00008": null,
+    "iss-00009": null,
+    "iss-00012": null,
+    "epic-00002": null,
+    "init-00001": null
+   },
+   "anim": {
+    "name": "sd-next",
+    "opacity": "0.575133"
+   },
+   "idle": [],
+   "color": "rgb(61, 220, 132)",
+   "overflow": false
+  },
+  {
+   "tag": "390-dark",
+   "view": "todos",
+   "live": [],
+   "liveCount": 0,
+   "rings": {
+    "iss-00003": null,
+    "iss-00004": null,
+    "iss-00008": null,
+    "iss-00009": null,
+    "iss-00012": null,
+    "epic-00002": null,
+    "init-00001": null
+   },
+   "anim": null,
+   "idle": [],
+   "color": null,
+   "overflow": false
+  },
+  {
+   "tag": "390-dark",
+   "view": "errors",
+   "errors": [],
+   "evalErrors": []
+  }
+ ],
+ "reduced": {
+  "live": [
+   "init-00001",
+   "epic-00002",
+   "epic-00010",
+   "iss-00003",
+   "iss-00008",
+   "iss-00012"
+  ],
+  "liveCount": 6,
+  "rings": {
+   "iss-00003": {
+    "f": 4,
+    "t": 4,
+    "nx": 1,
+    "label": "作業中（手順 4／8 終わった）"
+   },
+   "iss-00004": {
+    "f": 2,
+    "t": 3,
+    "nx": 0,
+    "label": "作業中（手順 2／5 終わった）"
+   },
+   "iss-00008": {
+    "f": 0,
+    "t": 0,
+    "nx": 1,
+    "label": "作業中"
+   },
+   "iss-00009": {
+    "f": 1,
+    "t": 1,
+    "nx": 0,
+    "label": "作業中（手順 9／14 終わった）"
+   },
+   "iss-00012": {
+    "f": 3,
+    "t": 0,
+    "nx": 1,
+    "label": "作業中（手順 3／3 終わった）"
+   },
+   "epic-00002": {
+    "f": 1,
+    "t": 6,
+    "nx": 1,
+    "label": "作業中（配下 1／7 終わった）"
+   },
+   "init-00001": {
+    "f": 1,
+    "t": 8,
+    "nx": 1,
+    "label": "作業中（配下 1／9 終わった）"
+   }
+  },
+  "anim": {
+   "name": "none",
+   "opacity": "0"
+  },
+  "idle": [],
+  "color": "rgb(11, 138, 74)",
+  "overflow": false
+ },
+ "reducedErrors": [],
+ "ok": {
+  "graphLive": true,
+  "listsStill": true,
+  "idlePanel": true,
+  "idleCover": true,
+  "coverLive": true,
+  "reduced": true,
+  "noErrors": true,
+  "noOverflow": true
+ }
+}
