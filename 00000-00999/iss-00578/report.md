@@ -154,8 +154,25 @@ spec-dock の既定の表示は、直す前も列と行が詰まっていたの�
 
 ## Verification
 
-（実装の後に書く）
+- 仕様のレビュー（spec-review、spec-reviewer opus / medium）：2回で合格（P0・P1 0。1回目 P2 2・P3 3、2回目 P3 1）。
+  `.workbench/spec-review/iss-00578/round-{1,2}.json`。その後、統括の指示で上下（R-05、F-03、D-05、D-06）を足した。
+- テスト駆動：新しい3つのテスト（列の間、行の帯、合成の構造を加えた線の検査）は、HEAD `b290da02a` の `router.js`／
+  `layout.js` に戻すと落ち（3 failed）、修正で通る（23 passed）。
+- コードのレビュー（code-review、code-reviewer sonnet / high、axis both）：`b290da02a..f3c11245a` で合格、指摘 0。
+  `.workbench/code-review/iss-00578/round-1.json`。
+- `origin/main`（#574、PR #577）を取り込んだマージ `8c5f01fa4`（衝突なし）。
+- 最終品質ゲート（final-quality-gate、quality-gate-reviewer opus / high、1人）：`8c5f01fa4` で合格。
+  レビュー pass（P0・P1 0、P3 1：この報告の数字の書き誤り 910 → 870。直した）、`make lint` exit 0、
+  `uv run pytest -q -p no:cacheprovider` exit 0（3748 passed、7 skipped、2156 秒）。
+  `.workbench/final-quality-gate/iss-00578/closure.md`。
 
 ## Residual Risks / Follow-ups
 
-（実装の後に書く）
+- 線の通らない行の帯（Initiative の格子で、同じ行の高い Epic の枠に合わせて行が高くなる。実データで 600 ほど）は、
+  行をそろえる配置の決まりによるもので、残る。直すなら、行をまたぐ高い枠の置き方（配置の決まりの変更）が要る。
+- 実データの、終わったものも出す表し方で、もとからある近すぎる車線が 5〜7 組み合わせに残る（直す前 9〜10）。
+- ツリーの終わったものも出す表し方（346 本）は、もとから 10 回で収まらず 5 秒ほどかかる（直す前より少し速い）。
+- 実データの列の間の超えは最大 36（焦点を init-02234 に当てた表示）。テストの上限の余白 24 は合成の構造で確かめる。
+- 次の版（0.9.0）の移行の注記に要る契約の変更：`router.js` が `portNeed(G)` を出し、`layout.js` の `portRoom` が
+  それを使う（`portSpan` は出したまま）。`graphInput` の結果に `fineEntries` が加わる。線の多い箱の左の辺では入口が
+  8px おきに並ぶ。公開の JSON、CLI、保存した選択は変わらない。

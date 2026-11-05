@@ -10,7 +10,7 @@ steps: {
 	"S-03": {title: "広げの要求を通り道ごとに見積もる", realizes: ["R-01", "R-02", "F-01"], status: "done", after: ["S-02"], session: "impl"}
 	"S-04": {title: "押されて範囲を超える線分のために、押している鎖の中の逃げられる線分を奥へ回す", realizes: ["R-03", "F-02"], status: "done", after: ["S-03"], session: "impl"}
 	"S-05": {title: "線の検査と速さのテストを、合成の構造を加えて通す", realizes: ["R-03", "R-04"], status: "done", after: ["S-04"], session: "impl"}
-	"S-06": {title: "実データ（taikyohiyou_project と spec-dock）の 1440、1000、390 の写しと数字を、直す前と後で report.md に残す", realizes: ["R-01", "R-05"], status: "doing", after: ["S-05"], session: "impl"}
+	"S-06": {title: "実データ（taikyohiyou_project と spec-dock）の 1440、1000、390 の写しと数字を、直す前と後で report.md に残す", realizes: ["R-01", "R-05"], status: "done", after: ["S-05"], session: "impl"}
 	"S-07": {title: "上下の原因を確かめる（行の高さ、入口の格子、箱を伸ばす回の広げ）", realizes: ["R-05"], status: "done", after: ["S-05"], session: "impl"}
 	"S-08": {title: "行の帯を測る検査と、行の帯の上限のテストを書き、修正の前に落ちることを確かめる", realizes: ["R-05", "R-02"], status: "done", after: ["S-07"], session: "impl"}
 	"S-09": {title: "線の多い入口の辺を S おきに置き、箱を伸ばす回は通り道を広げない。寄せの後に近すぎる組の不足を求める", realizes: ["R-05", "R-02", "R-03", "F-02", "F-03"], status: "done", after: ["S-08"], session: "impl"}
