@@ -2,7 +2,7 @@
 // (epic-00427/artifacts/20261103t150110z--dashboard-design-d2.html). Pure computation: no DOM, so the same code
 // runs in the page and in the node check of the tests.
 //
-// Input G = { obs: [{x1, y1, x2, y2, p1, p2, key, lane?}], frames: [{x1, y1, x2, y2, cls}], edges: [{a, z}], bounds, fineEntries? }
+// Input G = { obs: [{x1, y1, x2, y2, p1, p2, key, lane?}], frames: [{x1, y1, x2, y2, cls}], edges: [{a, z}], bounds, nested? }
 //   obs    rectangles a line must not cross (boxes, frame headings, folded groups); p1-p2 is where lines may leave or
 //          enter on the side. `lane: "v"` marks a rectangle that blocks only vertical runs (a tree's parent line).
 //   edges  leave the right side of obs[a] and enter the left side of obs[z].
@@ -11,7 +11,7 @@
 // sharing and crossing earlier lines, 4. nudging: overlapping segments of one direction are ordered to cross less
 // and spread S apart in their channel; a channel that is too narrow is returned as `widen`, 5. drawing: corners of
 // radius R and a cut in the lower line at each crossing.
-export const C = { M0: 4, M: 10, S: 8, PORT: 10, R: 7, AH: 7, BEND: 40, FRAME: 30, SHARE: 0.6, CROSS: 12, MINSEG: 2 };
+export const C = { M0: 4, M: 10, S: 8, PORT: 10, R: 7, AH: 7, BEND: 40, FRAME: 30, SHARE: 0.6, CROSS: 12, MINSEG: 2, WIDE: 160 };
 const EPS = 0.01;
 const uniq = a => { a.sort((p, q) => p - q); const o = []; for (const v of a) if (!o.length || v - o[o.length - 1] > EPS) o.push(v); return o; };
 const lb = (arr, v) => { let lo = 0, hi = arr.length; while (lo < hi) { const m = (lo + hi) >> 1; if (arr[m] < v - EPS) lo = m + 1; else hi = m; } return lo; };
@@ -41,7 +41,7 @@ function facing(G, Z, y) {
 }
 function entrySlots(G, Z, k, exits) {
   const coarse = slots(Z, C.S);
-  if (coarse.length >= k || !G.fineEntries) return coarse;
+  if (coarse.length >= k || !G.nested) return coarse;
   const fine = [];
   for (let y = Math.ceil((Z.p1 - EPS) / C.S) * C.S; y <= Z.p2 + EPS; y += C.S) {
     if (Math.round(y / C.S) % 2 !== 0) { fine.push(y); continue; }   // 入口の格子
@@ -260,7 +260,23 @@ function range(sg, G, V) {
     else if (f > sg.pos + EPS) { if (f - C.MINSEG < hi) { hi = f - C.MINSEG; hib = -2; } }
   }
   const pad = C.M - C.M0;
-  return { lo, hi, lob, hib, dlo: lob === -2 ? lo : Math.min(lo + pad, Math.max(lo, sg.pos)), dhi: hib === -2 ? hi : Math.max(hi - pad, Math.min(hi, sg.pos)), dlo0: lob === -2 ? lo : lo + pad, dhi0: hib === -2 ? hi : hi - pad };
+  let dlo0 = lob === -2 ? lo : lo + pad, dhi0 = hib === -2 ? hi : hi - pad;
+  // 目指す範囲は、線分を丸ごと含むいちばん内側の枠の中に限る（iss-00578）。枠は障害物ではないので、箱のない高さ
+  // （幅）では lo〜hi が枠の外まで広がり、寄せが線を枠の外へ出して戻すことがある。詰めがあふれたときだけ外へ出る
+  let home = null;
+  for (const f of G.frames || []) {
+    const p1 = V ? f.x1 : f.y1, p2 = V ? f.x2 : f.y2, s1 = V ? f.y1 : f.x1, s2 = V ? f.y2 : f.x2;
+    if (p1 < sg.pos && sg.pos < p2 && s1 <= sg.a + EPS && sg.b <= s2 + EPS && (!home || (f.x2 - f.x1) * (f.y2 - f.y1) < (home.x2 - home.x1) * (home.y2 - home.y1))) home = f;
+  }
+  if (home) {
+    dlo0 = Math.max(dlo0, Math.min((V ? home.x1 : home.y1) + C.M, sg.pos));
+    dhi0 = Math.min(dhi0, Math.max((V ? home.x2 : home.y2) - C.M, sg.pos));
+  }
+  // 範囲が箱1つ分より広い線分（隣の列や行に箱のない所を通る）は、A* の位置にとどめる（iss-00578）。範囲の端や
+  // 範囲の中央は A* の位置から遠く、線が遠回りになる。ほかの線分との間隔を守るときだけ lo〜hi の中で動く
+  const wide = !!G.nested && hi - lo > C.WIDE;   // 木では左の狭い所に長い線が並ぶので、寄せて車線を分ける
+  if (wide) dlo0 = dhi0 = Math.min(Math.max(sg.pos, dlo0), dhi0);
+  return { lo, hi, lob, hib, wide, dlo: lob === -2 ? lo : Math.min(lo + pad, Math.max(lo, sg.pos)), dhi: hib === -2 ? hi : Math.max(hi - pad, Math.min(hi, sg.pos)), dlo0, dhi0 };
 }
 function crossCount(A, B) {   // A を B の手前（左・上）に置いたときの交差の数
   let c = 0;
@@ -280,7 +296,7 @@ function crossCount(A, B) {   // A を B の手前（左・上）に置いたと
 function lacking(ord, conf, V, crowded, x, nb) {
   const need = new Map(), chain = new Map();
   const ask = (sg, amount) => {
-    if (!sg.movable || sg.lob < -1 || sg.hib < -1 || amount <= 0.5) return;
+    if (!sg.movable || sg.wide || sg.lob < -1 || sg.hib < -1 || amount <= 0.5) return;   // 広い線分は本来の範囲に余地がある
     const key = `${sg.lob}|${sg.hib}`;
     if (!need.has(key) || need.get(key).amount < amount) need.set(key, { axis: V ? "x" : "y", oa: sg.lob, ob: sg.hib, amount });
   };
@@ -353,7 +369,7 @@ function nudgePass(G, routes, V, widen) {
         let req = sg.dlo0, push = null;
         for (const t of nb.get(sg)) if (at.get(t) < i && x.get(t) + C.S > req) { req = x.get(t) + C.S; push = t; }
         by.set(sg, push);
-        const cap = sg.movable ? sg.dhi0 : sg.pos, top = sg.movable ? sg.hi : sg.pos;
+        const cap = sg.movable ? (sg.wide ? sg.hi : sg.dhi0) : sg.pos, top = sg.movable ? sg.hi : sg.pos;
         over = Math.max(over, req - cap);
         if (req > cap + 0.5) total += req - cap;
         x.set(sg, sg.movable ? req : sg.pos);
@@ -368,11 +384,14 @@ function nudgePass(G, routes, V, widen) {
       ord.splice(0, ord.length, ...rest.slice(0, k), move.p, ...rest.slice(k));
     }
     // 中央へ寄せる：余りの半分だけ奥へ動かし、奥から順に間隔と上端を守る
-    let slack = Infinity; ord.forEach(sg => { if (sg.movable) slack = Math.min(slack, sg.dhi0 - x.get(sg)); });
+    // 広い線分は寄せない（A* の位置にとどめる）ので、余りに数えない
+    let slack = Infinity; ord.forEach(sg => { if (sg.movable && !sg.wide) slack = Math.min(slack, sg.dhi0 - x.get(sg)); });
     const sh = slack > 0 && isFinite(slack) ? slack / 2 : 0;
     for (let i = ord.length - 1; i >= 0; i--) {
       const sg = ord[i]; if (!sg.movable) continue;
-      let v = x.get(sg) + sh; v = Math.min(v, Math.max(sg.dhi0, sg.lo));
+      // 目指す範囲からあふれた線分は、重ねずに本来の範囲（lo〜hi）へはみ出す（iss-00578）
+      const cap = sg.wide || x.get(sg) > sg.dhi0 + 0.5 ? sg.hi : sg.dhi0;
+      let v = x.get(sg) + (sg.wide ? 0 : sh); v = Math.min(v, Math.max(cap, sg.lo));
       for (let t = i + 1; t < ord.length; t++) if (conf(ord[t], sg)) v = Math.min(v, x.get(ord[t]) - C.S);
       v = Math.max(v, sg.lo); v = Math.min(v, sg.hi);
       x.set(sg, v);
@@ -449,7 +468,8 @@ export function svg(G, routes, classes) {
 }
 
 /* 機械の検査：(1) 始点・終点以外の箱の矩形（余白 margin）と交わる線分、(2) 自分の始点・終点の箱の内側に入る線分、
-   (3) 別の線の、同じ向きで間隔 lane 未満かつ範囲が重なる線分の組、(4) 斜めの線分 */
+   (3) 別の線の、同じ向きで間隔 lane 未満かつ範囲が重なる線分の組、(4) 斜めの線分、(5) 近すぎる出入り、
+   (6) 枠の外を通る線（o.frames を渡したとき） */
 export function audit(routes, obs, o = {}) {
   const m = o.margin == null ? 3 : o.margin, lane = o.lane == null ? C.S : o.lane;
   const all = []; let diagonal = 0;
@@ -481,5 +501,15 @@ export function audit(routes, obs, o = {}) {
   let portShare = 0; const ends = [];
   routes.forEach(rt => { const P = rt.pts; ends.push([rt.ka + "R", P[0].y], [rt.kz + "L", P[P.length - 1].y]); });
   for (let i = 0; i < ends.length; i++) for (let j = i + 1; j < ends.length; j++) if (ends[i][0] === ends[j][0] && Math.abs(ends[i][1] - ends[j][1]) < lane - 0.5) portShare++;
-  return { segments: all.length, boxHits, ownHits, overlaps, diagonal, portShare, trunkOverlaps, failed: routes.filter(r => r.failed).length, list };
+  // (6) 両端が同じ枠の中にある線が、その枠（両端を含むいちばん内側の枠）の外へ、余白 C.M と2車線より遠く出る
+  // （iss-00578。o.frames があるとき）。枠の下の余白に車線が入りきらず、枠の線のすぐ外を通るものは数えない
+  let frameExits = 0;
+  if (o.frames) routes.forEach((rt, ri) => {
+    const P = rt.pts, s = P[0], t = P[P.length - 1];
+    const has = (f, p, m) => p.x >= f.x1 - m && p.x <= f.x2 + m && p.y >= f.y1 - m && p.y <= f.y2 + m;
+    let home = null;
+    for (const f of o.frames) if (has(f, s, 0.5) && has(f, t, 0.5) && (!home || (f.x2 - f.x1) * (f.y2 - f.y1) < (home.x2 - home.x1) * (home.y2 - home.y1))) home = f;
+    if (home && P.some(p => !has(home, p, C.M + 2 * C.S))) { frameExits++; if (list.length < 40) list.push(`frame r${ri} ${home.id ?? ""}`); }
+  });
+  return { segments: all.length, boxHits, ownHits, overlaps, diagonal, portShare, trunkOverlaps, frameExits, failed: routes.filter(r => r.failed).length, list };
 }

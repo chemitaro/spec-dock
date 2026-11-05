@@ -688,8 +688,9 @@ export function graphInput(L) {
     .filter((n) => n.type === "frame")
     .map((n) => ({ x1: n.x1, y1: n.y1, x2: n.x2, y2: n.y2, cls: n.kind === "initiative" ? "ini" : n.state === "done" ? "done" : "epic", id: n.id }));
   const edges = L.edges.map((e) => ({ a: at.get(e.a), z: at.get(e.z), done: e.done, pairs: e.pairs }));
-  // a crowded entry side may take a port every lane in the nested layout, where a tall box widens its whole row (iss-00578)
-  return { obs, frames, edges, bounds: { x1: 0, y1: 0, x2: L.width, y2: L.height }, fineEntries: !tree };
+  // nested: in the nested layout a crowded entry side takes a port every lane (a tall box widens its whole row) and a run
+  // through empty space keeps its routed place (iss-00578)
+  return { obs, frames, edges, bounds: { x1: 0, y1: 0, x2: L.width, y2: L.height }, nested: !tree };
 }
 
 /**

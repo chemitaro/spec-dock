@@ -25,7 +25,7 @@ ROOT = Path(__file__).resolve().parents[3]
 ASSETS = ROOT / "src" / "spec_dock" / "assets" / "dashboard"
 CHECK = ROOT / "tests" / "js" / "dashboard_graph_check.mjs"
 SNAPSHOT = ROOT / "tests" / "fixtures" / "issue532" / "spec-dock-snapshot.json"
-AUDIT_KEYS = ("boxHits", "ownHits", "overlaps", "diagonal", "portShare", "trunkOverlaps", "failed")
+AUDIT_KEYS = ("boxHits", "ownHits", "overlaps", "diagonal", "portShare", "trunkOverlaps", "frameExits", "failed")
 
 
 def _node() -> str:

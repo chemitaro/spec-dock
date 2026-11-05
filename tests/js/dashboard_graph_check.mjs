@@ -42,6 +42,7 @@ function check(name, doc, opts) {
   const res = audit(
     r.routes.map((rt) => ({ pts: rt.pts, failed: rt.failed, ka: r.G.obs[r.G.edges[rt.ei].a].key, kz: r.G.obs[r.G.edges[rt.ei].z].key })),
     r.G.obs,
+    { frames: r.G.frames },
   );
   return { name, opts, edges: r.routes.length, iters: r.iters, unmapped: r.unmapped, widenLeft: r.widen.length, ms: Math.round(ms), ...res };
 }
