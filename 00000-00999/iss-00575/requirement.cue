@@ -27,8 +27,8 @@ background: "Initiative の中の Epic は画面の幅で折り返して横に�
 requirements: {
 	"R-01": {
 		title: "Initiative が、画面の幅に収まる分だけ横に並ぶ"
-		text:  "最上位の Initiative を、画面の幅（倍率100%で見える幅）に収まる列数で横に並べ、収まらなければ次の行へ折り返す。列数は、全体の高さが最も低くなるものを選び、同じなら列が多いほう（横に並ぶほう）を選ぶ。"
-		acceptance: ["Initiative が4つ（それぞれ Epic 1つに Issue 4つ）の構造で、幅1400で、ほかの Initiative と並ぶ Initiative の x が重ならず、同じ行に2つ以上並ぶ", "幅374では、1列になり、Initiative が縦に積まれる"]
+		text:  "最上位の Initiative を、画面の幅（倍率100%で見える幅）に収まる分だけ横に並べ、収まらなければ次の行へ折り返す。行の残りの幅に収まる Initiative は、その幅で作り直して同じ行に置く。ただし、下の行に積むより高くなるときは置かない。"
+		acceptance: ["Initiative が4つ（それぞれ Epic 1つに Issue 4つ）の構造で、幅1400で、ほかの Initiative と並ぶ Initiative の x が重ならず、同じ行に2つ以上並ぶ", "残りの幅が最小幅（420）に足りない幅1000と、幅374では、Initiative が縦に積まれる"]
 	}
 	"R-02": {
 		title: "並べ方の決まりは #560 と同じ"
@@ -37,8 +37,8 @@ requirements: {
 	}
 	"R-03": {
 		title: "幅が変わったときだけ並べ直す"
-		text:  "列数の選び直しは、見えている幅が変わったときだけ行う。線の配線で通路を広げる間は、列数を最初に決めた値のままにする。"
-		acceptance: ["edgeAudit の違反が、代表的な構造のすべての見せ方で0のまま", "配線の広げ直しの前後で列数が変わらない"]
+		text:  "並べ直しは、見えている幅が変わったときだけ行う。線の配線で通路を広げる間は、最初に決めた幅のままにする。"
+		acceptance: ["edgeAudit の違反が、代表的な構造のすべての見せ方で0のまま", "配線の広げ直しの前後で、Initiative の幅が変わらない"]
 	}
 }
 
@@ -54,5 +54,5 @@ failures: {
 
 // 制約・前提、合意した判断、未解決事項（任意）。
 constraints: ["編集の範囲は views/graph*、tests/、この Issue の Scope だけ", "版の番号と migration.md は変えない"]
-decisions: ["Initiative が1つなら今までと同じ（列数は1）", "依存でつながった Initiative のまとまりの中は、幅を分けず今までの幅を使う"]
+decisions: ["Initiative が1つなら今までと同じ", "依存でつながった Initiative のまとまりの中は、幅を分けず今までの幅を使う"]
 // questions: ["..."]
