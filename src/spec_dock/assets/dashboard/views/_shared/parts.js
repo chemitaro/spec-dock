@@ -1,7 +1,7 @@
 // Small HTML parts shared by the board, the detail screen and the overview (iss-00531 D-05). Every user text
 // goes through esc(). State shapes come from the shell's core/ui.js (doing = half circle, ready = triangle,
 // blocked = octagon, unknown = diamond, done = grey check), so #531 and #532 draw the same marks.
-import { ASSURANCE_LEVELS, KIND_LABEL, PR_STATE_WORDS, STATES, chip, esc, humanCount, humanMark, ic, stateIcon } from "../../core/ui.js";
+import { ASSURANCE_LEVELS, KIND_LABEL, PR_STATE_WORDS, STATES, chip, esc, humanCount, humanMark, ic, idleText, stateChip, stateIcon, stateMark } from "../../core/ui.js";
 import {
   CHECK_WORDS,
   MERGEABLE_WORDS,
@@ -12,7 +12,19 @@ import {
   withoutEmbed,
 } from "./logic.js";
 
-export { chip, esc, humanCount, humanMark, stateIcon, STATES };
+export { chip, esc, humanCount, humanMark, idleText, stateChip, stateIcon, stateMark, STATES };
+
+// Every Scope of a structure by its ID, made once per structure (iss-00574): a parent's ring counts the Issues below it.
+const SCOPE_MAPS = new WeakMap();
+export function scopesOf(data) {
+  if (!data?.scopes) return new Map();
+  let found = SCOPE_MAPS.get(data);
+  if (!found) {
+    found = new Map(data.scopes.map((item) => [item.id, item]));
+    SCOPE_MAPS.set(data, found);
+  }
+  return found;
+}
 
 
 // Kept as the screens' name for the shell's icons.
@@ -89,11 +101,11 @@ export function card(scope, ctx, { parent = null } = {}) {
   const human = humanCount(scope); // iss-00554 D-06: tasks of a person blocking it (and its subtree for a parent)
   if (human.count) meta.push(humanMark(human.count, { descendants: human.descendants, cls: "sd-hm" }));
   if (scope.downstream) meta.push(downMark(scope.downstream));
-  const parentLine = parent ? `<p class="sd-card__parent">${stateIcon(parent.state, false)}<span>${esc(parent.id)}</span><span>${esc(parent.title)}</span></p>` : "";
+  const parentLine = parent ? `<p class="sd-card__parent">${stateMark(parent, scopesOf(ctx.data), { label: false })}<span>${esc(parent.id)}</span><span>${esc(parent.title)}</span></p>` : "";
   return (
     `<a class="sd-card" data-nav data-st="${esc(scope.state)}" data-id="${esc(scope.id)}" href="${esc(ctx.href(scope.path))}">` +
     (scope.change ? `<span class="sd-card__chg" aria-hidden="true"></span>` : "") +
-    `<span class="sd-card__r1">${stateIcon(scope.state)}<span class="ds-docid">${esc(scope.id)}</span><span class="sd-no">#${esc(scope.number)}</span>` +
+    `<span class="sd-card__r1">${stateMark(scope, scopesOf(ctx.data))}<span class="ds-docid">${esc(scope.id)}</span><span class="sd-no">#${esc(scope.number)}</span>` +
     (scope.kind !== "issue" ? `<span class="sd-badge">${esc(kindLabel(scope.kind))}</span>` : "") +
     `${changeBadge(scope)}</span>` +
     `<span class="sd-card__ttl">${esc(scope.title)}</span>` +

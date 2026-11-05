@@ -30,8 +30,8 @@
   & .td-card__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 12px; color: var(--ds-text-2); min-width: 0; }
   & .td-card__meta > span { display: inline-flex; align-items: center; gap: 3px; min-width: 0; overflow-wrap: anywhere; }
   & .td-card__meta .ds-icon { font-size: 13px; color: var(--ds-muted); flex: none; }
-  & .td-blocks { color: var(--ds-danger-ink); font-weight: 650; }
-  & .td-blocks .ds-icon { color: var(--ds-danger) !important; }
+  & .td-blocks { color: var(--sd-blocked-ink); font-weight: 650; }
+  & .td-blocks .ds-icon { color: var(--sd-blocked) !important; }
   & .td-tag { color: var(--ds-accent-strong); font-weight: 650; }
   & .td-due { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; font-weight: 650; color: var(--ds-muted); white-space: nowrap; }
   & .td-due .ds-icon { font-size: 13px; }

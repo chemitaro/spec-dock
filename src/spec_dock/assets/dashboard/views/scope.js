@@ -6,7 +6,6 @@ import {
   assuranceMark,
   card,
   changeBadge,
-  chip,
   emptyState,
   esc,
   humanCount,
@@ -18,7 +17,11 @@ import {
   newTabLink,
   prMark,
   progressBar,
+  scopesOf,
+  stateChip,
   stateIcon,
+  stateMark,
+  idleText,
   STATES,
 } from "./_shared/parts.js";
 import { repositoryPath, todoPath, todosPath } from "../core/route.js";
@@ -37,7 +40,13 @@ const DOC_INFO = {
 const FRAME_SANDBOX = "allow-scripts allow-popups";
 
 const link = (ctx, scope) =>
-  `<a data-nav href="${esc(ctx.href(scope.path))}">${stateIcon(scope.state, false)}<span class="ds-docid">${esc(scope.id)}</span></a>`;
+  `<a data-nav href="${esc(ctx.href(scope.path))}">${stateMark(scope, scopesOf(ctx.data), { label: false })}<span class="ds-docid">${esc(scope.id)}</span></a>`;
+
+// "N分動きなし" on the cover of a Scope in progress that has not moved for 30 minutes (iss-00574 R-05).
+function idleBadge(scope, byId) {
+  const idle = idleText(scope, byId);
+  return idle ? `<span class="sd-badge sd-idle">${icon("clock")}${esc(idle)}</span>` : "";
+}
 
 function section(n, heading, aside = "") {
   return `<h2 class="sd-sec"><span class="sd-sec__n">${n}</span>${heading}${aside ? `<span class="sd-sec__aside">${aside}</span>` : ""}</h2>`;
@@ -72,7 +81,7 @@ function summaryTab(ctx, scope, doc, byId) {
   else if (worktrees.items.length) {
     worktree = worktrees.items.map((item) => `<span class="sd-mono">${esc(item.branch)}</span><span class="sd-muted sd-mono">${esc(item.path)}</span>`).join("<br>");
   } else worktree = `<span class="sd-muted">このPCにはない（ほかのPCの worktree は分からない）</span>`;
-  const tone = scope.state === "blocked" ? "danger" : scope.state === "unknown" ? "warning" : "note";
+  const tone = scope.state === "blocked" || scope.state === "unknown" ? scope.state : "note";
   let body = `<div class="sd-callout" data-tone="${tone}" data-st="${esc(scope.state)}">${stateIcon(scope.state, false)}<div><p class="sd-callout__title">${esc(STATES[scope.state]?.label ?? scope.state)}</p><p>${esc(scope.reason?.text ?? "")}</p></div></div>`;
   let n = 1;
   if (kids.length) {
@@ -364,7 +373,7 @@ function render(root, ctx) {
     `<header class="sd-cover" data-st="${esc(scope.state)}"><div class="sd-cover__main">` +
     `<p class="sd-cover__kicker">${esc(kindLabel(scope.kind))}<span class="ds-docid">${esc(scope.id)}</span><span class="sd-no">#${esc(scope.number)}</span></p>` +
     `<h1 class="sd-cover__title">${esc(scope.title)}</h1>` +
-    `<div class="sd-cover__tags">${chip(scope.state)}<span class="sd-badge" data-tone="${scope.state === "blocked" ? "danger" : scope.state === "unknown" ? "warning" : "accent"}">${esc(scope.reason?.text ?? "")}</span>${mergeBadge(scope)}${changeBadge(scope)}${humanTag(scope, ctx, path)}</div>` +
+    `<div class="sd-cover__tags">${stateChip(scope, byId, { motion: true })}${idleBadge(scope, byId)}<span class="sd-badge" data-tone="${scope.state === "blocked" || scope.state === "unknown" ? scope.state : "accent"}">${esc(scope.reason?.text ?? "")}</span>${mergeBadge(scope)}${changeBadge(scope)}${humanTag(scope, ctx, path)}</div>` +
     `</div><div class="sd-cover__side"><dl>` +
     `<dt>親の道筋</dt><dd>${pathHtml}</dd>` +
     `<dt>保証レベル</dt><dd>${assuranceHtml}</dd>` +

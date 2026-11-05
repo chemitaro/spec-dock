@@ -44,6 +44,14 @@
   --ds-series-1: #2a78d6; --ds-series-3: #1baf7a;
   --ds-chart-grid: #e6e9ee; --ds-chart-axis: #b9c0cb;
 
+  /* 状態の色の札（iss-00574 D-01）。印と帯（--sd-<状態>）、札の地・枠・文字。地との差は WCAG AA（テストで計算） */
+  --sd-ready: #2457c5;   --sd-ready-bg: #edf2fc;   --sd-ready-line: #c3d3f3;   --sd-ready-ink: #1d469f;
+  --sd-doing: #0b8a4a;   --sd-doing-bg: #e7f6ee;   --sd-doing-line: #b3e0c6;   --sd-doing-ink: #0a6b3a;
+  --sd-blocked: #a86e00; --sd-blocked-bg: #fff6dc; --sd-blocked-line: #efd595; --sd-blocked-ink: #7a5000;
+  --sd-unknown: #7048c0; --sd-unknown-bg: #f3effc; --sd-unknown-line: #d6c8f2; --sd-unknown-ink: #5b37a6;
+  --sd-done: var(--ds-faint); --sd-done-bg: var(--ds-tip-bg); --sd-done-line: var(--ds-tip-line); --sd-done-ink: var(--ds-tip-ink);
+  --sd-track: var(--ds-border-2);
+
   --pr-merged: var(--ds-syn-keyword);
 }
 @media (prefers-color-scheme: dark) {
@@ -80,6 +88,11 @@
     --ds-shadow-l: 0 30px 80px -20px rgb(0 0 0 / 80%);
     --ds-series-1: #3987e5; --ds-series-3: #199e70;
     --ds-chart-grid: #252a34; --ds-chart-axis: #4a5262;
+
+    --sd-ready: #6f9dff;   --sd-ready-bg: rgb(111 157 255 / 10%); --sd-ready-line: rgb(111 157 255 / 28%); --sd-ready-ink: #a8c3ff;
+    --sd-doing: #3ddc84;   --sd-doing-bg: rgb(61 220 132 / 10%);  --sd-doing-line: rgb(61 220 132 / 28%);  --sd-doing-ink: #7ce8ab;
+    --sd-blocked: #ffc93c; --sd-blocked-bg: rgb(255 201 60 / 10%); --sd-blocked-line: rgb(255 201 60 / 28%); --sd-blocked-ink: #ffd978;
+    --sd-unknown: #b79bff; --sd-unknown-bg: rgb(183 155 255 / 10%); --sd-unknown-line: rgb(183 155 255 / 28%); --sd-unknown-ink: #d2c0ff;
   }
 }
 :root[data-theme="dark"] {
@@ -115,14 +128,19 @@
   --ds-shadow-l: 0 30px 80px -20px rgb(0 0 0 / 80%);
   --ds-series-1: #3987e5; --ds-series-3: #199e70;
   --ds-chart-grid: #252a34; --ds-chart-axis: #4a5262;
+
+  --sd-ready: #6f9dff;   --sd-ready-bg: rgb(111 157 255 / 10%); --sd-ready-line: rgb(111 157 255 / 28%); --sd-ready-ink: #a8c3ff;
+  --sd-doing: #3ddc84;   --sd-doing-bg: rgb(61 220 132 / 10%);  --sd-doing-line: rgb(61 220 132 / 28%);  --sd-doing-ink: #7ce8ab;
+  --sd-blocked: #ffc93c; --sd-blocked-bg: rgb(255 201 60 / 10%); --sd-blocked-line: rgb(255 201 60 / 28%); --sd-blocked-ink: #ffd978;
+  --sd-unknown: #b79bff; --sd-unknown-bg: rgb(183 155 255 / 10%); --sd-unknown-line: rgb(183 155 255 / 28%); --sd-unknown-ink: #d2c0ff;
 }
 
-/* 5つの状態 → DS の意味の色の系統 */
-[data-st="done"]    { --st: var(--ds-faint);  --st-bg: var(--ds-tip-bg);    --st-line: var(--ds-tip-line);    --st-ink: var(--ds-tip-ink); }
-[data-st="doing"]   { --st: var(--ds-accent); --st-bg: var(--ds-accent-soft); --st-line: var(--ds-accent-line); --st-ink: var(--ds-accent-strong); }
-[data-st="ready"]   { --st: var(--ds-ok);     --st-bg: var(--ds-ok-bg);     --st-line: var(--ds-ok-line);     --st-ink: var(--ds-ok-ink); }
-[data-st="blocked"] { --st: var(--ds-danger); --st-bg: var(--ds-danger-bg); --st-line: var(--ds-danger-line); --st-ink: var(--ds-danger-ink); }
-[data-st="unknown"] { --st: var(--ds-warn);   --st-bg: var(--ds-warn-bg);   --st-line: var(--ds-warn-line);   --st-ink: var(--ds-warn-ink); }
+/* 5つの状態 → 状態の色の札（iss-00574 D-01） */
+[data-st="done"]    { --st: var(--sd-done); --st-bg: var(--sd-done-bg); --st-line: var(--sd-done-line); --st-ink: var(--sd-done-ink); }
+[data-st="doing"]   { --st: var(--sd-doing); --st-bg: var(--sd-doing-bg); --st-line: var(--sd-doing-line); --st-ink: var(--sd-doing-ink); }
+[data-st="ready"]   { --st: var(--sd-ready); --st-bg: var(--sd-ready-bg); --st-line: var(--sd-ready-line); --st-ink: var(--sd-ready-ink); }
+[data-st="blocked"] { --st: var(--sd-blocked); --st-bg: var(--sd-blocked-bg); --st-line: var(--sd-blocked-line); --st-ink: var(--sd-blocked-ink); }
+[data-st="unknown"] { --st: var(--sd-unknown); --st-bg: var(--sd-unknown-bg); --st-line: var(--sd-unknown-line); --st-ink: var(--sd-unknown-ink); }
 [data-st="merge"]   { --st: var(--ds-accent); --st-bg: var(--ds-accent-soft); --st-line: var(--ds-accent-line); --st-ink: var(--ds-accent-strong); }
 
 /* ---------- Base ---------- */
@@ -201,6 +219,13 @@ svg.ds-icon { width: 1em; height: 1em; flex: none; fill: none; stroke: currentCo
 .ds-docid { display: inline-block; font-family: var(--ds-font-mono); font-size: 11.5px; font-weight: 700; letter-spacing: .02em; padding: 1px 7px; border-radius: 4px; color: var(--ds-accent-strong); background: var(--ds-accent-soft); border: 1px solid var(--ds-accent-line); white-space: nowrap; line-height: 1.5; }
 .st-ico { width: 15px; height: 15px; flex: none; color: var(--st); }
 .st-ico .on { stroke: var(--ds-bg); fill: none; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+/* 作業中の輪（iss-00574 D-03、D-05）：動いているときだけ、次の区切り（.sd-nx の重ね）がゆっくり点滅する */
+.st-ico .sd-nx { opacity: .15; }
+.st-ico[data-live="1"] .sd-nx { animation: sd-next 2s ease-in-out infinite; }
+@keyframes sd-next { 0%, 100% { opacity: .15; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .st-ico .sd-nx { animation: none; opacity: 0; }
+}
 .chip { display: inline-flex; align-items: center; gap: .35em; padding: .08em .55em .08em .4em; border-radius: 4px; background: var(--st-bg); color: var(--st-ink); border: 1px solid var(--st-line); font-size: 12.5px; font-weight: 700; line-height: 1.6; white-space: nowrap; }
 
 /* ---------- Empty slots (replaced by #531 and #532) ---------- */
