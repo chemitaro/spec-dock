@@ -3,7 +3,7 @@
 import { boardColumns, boardCounts, boardOptions, groupByParent, KINDS, pullRequestNotice, withParam } from "./_shared/logic.js";
 
 const byNumber = (a, b) => a.number - b.number;
-import { card, emptyState, esc, icon, legend, newTabLink, stateIcon } from "./_shared/parts.js";
+import { card, emptyState, esc, icon, legend, newTabLink, stateIcon, stateMark } from "./_shared/parts.js";
 
 let dialogScope = null; // the cleanup dialog stays open across the 5-second refresh
 
@@ -15,7 +15,7 @@ function columnBody(column, ctx, byId, group) {
       .map(({ parent, items: members }) => {
         const head = parent && byId.get(parent);
         const label = head
-          ? `${stateIcon(head.state, false)}<span class="ds-docid">${esc(head.id)}</span><span>${esc(head.title)}</span>`
+          ? `${stateMark(head, byId, { label: false })}<span class="ds-docid">${esc(head.id)}</span><span>${esc(head.title)}</span>`
           : `<span>最上位</span>`;
         return `<div class="sd-col__grp">${label}</div>${members.map((item) => card(item, ctx)).join("")}`;
       })
@@ -38,7 +38,7 @@ function cleanupDialog(ctx, byId) {
     .map((item) => {
       const scope = byId.get(item.id);
       const nameHtml = scope
-        ? `<a data-nav href="${esc(ctx.href(scope.path))}">${stateIcon(scope.state, false)}<span class="ds-docid">${esc(scope.id)}</span></a><div class="sd-muted">${esc(scope.title)}</div>`
+        ? `<a data-nav href="${esc(ctx.href(scope.path))}">${stateMark(scope, byId, { label: false })}<span class="ds-docid">${esc(scope.id)}</span></a><div class="sd-muted">${esc(scope.title)}</div>`
         : `<span class="ds-docid">${esc(item.id)}</span>`;
       const github = scope?.url ? `<a href="${esc(scope.url)}" target="_blank" rel="noopener">${icon("external")}GitHub</a>` : "";
       return `<tr><td>${nameHtml}</td><td>${esc(item.text)}</td><td>${github}</td></tr>`;
@@ -96,7 +96,7 @@ function render(root, ctx) {
     (prNotice ? `<div class="sd-callout" data-tone="${prNotice.level === "unknown" ? "warning" : "note"}" data-code="pr-${prNotice.level}">${icon("branch")}<p>${esc(prNotice.text)}</p></div>` : "") +
     `<div class="sd-ctl"><span class="sd-seg" role="group" aria-label="種類">${kindButtons}</span>${toggle("group", options.group, "親ごとにまとめる")}${toggle("done", options.done, "終わったものも（列を足す）")}${legend()}</div>` +
     (unknown.length
-      ? `<div class="sd-callout" data-tone="warning" data-code="unknown">${stateIcon("unknown", false)}<div><p class="sd-callout__title">不明 ${unknown.length}件：記録の食い違いを直すまで、どの列にも入れない</p><p>${unknown
+      ? `<div class="sd-callout" data-tone="unknown" data-code="unknown">${stateIcon("unknown", false)}<div><p class="sd-callout__title">不明 ${unknown.length}件：記録の食い違いを直すまで、どの列にも入れない</p><p>${unknown
           .map((item) => `<a data-nav href="${esc(ctx.href(item.path))}">${esc(item.id)} ${esc(item.title)}</a>（${esc(item.reason?.text ?? "")}）`)
           .join("、")}</p></div></div>`
       : "") +

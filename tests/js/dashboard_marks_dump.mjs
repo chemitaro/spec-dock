@@ -2,6 +2,8 @@
 //   node dashboard_marks_dump.mjs <assets/dashboard directory>
 // Prints one JSON object; the test compares it with tests/fixtures/issue544/marks-golden.json, written from the
 // code before the marks' values moved to core/ui.js, so the move changes no HTML.
+// iss-00574 rewrote it once for the new state shapes (ready, doing, blocked, unknown; done is unchanged); every other
+// mark is still the same HTML.
 import { pathToFileURL } from "node:url";
 import path from "node:path";
 

@@ -225,7 +225,7 @@ function oneView(ctx) {
     `<header class="td-cover" data-overdue="${derived.overdue ? 1 : 0}" data-status="${esc(todo.status)}">` +
     `<p class="td-cover__kicker">${kindBadge(todo.kind)}<span class="ds-docid">${esc(todo.id)}</span><span class="sd-muted">${esc(repoName(repo))}</span></p>` +
     `<h1 class="td-cover__title">${esc(todo.title)}</h1>` +
-    `<div class="td-cover__tags"><span class="sd-badge" data-tone="${closed ? "" : "accent"}">${esc(state)}</span>${dueBadge(todo, derived)}${derived.blocking ? `<span class="sd-badge" data-tone="danger">${ic("person")}Scope を止めている</span>` : ""}${derived.parent_closable ? `<span class="sd-badge" data-tone="ok">${ic("check")}サブタスクがすべて終わった</span>` : ""}</div>` +
+    `<div class="td-cover__tags"><span class="sd-badge" data-tone="${closed ? "" : "accent"}">${esc(state)}</span>${dueBadge(todo, derived)}${derived.blocking ? `<span class="sd-badge" data-tone="blocked">${ic("person")}Scope を止めている</span>` : ""}${derived.parent_closable ? `<span class="sd-badge" data-tone="ok">${ic("check")}サブタスクがすべて終わった</span>` : ""}</div>` +
     `</header>` +
     kv([
       ["種類", esc(KIND_WORDS[todo.kind] ?? todo.kind ?? "")],

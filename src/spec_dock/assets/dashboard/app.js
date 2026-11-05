@@ -5,6 +5,7 @@ import * as api from "./core/api.js";
 import { createEmbedBridge } from "./core/embed.js";
 import { parseRoute, withEmbed } from "./core/route.js";
 import { renderNotices, renderTop } from "./core/topbar.js";
+import { LIVE_MS, movedAt } from "./core/ui.js";
 import { VIEWS } from "./views/index.js";
 import { mountSearch } from "./views/_shared/search.js";
 
@@ -96,11 +97,28 @@ async function loadRepository() {
     state.data = await api.structure(repo, state.baseline);
     state.loadedAt = performance.now();
     state.revision = state.data.revision;
+    state.liveUntil = liveUntil(state.data);
     state.scope = state.route.scope ? await api.scope(repo, state.route.scope, state.baseline).catch(() => null) : null;
     state.error = null;
   } catch (error) {
     state.error = `このリポジトリを読めませんでした（${error.message}）。`;
   }
+}
+
+// The earliest end of the 30-minute window of a Scope in progress that is moving now, or null (iss-00574 D-04).
+function liveUntil(data) {
+  const scopes = data?.scopes || [];
+  const byId = new Map(scopes.map((item) => [item.id, item]));
+  const now = Date.now();
+  let first = null;
+  for (const scope of scopes) {
+    if (scope.state !== "doing") continue;
+    const moved = movedAt(scope, byId);
+    if (moved == null || now - moved > LIVE_MS) continue;
+    const end = moved + LIVE_MS + 1;
+    if (first == null || end < first) first = end;
+  }
+  return first;
 }
 
 async function refresh() {
@@ -110,6 +128,10 @@ async function refresh() {
     const { revision } = await api.revision(repo);
     if (revision === state.revision) {
       renderTop(top, mobileTabs, state); // the fetch age keeps counting while nothing changes
+      if (state.liveUntil != null && Date.now() >= state.liveUntil) {
+        state.liveUntil = liveUntil(state.data); // a mark in progress passed its 30 minutes: stop its blinking
+        render();
+      }
       return;
     }
     await loadRepository();

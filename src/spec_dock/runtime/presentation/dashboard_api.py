@@ -195,6 +195,7 @@ def scope_item(
     facts: Mapping[str, Mapping[str, object]] | None = None,
     readings: Mapping[str, Mapping[str, str | None]] | None = None,
     todos: Annotations | None = None,
+    progress: Mapping[str, Mapping[str, object] | None] | None = None,
 ) -> dict[str, object]:
     node = model.snapshot.find(scope.id)
     read = (readings or {}).get(scope.id, {})
@@ -229,7 +230,13 @@ def scope_item(
         "branch": read.get("branch"),
         # Open human tasks blocking it, blocking it or a descendant, and related to it (iss-00554 D-03; not a contract).
         "todos": dict(todos.marks.get(scope.id, NO_TODOS)) if todos is not None else dict(NO_TODOS),
+        # The plan's step counts of an Issue in progress (iss-00574 D-07; not a contract); null otherwise.
+        "progress": _progress((progress or {}).get(scope.id)),
     }
+
+
+def _progress(found: Mapping[str, object] | None) -> dict[str, object] | None:
+    return dict(found) if found is not None else None
 
 
 def _snapshot_block(view: RepositoryView, *, now: datetime) -> dict[str, object]:
@@ -251,6 +258,7 @@ def structure_document(
     latest: SeenRecord | None,
     readings: Mapping[str, Mapping[str, str | None]] | None = None,
     todos: Annotations | None = None,
+    progress: Mapping[str, Mapping[str, object] | None] | None = None,
 ) -> dict[str, object]:
     model = view.model
     changes: Mapping[str, ScopeChange] = (
@@ -291,7 +299,8 @@ def structure_document(
         },
         "anomalies": [{"number": a.number, "code": a.code, "message": a.message} for a in model.anomalies],
         "scopes": [
-            scope_item(model, scope, changes.get(scope.id), order[scope.id], facts, readings, todos) for scope in scopes
+            scope_item(model, scope, changes.get(scope.id), order[scope.id], facts, readings, todos, progress)
+            for scope in scopes
         ],
         "cleanup": [{"id": c.scope_id, "code": c.code, "text": c.text} for c in model.cleanup],
         "timeline": {
@@ -376,6 +385,7 @@ def scope_document(
     readings: Mapping[str, Mapping[str, str | None]] | None = None,
     todos: Annotations | None = None,
     now: datetime | None = None,
+    progress: Mapping[str, Mapping[str, object] | None] | None = None,
 ) -> dict[str, object] | None:
     model = view.model
     if model is None or scope_id not in model.scopes:
@@ -396,6 +406,7 @@ def scope_document(
             layout_facts(model),
             readings,
             todos,
+            progress,
         ),
         "upstream": _path(upstream(model, scope_id)),
         "downstream": _path(downstream_ids(model, scope_id)),

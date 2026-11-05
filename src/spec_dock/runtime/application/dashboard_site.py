@@ -16,6 +16,7 @@ from pathlib import Path
 import threading
 from typing import TYPE_CHECKING, Literal
 
+from spec_dock.runtime.application.dashboard_progress import issues_in_progress, plan_signature
 from spec_dock.runtime.domain.canonical_structure import parse_timestamp
 from spec_dock.runtime.domain.dashboard_model import STALE_AFTER, build_model
 from spec_dock.runtime.domain.dashboard_snapshot import structure_confirmed_at
@@ -342,6 +343,7 @@ class DashboardSite:
             model.pull_request_status if model is not None else None,
             site.problem,
             self.todos.signature(site),  # CLI-written tasks reach the 5-second refresh (iss-00554 R-07)
+            plan_signature(site.catalog, issues_in_progress(model)),  # a rewritten plan too (iss-00574 D-08)
         )
         return hashlib.sha256(repr(parts).encode()).hexdigest()[:16]
 

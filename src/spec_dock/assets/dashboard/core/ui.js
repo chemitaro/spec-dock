@@ -1,7 +1,8 @@
-// Shared small parts for the shell and the screens (iss-00529). Screens may import these; the shapes and
-// labels follow the adopted design d2 (Epic D-07): doing = half circle, ready = triangle, blocked = octagon,
-// unknown = diamond, done = grey check. The one home of the marks' values (iss-00544): every icon shape, the
-// state, kind and pull request words and the assurance steps; the screens' parts draw with these.
+// Shared small parts for the shell and the screens (iss-00529). Screens may import these. The one home of the marks'
+// values (iss-00544): every icon shape, the state, kind and pull request words and the assurance steps; the
+// screens' parts draw with these. The state marks (iss-00574 D-03): ready = a ring with a play triangle, doing =
+// the progress ring, blocked = a filled circle with a pause, unknown = a ring with "?", done = a grey check; every
+// shape fits one circle. The colors are the state tokens of app.css (`--sd-<state>`).
 
 export const esc = (value) =>
   String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -52,11 +53,49 @@ export const ICONS = {
 export const ic = (name, cls = "") =>
   `<svg class="ds-icon${cls ? " " + cls : ""}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${ICONS[name] || ""}</svg>`;
 
+// The progress ring of a Scope in progress (iss-00574 D-03): one segment per plan step (dropped ones left out), the
+// done ones thick (3.6) in the state color, the rest thin (1.4) in the track color, so they differ by width too; past 12 steps one arc of the done part; with
+// no steps the outline only. `live` adds the one overlay that blinks (`.sd-nx`): the next segment, the next part of
+// the arc, the center dot when every step is done, or a thick ring over the outline.
+const RING = 8.6;
+const GAP = 0.32;
+const TAU = Math.PI * 2;
+const point = (a) => `${(12 + RING * Math.sin(a)).toFixed(2)} ${(12 - RING * Math.cos(a)).toFixed(2)}`;
+const arc = (a0, a1, cls, width, color = "currentColor") =>
+  `<path class="${cls}" d="M${point(a0)}A${RING} ${RING} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${point(a1)}" fill="none" stroke="${color}" stroke-width="${width}"/>`;
+const ring = (cls, width, color = "currentColor") =>
+  `<circle class="${cls}" cx="12" cy="12" r="${RING}" fill="none" stroke="${color}" stroke-width="${width}"/>`;
+const TRACK = "var(--sd-track)";
+const CENTER = '<circle class="sd-nx" cx="12" cy="12" r="3" fill="currentColor"/>';
+
+export function progressRing(progress, { live = false } = {}) {
+  const total = Math.max(0, Math.floor(progress?.total || 0));
+  const done = Math.min(Math.max(0, Math.floor(progress?.done || 0)), total);
+  if (!total) return ring("o", 2.4) + (live ? ring("sd-nx", 3.6) : "");
+  if (total <= 12) {
+    let out = "";
+    let next = "";
+    for (let i = 0; i < total; i++) {
+      const a0 = (i / total) * TAU + GAP / 2;
+      const a1 = ((i + 1) / total) * TAU - GAP / 2;
+      out += i < done ? arc(a0, a1, "f", 3.6) : arc(a0, a1, "t", 1.4, TRACK);
+      if (live && i === done) next = arc(a0, a1, "sd-nx f", 3.6);
+    }
+    return out + next + (live && done === total ? CENTER : "");
+  }
+  const end = (done / total) * TAU;
+  let out = ring("t", 1.4, TRACK);
+  if (done === total) out += ring("f", 3.6);
+  else if (done) out += arc(0, end, "f", 3.6);
+  if (live) out += done === total ? CENTER : arc(end, ((done + 1) / total) * TAU, "sd-nx f", 3.6);
+  return out;
+}
+
 export const STATES = {
-  ready: { label: "着手できる", shape: '<path d="M7 4.2 20.2 12 7 19.8z" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>' },
-  doing: { label: "作業中", shape: '<circle cx="12" cy="12" r="8.6" fill="none" stroke="currentColor" stroke-width="2.6"/><path d="M12 6.2a5.8 5.8 0 0 1 0 11.6z" fill="currentColor"/>' },
-  blocked: { label: "止められている", shape: '<path d="M8.1 2.6h7.8l5.5 5.5v7.8l-5.5 5.5H8.1l-5.5-5.5V8.1z" fill="currentColor"/><path class="on" d="M7.6 12h8.8"/>' },
-  unknown: { label: "不明", shape: '<path d="M12 1.8 22.2 12 12 22.2 1.8 12z" fill="currentColor"/><path class="on" style="stroke-width:2.2" d="M9.9 9.7a2.2 2.2 0 1 1 3.1 2c-.6.3-1 .8-1 1.4v.3M12 16.4v.1"/>' },
+  ready: { label: "着手できる", shape: '<circle cx="12" cy="12" r="8.6" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M10.1 8.3 16 12l-5.9 3.7z" fill="currentColor" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>' },
+  doing: { label: "作業中", shape: progressRing(null) },
+  blocked: { label: "止められている", shape: '<circle cx="12" cy="12" r="9.6" fill="currentColor"/><path class="on" d="M9.6 8.6v6.8"/><path class="on" d="M14.4 8.6v6.8"/>' },
+  unknown: { label: "不明", shape: '<circle cx="12" cy="12" r="8.6" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M9.8 9.7a2.3 2.3 0 1 1 3.2 2.1c-.6.3-1 .8-1 1.4v.3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="16.5" r="1.25" fill="currentColor"/>' },
   done: { label: "終わった", shape: '<circle cx="12" cy="12" r="10" fill="currentColor"/><path class="on" d="m7.6 12.3 3 3 5.8-6.2"/>' },
 };
 
@@ -70,10 +109,102 @@ export const ASSURANCE_LEVELS = { light: 1, standard: 2, strict: 3, critical: 4 
 
 export const PR_STATE_WORDS = { open: "開いている", draft: "下書き", merged: "マージ済み", closed: "閉じた" };
 
-export const stateIcon = (state, label = true) =>
-  `<svg class="st-ico" data-st="${state}" viewBox="0 0 24 24" ${label ? `role="img" aria-label="${STATES[state]?.label ?? state}"` : 'aria-hidden="true"'}>${STATES[state]?.shape ?? ""}</svg>`;
+// A state mark. For doing, `opts.progress` ({done, total}) draws the progress ring and `opts.live` its blinking
+// overlay; `opts.unit` names what is counted in the words ("手順" for an Issue's plan steps, "配下" for the Issues below).
+export function stateIcon(state, label = true, opts = {}) {
+  const { progress = null, live = false, unit = "手順" } = opts;
+  const doing = state === "doing";
+  const shape = doing ? progressRing(progress, { live }) : STATES[state]?.shape ?? "";
+  const name = STATES[state]?.label ?? state;
+  const words = doing && progress?.total ? `${name}（${unit} ${progress.done}／${progress.total} 終わった）` : name;
+  const a11y = label ? `role="img" aria-label="${esc(words)}"` : 'aria-hidden="true"';
+  return `<svg class="st-ico" data-st="${state}"${doing && live ? ' data-live="1"' : ""} viewBox="0 0 24 24" ${a11y}>${shape}</svg>`;
+}
 
-export const chip = (state) => `<span class="chip" data-st="${state}">${stateIcon(state, false)}${esc(STATES[state]?.label ?? state)}</span>`;
+export const chip = (state, opts = {}) => `<span class="chip" data-st="${state}">${stateIcon(state, false, opts)}${esc(STATES[state]?.label ?? state)}</span>`;
+
+// --- Progress and motion of a Scope in progress (iss-00574 D-03, D-04) ------------------------------------------
+
+export const LIVE_MS = 30 * 60 * 1000;
+
+const lookup = (byId) => (typeof byId === "function" ? byId : (id) => byId?.get?.(id));
+
+function below(scope, get) {
+  const seen = new Set([scope.id]);
+  const out = [];
+  const walk = (item) => {
+    for (const id of item.children || []) {
+      const child = get(id);
+      if (!child || seen.has(child.id)) continue;
+      seen.add(child.id);
+      out.push(child);
+      walk(child);
+    }
+  };
+  walk(scope);
+  return out;
+}
+
+const time = (text) => {
+  const value = text ? Date.parse(text) : NaN;
+  return Number.isFinite(value) ? value : null;
+};
+
+// {done, total} of a Scope in progress: an Issue's plan steps, an Epic's or Initiative's Issues below it; else null.
+export function scopeProgress(scope, byId) {
+  if (scope?.state !== "doing") return null;
+  if (scope.kind === "issue") {
+    const p = scope.progress;
+    return p && p.total ? { done: p.done || 0, total: p.total } : null;
+  }
+  const issues = below(scope, lookup(byId)).filter((item) => item.kind === "issue");
+  return issues.length ? { done: issues.filter((item) => item.state === "done").length, total: issues.length } : null;
+}
+
+// The last move in milliseconds: an Issue's `active_at` or plan time, a parent's also every Scope below; null if unknown.
+export function movedAt(scope, byId) {
+  if (!scope) return null;
+  const items = scope.kind === "issue" ? [scope] : [scope, ...below(scope, lookup(byId))];
+  let latest = null;
+  for (const item of items) {
+    for (const value of [time(item.active_at), time(item.progress?.modified_at)]) {
+      if (value != null && (latest == null || value > latest)) latest = value;
+    }
+  }
+  return latest;
+}
+
+export const isLive = (moved, now) => moved != null && now - moved <= LIVE_MS;
+
+export function idleWords(ms) {
+  const minutes = Math.floor(ms / 60000);
+  if (minutes < 1) return "1分以内動きなし";
+  if (minutes < 60) return `${minutes}分動きなし`;
+  const hours = Math.floor(minutes / 60);
+  return hours < 48 ? `${hours}時間動きなし` : `${Math.floor(hours / 24)}日動きなし`;
+}
+
+// "N分動きなし" for a Scope in progress that has not moved for 30 minutes; "" otherwise (and when the time is unknown).
+export function idleText(scope, byId, now = Date.now()) {
+  if (scope?.state !== "doing") return "";
+  const moved = movedAt(scope, byId);
+  return moved == null || isLive(moved, now) ? "" : idleWords(now - moved);
+}
+
+// A Scope's state mark. Only the graph's boxes, its side panel and the detail cover pass `motion: true`; lists never do.
+export function stateMark(scope, byId, { now = Date.now(), motion = false, label = true } = {}) {
+  const state = scope?.state ?? "unknown";
+  if (state !== "doing") return stateIcon(state, label);
+  const live = motion && isLive(movedAt(scope, byId), now);
+  return stateIcon("doing", label, { progress: scopeProgress(scope, byId), live, unit: scope.kind === "issue" ? "手順" : "配下" });
+}
+
+export function stateChip(scope, byId, { now = Date.now(), motion = false } = {}) {
+  const state = scope?.state ?? "unknown";
+  if (state !== "doing") return chip(state);
+  const live = motion && isLive(movedAt(scope, byId), now);
+  return chip("doing", { progress: scopeProgress(scope, byId), live, unit: scope.kind === "issue" ? "手順" : "配下" });
+}
 
 export function ago(seconds) {
   if (seconds == null) return "—";
