@@ -1,48 +1,76 @@
 package spec
 
-// 要件（Issue）。型 specdock/v1。書き方は spec-dock/docs/authoring/ のガイドにある。
-// 文章の項目には Markdown を書いてよい。型にない項目は、必要に応じて足してよい。
-
-// 型の版。消さない。
 schema: "specdock/v1"
 
-// 保証レベル（light、standard、strict、critical）と、その理由。
-// 失敗したときの影響と回復の難しさで選ぶ（工数や作業の難しさでは選ばない）。
-// 具体化や作業の途中で、上げても下げてもよい。正本はここだけで、ほかの場所に写さない。
 assurance: {
 	level:  "light"
-	reason: "テストの時間の上限と文書の1文を直すだけ"
+	reason: "テストの測り方と、ダッシュボードの小さな見た目の直し。ユーザーの保存データも公開の契約も変えず、PR を戻せば元に戻る"
 }
 
-// 目的と背景（任意）。
-// purpose:    "この Issue が実現する価値"
-// background: "解く問題と、関係者"
+purpose: "負荷が高い PC でも落ちないテストにし、ダッシュボードの細かい見た目の不具合 4 件を直す"
 
-// 対象と対象外（任意）。
-// includes: ["..."]
-// excludes: ["..."]
+background: """
+	親は epic-00080（小さな不具合の直し）。統括が 2026-11-05 に、負荷の高い PC で `test_the_250_scope_structure_routes_within_a_second`（上限 1000ms。負荷 40〜128 で 1379〜2060ms）と
+	`test_issue440_g3_worktree_bootstrap` の 0.1 秒の timeout のテストが main でも落ちることと、ブラウザーで見たダッシュボードの見た目の不具合 4 件を見つけた。CI では通る。
+	作業メモの 2（`migration.md` の食い違い）はこの Issue では直さない（次の版 0.9.0 のリリースの Issue が新しい節で正す）。
+	"""
 
-// 観測できる要件。番号（R-01、R-02、…）をキーにする。
-// title は必須。acceptance（観測できる受け入れの条件）は standard 以上で必須。
+includes: [
+	"時間を見る 2 つのテストを、負荷に強い測り方にする",
+	"`/favicon.ico` の 404、Scope が 0 件の札、文書の画面の目次の背景、390px の図の枠の線",
+]
+
+excludes: [
+	"`migration.md` と版の番号（0.9.0 のリリースの Issue が行う）",
+	"配線の経路探索そのものの速さの改善",
+]
+
 requirements: {
-	// "R-01": {
-	// 	title: "利用者が〜できる"
-	// 	text:  "詳しい説明"
-	// 	acceptance: ["〜が観測できる"]
-	// }
+	"R-01": {
+		title: "構造の図の経路探索の時間のテストが、負荷に強い"
+		text:  "性能の退行を見張る意味は残したまま、PC の負荷で時間が伸びても落ちない。上限をただ大きくしない。"
+		acceptance: [
+			"時間は node の CPU 時間（user+system）で測り、3 回のうちの最小を採る。上限 1000ms は変えない",
+			"`yes > /dev/null` を CPU の数の 4 倍走らせた状態でも、`test_the_250_scope_structure_routes_within_a_second` が通る",
+		]
+	}
+	"R-02": {
+		title: "bootstrap の timeout のテストが、負荷に強い"
+		text:  "timeout は Git の事前確認も含めて数える。0.1 秒では、負荷が高いと hook が始まる前に切れて `started` が偽になる。"
+		acceptance: [
+			"timeout を 1.0 秒にし、hook はそれより長く（2 秒）動くようにする。確かめる内容（部分の効果が残る、子のプロセスの群れが止まる）は変えない",
+			"負荷をかけた状態でも `tests/cli_runtime/test_issue440_g3_worktree_bootstrap.py` が通る",
+		]
+	}
+	"R-03": {
+		title: "ダッシュボードが `/favicon.ico` の 404 を出さない"
+		acceptance: [
+			"`GET /favicon.ico` が 200 で SpecDock の印の SVG を返す",
+			"ダッシュボードのページが `<link rel=\"icon\">` で同じ印を指し、ブラウザーの通信に 404 が出ない",
+		]
+	}
+	"R-04": {
+		title: "Scope が 0 件のリポジトリの札に、「Scope がない」と示す"
+		acceptance: ["横断の概況で、Scope が 0 件のリポジトリの札に「Scope はまだありません」と出る（見出しだけで空にならない）"]
+	}
+	"R-05": {
+		title: "文書の画面の左の目次の背景が、最後までつながる"
+		text:  "長い文書でスクロールしても、目次の列の背景と縁の線が文書の終わりまで続く。"
+		acceptance: ["ダッシュボードが返す文書の HTML に、目次の列の背景を列の全体に敷く規則が入る（PC の幅、画面表示だけ）"]
+	}
+	"R-06": {
+		title: "390px の幅で、状態の札の帯の下に図の枠の線が見えない"
+		acceptance: ["390px の幅の構造の図で、状態の札の帯の下は帯の背景で隠れ、図の領域は帯の下から始まる"]
+	}
 }
 
-// 失敗・境界の条件。番号（F-01、…）をキーにする。
-// title は必須。impact（起きたときの影響）と recovery（回復のしかた）は strict 以上で必須。
 failures: {
-	// "F-01": {
-	// 	title:    "〜のときは、何も書かずに止まる"
-	// 	impact:   "〜"
-	// 	recovery: "〜"
-	// }
+	"F-01": {
+		title: "上限を緩めただけで、性能の退行を見逃す"
+		text:  "CPU 時間と最小値で負荷の影響を除き、上限は 1000ms のままにする。"
+	}
 }
 
-// 制約・前提、合意した判断、未解決事項（任意）。
-// constraints: ["..."]
-// decisions: ["..."]
-// questions: ["..."]
+decisions: [
+	"(c) の目次の背景は、統括のブラウザーでは見えたが、headless Chrome（PC 幅、スクロール、暗い・明るい、iframe の中）では再現できなかった。原因を確かめられないので、`ds.css`（配布資産）は変えず、ダッシュボードが返す文書の HTML に小さな上書きの規則を足して、背景を列の全体に敷く（配布の契約は変わらない）。",
+]
