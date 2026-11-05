@@ -50,9 +50,9 @@ design: {
 		text: """
 			- `STATES` の形：ready＝輪（半径8.6、線2.4）と中の三角。blocked＝塗った丸（半径9.6）と `.on` の2本の縦の棒。unknown＝輪と `?`（線と点を印の色で）。done＝今のまま。doing＝輪の外枠（`progressRing` の既定）。
 			- `progressRing({done, total} | null, {live})`：中心 (12, 12)、半径8.6。
-			  - total が1〜12：total 個の区切り（区切りの間に 0.32 ラジアンの隙間）。i < done は `--st` の太い線（3.2）、ほかは `--sd-track` の細い線（2）。live かつ done < total なら、i = done の区切りに、太い線の重ね（`class="sd-nx"`）を足す。live かつ done = total なら、中心に半径3の塗った丸の重ね（`class="sd-nx"`）を足す。
-			  - total が13以上：`--sd-track` の細い輪と、done／total の弧（太い線）。live かつ done < total なら、弧の先から 1／total の長さの重ねの弧（`class="sd-nx"`）を足す。done = total なら区切りと同じく中心の丸。
-			  - null か total が0：`--st` の外枠（線2.4）だけ。live なら、外枠の上に太い線（3.2）の輪の重ね（`class="sd-nx"`）を足す（外枠そのものは点滅させない）。
+			  - total が1〜12：total 個の区切り（区切りの間に 0.32 ラジアンの隙間）。i < done は `--st` の太い線（3.6）、ほかは `--sd-track` の細い線（1.4）。19px の箱でも太さの差で読めるよう、差を大きく取る。live かつ done < total なら、i = done の区切りに、太い線の重ね（`class="sd-nx"`）を足す。live かつ done = total なら、中心に半径3の塗った丸の重ね（`class="sd-nx"`）を足す。
+			  - total が13以上：`--sd-track` の細い輪（1.4）と、done／total の弧（太い線）。live かつ done < total なら、弧の先から 1／total の長さの重ねの弧（`class="sd-nx"`）を足す。done = total なら区切りと同じく中心の丸。
+			  - null か total が0：`--st` の外枠（線2.4）だけ。live なら、外枠の上に太い線（3.6）の輪の重ね（`class="sd-nx"`）を足す（外枠そのものは点滅させない）。
 			  - 重ねは、どの場合も別の要素で、`.sd-nx` だけが点滅する。名前は、構造の図の絞り込みの釦の `.gx .nx` と重ならないよう `sd-nx` にする。重ねの色は `--st`（`stroke`／`fill` に直接書く）。
 			- `stateIcon(state, label = true, opts = {})`：`opts.progress` と `opts.live` を受け、doing のときだけ `progressRing` を描く。`aria-label` は doing で数があれば「作業中（手順 4／8 終わった）」。Epic・Initiative は「作業中（配下 2／5 終わった）」（`opts.unit`）。live なら `data-live="1"` を SVG に付ける。
 			- `chip(state, opts)` も同じ `opts` を `stateIcon` に渡す。
@@ -71,7 +71,7 @@ design: {
 	"D-05": {
 		title: "点滅（CSS）"
 		text: """
-			`app.css` に `@keyframes sd-next { 0%, 100% { opacity: .15 } 50% { opacity: 1 } }` と `.st-ico[data-live="1"] .sd-nx { animation: sd-next 2s ease-in-out infinite; }` を置く。`.st-ico .sd-nx` は既定で `opacity: .15`（重ねは live のときだけ描く）。`@media (prefers-reduced-motion: reduce) { .st-ico .sd-nx { animation: none; opacity: 0; } }`（重ねだけが消え、外枠と区切りは残る）。大きさは今の `.st-ico`（15px、構造の図も15px）のまま、太い区切り（3.2）で差を出す。
+			`app.css` に `@keyframes sd-next { 0%, 100% { opacity: .15 } 50% { opacity: 1 } }` と `.st-ico[data-live="1"] .sd-nx { animation: sd-next 2s ease-in-out infinite; }` を置く。`.st-ico .sd-nx` は既定で `opacity: .15`（重ねは live のときだけ描く）。`@media (prefers-reduced-motion: reduce) { .st-ico .sd-nx { animation: none; opacity: 0; } }`（重ねだけが消え、外枠と区切りは残る）。大きさは、構造の図の箱と枠の頭の作業中の輪だけ 19px にし（ほかは今の 15px）、太い区切り（3.6）と細い区切り（1.4）の差で読めるようにする。
 			"""
 		satisfies: ["R-05"]
 	}
