@@ -58,7 +58,7 @@ def _rgba(value: str, tokens: dict[str, str]) -> tuple[float, float, float, floa
 
 def _over(top: tuple[float, float, float, float], under: tuple[float, float, float, float]) -> tuple[float, ...]:
     a = top[3]
-    return tuple(top[i] * a + under[i] * (1 - a) for i in range(3)) + (1.0,)
+    return (*(top[i] * a + under[i] * (1 - a) for i in range(3)), 1.0)
 
 
 def _luminance(color: tuple[float, ...]) -> float:
@@ -111,7 +111,11 @@ def test_the_state_rules_use_only_the_state_tokens() -> None:
 
 def test_blocking_marks_are_yellow_not_danger() -> None:
     checks = {
-        "views/_shared/parts.css": (r"\.sd-hm \{[^}]*\}", r'\.sd-bar i\[data-st="blocked"\][^}]*\}', r'\[data-st="blocked"\]\.sd-card \{[^}]*\}'),
+        "views/_shared/parts.css": (
+            r"\.sd-hm \{[^}]*\}",
+            r'\.sd-bar i\[data-st="blocked"\][^}]*\}',
+            r'\[data-st="blocked"\]\.sd-card \{[^}]*\}',
+        ),
         "views/graph.css": (r"\.gx \.hm \{[^}]*\}",),
         "views/todos.css": (r"\.td-blocks \{[^}]*\}", r"\.td-blocks \.ds-icon \{[^}]*\}"),
     }
@@ -138,7 +142,8 @@ def test_reduced_motion_hides_only_the_blinking_overlay() -> None:
     reduced = re.findall(r"@media \(prefers-reduced-motion: reduce\) \{(.*?)\n\}", APP_CSS, re.S)
     # the reduced rule must win over the blinking rule: the same selector (an attribute selector raises it)
     assert any(
-        re.search(r'\.st-ico\[data-live="1"\] \.sd-nx[^{]*\{[^}]*animation: none[^}]*opacity: 0', block) for block in reduced
+        re.search(r'\.st-ico\[data-live="1"\] \.sd-nx[^{]*\{[^}]*animation: none[^}]*opacity: 0', block)
+        for block in reduced
     )
 
 
@@ -150,6 +155,10 @@ def test_list_screens_never_ask_for_motion_and_every_screen_draws_with_state_mar
         assert "motion: true" in (ASSETS / rel).read_text(), rel
     for rel in ("views/graph.js", "views/scope.js", "views/board.js", "views/overview.js", "views/_shared/search.js"):
         assert "stateMark(" in (ASSETS / rel).read_text(), rel
+    graph = (ASSETS / "views" / "graph.js").read_text()
+    for place in ('<div class="gx-r1">', '<p class="pn-why" data-st="${s.state}">'):  # the box and the panel's reason
+        assert re.search(re.escape(place) + r"\$\{M\.stateMark\(s, V\.ix\.byId, \{ motion: true", graph), place
+    assert "${M.stateChip(s, V.ix.byId, { motion: true })}" in graph  # the panel's chip
 
 
 def test_the_shell_redraws_when_the_live_window_ends() -> None:
@@ -199,7 +208,9 @@ def test_every_state_shape_fits_the_circle(tmp_path: Path) -> None:
     )
     for state, svg in [*out["svg"].items(), ("ring", out["ring"])]:
         for attrs in re.findall(r"<circle ([^>]*)>", svg):
-            r = float(re.search(r'\br="([\d.]+)"', attrs).group(1))
+            radius = re.search(r'\br="([\d.]+)"', attrs)
+            assert radius, (state, attrs)
+            r = float(radius.group(1))
             width = re.search(r'stroke-width="([\d.]+)"', attrs)
             assert r + (float(width.group(1)) / 2 if width else 0) <= 10.5, (state, attrs)
         for x, y in re.findall(r"[MA][^\"]*?([\d.]+) ([\d.]+)(?=[A\"M]|$)", svg):
@@ -225,7 +236,7 @@ def test_the_ring_shows_the_plan_steps(tmp_path: Path) -> None:
         segments = _segments(cases[key])
         assert len(segments) == total, key
         assert [cls for cls, _ in segments] == ["f"] * done + ["t"] * (total - done), key
-        assert all(width == (3.6 if cls == "f" else 1.4) for cls, width in segments), key
+        assert all(math.isclose(width, 3.6 if cls == "f" else 1.4) for cls, width in segments), key
         assert "sd-nx" not in cases[key]
     # more than 12 steps: a track circle and one arc of the done part
     assert len(_segments(cases["e"])) == 1 and 'class="t"' in cases["e"] and "<circle" in cases["e"]
@@ -274,7 +285,14 @@ def test_moved_time_liveness_and_idle_words(tmp_path: Path) -> None:
     assert out["moved"] == [now - 29 * 60000, now - 29 * 60000, now - 400 * 60000, now - 31 * 60000, None]
     assert out["live"] == [True, True, False, False, False]
     assert out["idle"] == ["", "", "", "31分動きなし", ""]  # a done Scope and an unknown time say nothing
-    assert out["words"] == ["1分以内動きなし", "59分動きなし", "1時間動きなし", "47時間動きなし", "2日動きなし", "3日動きなし"]
+    assert out["words"] == [
+        "1分以内動きなし",
+        "59分動きなし",
+        "1時間動きなし",
+        "47時間動きなし",
+        "2日動きなし",
+        "3日動きなし",
+    ]
     assert out["epicProgress"] == {"done": 1, "total": 3}
     assert out["issueProgress"] == {"done": 1, "total": 4}
     assert out["readyProgress"] is None

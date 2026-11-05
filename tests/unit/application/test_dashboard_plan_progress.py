@@ -5,7 +5,6 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import json
 import os
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from spec_dock.runtime.application.dashboard_progress import PlanProgressCache, read_plan_progress
@@ -15,6 +14,8 @@ from spec_dock.runtime.infra.github_structure import GithubRepository
 from tests.support.dashboard_site import scope_dir
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from spec_dock.runtime.infra.cue_tool import CueTool
 
 REPO = GithubRepository("o", "r")
@@ -197,8 +198,21 @@ def test_the_real_cue_reads_the_steps_of_a_plan_alone(tmp_path: Path) -> None:
         'package spec\n\nsteps: {\n\t"S-01": {title: "a", realizes: ["R-01"], status: "done"}\n'
         '\t"S-02": {title: "b", realizes: ["R-01"]}\n}\n'
     )
-    progress = _read(tmp_path / "c", PlanProgressCache(), ("iss-00002",), steps_reader=read_plan_steps, cue_locator=None)
+    progress = _read(
+        tmp_path / "c", PlanProgressCache(), ("iss-00002",), steps_reader=read_plan_steps, cue_locator=None
+    )
     assert progress["iss-00002"] is not None
     assert {k: progress["iss-00002"][k] for k in ("total", "done", "todo")} == {"total": 2, "done": 1, "todo": 1}
     (directory / "plan.cue").write_text("package spec\n\nsteps: {\n")  # a syntax error
     assert read_plan_steps(directory, timeout=3.0) is None
+
+
+def test_a_status_that_is_not_text_counts_as_todo(tmp_path: Path) -> None:
+    catalog = _catalog(tmp_path)
+
+    def odd(directory: Path, *, timeout: float, tool: CueTool | None = None) -> dict[str, object] | None:
+        return {"S-01": {"status": ["done"]}, "S-02": {"status": {}}, "S-03": {"status": "done"}, "S-04": "x"}
+
+    progress = _read(catalog, PlanProgressCache(), ("iss-00002",), steps_reader=odd)["iss-00002"]
+    assert progress is not None
+    assert (progress["total"], progress["done"], progress["todo"]) == (4, 1, 3)

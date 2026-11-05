@@ -33,7 +33,9 @@ _STATUSES: Final = ("done", "doing", "todo", "dropped")
 
 
 class StepsReader(Protocol):
-    def __call__(self, directory: Path, *, timeout: float, tool: CueTool | None = None) -> Mapping[str, object] | None: ...
+    def __call__(
+        self, directory: Path, *, timeout: float, tool: CueTool | None = None
+    ) -> Mapping[str, object] | None: ...
 
 
 class CueLocator(Protocol):
@@ -61,7 +63,8 @@ def plan_counts(steps: Mapping[str, object] | None) -> dict[str, int] | None:
     counts = dict.fromkeys(_STATUSES, 0)
     for value in steps.values():
         status = value.get("status", "todo") if isinstance(value, dict) else "todo"
-        counts[status if status in counts else "todo"] += 1
+        # Untyped: a status may be any value (a list, a struct); only a known word counts as itself.
+        counts[status if isinstance(status, str) and status in counts else "todo"] += 1
     return {"total": counts["done"] + counts["doing"] + counts["todo"], **counts}
 
 

@@ -529,7 +529,7 @@ function renderPanel() {
   panel.innerHTML =
     `<div class="pn-grab"></div><div class="pn-head">${M.stateChip(s, V.ix.byId, { motion: true })}${mergeBadge(s)}<button type="button" class="iconbtn" data-act="close" aria-label="閉じる">${ic("x")}</button></div>` +
     `<div class="pn-body"><p class="pn-kicker"><span class="ds-docid">${esc(s.id)}</span>#${s.number}・${M.KIND[s.kind] ?? s.kind}</p><h2 class="pn-title">${esc(s.title)}</h2>` +
-    `<p class="pn-why" data-st="${s.state}">${stateIcon(s.state, false)}<span>${esc(s.reason?.text ?? "")}</span></p>${idleLine(s)}${panelPath(s)}<dl class="kv">${panelKv(s)}</dl>${panelStats(s)}</div>` +
+    `<p class="pn-why" data-st="${s.state}">${M.stateMark(s, V.ix.byId, { motion: true, label: false })}<span>${esc(s.reason?.text ?? "")}</span></p>${idleLine(s)}${panelPath(s)}<dl class="kv">${panelKv(s)}</dl>${panelStats(s)}</div>` +
     `<div class="pn-foot"><a class="ds-btn is-primary" data-nav href="${esc(V.ctx.href(s.path))}">詳しく${ic("arrowRight")}</a>` +
     (frame ? `<button type="button" class="ds-btn" data-act="focus" data-focus="${esc(s.id)}">${ic("target")}この範囲に絞る</button>` : "") +
     `<a class="ds-btn" href="${esc(s.url)}" target="_blank" rel="noopener">${ic("external")}GitHub</a></div>`;

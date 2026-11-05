@@ -1,6 +1,6 @@
 // Small HTML parts shared by the board, the detail screen and the overview (iss-00531 D-05). Every user text
-// goes through esc(). State shapes come from the shell's core/ui.js (doing = half circle, ready = triangle,
-// blocked = octagon, unknown = diamond, done = grey check), so #531 and #532 draw the same marks.
+// goes through esc(). State marks come from the shell's core/ui.js (`stateIcon`, `stateMark`: the shapes and the
+// progress ring of iss-00574), so #531 and #532 draw the same marks.
 import { ASSURANCE_LEVELS, KIND_LABEL, PR_STATE_WORDS, STATES, chip, esc, humanCount, humanMark, ic, idleText, stateChip, stateIcon, stateMark } from "../../core/ui.js";
 import {
   CHECK_WORDS,

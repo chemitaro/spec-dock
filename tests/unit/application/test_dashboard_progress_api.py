@@ -5,13 +5,14 @@ from __future__ import annotations
 from dataclasses import replace
 import json
 import os
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from spec_dock.runtime.application import dashboard_progress as progress_module
-from spec_dock.runtime.application import dashboard_scope_details as details_module
+from spec_dock.runtime.application import (
+    dashboard_progress as progress_module,
+    dashboard_scope_details as details_module,
+)
 from spec_dock.runtime.application.dashboard_http import DashboardHttp, Request
 from spec_dock.runtime.application.dashboard_site import DashboardSite
 from spec_dock.runtime.application.scope_check import AssuranceReading
@@ -19,6 +20,8 @@ from tests.support.dashboard import NOW, node, snapshot
 from tests.support.dashboard_site import register, scope_dir, write_snapshot
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from spec_dock.runtime.infra.cue_tool import CueTool
 
 HOST = "127.0.0.1:47800"

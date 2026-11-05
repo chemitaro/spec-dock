@@ -459,7 +459,7 @@ class DashboardHttp:
             one = {op[1]: scope_facts(details)} if details is not None else None
             scope_todos = self.site.todos.annotations(site, view.model) if known else None
             doing = [op[1]] if op[1] in issues_in_progress(view.model) else []
-            progress = read_plan_progress(site, doing, self.progress, prune=False) if doing else None
+            one_progress = read_plan_progress(site, doing, self.progress, prune=False) if doing else None
             scope_json = scope_document(
                 view,
                 op[1],
@@ -468,7 +468,7 @@ class DashboardHttp:
                 readings=one,
                 todos=scope_todos,
                 now=self.now(),
-                progress=progress,
+                progress=one_progress,
             )
             if scope_json is None:
                 return self._error(404, "DASHBOARD_SCOPE_UNKNOWN", f"{op[1]} is not in this repository's structure")
