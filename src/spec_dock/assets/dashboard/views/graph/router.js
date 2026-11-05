@@ -2,7 +2,7 @@
 // (epic-00427/artifacts/20261103t150110z--dashboard-design-d2.html). Pure computation: no DOM, so the same code
 // runs in the page and in the node check of the tests.
 //
-// Input G = { obs: [{x1, y1, x2, y2, p1, p2, key, lane?}], frames: [{x1, y1, x2, y2, cls}], edges: [{a, z}], bounds }
+// Input G = { obs: [{x1, y1, x2, y2, p1, p2, key, lane?}], frames: [{x1, y1, x2, y2, cls}], edges: [{a, z}], bounds, fineEntries? }
 //   obs    rectangles a line must not cross (boxes, frame headings, folded groups); p1-p2 is where lines may leave or
 //          enter on the side. `lane: "v"` marks a rectangle that blocks only vertical runs (a tree's parent line).
 //   edges  leave the right side of obs[a] and enter the left side of obs[z].
@@ -24,27 +24,64 @@ function slots(o, offset) {
   for (let y = Math.ceil((o.p1 - offset) / PORT_GRID) * PORT_GRID + offset; y <= o.p2 + EPS; y += PORT_GRID) out.push(y);
   return out;
 }
-function assignPorts(G) {
+/* 線の多い入口の辺（iss-00578）：2S の格子に入りきらない入口は、S おきに置く。ただし、出口の格子の高さには、
+   左で向かい合う障害物（その高さで、辺のすぐ左にある障害物）がその高さに出口を持つときは置かない（どちらも寄せで
+   動かない端の線分なので、重なると解けない）。入口を S おきにすると、線の多い箱が 2S おきの分まで高くならず、
+   その行のほかの列に、間の広い横の線の帯ができない */
+const sidesOf = G => {
   const sides = new Map();
   const add = (k, it) => { if (!sides.has(k)) sides.set(k, []); sides.get(k).push(it); };
   G.edges.forEach(e => { add(e.a + "R", { e, end: 0 }); add(e.z + "L", { e, end: 1 }); });
-  const mid = o => (o.p1 + o.p2) / 2;
+  return sides;
+};
+function facing(G, Z, y) {
+  let best = -1;
+  G.obs.forEach((o, i) => { if (!o.lane && o !== Z && o.x2 <= Z.x1 + EPS && o.y1 - EPS <= y && y <= o.y2 + EPS && (best < 0 || o.x2 > G.obs[best].x2)) best = i; });
+  return best;
+}
+function entrySlots(G, Z, k, exits) {
+  const coarse = slots(Z, C.S);
+  if (coarse.length >= k || !G.fineEntries) return coarse;
+  const fine = [];
+  for (let y = Math.ceil((Z.p1 - EPS) / C.S) * C.S; y <= Z.p2 + EPS; y += C.S) {
+    if (Math.round(y / C.S) % 2 !== 0) { fine.push(y); continue; }   // 入口の格子
+    const f = facing(G, Z, y);
+    if (f < 0 || !(exits.get(f) || []).some(v => Math.abs(v - y) < C.S - 0.5)) fine.push(y);
+  }
+  return fine.length > coarse.length ? fine : coarse;
+}
+const mid = o => (o.p1 + o.p2) / 2;
+// 1つの辺の線を、向こうの端の高さの順に並べ、枠から中央に近い k 個の続いた枠を選ぶ（足りなければ辺に詰める）
+function place(G, o, list, end, free) {
+  const oth = it => G.obs[it.end ? it.e.a : it.e.z];
+  list.sort((p, q) => mid(oth(p)) - mid(oth(q)) || oth(p).x1 - oth(q).x1);
+  const k = list.length;
+  if (free.length >= k) {
+    let best = 0;
+    for (let s = 0; s + k <= free.length; s++) if (Math.abs((free[s] + free[s + k - 1]) / 2 - mid(o)) < Math.abs((free[best] + free[best + k - 1]) / 2 - mid(o))) best = s;
+    return free.slice(best, best + k);
+  }
+  // 枠が足りない（配置が箱を高くするまでの間）：辺に詰めて並べる（検査が数える）
+  const sp = k > 1 ? Math.max(0, o.p2 - o.p1) / (k - 1) : 0;
+  return list.map((_, i) => (k > 1 ? o.p1 + i * sp : mid(o)));
+}
+// 出口の高さ（障害物の番号ごと）
+function exitPorts(G, sides) {
+  const exits = new Map();
   sides.forEach((list, key) => {
-    const o = G.obs[parseInt(key, 10)], end = key.endsWith("L") ? 1 : 0;
-    const oth = it => G.obs[it.end ? it.e.a : it.e.z];
-    list.sort((p, q) => mid(oth(p)) - mid(oth(q)) || oth(p).x1 - oth(q).x1);
-    const k = list.length, free = slots(o, end ? C.S : 0);
-    let ys;
-    if (free.length >= k) {
-      // 中央に近い k 個の続いた枠
-      let best = 0;
-      for (let s = 0; s + k <= free.length; s++) if (Math.abs((free[s] + free[s + k - 1]) / 2 - mid(o)) < Math.abs((free[best] + free[best + k - 1]) / 2 - mid(o))) best = s;
-      ys = free.slice(best, best + k);
-    } else {   // 枠が足りない（配置が箱を高くするまでの間）：辺に詰めて並べる（検査が数える）
-      const sp = k > 1 ? Math.max(0, o.p2 - o.p1) / (k - 1) : 0;
-      ys = list.map((_, i) => (k > 1 ? o.p1 + i * sp : mid(o)));
-    }
-    list.forEach((it, i) => { it.e[end ? "y2" : "y1"] = ys[i]; it.e[end ? "k2" : "k1"] = k; });
+    if (!key.endsWith("R")) return;
+    const i = parseInt(key, 10);
+    exits.set(i, place(G, G.obs[i], list, 0, slots(G.obs[i], 0)));
+  });
+  return exits;
+}
+function assignPorts(G) {
+  const sides = sidesOf(G), exits = exitPorts(G, sides);
+  // 出口を先に置き、入口は、向かいの出口の高さを知って置く
+  sides.forEach((list, key) => {
+    const i = parseInt(key, 10), o = G.obs[i], end = key.endsWith("L") ? 1 : 0;
+    const ys = end ? place(G, o, list, 1, entrySlots(G, o, list.length, exits)) : exits.get(i);
+    list.forEach((it, j) => { it.e[end ? "y2" : "y1"] = ys[j]; it.e[end ? "k2" : "k1"] = list.length; });
   });
   // まっすぐ届く線：入口の辺にその線だけなら、入口を出口の高さにそろえて、段差のない1本にする
   G.edges.forEach(e => {
@@ -53,8 +90,30 @@ function assignPorts(G) {
   });
 }
 
-/** 1つの辺に k 本の線を出し入れするのに要る、出入りの範囲の長さ */
+/** 1つの辺に k 本の線を出し入れするのに要る、出入りの範囲の長さ（2S の格子） */
 export const portSpan = k => (k - 1) * PORT_GRID + PORT_GRID;
+
+/**
+ * 出入りの位置が足りない辺ごとに、箱（または枠の見出し）をどれだけ高くすればよいか（px）。キーは障害物の番号。
+ * 出口の辺は 2S の格子、入口の辺は entrySlots の枠（線が多ければ S おき）で数える（iss-00578）。
+ */
+export function portNeed(G) {
+  const sides = sidesOf(G), exits = exitPorts(G, sides), need = new Map();
+  sides.forEach((list, key) => {
+    const i = parseInt(key, 10), o = G.obs[i], k = list.length;
+    if (k < 2 || o.lane) return;
+    let extra;
+    if (key.endsWith("R")) extra = portSpan(k) - (o.p2 - o.p1);
+    else {
+      const have = entrySlots(G, o, k, exits).length;
+      if (have >= k) return;
+      const per = Math.max(have, 1) / Math.max(C.S, o.p2 - o.p1);   // 1px あたりの枠の数
+      extra = Math.min(portSpan(k) - (o.p2 - o.p1), (k - have) / per);
+    }
+    if (extra > 0.5) need.set(i, Math.max(need.get(i) || 0, Math.ceil(extra)));
+  });
+  return need;
+}
 
 /* 2. 疎な直交の格子（可視グラフ） */
 function buildGrid(G) {
@@ -214,6 +273,35 @@ function crossCount(A, B) {   // A を B の手前（左・上）に置いたと
   for (const [p] of fwd) for (const [q] of back) if (Math.abs(p - q) < C.S - 0.5) c += 10;
   return c;
 }
+/* 通り道ごとの不足（iss-00578）：束は、箱の上下の空きを通る範囲の広い線分を介して、別々の列の間の線分をまとめる
+   ことがある。束の詰めの超えは、別の通り道の鎖を含むので、広げの量にしない。並びの順に、線分ごとに、自分の通り道
+   （動ける範囲 lo〜hi）の中にある手前の線分だけの鎖を数え直し、望む上端を超えた分を、その線分の両側の障害物の間の
+   不足とする（-1 は図の端。端も広げられる。-2 は線の自分の曲がりで、広げても足りない） */
+function lacking(ord, conf, V, crowded, x, nb) {
+  const need = new Map(), chain = new Map();
+  const ask = (sg, amount) => {
+    if (!sg.movable || sg.lob < -1 || sg.hib < -1 || amount <= 0.5) return;
+    const key = `${sg.lob}|${sg.hib}`;
+    if (!need.has(key) || need.get(key).amount < amount) need.set(key, { axis: V ? "x" : "y", oa: sg.lob, ob: sg.hib, amount });
+  };
+  // 寄せの後に、重なる2本が車線の間隔より近く残れば（範囲の端に止められた）、その通り道の不足とする
+  ord.forEach(sg => { for (const t of nb.get(sg)) if (t.ri !== sg.ri && Math.min(sg.b, t.b) - Math.max(sg.a, t.a) > 0.5) { const d = Math.abs(x.get(sg) - x.get(t)); if (d < C.S - 0.5) ask(sg, C.S - d); } });
+  if (!crowded) return [...need.values()];
+  ord.forEach((sg, i) => {
+    let req = sg.movable ? sg.dlo0 : sg.pos;
+    for (let t = 0; t < i; t++) {
+      const p = ord[t];
+      if (!conf(p, sg)) continue;
+      const inside = p.movable
+        ? p.lo >= sg.lo - EPS && (p.hi <= sg.hi + EPS || chain.get(p) <= sg.hi + EPS)
+        : p.pos >= sg.lo - EPS && p.pos <= sg.hi + EPS;
+      if (inside) req = Math.max(req, chain.get(p) + C.S);
+    }
+    chain.set(sg, req);
+    ask(sg, req - sg.dhi0);
+  });
+  return [...need.values()];
+}
 function nudgePass(G, routes, V, widen) {
   const L = segs(routes, V), oc = V ? "x" : "y";
   L.forEach(sg => Object.assign(sg, sg.movable ? range(sg, G, V) : { lo: sg.pos, hi: sg.pos, dlo: sg.pos, dhi: sg.pos, dlo0: sg.pos, dhi0: sg.pos, lob: -2, hib: -2 }));
@@ -227,14 +315,21 @@ function nudgePass(G, routes, V, widen) {
   groups.forEach(gr => {
     if (!gr.some(sg => sg.movable)) return;
     const cmp = (A, B) => {
+      // 動かない線分との前後は、動く線分が入れる側（片方だけなら）にする（iss-00578）
+      if (A.movable !== B.movable) {
+        const m = A.movable ? A : B, f = A.movable ? B : A;
+        const before = m.dlo0 + C.S <= f.pos + 0.5, after = f.pos + C.S <= m.dhi0 + 0.5;
+        if (before !== after) return (before ? -1 : 1) * (A.movable ? 1 : -1);
+      }
       if (!A.movable || !B.movable) return A.pos - B.pos || A.ri - B.ri;
       const ab = crossCount(A, B), ba = crossCount(B, A);
       return ab !== ba ? ab - ba : (A.pos - B.pos || A.ri - B.ri);
     };
     // 並びの順：重なる組ごとに「交差の少ないほうの前後」を決め、その前後関係で並べる（閉路は位置の小さいものから切る）
-    const m = gr.length, after = gr.map(() => []), indeg = new Array(m).fill(0);
+    const m = gr.length, after = gr.map(() => []), indeg = new Array(m).fill(0), nb = new Map(gr.map(sg => [sg, []]));
     for (let i = 0; i < m; i++) for (let j = i + 1; j < m; j++) {
       if (!conf(gr[i], gr[j])) continue;
+      nb.get(gr[i]).push(gr[j]); nb.get(gr[j]).push(gr[i]);
       if (cmp(gr[i], gr[j]) <= 0) { after[i].push(j); indeg[j]++; } else { after[j].push(i); indeg[i]++; }
     }
     const ord = [], used = new Array(m).fill(false), byPos = (i, j) => gr[i].pos - gr[j].pos || gr[i].ri - gr[j].ri;
@@ -245,13 +340,33 @@ function nudgePass(G, routes, V, widen) {
       after[i].forEach(j => indeg[j]--);
     }
     // 詰める：手前から、望む範囲の下端と、手前の重なる線分 + S のうち大きいほう
-    const x = new Map(); let over = 0;
-    ord.forEach((sg, i) => {
-      let req = sg.dlo0;
-      for (let t = 0; t < i; t++) if (conf(ord[t], sg)) req = Math.max(req, x.get(ord[t]) + C.S);
-      if (!sg.movable) { if (req > sg.pos + 0.5) over = Math.max(over, req - sg.pos); x.set(sg, sg.pos); }
-      else { x.set(sg, req); over = Math.max(over, req - sg.dhi0); }
-    });
+    // 並びの順は通り道の範囲を見ないので、範囲の広い線分が、別の通り道の鎖に押されたまま、狭い線分や動かない線分の
+    // 手前に並ぶことがある（iss-00578）。押されて自分の上端（動かない線分は自分の位置）を超える線分があれば、それを
+    // 押している鎖を手前へたどり、それより奥へ逃げられる線分（範囲がそれより奥まであり、それの奥に入る余地がある）を、
+    // それのすぐ奥へ回して詰め直す（12回まで。押されの合計が減らなければ、その前の並びに戻してやめる）
+    let x = new Map(), over = 0, prev = null;
+    const by = new Map(), at = new Map();
+    for (let tries = 0; ; tries++) {
+      over = 0; let move = null, total = 0;
+      ord.forEach((sg, i) => at.set(sg, i));
+      ord.forEach((sg, i) => {
+        let req = sg.dlo0, push = null;
+        for (const t of nb.get(sg)) if (at.get(t) < i && x.get(t) + C.S > req) { req = x.get(t) + C.S; push = t; }
+        by.set(sg, push);
+        const cap = sg.movable ? sg.dhi0 : sg.pos, top = sg.movable ? sg.hi : sg.pos;
+        over = Math.max(over, req - cap);
+        if (req > cap + 0.5) total += req - cap;
+        x.set(sg, sg.movable ? req : sg.pos);
+        if (move || tries >= 12 || req <= cap + 0.5) return;
+        const base = sg.movable ? sg.dlo0 : sg.pos;
+        for (let p = push; p && !move; p = by.get(p)) if (p.movable && p.hi > top + EPS && base + C.S <= p.dhi0 + 0.5) move = { sg, p };
+      });
+      if (prev && total >= prev.total - 0.5) { ord.splice(0, ord.length, ...prev.ord); x = prev.x; over = prev.over; break; }
+      if (!move) break;
+      prev = { ord: ord.slice(), x: new Map(x), over, total };
+      const rest = ord.filter(t => t !== move.p), k = rest.indexOf(move.sg) + 1;
+      ord.splice(0, ord.length, ...rest.slice(0, k), move.p, ...rest.slice(k));
+    }
     // 中央へ寄せる：余りの半分だけ奥へ動かし、奥から順に間隔と上端を守る
     let slack = Infinity; ord.forEach(sg => { if (sg.movable) slack = Math.min(slack, sg.dhi0 - x.get(sg)); });
     const sh = slack > 0 && isFinite(slack) ? slack / 2 : 0;
@@ -263,12 +378,7 @@ function nudgePass(G, routes, V, widen) {
       x.set(sg, v);
     }
     ord.forEach(sg => { if (!sg.movable) return; const P = routes[sg.ri].pts, v = x.get(sg); P[sg.k][oc] = v; P[sg.k + 1][oc] = v; });
-    if (over > 0.5) {
-      let ma = null, mb = null;
-      // 通り道の両側の障害物（-1 は図の端。端も広げられる。-2 は線の自分の曲がりで、広げても足りない）
-      ord.forEach(sg => { if (!sg.movable) return; if (sg.lob >= -1 && (!ma || sg.dlo0 > ma.dlo0)) ma = sg; if (sg.hib >= -1 && (!mb || sg.dhi0 < mb.dhi0)) mb = sg; });
-      if (ma && mb) widen.push({ axis: V ? "x" : "y", oa: ma.lob, ob: mb.hib, amount: over });
-    }
+    widen.push(...lacking(ord, conf, V, over > 0.5, x, nb));
   });
 }
 export function route(G) {

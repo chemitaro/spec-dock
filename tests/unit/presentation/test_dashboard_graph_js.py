@@ -19,7 +19,7 @@ from typing import Any
 import pytest
 
 from tests.support.dashboard import closed, node, snapshot
-from tests.support.dashboard_graph import document, document_of, generated
+from tests.support.dashboard_graph import document, document_of, generated, many_lines as generated_many_lines
 
 ROOT = Path(__file__).resolve().parents[3]
 ASSETS = ROOT / "src" / "spec_dock" / "assets" / "dashboard"
@@ -83,14 +83,16 @@ def representative(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
         # With 8 rounds that return the last round, both keep lanes too close in some ways of showing (iss-00544).
         "generated-15": document(generated(seed=15)),
         "generated-18": document(generated(seed=18)),
+        # iss-00578: many lines from one Issue and into one, across the stage columns
+        "many-lines": document(generated_many_lines()),
     }
     return _run(tmp_path_factory.mktemp("graph"), {"documents": documents, "checks": ["audit"]})
 
 
 def test_every_way_of_showing_the_representative_structures_draws_clean_lines(representative: dict[str, Any]) -> None:
     runs = representative["audit"]
-    assert {run["name"] for run in runs} == {"spec-dock", "generated", "generated-15", "generated-18"}
-    assert len(runs) >= 4 * 16  # 16 combinations each, and every open Epic or Initiative as the focus
+    assert {run["name"] for run in runs} == {"spec-dock", "generated", "generated-15", "generated-18", "many-lines"}
+    assert len(runs) >= 5 * 16  # 16 combinations each, and every open Epic or Initiative as the focus
     assert sum(run["edges"] for run in runs if run["name"] == "spec-dock" and run["opts"]["deps"] == "all") > 100
     dirty = [
         {
@@ -109,6 +111,47 @@ def test_the_250_scope_structure_routes_within_a_second(representative: dict[str
     runs = [run for run in representative["audit"] if run["name"] == "generated" and not run["opts"].get("focus")]
     assert len(runs) == 16 + 2 * 8  # and the nested ones at a PC's and a phone's width (iss-00560)
     assert max(run["ms"] for run in runs) < 1000
+
+
+# --- iss-00578: the passages between columns and rows fit the lines that pass --------------------------------------
+
+# A lane is 8px and each side keeps 10px, so n runs need 8n + 12; a column passage is 44 at least (the column gap), a row
+# band 12 (the row gap). 24 more (3 lanes) is the allowance.
+_BASE = {"x": 44, "y": 12}
+_ALLOWANCE = 24
+
+
+@pytest.fixture(scope="module")
+def many_lines(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
+    return _run(
+        tmp_path_factory.mktemp("many-lines"),
+        {"documents": {"many-lines": document(generated_many_lines())}, "checks": ["passages"]},
+    )
+
+
+def _too_wide(runs: list[dict[str, Any]], axis: str) -> list[dict[str, Any]]:
+    return [
+        {"opts": run["opts"], **p, "bound": max(_BASE[axis], 8 * p["runs"] + 12) + _ALLOWANCE}
+        for run in runs
+        for p in run["passages"]
+        if p["axis"] == axis and p["gap"] > max(_BASE[axis], 8 * p["runs"] + 12) + _ALLOWANCE
+    ]
+
+
+def test_the_passage_between_stage_columns_fits_the_lines_that_pass(many_lines: dict[str, Any]) -> None:
+    """Before iss-00578 one passage of this structure was 954px wide for 9 vertical runs."""
+    runs = many_lines["passages"]
+    assert len(runs) >= 16 + 2 * 8
+    assert max(p["runs"] for run in runs for p in run["passages"] if p["axis"] == "x") >= 8  # many lines pass
+    assert _too_wide(runs, "x") == []
+
+
+def test_the_band_between_rows_fits_the_lines_that_pass(many_lines: dict[str, Any]) -> None:
+    """Under a box of a row that a tall box makes tall, the band holds the lines into the tall one: a crowded entry side
+    takes a port every lane, not every two (iss-00578). Before, one band was 283px for 15 horizontal runs."""
+    runs = many_lines["passages"]
+    assert max(p["runs"] for run in runs for p in run["passages"] if p["axis"] == "y") >= 8  # many lines pass
+    assert _too_wide(runs, "y") == []
 
 
 @pytest.fixture(scope="module")

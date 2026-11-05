@@ -101,3 +101,46 @@ def generated(count: int = 250, *, seed: int = 532) -> StructureSnapshot:
 
 def _at(start: datetime, number: int) -> str:
     return (start + timedelta(hours=number * 14)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+# iss-00578: the shape of a real Epic with many lines (taikyohiyou_project epic-02233, 22 Issues): one Issue that many
+# wait for (54), one that waits for almost every other (53), and lines that pass several stage columns.
+_MANY_LINES = {
+    35: (),
+    36: (54,),
+    37: (36,),
+    38: (36, 41, 43, 44, 46, 51, 52, 54),
+    39: (41, 52),
+    40: (39, 41),
+    41: (49, 52, 54),
+    42: (40, 41),
+    43: (44, 52),
+    44: (51, 52, 54),
+    45: (37, 38, 43, 44),
+    46: (54,),
+    47: (46,),
+    48: (37, 43),
+    49: (54,),
+    50: (42,),
+    51: (54,),
+    52: (54,),
+    53: (*range(36, 53), 71, 83),
+    54: (),
+    71: (44, 46),
+    83: (),
+}
+_MANY_LINES_DONE = {35, 36, 37, 41, 43, 44, 46, 47, 49, 51, 52, 54, 71}
+_MANY_LINES_DOING = {38, 39, 48, 83}
+
+
+def many_lines(base: int = 600) -> StructureSnapshot:
+    """An Initiative with one Epic of 22 Issues whose dependencies fan out from one and into one (iss-00578)."""
+    items = [node(base, "initiative", in_progress=True), node(base + 1, "epic", parent=base, in_progress=True)]
+    for n, deps in _MANY_LINES.items():
+        number = base + 100 + n
+        blocked = tuple(base + 100 + d for d in deps)
+        if n in _MANY_LINES_DONE:
+            items.append(closed(number, "issue", parent=base + 1, blocked_by=blocked))
+        else:
+            items.append(node(number, "issue", parent=base + 1, blocked_by=blocked, in_progress=n in _MANY_LINES_DOING))
+    return replace(snapshot(*items), repository="github.com/o/many-lines")
