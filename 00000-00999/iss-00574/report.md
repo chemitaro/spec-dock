@@ -56,6 +56,16 @@ ID: "iss-00574"
 - 仕様の面：合格（1回目の結果は必須の項目が抜けた機械的な誤りで、同じレビュアーが書き直した）。P2 1件（要点の理由の行の印が外枠だけ）→ `stateMark`（`motion: true`）で描き、静的テストで箱・理由の行・札を確かめるようにした。
 - 直しは `c3d08dedd`。`make lint` の誤り（ruff 5件、整形、mypy 2件）も同じコミットで直した。
 
+### 最終品質ゲート（quality-gate-reviewer opus/high、1人。キャンペーン `fqg-iss-00574-1`）
+
+- **合格のコミット：`c3d08dedd`**（範囲 `b290da02a..c3d08dedd`、R-01〜R-07・F-01〜F-02、worktree clean）。観点：functional-correctness、requirements-closure、test-adequacy。ChatGPT の補助の道は使っていない（無効）。
+- レビューの道：合格。P0 0件、P1 0件、P2 0件、P3 2件（情報のみ：構造の図の描き直しの鍵 `sig` に動いている ID を入れたことを確かめるテストがない。詳しい画面の API の `prune=False` の配線を HTTP 層のテストで見分けられない。どちらも今の実装は正しい）。覆う範囲は完全。
+- 試験の道（同じコミット）：`make lint` exit 0（ruff check、ruff format check、mypy すべて pass）。`uv run pytest` exit 0（3746 passed、7 skipped、30分28秒）。
+
+### PR
+
+- [#577](https://github.com/chemitaro/spec-dock/pull/577)（`main` へ、head `c3d08dedd`、`Refs #574`・`Refs #573`）。作る直前に `origin/main` を取り込み直す必要はなかった（`b290da02a` から進んでいない）。
+
 ## Residual Risks / Follow-ups
 
 - マージ待ちの列と札は今のまま（accent の青）で、着手できるの深い青と近い。状態ではないので変えていない（枝の印で見分けられる）。
