@@ -286,11 +286,20 @@ def _wide() -> dict[str, Any]:
 
 
 def _initiatives() -> dict[str, Any]:
-    """iss-00575: four Initiatives of one Epic of four Issues each, and a fifth with a chain of two Epics."""
+    """iss-00575: four Initiatives of one Epic of four Issues each, none depending on another."""
     nodes: list[Any] = []
     for k in range(4):
         base = 600 + k * 10
         nodes += [node(base, "initiative"), node(base + 1, "epic", parent=base)]
+        nodes += [node(base + 2 + i, "issue", parent=base + 1) for i in range(4)]
+    return document(snapshot(*nodes))
+
+
+def _init_chain() -> dict[str, Any]:
+    """Three alike Initiatives: 701 waits for 700, and 702 stands alone."""
+    nodes: list[Any] = []
+    for base, blocked in ((700, ()), (710, (700,)), (720, ())):
+        nodes += [node(base, "initiative", blocked_by=blocked), node(base + 1, "epic", parent=base)]
         nodes += [node(base + 2 + i, "issue", parent=base + 1) for i in range(4)]
     return document(snapshot(*nodes))
 
@@ -330,13 +339,15 @@ def context(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
     return _run(
         tmp_path_factory.mktemp("context"),
         {
-            "documents": {"context": _context(), "missing": _missing_times(), "wide": _wide(), "inits": _initiatives()},
+            "documents": {"context": _context(), "missing": _missing_times(), "wide": _wide(), "inits": _initiatives(), "chain": _init_chain()},
             "layouts": {
                 "context": layouts,
                 "missing": {"home": {}},
                 "wide": {"home": {}, "w1240": {"width": 1240}, "w1400": {"width": 1400}, "w374": {"width": 374}},
-                "inits": {"home": {}, "w1400": {"width": 1400}, "w1000": {"width": 1000}, "w374": {"width": 374}},
+                "inits": {"home": {}, "w1400": {"width": 1400}, "w1000": {"width": 1000}, "w374": {"width": 374}, "gapped": {"width": 1400}},
+                "chain": {"w1400": {"width": 1400}},
             },
+            "gaps": {"inits": {"gapped": {"all.x": 12, "all.y": 12, "wcroot": 30}}},
             "checks": ["layout", "audit"],
             "prefs": [
                 {"current": None, "legacy": None},
@@ -610,3 +621,28 @@ def test_initiatives_go_left_to_right_in_the_activity_order(context: dict[str, A
     narrow = [i["id"] for i in sorted(_frames(context, "w374"), key=lambda item: item["y1"])]
     assert wide == narrow
     assert not [run for run in context["audit"] if run["name"] == "inits" and any(run[key] for key in AUDIT_KEYS)]
+
+
+def test_a_chain_of_initiatives_keeps_its_row_and_is_not_narrowed(context: dict[str, Any]) -> None:
+    """iss-00575 R-02: what depends on an Initiative sits right of it on its row, at the width it has on its own."""
+    nodes = {item["id"]: item for item in context["layout"]["chain"]["w1400"]["nodes"]}
+    first, second, alone = (nodes[i] for i in ("init-00700", "init-00710", "init-00720"))
+    assert first["y1"] == second["y1"] and first["x2"] < second["x1"]
+    assert alone["y1"] > first["y2"]
+    assert (first["x2"] - first["x1"]) == (second["x2"] - second["x1"]) == (alone["x2"] - alone["x1"])
+    assert context["layout"]["chain"]["w1400"]["wraps"]["root#shares"] == []
+
+
+def test_the_widths_taken_stay_when_the_routing_widens_the_gaps(context: dict[str, Any]) -> None:
+    """R-03: with gaps added the Initiatives keep the widths they were narrowed to, and the rows they share."""
+    plain, gapped = (context["layout"]["inits"][k] for k in ("w1400", "gapped"))
+    assert plain["wraps"]["root#shares"] == gapped["wraps"]["root#shares"] != []
+
+    def rows(layout: dict[str, Any]) -> list[list[str]]:
+        frames = [n for n in layout["nodes"] if n["type"] == "frame" and n["id"].startswith("init-")]
+        by_row: dict[float, list[dict[str, Any]]] = {}
+        for frame in frames:
+            by_row.setdefault(frame["y1"], []).append(frame)
+        return [[f["id"] for f in sorted(r, key=lambda f: f["x1"])] for _, r in sorted(by_row.items())]
+
+    assert rows(plain) == rows(gapped)
