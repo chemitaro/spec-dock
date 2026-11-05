@@ -35,6 +35,9 @@ design: {
 		text: """
 			- `views/_shared/parts.css`：`.sd-bar i[data-st="blocked"]` と `[data-st="blocked"].sd-card` の縞を `--sd-blocked` に。`.sd-hm`（人 n）を `--sd-blocked-*` に。
 			- `views/graph.css`：`.gx-box[data-st="doing"]` の地と枠を `--sd-doing-bg`／`--sd-doing-line` に。`.hm`（人 n）を `--sd-blocked-*` に。
+			- `views/overview.js`：「止められている N」の札を `data-tone="blocked"` にする。
+			- `views/graph.css`：`.gx-box[data-st="unknown"]` の地と枠を `--sd-unknown-bg`／`--sd-unknown-line` に。
+			- `views/board.js`：不明の知らせを `data-tone="unknown"` にする。
 			- `views/todos.css`：`.td-blocks`（止める）を `--sd-blocked-ink`／`--sd-blocked` に。
 			- `views/todos.js`：「Scope を止めている」の札を `data-tone="blocked"` にし、`parts.css` に `blocked` の札の色を足す。
 			- `views/scope.js`：表紙の理由の札の `data-tone` を、止められているは `blocked`、不明は `unknown` にする（今は danger と warning）。`views/_shared/parts.css` の `.sd-badge` と `.sd-callout` に `blocked`／`unknown` の色を足し、要約の「止められている」の知らせも `blocked` にする。
@@ -47,9 +50,10 @@ design: {
 		text: """
 			- `STATES` の形：ready＝輪（半径8.6、線2.4）と中の三角。blocked＝塗った丸（半径9.6）と `.on` の2本の縦の棒。unknown＝輪と `?`（線と点を印の色で）。done＝今のまま。doing＝輪の外枠（`progressRing` の既定）。
 			- `progressRing({done, total} | null, {live})`：中心 (12, 12)、半径8.6。
-			  - total が1〜12：total 個の区切り（区切りの間に 0.32 ラジアンの隙間）。i < done は `--st` の太い線（3.2）、ほかは `--sd-track` の細い線（2）。live かつ done < total なら、i = done の区切りに、太い線の重ね（`class="nx"`）を足す。
-			  - total が13以上：`--sd-track` の細い輪と、done／total の弧（太い線）。live かつ done < total なら、弧の先から 1／total の長さの重ねの弧（`class="nx"`）を足す。
-			  - null か total が0：`--st` の外枠（線2.4）だけ。live なら外枠そのものに `class="nx"` を付ける。
+			  - total が1〜12：total 個の区切り（区切りの間に 0.32 ラジアンの隙間）。i < done は `--st` の太い線（3.2）、ほかは `--sd-track` の細い線（2）。live かつ done < total なら、i = done の区切りに、太い線の重ね（`class="sd-nx"`）を足す。live かつ done = total なら、中心に半径3の塗った丸の重ね（`class="sd-nx"`）を足す。
+			  - total が13以上：`--sd-track` の細い輪と、done／total の弧（太い線）。live かつ done < total なら、弧の先から 1／total の長さの重ねの弧（`class="sd-nx"`）を足す。done = total なら区切りと同じく中心の丸。
+			  - null か total が0：`--st` の外枠（線2.4）だけ。live なら、外枠の上に太い線（3.2）の輪の重ね（`class="sd-nx"`）を足す（外枠そのものは点滅させない）。
+			  - 重ねは、どの場合も別の要素で、`.sd-nx` だけが点滅する。名前は、構造の図の絞り込みの釦の `.gx .nx` と重ならないよう `sd-nx` にする。重ねの色は `--st`（`stroke`／`fill` に直接書く）。
 			- `stateIcon(state, label = true, opts = {})`：`opts.progress` と `opts.live` を受け、doing のときだけ `progressRing` を描く。`aria-label` は doing で数があれば「作業中（手順 4／8 終わった）」。Epic・Initiative は「作業中（配下 2／5 終わった）」（`opts.unit`）。live なら `data-live="1"` を SVG に付ける。
 			- `chip(state, opts)` も同じ `opts` を `stateIcon` に渡す。
 			- 純粋な関数を足す：`scopeProgress(scope, byId)`（Issue は `scope.progress` の `{done, total}`、Epic・Initiative は配下の Issue の数え上げ。作業中でなければ null）、`movedAt(scope, byId)`（D-04 の時刻、ミリ秒。分からなければ null）、`LIVE_MS = 30 * 60 * 1000`、`isLive(moved, now)`、`idleWords(ms)`（「N分動きなし」「N時間動きなし」「N日動きなし」。分は60未満、時間は48未満）、`stateMark(scope, byId, {now, motion})`（`motion` が真のときだけ live を渡す。一覧は偽で呼ぶ）。DOM を使わない。
@@ -67,7 +71,7 @@ design: {
 	"D-05": {
 		title: "点滅（CSS）"
 		text: """
-			`app.css` に `@keyframes sd-next { 0%, 100% { opacity: .15 } 50% { opacity: 1 } }` と `.st-ico[data-live="1"] .nx { animation: sd-next 2s ease-in-out infinite; }` を置く。`.st-ico .nx` は既定で `opacity: .15`（点滅しないときの見え方は重ねを描かないので出ない）。`@media (prefers-reduced-motion: reduce) { .st-ico .nx { animation: none; opacity: 0; } }`。大きさは今の `.st-ico`（15px、構造の図も15px）のまま、太い区切り（3.2）で差を出す。
+			`app.css` に `@keyframes sd-next { 0%, 100% { opacity: .15 } 50% { opacity: 1 } }` と `.st-ico[data-live="1"] .sd-nx { animation: sd-next 2s ease-in-out infinite; }` を置く。`.st-ico .sd-nx` は既定で `opacity: .15`（重ねは live のときだけ描く）。`@media (prefers-reduced-motion: reduce) { .st-ico .sd-nx { animation: none; opacity: 0; } }`（重ねだけが消え、外枠と区切りは残る）。大きさは今の `.st-ico`（15px、構造の図も15px）のまま、太い区切り（3.2）で差を出す。
 			"""
 		satisfies: ["R-05"]
 	}
@@ -86,9 +90,9 @@ design: {
 		text: """
 			- `read_plan_steps(directory, *, timeout, tool) -> dict | None`：`cue export --out json -e steps plan.cue`（`cwd` は Scope のディレクトリ）。結果が辞書でなければ、または `cue` が誤りを返せば None。
 			- `plan_counts(steps) -> {total, done, doing, todo, dropped}`：`dashboard_documents.plan_progress` の数え方を使う（`doing_steps` は返さない）。手順が空なら None。
-			- `PlanProgressCache`：カタログごとに `{ID: (plan.cue の st_mtime_ns, st_size, counts | None)}`。ロックで表の読みと差し替えを守る。その要求で見なかった Scope の分は捨てる。
-			- `read_plan_progress(site, scope_ids, cache, *, timeout=3.0, clock, steps_reader, cue_locator) -> {ID: progress | None}`：`scope_ids` は作業中の Issue だけ（呼ぶ側が選ぶ）。カタログがなければ全部 None。`plan.cue` を `lstat` し、通常のファイルでなければ None。覚えた (時刻, 大きさ) が同じなら覚えた値。違えば締め切りの前に読み、読めた数（なければ None）を覚える。締め切りの後、`cue` がない、読み終えたときに締め切りを過ぎて読めなかったものは None で覚えない。例外はその Scope の None。値には `modified_at`（`st_mtime` の UTC、秒まで）を足す。
-			- 構造の API（`dashboard_http.py` の `structure`）：`model.scopes` のうち `kind == "issue"` かつ `state == "doing"` の ID で `read_plan_progress` を呼び、`structure_document(..., progress=…)` に渡す。詳しい画面の API（`scopes/<ID>`）も、その1つの ID が作業中の Issue なら同じキャッシュで読む。
+			- `PlanProgressCache`：カタログごとに `{ID: (plan.cue の st_mtime_ns, st_size, counts | None)}`。ロックで表の読みと差し替えを守る。その要求で見なかった Scope の分は、`prune=True`（構造の API）のときだけ捨てる。
+			- `read_plan_progress(site, scope_ids, cache, *, prune=True, timeout=3.0, clock, steps_reader, cue_locator) -> {ID: progress | None}`：`scope_ids` は作業中の Issue だけ（呼ぶ側が選ぶ）。カタログがなければ全部 None。`plan.cue` を `lstat` し、通常のファイルでなければ None。覚えた (時刻, 大きさ) が同じなら覚えた値。違えば締め切りの前に読み、読めた数（なければ None）を覚える。締め切りの後、`cue` がない、読み終えたときに締め切りを過ぎて読めなかったものは None で覚えない。例外はその Scope の None。値には `modified_at`（`st_mtime` の UTC、秒まで）を足す。
+			- 構造の API（`dashboard_http.py` の `structure`）：`model.scopes` のうち `kind == "issue"` かつ `state == "doing"` の ID で `read_plan_progress` を呼び、`structure_document(..., progress=…)` に渡す。詳しい画面の API（`scopes/<ID>`）も、その1つの ID が作業中の Issue なら同じキャッシュで `prune=False` で読む（ほかの Issue の覚えた値を捨てず、その1件だけを足すか差し替える）。
 			- `presentation/dashboard_api.py`：`scope_item(..., progress=None)` が `"progress": progress.get(ID)` を入れる。`structure_document` と `scope_document` に `progress` を足す（既定 None で `null`）。
 			"""
 		satisfies: ["R-06", "F-01"]
