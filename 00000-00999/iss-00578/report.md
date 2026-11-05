@@ -206,7 +206,7 @@ taikyohiyou 17:44 の近すぎる車線の合計は 7 → 12 に増えた（増�
   `.workbench/final-quality-gate/iss-00578-3/closure.md`。
 - 写しと数字は、最終の `a74637053` で取り直した（上の節）。
 - PR：https://github.com/chemitaro/spec-dock/pull/579（head `a74637053`、base main）。CI（Provider CI、SpecDock check、
-  Commit identity）は合格、GitHub はマージできる状態（2026-11-05T17:43:36Z の観測。Actions と Commit Status の範囲）。
+  Commit identity）は合格、GitHub はマージできる状態（`a74637053` で 2026-11-05T19:07:06Z の観測。Actions と Commit Status の範囲）。
   マージと `work finish` は統括と利用者が行う。
 
 ## Residual Risks / Follow-ups
