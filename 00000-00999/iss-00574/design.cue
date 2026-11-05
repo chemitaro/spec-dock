@@ -40,7 +40,7 @@ design: {
 			- `views/board.js`：不明の知らせを `data-tone="unknown"` にする。
 			- `views/todos.css`：`.td-blocks`（止める）を `--sd-blocked-ink`／`--sd-blocked` に。
 			- `views/todos.js`：「Scope を止めている」の札を `data-tone="blocked"` にし、`parts.css` に `blocked` の札の色を足す。
-			- `views/scope.js`：表紙の理由の札の `data-tone` を、止められているは `blocked`、不明は `unknown` にする（今は danger と warning）。`views/_shared/parts.css` の `.sd-badge` と `.sd-callout` に `blocked`／`unknown` の色を足し、要約の「止められている」の知らせも `blocked` にする。
+			- `views/scope.js`：表紙の理由の札と要約の状態の知らせの `data-tone` を、終わった以外はその状態の名前（`blocked`、`unknown`、`doing`、`ready`）にする（今は danger、warning、note、accent）。`views/_shared/parts.css` の `.sd-badge` と `.sd-callout` に、4つの状態の色を足す。
 			- 期限切れ、PR の閉じた・失敗、critical、マージ待ちの列は変えない。
 			"""
 		satisfies: ["R-02"]
