@@ -6,7 +6,6 @@
 // The model decides every state, order, stage and path (#528, through the structure and scope APIs). This module
 // only places (graph/layout.js), routes (graph/router.js) and draws.
 import * as api from "../core/api.js";
-import { chip } from "../core/ui.js";
 import { DEFAULTS, index, routeLayout } from "./graph/layout.js";
 import { audit, svg as edgeSvg } from "./graph/router.js";
 import * as M from "./graph/marks.js";
@@ -161,7 +160,10 @@ function render(root, ctx) {
     V.desc = descendants(V.ix);
   }
   if (V.sel && !byId(V.sel)) select(null);
-  const sig = `${data.revision}|${JSON.stringify(V.opts)}|${focus}|${seenWidth()}|${seenHeight()}`;
+  // The Scopes moving now key the world too: past their 30 minutes the boxes are drawn again, still (iss-00574 D-04).
+  const now = Date.now();
+  const live = data.scopes.filter((s) => s.state === "doing" && M.isLive(M.movedAt(s, V.ix.byId), now)).map((s) => s.id);
+  const sig = `${data.revision}|${JSON.stringify(V.opts)}|${focus}|${live.join(",")}|${seenWidth()}|${seenHeight()}`;
   renderBar(focus);
   renderLegend();
   if (sig !== V.sig) {
@@ -246,7 +248,7 @@ function boxHtml(s, n) {
     `<div class="gx-box${frame ? " is-frame" : ""}" data-id="${esc(s.id)}" data-st="${s.state}" role="button" tabindex="0" aria-label="${esc(label)}" style="${pos(n)}">` +
     M.chgMark(s.change) +
     `<span class="rt" title="大もとの待ち先：ここが進めば、選んだ箱へ続く待ちがほどける" role="img" aria-label="大もとの待ち先">${ic("target")}大もと</span>` +
-    `<div class="gx-r1">${stateIcon(s.state)}<span class="gx-id">${esc(s.id)}</span><span class="gx-no">#${s.number}</span>${stg}</div>` +
+    `<div class="gx-r1">${M.stateMark(s, V.ix.byId, { motion: true })}<span class="gx-id">${esc(s.id)}</span><span class="gx-no">#${s.number}</span>${stg}</div>` +
     `<div class="gx-ttl${frame ? " is-one" : ""}" title="${esc(s.title)}">${esc(s.title)}</div>` +
     marks +
     `</div>`
@@ -257,7 +259,7 @@ function frameHtml(s, n, cleanup) {
   const { cnt, total } = tally(s.id);
   const ini = s.kind === "initiative";
   const head =
-    `<div class="gx-fh" data-id="${esc(s.id)}" role="button" tabindex="0" aria-label="${esc(`${s.id} ${s.title}。${STATES[s.state]?.label ?? s.state}`)}">${stateIcon(s.state)}` +
+    `<div class="gx-fh" data-id="${esc(s.id)}" role="button" tabindex="0" aria-label="${esc(`${s.id} ${s.title}。${STATES[s.state]?.label ?? s.state}`)}">${M.stateMark(s, V.ix.byId, { motion: true })}` +
     (ini ? `<span class="gx-kicker">Initiative</span>` : "") +
     `<span class="ds-docid">${esc(s.id)}</span><span class="gx-fttl" title="${esc(s.title)}">${esc(s.title)}</span></div>`;
   const meta =
@@ -453,7 +455,7 @@ function renderLegend() {
   V.el.legend.dataset.open = String(V.legend);
   V.el.legend.innerHTML =
     `<button type="button" class="legend__head" data-act="legend" aria-expanded="${V.legend}">${ic("info")}凡例${ic("chevronRight")}</button><div class="legend__body">` +
-    `<div class="lg-grp"><h4>状態</h4><ul>${["blocked", "ready", "doing", "unknown", "done"].map((s) => li(stateIcon(s, false), STATES[s].label)).join("")}${li('<span class="sbar" style="width:26px"><i data-st="done" style="width:60%"></i><i data-st="doing" style="width:20%"></i><i data-st="ready" style="width:20%"></i></span>', "配下の内訳")}</ul></div>` +
+    `<div class="lg-grp"><h4>状態</h4><ul>${["blocked", "ready", "doing", "unknown", "done"].map((s) => li(s === "doing" ? stateIcon(s, false, { progress: { done: 3, total: 8 } }) : stateIcon(s, false), s === "doing" ? "作業中（区切り＝計画の手順、緑＝終わった。30分以内に動いたら次が点滅）" : STATES[s].label, s === "doing")).join("")}${li('<span class="sbar" style="width:26px"><i data-st="done" style="width:60%"></i><i data-st="doing" style="width:20%"></i><i data-st="ready" style="width:20%"></i></span>', "配下の内訳")}</ul></div>` +
     `<div class="lg-grp"><h4>PR と CI</h4><ul>${li(`<span class="pr" data-pr="open">${ic("branch")}</span>`, "開いている")}${li(`<span class="pr" data-pr="draft">${ic("branch")}</span>`, "下書き")}${li(`<span class="pr" data-pr="merged">${ic("merge")}</span>`, "マージ済み")}${li(`<span class="pr" data-pr="closed">${ic("prClosed")}</span>`, "閉じた")}` +
     `${li('<span class="ci" data-ci="success"></span>', "CI 成功")}${li('<span class="ci" data-ci="failure"></span>', "CI 失敗")}${li('<span class="ci" data-ci="running"></span>', "CI 実行中")}${li(`<span class="mg" data-mg="ok">${ic("check")}</span>`, "マージできる")}${li(`<span class="mg" data-mg="conflict">${ic("zap")}</span>`, "衝突")}</ul></div>` +
     `<div class="lg-grp"><h4>保証</h4><ul>${M.AS_LEVELS.map((l) => li(M.asMark(l), l)).join("")}</ul></div>` +
@@ -530,13 +532,19 @@ function renderPanel() {
   const frame = s.kind !== "issue" || (V.ix.kids.get(s.id) || []).length > 0;
   panel.dataset.st = s.state;
   panel.innerHTML =
-    `<div class="pn-grab"></div><div class="pn-head">${chip(s.state)}${mergeBadge(s)}<button type="button" class="iconbtn" data-act="close" aria-label="閉じる">${ic("x")}</button></div>` +
+    `<div class="pn-grab"></div><div class="pn-head">${M.stateChip(s, V.ix.byId, { motion: true })}${mergeBadge(s)}<button type="button" class="iconbtn" data-act="close" aria-label="閉じる">${ic("x")}</button></div>` +
     `<div class="pn-body"><p class="pn-kicker"><span class="ds-docid">${esc(s.id)}</span>#${s.number}・${M.KIND[s.kind] ?? s.kind}</p><h2 class="pn-title">${esc(s.title)}</h2>` +
-    `<p class="pn-why" data-st="${s.state}">${stateIcon(s.state, false)}<span>${esc(s.reason?.text ?? "")}</span></p>${panelPath(s)}<dl class="kv">${panelKv(s)}</dl>${panelStats(s)}</div>` +
+    `<p class="pn-why" data-st="${s.state}">${M.stateMark(s, V.ix.byId, { motion: true, label: false })}<span>${esc(s.reason?.text ?? "")}</span></p>${idleLine(s)}${panelPath(s)}<dl class="kv">${panelKv(s)}</dl>${panelStats(s)}</div>` +
     `<div class="pn-foot"><a class="ds-btn is-primary" data-nav href="${esc(V.ctx.href(s.path))}">詳しく${ic("arrowRight")}</a>` +
     (frame ? `<button type="button" class="ds-btn" data-act="focus" data-focus="${esc(s.id)}">${ic("target")}この範囲に絞る</button>` : "") +
     `<a class="ds-btn" href="${esc(s.url)}" target="_blank" rel="noopener">${ic("external")}GitHub</a></div>`;
   open(panel);
+}
+
+// "N分動きなし" under the reason of a Scope in progress that has not moved for 30 minutes (iss-00574 R-05).
+function idleLine(s) {
+  const idle = M.idleText(s, V.ix.byId);
+  return idle ? `<p class="pn-idle">${ic("clock")}${esc(idle)}</p>` : "";
 }
 
 function open(panel) {

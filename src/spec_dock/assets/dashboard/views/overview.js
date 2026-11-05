@@ -3,7 +3,7 @@
 import * as api from "../core/api.js";
 import { ago } from "../core/ui.js";
 import { boardCounts, byRank, overviewWarnings, stateCounts } from "./_shared/logic.js";
-import { emptyState, esc, icon, legend, newTabLink, stateCountList, stateIcon } from "./_shared/parts.js";
+import { emptyState, esc, icon, legend, newTabLink, stateCountList, stateIcon, stateMark } from "./_shared/parts.js";
 
 const REFRESH_MS = 60000;
 const PER_SECTION = 3;
@@ -35,11 +35,12 @@ function refresh(ctx) {
   return loading;
 }
 
-function section(state, label, items, iconHtml) {
+// Each Issue in progress shows its progress ring (iss-00574 R-03; still: a list never moves).
+function section(state, label, items, iconHtml, byId = null) {
   const list = items.length
     ? items
         .slice(0, PER_SECTION)
-        .map((item) => `<li><small>#${esc(item.number)}</small>${esc(item.title)}</li>`)
+        .map((item) => `<li>${byId ? stateMark(item, byId, { label: false }) : ""}<small>#${esc(item.number)}</small>${esc(item.title)}</li>`)
         .join("") + (items.length > PER_SECTION ? `<li class="sd-none">ほか ${items.length - PER_SECTION}件</li>` : "")
     : `<li class="sd-none">ない</li>`;
   return `<div class="sd-ov__sec" data-st="${state}"><h3>${iconHtml}${label}<b>${items.length}</b></h3><ul>${list}</ul></div>`;
@@ -91,9 +92,9 @@ function repoCard(item, ctx) {
     const cleanup = (structure.cleanup || []).length;
     const changes = structure.changes_count || 0;
     body =
-      `<div class="sd-ov__next">${section("merge", "マージ待ち", lane("awaiting_merge"), icon("branch"))}${section("doing", "作業中", lane("doing"), stateIcon("doing", false))}${section("ready", "着手できる", lane("ready"), stateIcon("ready", false))}</div>` +
+      `<div class="sd-ov__next">${section("merge", "マージ待ち", lane("awaiting_merge"), icon("branch"))}${section("doing", "作業中", lane("doing"), stateIcon("doing", false), new Map(scopes.map((scope) => [scope.id, scope])))}${section("ready", "着手できる", lane("ready"), stateIcon("ready", false))}</div>` +
       `<div class="sd-ov__counts">${stateCountList(counts, { done: false })}<span class="sd-cnt" data-st="merge" title="マージ待ち ${board.merge}">${icon("branch")}<span class="vh">マージ待ち</span>${board.merge}</span><span class="sd-ov__frac">${board.done}<small>／${board.total} 終わった</small></span></div>` +
-      `<div class="sd-ov__flags"><span class="sd-badge" data-tone="${board.blocked ? "danger" : ""}">${stateIcon("blocked", false)}止められている ${board.blocked}</span><span class="sd-badge" data-tone="${cleanup ? "warning" : ""}">${icon("box")}片付けの候補 ${cleanup}</span><span class="sd-badge" data-tone="${changes ? "accent" : ""}" data-changes="${changes}">${icon("bell")}変化 ${changes}</span>${todoFlags(structure)}</div>`;
+      `<div class="sd-ov__flags"><span class="sd-badge" data-tone="${board.blocked ? "blocked" : ""}">${stateIcon("blocked", false)}止められている ${board.blocked}</span><span class="sd-badge" data-tone="${cleanup ? "warning" : ""}">${icon("box")}片付けの候補 ${cleanup}</span><span class="sd-badge" data-tone="${changes ? "accent" : ""}" data-changes="${changes}">${icon("bell")}変化 ${changes}</span>${todoFlags(structure)}</div>`;
   }
   return (
     `<a class="sd-ov" data-repo="${esc(item.repository)}" href="${esc(href)}"${warnings.some((warning) => warning.level !== "info") ? ' data-warn="1"' : ""}>` +

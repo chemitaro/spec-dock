@@ -7,6 +7,8 @@
 
 .gx .st-ico { width: 15px; height: 15px; flex: none; color: var(--st); }
 .gx .st-ico .on { stroke: var(--ds-bg); fill: none; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+/* 作業中の輪は、箱と枠の頭で少し大きく描き、区切りと点滅を読めるようにする（iss-00574 R-05） */
+.gx :is(.gx-r1, .gx-fh) > .st-ico[data-st="doing"] { width: 19px; height: 19px; margin: -2px 0; }
 .gx .as { display: inline-flex; align-items: flex-end; gap: 1.5px; height: 11px; }
 .gx .as i { width: 3px; border-radius: 1px; background: var(--ds-surface-3); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ds-border-2) 45%, transparent); }
 .gx .as i:nth-child(1) { height: 4px; } .gx .as i:nth-child(2) { height: 6.5px; } .gx .as i:nth-child(3) { height: 9px; } .gx .as i:nth-child(4) { height: 11px; }
@@ -91,11 +93,11 @@
   transition: box-shadow .15s, opacity .2s, transform .15s var(--ds-ease);
 }
 .gx .gx-box:hover { box-shadow: var(--ds-shadow); }
-.gx .gx-box[data-st="doing"] { background: var(--ds-accent-soft); border-color: var(--ds-accent-line); border-left-color: var(--st); }
+.gx .gx-box[data-st="doing"] { background: var(--sd-doing-bg); border-color: var(--sd-doing-line); border-left-color: var(--st); }
 .gx .gx-box[data-st="blocked"] { border-left-color: transparent; }
 .gx .gx-box[data-st="blocked"] { background: var(--ds-surface-2); }
 .gx .gx-box[data-st="blocked"]::before { content: ""; position: absolute; left: -4px; top: -1px; bottom: -1px; width: 4px; border-radius: 6px 0 0 6px; background: repeating-linear-gradient(-45deg, color-mix(in srgb, var(--st) 80%, transparent) 0 3px, color-mix(in srgb, var(--st) 22%, transparent) 3px 6px); }
-.gx .gx-box[data-st="unknown"] { background: var(--ds-warn-bg); border-style: dashed; border-color: var(--ds-warn-line); border-left: 4px solid var(--st); }
+.gx .gx-box[data-st="unknown"] { background: var(--sd-unknown-bg); border-style: dashed; border-color: var(--sd-unknown-line); border-left: 4px solid var(--st); }
 .gx .gx-box[data-st="done"] { background: var(--ds-surface-2); }
 .gx .gx-box[data-st="done"] .gx-ttl { color: var(--ds-muted); }
 .gx .gx-box.is-sel, .gx .gx-box.is-sel:hover { box-shadow: 0 0 0 3px var(--ds-accent), 0 0 0 8px color-mix(in srgb, var(--ds-accent) 20%, transparent), var(--ds-shadow-l); }
@@ -119,7 +121,7 @@
 .gx .dn .ds-icon { font-size: 12px; stroke-width: 2.2; color: var(--ds-muted); }
 .gx .gx-marks .dn { margin-left: auto; }
 /* 人が止めている数（iss-00554 D-06）。後に続くの前に置き、行を折り返さない */
-.gx .hm { display: inline-flex; align-items: center; gap: 1px; flex: none; padding: 0 5px 0 3px; height: 17px; border-radius: 4px; background: var(--ds-danger-bg); border: 1px solid var(--ds-danger-line); color: var(--ds-danger-ink); font-size: 11px; font-weight: 700; line-height: 1; white-space: nowrap; }
+.gx .hm { display: inline-flex; align-items: center; gap: 1px; flex: none; padding: 0 5px 0 3px; height: 17px; border-radius: 4px; background: var(--sd-blocked-bg); border: 1px solid var(--sd-blocked-line); color: var(--sd-blocked-ink); font-size: 11px; font-weight: 700; line-height: 1; white-space: nowrap; }
 .gx .hm .ds-icon { font-size: 12px; stroke-width: 2.2; }
 .gx .hm small { margin-left: 2px; font-size: 9.5px; font-weight: 650; }
 .gx .gx-marks .hm { margin-left: auto; }
@@ -294,3 +296,6 @@
   .gx .gx-tools .tool-group[role="group"] .tool { width: 32px; padding: 0; justify-content: center; }
   .gx .panel { top: auto; max-height: 58%; }
 }
+/* 作業中で30分を超えて動きがない（iss-00574 R-05） */
+.gx .pn-idle { display: flex; align-items: center; gap: 6px; margin: 6px 0 0; padding: 0 12px; color: var(--ds-muted); font-size: 12.5px; font-weight: 650; }
+.gx .pn-idle .ds-icon { font-size: 14px; }
