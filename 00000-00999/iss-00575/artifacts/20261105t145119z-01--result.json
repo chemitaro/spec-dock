@@ -1,0 +1,230 @@
+{
+ "runs": [
+  {
+   "tag": "pc-1440",
+   "audit": {
+    "segments": 75,
+    "boxHits": 0,
+    "ownHits": 0,
+    "overlaps": 0,
+    "diagonal": 0,
+    "portShare": 0,
+    "trunkOverlaps": 0,
+    "failed": 0,
+    "list": [],
+    "edges": 23,
+    "iters": 1,
+    "ms": 7,
+    "unmapped": 0,
+    "widenLeft": 0,
+    "missing": 0,
+    "drift": 0,
+    "mode": "nest"
+   },
+   "inits": [
+    {
+     "id": "init-00423",
+     "x": 24,
+     "y": 24,
+     "w": 1358,
+     "h": 417
+    },
+    {
+     "id": "init-00079",
+     "x": 1396,
+     "y": 24,
+     "w": 1194,
+     "h": 563
+    },
+    {
+     "id": "init-00468",
+     "x": 24,
+     "y": 615,
+     "w": 1790,
+     "h": 1449
+    },
+    {
+     "id": "init-00039",
+     "x": 1828,
+     "y": 615,
+     "w": 932,
+     "h": 157
+    }
+   ],
+   "worldW": 2784,
+   "worldH": 2088,
+   "scrollW": 1440,
+   "innerW": 1440,
+   "rows": [
+    [
+     "init-00423",
+     "init-00079"
+    ],
+    [
+     "init-00468",
+     "init-00039"
+    ]
+   ],
+   "fitZoom": "30%"
+  },
+  {
+   "tag": "pc-1920",
+   "audit": {
+    "segments": 75,
+    "boxHits": 0,
+    "ownHits": 0,
+    "overlaps": 0,
+    "diagonal": 0,
+    "portShare": 0,
+    "trunkOverlaps": 0,
+    "failed": 0,
+    "list": [],
+    "edges": 23,
+    "iters": 1,
+    "ms": 6,
+    "unmapped": 0,
+    "widenLeft": 0,
+    "missing": 0,
+    "drift": 0,
+    "mode": "nest"
+   },
+   "inits": [
+    {
+     "id": "init-00423",
+     "x": 24,
+     "y": 24,
+     "w": 1766,
+     "h": 257
+    },
+    {
+     "id": "init-00079",
+     "x": 1804,
+     "y": 24,
+     "w": 1770,
+     "h": 461
+    },
+    {
+     "id": "init-00468",
+     "x": 24,
+     "y": 513,
+     "w": 1770,
+     "h": 1151
+    },
+    {
+     "id": "init-00039",
+     "x": 1808,
+     "y": 513,
+     "w": 932,
+     "h": 157
+    }
+   ],
+   "worldW": 3598,
+   "worldH": 1688,
+   "scrollW": 1920,
+   "innerW": 1920,
+   "rows": [
+    [
+     "init-00423",
+     "init-00079"
+    ],
+    [
+     "init-00468",
+     "init-00039"
+    ]
+   ],
+   "fitZoom": "51%"
+  },
+  {
+   "tag": "390",
+   "audit": {
+    "segments": 75,
+    "boxHits": 0,
+    "ownHits": 0,
+    "overlaps": 0,
+    "diagonal": 0,
+    "portShare": 0,
+    "trunkOverlaps": 0,
+    "failed": 0,
+    "list": [],
+    "edges": 23,
+    "iters": 0,
+    "ms": 4,
+    "unmapped": 0,
+    "widenLeft": 0,
+    "missing": 0,
+    "drift": 0,
+    "mode": "nest"
+   },
+   "inits": [
+    {
+     "id": "init-00423",
+     "x": 24,
+     "y": 24,
+     "w": 1108,
+     "h": 600
+    },
+    {
+     "id": "init-00079",
+     "x": 24,
+     "y": 652,
+     "w": 420,
+     "h": 2195
+    },
+    {
+     "id": "init-00468",
+     "x": 24,
+     "y": 2875,
+     "w": 1344,
+     "h": 4168
+    },
+    {
+     "id": "init-00039",
+     "x": 24,
+     "y": 7071,
+     "w": 420,
+     "h": 363
+    }
+   ],
+   "worldW": 1392,
+   "worldH": 7458,
+   "scrollW": 390,
+   "innerW": 390,
+   "rows": [
+    [
+     "init-00423"
+    ],
+    [
+     "init-00079"
+    ],
+    [
+     "init-00468"
+    ],
+    [
+     "init-00039"
+    ]
+   ],
+   "fitZoom": "7%"
+  }
+ ],
+ "heightRelayouts": {
+  "sameSig": false,
+  "rows": [
+   [
+    "init-00423",
+    "init-00079",
+    "init-00468",
+    "init-00039"
+   ]
+  ]
+ },
+ "backSameLayout": true,
+ "errors": {
+  "390": [],
+  "pc-1440": [],
+  "pc-1440Eval": [],
+  "pc-1920": [],
+  "pc-1920Eval": [],
+  "390Eval": []
+ },
+ "ok": true
+}
