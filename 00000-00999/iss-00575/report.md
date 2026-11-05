@@ -15,7 +15,7 @@ ID: "iss-00575"
 構造の図の最上位を、全体を画面に収めたときの倍率が最大になる切れ目で並べるようにした（`views/graph/layout.js` の `childrenBlock`、`shelved`、`widestRoom`）。各ブロック（Initiative、依存でつながったまとまり、折りたたみの塊）は自然な幅のまま活動順に詰め、行の切れ目の候補（先頭から k 個を横に並べた幅）をすべて試して、倍率 min(1, 見える幅 ÷ 全体の幅, 見える高さ ÷ 全体の高さ) が最大のものを採る。見える領域が縦長（高さが幅以上）なら今までの折り返し（縦積み）。高さを渡さない呼び出しも今までのまま。`graph.js` は図の領域の実寸（幅と高さ）を渡し、200ms 変わらなくなってから並べ直す。
 
 - 最初の実装（`c8d5ba8bb` ほか。残りの幅に収まる Initiative を狭めて作り直す方式、`root#shares`）は、実データで一度も並ばなかったため、統括の指示で置き換えた。`root#shares` と狭める仕組みは、この方式では要らないので外した（理由：各ブロックを自然な幅のまま詰めるので、作り直す相手がない）。
-- 置き換えのコミット：`4b274539c`。
+- 置き換えのコミット：`4b274539c`。その後 `origin/main`（#574）を取り込み（`6157901a0`、graph.js の sig の1行を、main の live キーと私の高さを合わせて解消）、写しと全体のテスト、ゲートをやり直した。
 
 ## Verification
 
@@ -23,7 +23,7 @@ ID: "iss-00575"
 - コードのレビュー（sonnet / high）：最初の方式の `c8d5ba8bb` で合格。方式を改めた後は、最終品質ゲートの1人のレビュー（opus / high）に任せた。
 - 最終品質ゲート：結果は下の「ゲートの結果」と、PR の本文に書く。
 - テスト：合成の4 Initiative で、1400×760 と 1920×1080 は2つずつ2行（幅は狭めない）、幅374・高さ800は縦積み、高さなしは今までの折り返し。依存でつながった鎖が1行に残り切れ目が鎖の中に落ちない。広げ直しの前後で行が同じ。edgeAudit の違反0（高さありの 1400×760 と 1900×940 を含む）。`graph.js` の高さの受け渡しと、変わり終わってからの並べ直しの文字列。
-- 実データ（spec-dock の構造、325件）の写し（ブラウザー、headless Chrome。`--disable-features=MacAppCodeSignClone`、`Browser.close` で閉じた）：[PC 1440×900](artifacts/20261105t145118z--pc-1440-graph-fit.png)、[PC 1920×1080](artifacts/20261105t145118z-01--pc-1920-graph-fit.png)、[390px](artifacts/20261105t145119z--390-graph-fit.png)、[結果](artifacts/20261105t145119z-01--result.json)。一時の状態の置き場（`.workbench/iss-00575/browser/state`）に、この PC のスナップショットを写し（取得の時刻だけ今に動かし）、`spec-dock dashboard serve --port 18575 --offline` で開いた。
+- 実データ（spec-dock の構造、325件）の写し（ブラウザー、headless Chrome。`--disable-features=MacAppCodeSignClone`、`Browser.close` で閉じた）：[PC 1440×900](artifacts/20261105t152346z--pc-1440-graph-fit.png)、[PC 1920×1080](artifacts/20261105t152346z-01--pc-1920-graph-fit.png)、[390px](artifacts/20261105t152346z-02--390-graph-fit.png)、[結果](artifacts/20261105t152347z--result.json)。一時の状態の置き場（`.workbench/iss-00575/browser/state`）に、この PC のスナップショットを写し（取得の時刻だけ今に動かし）、`spec-dock dashboard serve --port 18575 --offline` で開いた。
   - 1440×900：2つずつの2行（init-00423 と init-00079、init-00468 と init-00039）。「全体」の倍率は 30%（統括の見た縦積みの 27% から上がった。node の元データでは 39%）。
   - 1920×1080：同じ 2×2、倍率 51%。
   - 390：縦積み（倍率 7%）。
