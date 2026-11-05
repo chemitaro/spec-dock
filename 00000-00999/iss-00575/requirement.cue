@@ -27,8 +27,8 @@ background: "Initiative の中の Epic は画面の幅で折り返して横に�
 requirements: {
 	"R-01": {
 		title: "Initiative が、画面の幅に収まる分だけ横に並ぶ"
-		text:  "最上位の Initiative を、画面の幅（倍率100%で見える幅）に収まる列数で横に並べ、収まらなければ次の行へ折り返す。列数は、全体の高さが最も低くなるものを選び、同じなら列が少ないほうを選ぶ。"
-		acceptance: ["幅1400で、ほかの Initiative と並ぶ Initiative の x が重ならず、同じ行に2つ以上並ぶ", "幅374では、1列になり、Initiative が縦に積まれる"]
+		text:  "最上位の Initiative を、画面の幅（倍率100%で見える幅）に収まる列数で横に並べ、収まらなければ次の行へ折り返す。列数は、全体の高さが最も低くなるものを選び、同じなら列が多いほう（横に並ぶほう）を選ぶ。"
+		acceptance: ["Initiative が4つ（それぞれ Epic 1つに Issue 4つ）の構造で、幅1400で、ほかの Initiative と並ぶ Initiative の x が重ならず、同じ行に2つ以上並ぶ", "幅374では、1列になり、Initiative が縦に積まれる"]
 	}
 	"R-02": {
 		title: "並べ方の決まりは #560 と同じ"
