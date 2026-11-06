@@ -1,10 +1,10 @@
 package spec
 
 steps: {
-	"S-01": {title: "版を 0.9.0 にする", realizes: ["R-01"], status: "todo", session: "impl"}
-	"S-02": {title: "migration.md に 0.9.0 の節を足す（提供側と dogfood）", realizes: ["R-02"], status: "todo", after: ["S-01"], session: "impl"}
-	"S-03": {title: "static-inventory.json と fixture とテストを足す", realizes: ["R-03"], status: "todo", after: ["S-02"], session: "impl"}
-	"S-04": {title: "R-04 はマージの後に統括が行う", realizes: ["R-04"], status: "todo", after: ["S-03"]}
+	"S-01": {title: "版を 0.9.0 にする", realizes: ["R-01"], status: "done", session: "impl"}
+	"S-02": {title: "migration.md に 0.9.0 の節を足す（提供側と dogfood）", realizes: ["R-02"], status: "done", after: ["S-01"], session: "impl"}
+	"S-03": {title: "static-inventory.json と fixture とテストを足す", realizes: ["R-03"], status: "done", after: ["S-02"], session: "impl"}
+	"S-04": {title: "R-04 はマージの後に統括が行う", realizes: ["R-04"], status: "done", after: ["S-03"]}
 }
 
 tests: {
