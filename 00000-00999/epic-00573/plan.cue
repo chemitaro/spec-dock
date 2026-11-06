@@ -1,33 +1,28 @@
 package spec
 
 // 計画（Epic）。型 specdock/v1。
-// Epic の計画は、子の Scope への切り分けを持つ。実装の手順とテストは子の Scope が持つので、
-// steps と tests は書かない。
 
-// 目標（任意）。
-// goal: "..."
+goal: "状態の表し方と構造の図の配置を改め、0.9.0 として配る。"
 
-// 子の Scope への切り分け。子の ID（iss-00001 など）をキーにする。covers（子に任せる要件・失敗の条件の番号）が必須。
-// すべての要件を、いずれかの子に任せる。standard 以上では、それが「確かめるテストがある」にも当たり、
-// strict 以上では、すべての失敗の条件を任せ、どの子にも、任せる番号を書く。
-// 子の題名は GitHub に、子の保証レベルは子の requirement.cue にあるので、ここには書かない。
 slices: {
-	// "iss-00001": {
-	// 	covers: ["R-01", "F-01"]
-	// 	text:   "この Issue に任せること"
-	// 	after: ["iss-00002"]
-	// 	session: "coord"
-	// }
+	"iss-00574": {
+		covers: ["R-01", "R-02", "F-01"]
+		text:   "状態の色と形、作業中の区切りの輪と30分の点滅、plan.cue の進み具合の API（PR #577）"
+	}
+	"iss-00575": {
+		covers: ["R-03"]
+		text:   "構造の図の最上位を、全体表示の倍率が最大になる行の幅で並べる（PR #576）"
+	}
+	"iss-00578": {
+		covers: ["R-04"]
+		text:   "構造の図の左右・上下の広い隙間と、枠の外への遠回りを直す（PR #579）"
+	}
+	"iss-00580": {
+		covers: ["R-05"]
+		text:   "SpecDock 0.9.0 のリリース（PR #582）"
+		after: ["iss-00574", "iss-00575", "iss-00578"]
+	}
 }
 
-// 検証のしかた、戻し方、終わりの条件（任意）。critical では、切り分けがあれば rollback が要る。
-// verification: "..."
-// rollback:     "..."
-// exit:         "..."
-
-// 実行の割り当て（任意）。切り分けの session は、ここのセッションの名前を指す。
-// レビューの after は、どの切り分けの後かを指す。モデルと推論の名前は、どんな文字列でもよい。
-// execution: {
-// 	sessions: coord: {task: "統括", model: "...", effort: "...", rationale: "..."}
-// 	reviews: gate: {role: "最終の確かめ", after: "iss-00001", model: "...", effort: "..."}
-// }
+verification: "各 Issue の report.md（ゲートの合格、headless Chrome の写し）と、統括のブラウザーでの確かめ。リリース後に7つのリポジトリで canonical check が合格する。"
+exit:         "4つの子の Issue が閉じ、0.9.0 が7つのリポジトリに配られている。"
