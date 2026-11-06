@@ -81,7 +81,10 @@ _TOC_GROUND: Final = (
 
 
 def _with_toc_ground(page: str) -> str:
-    head = page.find("</head>")
+    # The Markdown source sits in a <script> inside <head>, so a "</head>" written in the document comes before the real
+    # one: the real one is the last before the (empty) <body>.
+    body = page.rfind("<body")
+    head = page.rfind("</head>", 0, body) if body >= 0 else page.rfind("</head>")
     return page if head < 0 else page[:head] + _TOC_GROUND + page[head:]
 
 

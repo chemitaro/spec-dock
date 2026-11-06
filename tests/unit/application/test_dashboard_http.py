@@ -515,3 +515,13 @@ def test_a_document_page_lays_the_toc_ground_over_the_whole_column(env: Env) -> 
     assert page.count('<style id="sd-toc-ground">') == 1
     assert page.index('id="sd-toc-ground"') < page.index("</head>")
     assert "min-width: 1180px" in page and ".ds-layout { background: linear-gradient(" in page
+
+
+def test_the_toc_ground_goes_before_the_real_head_end_even_if_the_text_writes_one(env: Env) -> None:
+    directory = scope_dir(env.r, "iss-00002")
+    (directory / "report.md").write_text("# Report\n\nwrite `</head>` and <body> in text\n", encoding="utf-8")
+    page = env.get("/r/github.com/o/r/scopes/iss-00002/doc/report.md").body.decode("utf-8")
+    style = page.index('id="sd-toc-ground"')
+    assert page.index("write `</head>`") < style  # the document text is untouched, before the style
+    assert page.count("write `</head>` and <body> in text") == 1
+    assert page[style:].index("</head>") == page[style:].index("</style></head>") + len("</style>")
