@@ -22,13 +22,8 @@ design: {
 		satisfies: ["R-04"]
 	}
 	"D-05": {
-		title:     "文書の目次の背景の上書き"
-		text:      "`dashboard_http` が文書の HTML（CUE、Markdown、失敗のページ）の `</head>` の前に、`@media screen and (min-width: 1180px)` で `.ds-layout` に目次の幅の背景と縁の線を敷く `<style>` を足す。"
-		satisfies: ["R-05"]
-	}
-	"D-06": {
 		title:     "狭い幅の図の領域を帯の下から始める"
 		text:      "`views/graph.css` の `@container app (max-width: 640px)` で、`.gx` の背景を図と同じにし、`.gx-view` の `top` を帯の高さ（46px）にして上に縁の線を引く。"
-		satisfies: ["R-06"]
+		satisfies: ["R-05"]
 	}
 }

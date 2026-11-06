@@ -11,10 +11,10 @@
 写しは headless Chrome（CDP）、一時の状態の置き場で立てたこの worktree のサーバー、PC 幅 1400px と 390px、明るい・暗いで撮った。名前は `a-`（favicon）、`b-`（概況）、`c-`（文書）、`d-`（図）＋`-light|dark-1400|390`。
 - (a) `/favicon.ico` の 404：前は SPA の各ページで `404 /favicon.ico` が 1 件（`before/a-*`、`b-*`、`d-*`）。後は 0 件（`after/*` はすべて `no 4xx`）。`assets/dashboard/favicon.svg` を置き、`index.html` の `<link rel="icon">` で指し、`GET /favicon.ico` も同じ SVG（200）を返す。
 - (b) Scope が 0 件の札：前は空。後は「Scope はまだありません」（`before/b-overview-*` と `after/b-overview-*`）。構造を読めたときだけ出す（読み込み失敗とは区別）。
-- (c) 文書の目次の背景：**統括のブラウザーでの現象は、headless Chrome で再現できなかった**（PC 幅、スクロールの先頭・中・終わり、目次の内側のスクロール、SPA の iframe の中、明るい・暗い。すべて目次は最後までつながって見えた。`before/c-doc-*`）。原因を確かめられないので、配布資産の `ds.css` は変えず、ダッシュボードが返す文書の HTML（CUE、Markdown、失敗のページ）に `<style id="sd-toc-ground">` を足し、`.ds-layout` に目次の幅の背景と縁の線を敷く（PC 幅、画面表示だけ）。`after/c-doc-*` は見た目が変わらないことの確認。**統括のブラウザーで、直った（または直らない）ことの確認が要る。**
+- (c) 文書の目次の背景：**不具合なし。変更なし。** 統括の 2026-11-05 の指摘は、ページ全体を 1 枚に撮る写し（captureBeyondViewport）で sticky の目次が画面の高さ分しか写らなかったための見かけだった（統括が main の 0.8.0 でも 1440×900 で先頭・途中・いちばん下まで確かめ、切れていないことを確認、2026-11-06）。この Issue でいったん入れた上書き（`dashboard_http._with_toc_ground`、`style#sd-toc-ground`）とそのテストは取り除いた。headless Chrome の写し（`before|after/c-doc-*`）も、切れていないことを示す。
 - (d) 390px の帯の下の枠の線：狭い幅（`@container app (max-width: 640px)`）で、図の領域を帯の高さ（46px）の下から始め、帯の背景と縁の線をつけた（`before/d-graph-*-390` と `after/d-graph-*-390`）。参考（P3、直さない）：Scope に絞った（focus）状態では帯が 46px より高くなるので、その状態で図を動かすと帯の下に線が見えうる。
 
-## 3. 検証
+## 3. 検証（経過）
 - 仕様のレビュー：spec-reviewer（opus / medium）、P0/P1 なし、P2 2 件（D-04 は実装に反映、D-02 は据え置き）。sha256：requirement 015f4e1f…、design 18883de5…、plan は後に status だけ更新。
 - コードのレビュー：code-reviewer（sonnet / high）、8362aab04、指摘なし。
 - 最終品質ゲート：quality-gate-reviewer（opus / high、1 人）。試行 1 は P1（FQG-001：本文に `</head>` があると `<style>` が本文の途中に入る）→ 2ab6a7c37 で直し、テストを足した。試行 2 は 2ab6a7c37 で pass（P3 1 件）。詳細は `.workbench/final-quality-gate/g1/closure.md`。
@@ -23,5 +23,8 @@
 
 ## 4. 次の版（0.9.0）の移行の注記に要る契約の変更
 - 配布資産（`static-inventory.json` の行）の変更なし。`ds.css`、文書、スキルは変えていない。
-- ダッシュボードの HTTP：`GET /favicon.ico`（200、`image/svg+xml`）と `/assets/favicon.svg` が増えた。文書ページ（`/r/<repo>/scopes/<ID>/doc…`）の HTML に `<style id="sd-toc-ground">` が増えた。
+- ダッシュボードの HTTP：`GET /favicon.ico`（200、`image/svg+xml`）と `/assets/favicon.svg` が増えた。文書ページの HTML は変えていない。
 - 版の番号と `migration.md` は変えていない。
+
+## 5. (c) を取り除いた後の検証
+（下に追記する）
