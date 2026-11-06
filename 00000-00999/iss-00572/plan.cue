@@ -3,12 +3,12 @@ package spec
 goal: "時間のテスト 2 件を負荷に強くし、ダッシュボードの見た目 4 件を直す"
 
 steps: {
-	"S-01": {title: "グラフの時間のテストを CPU 時間の最小にする", realizes: ["R-01", "F-01"], status: "doing", session: "impl"}
-	"S-02": {title: "bootstrap の timeout のテストに余裕を持たせる", realizes: ["R-02"], status: "doing", session: "impl"}
-	"S-03": {title: "favicon を配り、ページから指す", realizes: ["R-03"], session: "impl"}
-	"S-04": {title: "Scope が 0 件の札に一言を出す", realizes: ["R-04"], session: "impl"}
-	"S-05": {title: "文書の目次の背景を最後までつなぐ", realizes: ["R-05"], session: "impl"}
-	"S-06": {title: "390px の帯の下の枠の線を隠す", realizes: ["R-06"], session: "impl"}
+	"S-01": {title: "グラフの時間のテストを CPU 時間の最小にする", realizes: ["R-01", "F-01"], status: "done", session: "impl"}
+	"S-02": {title: "bootstrap の timeout のテストに余裕を持たせる", realizes: ["R-02"], status: "done", session: "impl"}
+	"S-03": {title: "favicon を配り、ページから指す", realizes: ["R-03"], status: "done", session: "impl"}
+	"S-04": {title: "Scope が 0 件の札に一言を出す", realizes: ["R-04"], status: "done", session: "impl"}
+	"S-05": {title: "文書の目次の背景を最後までつなぐ", realizes: ["R-05"], status: "done", session: "impl"}
+	"S-06": {title: "390px の帯の下の枠の線を隠す", realizes: ["R-06"], status: "done", session: "impl"}
 }
 
 tests: {
