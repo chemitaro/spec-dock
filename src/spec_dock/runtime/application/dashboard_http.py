@@ -70,24 +70,6 @@ _SNAPSHOT_ERRORS: Final = {
     "unreadable": ("DASHBOARD_SNAPSHOT_UNREADABLE", "spec-dock canonical status"),
     "unsupported": ("DASHBOARD_SNAPSHOT_UNSUPPORTED", "spec-dock --version"),
 }
-# iss-00572: the table-of-contents column's ground and edge are laid over the whole grid column, so they run to the end of a
-# long document whatever the sticky sidebar does (the design system paints them only on the sidebar box).
-_TOC_GROUND: Final = (
-    '<style id="sd-toc-ground">@media screen and (min-width: 1180px) {'
-    " .ds-layout { background: linear-gradient(to right, var(--ds-bg-2) calc(var(--ds-sidebar-w) - 1px),"
-    " var(--ds-border) calc(var(--ds-sidebar-w) - 1px) var(--ds-sidebar-w), transparent var(--ds-sidebar-w)); }"
-    " .ds-sidebar { height: calc(100dvh - var(--ds-topbar-h)); } }</style>"
-)
-
-
-def _with_toc_ground(page: str) -> str:
-    # The Markdown source sits in a <script> inside <head>, so a "</head>" written in the document comes before the real
-    # one: the real one is the last before the (empty) <body>.
-    body = page.rfind("<body")
-    head = page.rfind("</head>", 0, body) if body >= 0 else page.rfind("</head>")
-    return page if head < 0 else page[:head] + _TOC_GROUND + page[head:]
-
-
 _SHELL_CSP: Final = (
     "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;"
     " connect-src 'self'; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"
@@ -335,7 +317,7 @@ class DashboardHttp:
             page = markdown_page(directory, parts, scope_id=scope_id, title=model.title)
             if page is None:
                 return self._material(404, b"not found", "text/plain; charset=utf-8")
-            return self._material(200, _with_toc_ground(page).encode("utf-8"), "text/html; charset=utf-8")
+            return self._material(200, page.encode("utf-8"), "text/html; charset=utf-8")
         if not is_cue_scope(directory):
             return self._material(404, b"not found", "text/plain; charset=utf-8")
         drawn = self.documents.drawn(
@@ -343,8 +325,8 @@ class DashboardHttp:
         )
         if drawn.html is None:
             page = failure_page(scope_id, model.title, drawn.check)
-            return self._material(503, _with_toc_ground(page).encode("utf-8"), "text/html; charset=utf-8")
-        return self._material(200, _with_toc_ground(drawn.html).encode("utf-8"), "text/html; charset=utf-8")
+            return self._material(503, page.encode("utf-8"), "text/html; charset=utf-8")
+        return self._material(200, drawn.html.encode("utf-8"), "text/html; charset=utf-8")
 
     def _document_details(
         self, site: SiteRepository, model: ScopeModel, details: dict[str, object]
