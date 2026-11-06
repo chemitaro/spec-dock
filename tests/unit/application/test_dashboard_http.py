@@ -492,3 +492,15 @@ def test_reading_everything_writes_nothing_but_seen(env: Env) -> None:
     ):
         assert env.get(path).status == 200, path
     assert tree() == before
+
+
+# --- iss-00572: the mark ---------------------------------------
+
+
+def test_favicon_is_the_mark_and_the_shell_points_at_it(env: Env) -> None:
+    for path in ("/favicon.ico", "/assets/favicon.svg"):
+        response = env.get(path)
+        assert response.status == 200 and response.header("content-type") == "image/svg+xml", path
+        assert response.body.startswith(b"<svg")
+    assert b'<link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">' in env.get("/").body
+    assert env.get("/favicon.ico/x").status == 404

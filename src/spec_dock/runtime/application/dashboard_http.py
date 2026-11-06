@@ -218,6 +218,8 @@ class DashboardHttp:
         head, rest = trimmed[0], trimmed[1:]
         if head == "assets":
             return self._static(screen_asset(rest), cors=False)
+        if head == "favicon.ico" and not rest:
+            return self._static(screen_asset(["favicon.svg"]), cors=False)  # the mark, so no 404 (iss-00572)
         if head == "ds":
             return self._static(design_system_asset(rest), cors=True)
         if head == "vendor":
