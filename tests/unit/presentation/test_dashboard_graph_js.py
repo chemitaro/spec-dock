@@ -705,13 +705,14 @@ def _packing(*, extra_singles: int = 0) -> dict[str, Any]:
     """Like epic-00313: five singles (one doing), two chains, a six-to-one fan-in and a four-stage two-row grid."""
     items = [node(800, "epic")]
     items += [node(n, "issue", parent=800, in_progress=n == 801) for n in range(801, 806)]
-    items += [node(n, "issue", parent=800) for n in range(810, 816)]
+    # Keep the tall group and the two short chains ahead of the four-stage group in the activity order.
+    items += [node(n, "issue", parent=800, in_progress=n == 810) for n in range(810, 816)]
     items += [
         node(816, "issue", parent=800, blocked_by=(810,)),
         node(817, "issue", parent=800, blocked_by=(811, 812, 813, 814, 815, 816)),
     ]
     for a in (830, 840):
-        items += [node(a, "issue", parent=800), node(a + 1, "issue", parent=800, blocked_by=(a,))]
+        items += [node(a, "issue", parent=800, in_progress=True), node(a + 1, "issue", parent=800, blocked_by=(a,))]
     for col in range(4):
         for row in range(2):
             n = 850 + col * 2 + row
@@ -735,9 +736,9 @@ def packing(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
 
 def test_single_issues_fill_the_first_group_shelf_and_shorten_the_epic(packing: dict[str, Any]) -> None:
     nodes = _at_key(packing, "packed", "w1440")
-    # Start commit 982932e47, same synthetic API document, width 1440 / height 900: Epic height = 971px.
+    # Start commit 982932e47, same synthetic API document, width 1440 / height 900: Epic height = 1073px.
     epic = nodes["epic-00800"]
-    assert epic["y2"] - epic["y1"] < 971
+    assert epic["y2"] - epic["y1"] < 1073
     group_ids = [*range(810, 818), 830, 831]
     group_nodes = [nodes[f"iss-{n:05d}"] for n in group_ids]
     top, bottom = min(n["y1"] for n in group_nodes), max(n["y2"] for n in group_nodes)
@@ -750,9 +751,9 @@ def test_single_issues_fill_the_first_group_shelf_and_shorten_the_epic(packing: 
 def _under_group(*, next_shelf: bool = False) -> dict[str, Any]:
     items = [node(900, "epic")]
     items += [node(n, "issue", parent=900, in_progress=n == 901) for n in range(901, 906)]
-    items += [node(n, "issue", parent=900) for n in range(910, 916)]
+    items += [node(n, "issue", parent=900, in_progress=next_shelf and n == 910) for n in range(910, 916)]
     items += [node(916, "issue", parent=900, blocked_by=tuple(range(910, 916)))]
-    items += [node(930, "issue", parent=900), node(931, "issue", parent=900, blocked_by=(930,))]
+    items += [node(930, "issue", parent=900, in_progress=next_shelf), node(931, "issue", parent=900, blocked_by=(930,))]
     if next_shelf:
         items += [node(n, "issue", parent=900, blocked_by=((n - 1,) if n > 940 else ())) for n in range(940, 944)]
     return document(snapshot(*items))
