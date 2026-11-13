@@ -399,6 +399,9 @@ def context(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
                 "inits": {
                     "home": {},
                     "w1400": {"width": 1400, "height": 760},
+                    "w1400-no-height": {"width": 1400},
+                    "w1920-no-height": {"width": 1920},
+                    "default-with-height": {"height": 760},
                     "w1920": {"width": 1920, "height": 1080},
                     "w374": {"width": 374, "height": 800},
                     "gapped": {"width": 1400, "height": 760},
@@ -637,7 +640,7 @@ def test_reordering_the_first_stage_removes_the_crossing(rows: dict[str, Any]) -
     assert crossing == []
 
 
-# --- iss-00575: the top level wraps where the whole graph shows largest in the view -----------------------------
+# --- iss-00583: the top level wraps at the width seen; height remains a page resize signal --------------------
 
 
 def _frames(context: dict[str, Any], key: str) -> list[dict[str, Any]]:
@@ -653,14 +656,18 @@ def _rows(layout: dict[str, Any], prefix: str = "init-") -> list[list[str]]:
     return [[f["id"] for f in sorted(r, key=lambda f: f["x1"])] for _, r in sorted(by_row.items())]
 
 
-def test_initiatives_wrap_where_the_whole_shows_largest(context: dict[str, Any]) -> None:
-    """iss-00575 R-01: four alike Initiatives show largest two by two in a wide view (1400x760 and 1920x1080); they
-    keep their own widths, none overlaps, and the order is the activity order."""
-    for key in ("w1400", "w1920"):
+def test_initiatives_wrap_at_the_width_seen(context: dict[str, Any]) -> None:
+    """iss-00583 R-02 replaces the fit-zoom cut of iss-00575: rows fit at 100%, in activity order."""
+    for key, width in (("w1400", 1400), ("w1920", 1920)):
         layout = context["layout"]["inits"][key]
-        assert _rows(layout) == [["init-00600", "init-00610"], ["init-00620", "init-00630"]], key
-        widths = {n["x2"] - n["x1"] for n in layout["nodes"] if n["type"] == "frame" and n["id"].startswith("init-")}
-        assert len(widths) == 1, key  # not narrowed: every Initiative keeps its natural width
+        nodes = {n["id"]: n for n in layout["nodes"]}
+        rows = _rows(layout)
+        assert [i for row in rows for i in row] == [f"init-{600 + k * 10:05d}" for k in range(4)]
+        for row in rows:
+            frames = [nodes[i] for i in row]
+            assert len(row) == 1 or max(n["x2"] for n in frames) - min(n["x1"] for n in frames) <= width - 48
+        widths = {nodes[i]["x2"] - nodes[i]["x1"] for row in rows for i in row}
+        assert len(widths) == 1, key  # every Initiative keeps its natural width
 
 
 def test_initiatives_stack_in_a_tall_view(context: dict[str, Any]) -> None:
@@ -670,8 +677,16 @@ def test_initiatives_stack_in_a_tall_view(context: dict[str, Any]) -> None:
     assert len({item["x1"] for item in firsts}) == 1
 
 
-def test_without_a_height_the_top_level_wraps_at_the_width_seen(context: dict[str, Any]) -> None:
-    """The layout of iss-00560 stays when the page gives no height."""
+def test_height_does_not_change_top_level_rows(context: dict[str, Any]) -> None:
+    """R-02: a height is accepted for the page's resize signal but does not affect coordinates, even without width."""
+    for with_height, without in (
+        ("w1400", "w1400-no-height"),
+        ("w1920", "w1920-no-height"),
+        ("default-with-height", "home"),
+    ):
+        a, b = (context["layout"]["inits"][key] for key in (with_height, without))
+        assert _rows(a) == _rows(b)
+        assert a["nodes"] == b["nodes"]
     assert len(_rows(context["layout"]["inits"]["home"])) == 4
 
 
@@ -680,14 +695,16 @@ def test_a_chain_of_initiatives_is_one_block_on_one_row(context: dict[str, Any])
     nodes = {item["id"]: item for item in context["layout"]["chain"]["w1400"]["nodes"]}
     first, second, alone = (nodes[i] for i in ("init-00700", "init-00710", "init-00720"))
     assert first["y1"] == second["y1"] and first["x2"] < second["x1"]
-    assert alone["y1"] > first["y2"]
+    # The chain exceeds this view's width by itself. The single cannot fit beside it, so uses the next shelf.
+    assert alone["x1"] == first["x1"]
+    assert alone["y1"] == max(first["y2"], second["y2"]) + 28
 
 
 def test_the_rows_stay_when_the_routing_widens_the_gaps(context: dict[str, Any]) -> None:
     """R-03: with gaps added the Initiatives keep the rows they were cut into."""
     plain, gapped = (context["layout"]["inits"][k] for k in ("w1400", "gapped"))
     assert _rows(plain) == _rows(gapped)
-    assert len(_rows(plain)) == 2
+    assert len(_rows(plain)) == 4  # the visible width fits one natural-width Initiative per row
 
 
 def test_the_graph_lays_out_again_when_the_room_it_is_seen_in_changes() -> None:
