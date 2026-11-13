@@ -82,8 +82,8 @@ const isPhone = () => (V.root?.clientWidth || innerWidth) <= PHONE;
 // The graph's visible width at 100% (px), where the groups of the layout wrap (iss-00560 D-05): the same 16px of
 // margin as the first view and "fit".
 const seenWidth = () => Math.max(1, (V.el?.view.clientWidth || innerWidth) - 16);
-// iss-00575: and its visible height with the same margin (the toolbar's own height, which comes and goes with the
-// selection, is left out so that the layout stays): the top level wraps where the whole graph shows largest in it.
+// The visible height with the same margin, kept as a resize signal (placement uses width only, iss-00583).
+// Leave out the toolbar's changing height so that selecting a Scope keeps the layout.
 const seenHeight = () => Math.max(1, (V.el?.view.clientHeight || innerHeight) - 16);
 const byId = (id) => V.ix?.byId.get(id);
 

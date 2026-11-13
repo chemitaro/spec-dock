@@ -6,8 +6,8 @@
 // The model decides everything about the Scopes (state, stage, recommended order, cleanup candidates); this module
 // only arranges them (iss-00560): the children of one parent split into the groups their dependencies connect; a
 // group is a grid of stages (left to right) and rows, where what follows sits on the row of what it follows; the
-// groups go left to right in the activity order (iss-00556 D-03) and wrap at the width seen at 100%, never inside a
-// group.
+// dependency groups go first in the activity order and wrap at the width seen at 100%, never inside a group;
+// single Scopes fill the space beside and below them (iss-00583).
 import { audit, portNeed, route } from "./router.js";
 
 export const SIZE = {
@@ -391,41 +391,100 @@ function gridBlock(ck, members, edges, stage, ctx, avail) {
   return { t: "group", key: `rr${ck}`, axis: "y", w, h, kids: rows };
 }
 
-// Shelves (iss-00560 D-03): the groups left to right, wrapping before one that would pass the width it may use.
-// Where to wrap is decided once, without the routing's widening (ctx.breaks from the layout with no gaps), so that
-// widening a channel never moves a group to another shelf between the rounds.
-function shelfBlock(key, items, ctx, avail, rowBase) {
-  const fixed = ctx.breaks?.get(key);
-  const sizes = [];
+// Lay out a container on one axis. Its measured extent always includes every child, also after routing widens it.
+function lineBlock(key, axis, kids, ctx, base) {
+  let end = 0;
+  for (const [i, kid] of kids.entries()) {
+    kid.x = axis === "x" ? end : 0;
+    kid.y = axis === "y" ? end : 0;
+    end += (axis === "x" ? kid.w : kid.h) + (i < kids.length - 1 ? gap(ctx.gaps, key, base, i) : 0);
+  }
+  const cross = Math.max(0, ...kids.map((kid) => (axis === "x" ? kid.h : kid.w)));
+  return { t: "group", key, axis, w: axis === "x" ? end : cross, h: axis === "y" ? end : cross, kids };
+}
+
+// Choose places without gaps: groups set each shelf's height; singles try right columns, then rows under groups.
+// Store indices rather than coordinates so widening can rebuild the same container tree with the new dimensions.
+function packPlaces(groups, singles, avail) {
   const shelves = [];
-  let shelf = null;
-  for (const it of items) {
-    const full = fixed ? shelf && shelf.items.length >= fixed[shelves.length - 1] : shelf && shelf.items.length && shelf.w + BASE.wrapCol + it.w > avail;
-    if (!shelf || full) {
-      shelf = { items: [], w: 0, h: 0 };
+  for (const [i, block] of groups.entries()) {
+    let shelf = shelves.at(-1);
+    if (!shelf || shelf.w + BASE.wrapCol + block.w > avail) {
+      shelf = { slots: [], columns: [], w: 0, h: 0 };
       shelves.push(shelf);
     }
-    const n = shelf.items.length;
-    it.x = n ? shelf.w + gap(ctx.gaps, `wc${key}`, BASE.wrapCol, n - 1) : 0;
-    shelf.w = it.x + it.w;
-    shelf.h = Math.max(shelf.h, it.h);
-    shelf.items.push(it);
+    shelf.w += (shelf.slots.length ? BASE.wrapCol : 0) + block.w;
+    shelf.h = Math.max(shelf.h, block.h);
+    shelf.slots.push({ group: i, rows: [] });
   }
-  ctx.wraps.set(key, shelves.map((r) => r.items.length));
-  let y = 0;
-  shelves.forEach((r, i) => {
-    r.y = y;
-    r.items.forEach((it) => (it.y = 0));
-    y += r.h + (i < shelves.length - 1 ? gap(ctx.gaps, `wr${key}`, rowBase, i) : 0);
-  });
+  const rest = [];
+  for (const [i, block] of singles.entries()) {
+    let placed = false;
+    for (const shelf of shelves) {
+      const column = shelf.columns.find((c) => block.w <= c.w && c.h + BASE.wrapRow + block.h <= shelf.h);
+      if (column) {
+        column.items.push(i);
+        column.h += BASE.wrapRow + block.h;
+        placed = true;
+      } else if (shelf.w + BASE.wrapCol + block.w <= avail && block.h <= shelf.h) {
+        shelf.columns.push({ items: [i], w: block.w, h: block.h });
+        shelf.w += BASE.wrapCol + block.w;
+        placed = true;
+      } else {
+        for (const slot of shelf.slots) {
+          const group = groups[slot.group];
+          const row = slot.rows.at(-1);
+          const above = group.h + slot.rows.slice(0, -1).reduce((h, r) => h + BASE.wrapRow + r.h, 0);
+          if (row && row.w + BASE.wrapCol + block.w <= group.w && above + BASE.wrapRow + Math.max(row.h, block.h) <= shelf.h) {
+            row.items.push(i);
+            row.w += BASE.wrapCol + block.w;
+            row.h = Math.max(row.h, block.h);
+            placed = true;
+          } else {
+            const bottom = group.h + slot.rows.reduce((h, r) => h + BASE.wrapRow + r.h, 0);
+            if (block.w <= group.w && bottom + BASE.wrapRow + block.h <= shelf.h) {
+              slot.rows.push({ items: [i], w: block.w, h: block.h });
+              placed = true;
+            }
+          }
+          if (placed) break;
+        }
+      }
+      if (placed) break;
+    }
+    if (!placed) rest.push(i);
+  }
+  const remaining = [];
+  for (const i of rest) {
+    let row = remaining.at(-1);
+    if (!row || row.w + BASE.wrapCol + singles[i].w > avail) {
+      row = { items: [], w: 0 };
+      remaining.push(row);
+    }
+    row.w += (row.items.length ? BASE.wrapCol : 0) + singles[i].w;
+    row.items.push(i);
+  }
   return {
-    t: "group",
-    key: `wr${key}`,
-    axis: "y",
-    w: Math.max(0, ...shelves.map((r) => r.w)),
-    h: y,
-    kids: shelves.map((r) => ({ t: "group", key: `wc${key}`, axis: "x", x: 0, y: r.y, w: r.w, h: r.h, kids: r.items })),
+    shelves: shelves.map((s) => ({ slots: s.slots.map((p) => ({ group: p.group, rows: p.rows.map((r) => r.items) })), columns: s.columns.map((c) => c.items) })),
+    rest: remaining.map((r) => r.items),
   };
+}
+
+function packBlock(key, groups, singles, ctx, avail, rowBase) {
+  const places = ctx.breaks?.get(key) || packPlaces(groups, singles, avail);
+  ctx.wraps.set(key, places);
+  const shelves = places.shelves.map((shelf, r) => {
+    const slots = shelf.slots.map((slot, p) => {
+      const block = groups[slot.group];
+      if (!slot.rows.length) return block;
+      const rows = slot.rows.map((items, j) => lineBlock(`cp${key}~${r}~${p}~${j}`, "x", items.map((i) => singles[i]), ctx, BASE.wrapCol));
+      return lineBlock(`pr${key}~${r}~${p}`, "y", [block, ...rows], ctx, BASE.wrapRow);
+    });
+    const columns = shelf.columns.map((items, c) => lineBlock(`pv${key}~${r}~${c}`, "y", items.map((i) => singles[i]), ctx, BASE.wrapRow));
+    return lineBlock(`wc${key}`, "x", [...slots, ...columns], ctx, BASE.wrapCol);
+  });
+  for (const items of places.rest) shelves.push(lineBlock(`wc${key}`, "x", items.map((i) => singles[i]), ctx, BASE.wrapCol));
+  return lineBlock(`wr${key}`, "y", shelves, ctx, rowBase);
 }
 
 // The children of one parent (null: the top level), placed by the groups their dependencies connect.
@@ -436,59 +495,21 @@ function childrenBlock(parent, kids, ctx, avail) {
   const list = kids.slice().sort(act);
   const edges = siblingEdges(list, ctx.ix, all);
   const stage = stagesOf(list, edges);
-  const items = [];
+  const groups = [];
+  const singles = [];
   const loose = []; // groups that fold whole: one folded group at the end
   components(list, edges).forEach((members, g) => {
     if (members.every((s) => folds(s, ctx))) loose.push(...members);
-    else if (members.length === 1) items.push(ctx.node(members[0], avail));
+    else if (members.length === 1) singles.push(ctx.node(members[0], avail));
     else {
       const inside = new Set(members.map((s) => s.id));
       const own = edges.filter(([a, b]) => inside.has(a) && inside.has(b));
       members.sort((a, b) => stage(a) - stage(b) || act(a, b));
-      items.push(gridBlock(`${key}~${g}`, members, own, stage, ctx, avail));
+      groups.push(gridBlock(`${key}~${g}`, members, own, stage, ctx, avail));
     }
   });
-  if (loose.length) items.push(chipBlock(`${key}.f`, loose, ctx));
-  // iss-00575: the top level wraps where the whole graph shows largest in the view (when it has a height to fit)
-  const room = !parent && !ctx.breaks && ctx.opts.height > 0 ? widestRoom(items, ctx.opts, avail) : avail;
-  return shelfBlock(key, items, ctx, room, parent ? BASE.wrapRow : BASE.world);
-}
-
-// Shelves of the blocks in order, wrapping where one would pass `cap`: the width and the height of the whole.
-function shelved(blocks, cap) {
-  let w = 0;
-  let h = 0;
-  let row = null;
-  for (const b of blocks) {
-    if (!row || (row.n && row.w + BASE.wrapCol + b.w > cap)) {
-      if (row) h += row.h + BASE.world;
-      row = { w: 0, h: 0, n: 0 };
-    }
-    row.w = row.n ? row.w + BASE.wrapCol + b.w : b.w;
-    row.h = Math.max(row.h, b.h);
-    row.n++;
-    w = Math.max(w, row.w);
-  }
-  return { w, h: h + (row ? row.h : 0) };
-}
-
-// The width the top level may use (iss-00575 R-01): every cut of the order is a candidate (the widths of the first k
-// blocks side by side); the one whose whole graph shows at the largest zoom in the view wins, as "fit" would zoom
-// (at most 100%). A tie goes to the smaller whole, then to the narrower row. The blocks keep their own widths.
-function widestRoom(blocks, opts, avail) {
-  const seenW = Number(opts.width) > 0 ? Number(opts.width) : WRAP_WIDTH;
-  const seenH = Number(opts.height);
-  if (seenH >= seenW) return avail; // a tall view (a phone) stacks them, as the groups wrap at the width seen
-  const m = 2 * SIZE.margin;
-  let best = null;
-  let run = 0;
-  blocks.forEach((b, k) => {
-    run += (k ? BASE.wrapCol : 0) + b.w;
-    const { w, h } = shelved(blocks, run);
-    const zoom = Math.min(1, seenW / (w + m), seenH / (h + m));
-    if (!best || zoom > best.zoom + 1e-9 || (Math.abs(zoom - best.zoom) <= 1e-9 && w * h < best.area)) best = { zoom, area: w * h, cap: run };
-  });
-  return best ? best.cap : seenW;
+  if (loose.length) singles.push(chipBlock(`${key}.f`, loose, ctx));
+  return packBlock(key, groups, singles, ctx, avail, parent ? BASE.wrapRow : BASE.world);
 }
 
 function frameBlock(s, kids, ctx, avail) {
@@ -560,8 +581,8 @@ function flatten(block, ox, oy, path, out) {
  * @param scopes  structure API `scopes`
  * @param cleanup structure API `cleanup` ([{id, code, text}])
  * @param options {mode: "nest"|"tree", showDone, deps: "all"|"wait"|"none", fold, focus, width, height} — width: the graph's
- *                visible width at 100% (px), where the groups wrap (WRAP_WIDTH when absent); height: its visible
- *                height (px), with which the top level wraps where the whole shows largest (iss-00575; none: at width)
+ *                visible width at 100% (px), where the groups wrap (WRAP_WIDTH when absent); height is accepted
+ *                but unused by placement (the page keeps it as a resize signal, iss-00583).
  * @param gaps    extra pixels per gap key (from earlier routing rounds)
  */
 export function layout(scopes, cleanup, options = {}, gaps = {}) {
