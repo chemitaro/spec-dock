@@ -121,5 +121,7 @@ ID: "iss-00583"
 
 - 変更は前から記録していた1つの旧読み順の期待と、その理由のコメントだけ。API 文書を node で配置した `activity-after.json` を使い、塊30→60、空きの単独20、下の単独1という受け入れの規則との対応を確認。内側の Epic / Issue の読み順と木の順は変更していない。
 - S-03 の実行に残った1 failed（Red）から、`uv run pytest tests/unit/presentation/test_dashboard_graph_js.py -k frames_follow_activity_and_boxes_put_done_below` が 1 passed / 37 deselected（0.29秒）へ。
-- `make lint`：exit 0（ruff / format / mypy 合格、`s-04-lint.log`）。`spec-dock scope check iss-00583`：valid、errors=0、warnings=0。全体 `uv run pytest` は元の1回を実行中（ログ `s-04-pytest.log`）、結果を待ってから status 完了とコミットを行う。
+- `make lint`：exit 0（ruff / format / mypy 合格、`s-04-lint.log`）。`spec-dock scope check iss-00583`：valid、errors=0、warnings=0。全体 `uv run pytest`：exit 0、3769 passed / 7 skipped（1824.13秒、`s-04-pytest.log`）。構造グラフ38件もすべて合格。開始コミットは3759 passed / 7 skippedで、追加10件を含めて失敗なし。
 - `.workbench/implement/iss-00583` の適用済み草稿4つと診断用の中間出力だけを整理。基準のJS資産、比較入力・出力、再現用 plugin、測定スクリプト、ベースラインと各ステップのログは検証証拠として保持。
+
+- 最終検証：`make lint` と `uv run pytest`（全体）が両方合格。既存の失敗は開始時から0件。ソース・テストを固定して最後の1回を完了まで待ち、静かな出力を理由に再実行していない。S-01〜S-04 の status を done にした。最終コミットと Scope check の結果は後記。
