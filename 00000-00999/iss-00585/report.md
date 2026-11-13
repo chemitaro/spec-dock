@@ -48,6 +48,7 @@ SpecDock 0.9.1 のリリースの変更を作った。機能のコードは変�
 - 実装担当の報告：対象の統合テスト3ファイル 10 passed、`make lint`、`uv lock --check` 合格、全体 3772 passed / 7 skipped。
 - wheel：隔離した venv で `spec-dock --version` が `spec-dock 0.9.1`（Outcome の S-04）。
 - `spec-dock scope check iss-00585`：誤り0、警告0。
+- PR #586（https://github.com/chemitaro/spec-dock/pull/586、head 61d7c3c99）：CI 合格（Provider CI、SpecDock check、Commit identity。observer の結果 OBSERVED_CI_PASS、merge_readiness READY）。
 
 ## Residual Risks / Follow-ups
 
