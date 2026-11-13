@@ -1,0 +1,290 @@
+[
+  {
+    "repo": "housing-lifecycle",
+    "size": "1440",
+    "file": "before-housing-lifecycle-1440.png",
+    "errors": [],
+    "seenWidth": 1424,
+    "worldWidth": 5724,
+    "worldHeight": 2591,
+    "transform": "translate(0px, 92px) scale(0.88)",
+    "initiatives": [
+      {
+        "id": "init-00002",
+        "x1": 24,
+        "y1": 24,
+        "x2": 1402,
+        "y2": 771
+      },
+      {
+        "id": "init-00001",
+        "x1": 1448,
+        "y1": 24,
+        "x2": 2832,
+        "y2": 1617
+      },
+      {
+        "id": "init-00066",
+        "x1": 2878,
+        "y1": 24,
+        "x2": 3980,
+        "y2": 289
+      },
+      {
+        "id": "init-00067",
+        "x1": 4026,
+        "y1": 24,
+        "x2": 5700,
+        "y2": 1456
+      },
+      {
+        "id": "init-00068",
+        "x1": 24,
+        "y1": 1649,
+        "x2": 3100,
+        "y2": 2567
+      },
+      {
+        "id": "init-00072",
+        "x1": 3146,
+        "y1": 1649,
+        "x2": 3382,
+        "y2": 1727
+      },
+      {
+        "id": "init-00071",
+        "x1": 3428,
+        "y1": 1649,
+        "x2": 3664,
+        "y2": 1727
+      },
+      {
+        "id": "init-00070",
+        "x1": 3710,
+        "y1": 1649,
+        "x2": 3946,
+        "y2": 1727
+      },
+      {
+        "id": "init-00069",
+        "x1": 3992,
+        "y1": 1649,
+        "x2": 4228,
+        "y2": 1727
+      }
+    ],
+    "audit": {
+      "segments": 100,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 36,
+      "iters": 9,
+      "ms": 57,
+      "unmapped": 0,
+      "widenLeft": 0,
+      "missing": 0,
+      "drift": 0,
+      "mode": "nest"
+    },
+    "scrollX": false
+  },
+  {
+    "repo": "housing-lifecycle",
+    "size": "1000",
+    "file": "before-housing-lifecycle-1000.png",
+    "errors": [],
+    "seenWidth": 984,
+    "worldWidth": 4636,
+    "worldHeight": 3031,
+    "transform": "translate(0px, 92px) scale(0.88)",
+    "initiatives": [
+      {
+        "id": "init-00002",
+        "x1": 24,
+        "y1": 24,
+        "x2": 1346,
+        "y2": 924
+      },
+      {
+        "id": "init-00001",
+        "x1": 1392,
+        "y1": 24,
+        "x2": 2388,
+        "y2": 1667
+      },
+      {
+        "id": "init-00066",
+        "x1": 2434,
+        "y1": 24,
+        "x2": 3340,
+        "y2": 325
+      },
+      {
+        "id": "init-00067",
+        "x1": 3386,
+        "y1": 24,
+        "x2": 4612,
+        "y2": 1897
+      },
+      {
+        "id": "init-00068",
+        "x1": 24,
+        "y1": 1925,
+        "x2": 2634,
+        "y2": 3007
+      },
+      {
+        "id": "init-00072",
+        "x1": 2680,
+        "y1": 1925,
+        "x2": 2916,
+        "y2": 2003
+      },
+      {
+        "id": "init-00071",
+        "x1": 2962,
+        "y1": 1925,
+        "x2": 3198,
+        "y2": 2003
+      },
+      {
+        "id": "init-00070",
+        "x1": 3244,
+        "y1": 1925,
+        "x2": 3480,
+        "y2": 2003
+      },
+      {
+        "id": "init-00069",
+        "x1": 3526,
+        "y1": 1925,
+        "x2": 3762,
+        "y2": 2003
+      }
+    ],
+    "audit": {
+      "segments": 102,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 36,
+      "iters": 9,
+      "ms": 61,
+      "unmapped": 0,
+      "widenLeft": 0,
+      "missing": 0,
+      "drift": 0,
+      "mode": "nest"
+    },
+    "scrollX": false
+  },
+  {
+    "repo": "housing-lifecycle",
+    "size": "390",
+    "file": "before-housing-lifecycle-390.png",
+    "errors": [],
+    "seenWidth": 374,
+    "worldWidth": 2434,
+    "worldHeight": 13029,
+    "transform": "translate(4px, 8px) scale(0.74)",
+    "initiatives": [
+      {
+        "id": "init-00002",
+        "x1": 24,
+        "y1": 24,
+        "x2": 1122,
+        "y2": 1559
+      },
+      {
+        "id": "init-00001",
+        "x1": 24,
+        "y1": 1587,
+        "x2": 1020,
+        "y2": 4257
+      },
+      {
+        "id": "init-00066",
+        "x1": 24,
+        "y1": 4285,
+        "x2": 444,
+        "y2": 4892
+      },
+      {
+        "id": "init-00067",
+        "x1": 24,
+        "y1": 4920,
+        "x2": 668,
+        "y2": 9737
+      },
+      {
+        "id": "init-00068",
+        "x1": 24,
+        "y1": 9765,
+        "x2": 2410,
+        "y2": 12581
+      },
+      {
+        "id": "init-00072",
+        "x1": 24,
+        "y1": 12609,
+        "x2": 260,
+        "y2": 12687
+      },
+      {
+        "id": "init-00071",
+        "x1": 24,
+        "y1": 12715,
+        "x2": 260,
+        "y2": 12793
+      },
+      {
+        "id": "init-00070",
+        "x1": 24,
+        "y1": 12821,
+        "x2": 260,
+        "y2": 12899
+      },
+      {
+        "id": "init-00069",
+        "x1": 24,
+        "y1": 12927,
+        "x2": 260,
+        "y2": 13005
+      }
+    ],
+    "audit": {
+      "segments": 100,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 36,
+      "iters": 9,
+      "ms": 52,
+      "unmapped": 0,
+      "widenLeft": 0,
+      "missing": 0,
+      "drift": 0,
+      "mode": "nest"
+    },
+    "scrollX": false
+  }
+]
