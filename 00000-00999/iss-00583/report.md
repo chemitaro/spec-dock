@@ -110,3 +110,5 @@ ID: "iss-00583"
 - 幅と高さのテスト：`uv run pytest tests/unit/presentation/test_dashboard_graph_js.py -k 'initiatives_wrap_at or height_does_not or a_chain_of_initiatives or rows_stay_when'` は Red 3 failed / 1 passed（0.29秒、`s-03-red.log`）→ Green 4 passed（0.22秒、`s-03-green.log`）。変更前は幅1400の行が1634pxで1352pxの範囲を超えていた。
 - 節目 `uv run pytest tests/unit/presentation/test_dashboard_graph_js.py`：37 passed / 1 failed（36.98秒、`s-03-graph.log`）。残る1件は CP-1 でも記録した旧読み順の期待で、S-04で更新する。
 - `make lint`：exit 0（`s-03-lint.log`）。`git diff --check` 合格。src の views と tests を検索し、widestRoom / shelved / opts.height / 倍率で最上位を選ぶ古い説明が残っていないことを確認。
+
+- S-03 コミット：`125df986a2a51aa7779d28e5676a1461ad7935f2`（parent `6d7b2758f335eb00b88b1a5322d97668edad3e55`）。Scope check valid、errors=0、warnings=0、Gitクリーン。ただし git-autocommit が今回だけ英語の文を生成したため、日本語の指定に合わない。共有認可契約 A2 では履歴の書き換えは通常認可の外なので、修正方法を担当者に確認する。日本語訳案 `.workbench/implement/iss-00583/s-03-message-ja.txt`。自分から push は実施していない。
