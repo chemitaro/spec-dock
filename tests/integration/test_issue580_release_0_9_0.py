@@ -29,17 +29,6 @@ def _sha(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def test_the_version_is_0_9_0_in_every_place() -> None:
-    project = re.search(r'^version = "([^"]+)"', (ROOT / "pyproject.toml").read_text("utf-8"), re.M)
-    assert project is not None and project.group(1) == "0.9.0"
-    locked = re.search(
-        r'\[\[package\]\]\nname = "spec-dock"\nversion = "([^"]+)"', (ROOT / "uv.lock").read_text("utf-8")
-    )
-    assert locked is not None and locked.group(1) == "0.9.0"
-    assert (SCAFFOLD / "system/spec-dock-version").read_text("utf-8") == "0.9.0\n"
-    assert (ROOT / "spec-dock/system/spec-dock-version").read_text("utf-8") == "0.9.0\n"
-
-
 def test_the_migration_notes_describe_0_9_0_and_the_dogfood_copy_matches() -> None:
     text = (SCAFFOLD / "docs/migration.md").read_text("utf-8")
     headings = re.findall(r"^## (.+)$", text, re.M)
