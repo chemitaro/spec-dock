@@ -16,6 +16,7 @@ ID: "iss-00583"
 - round-2（同じレビュアー）：**合格**。P0・P1・P2 なし、P3 1（graph.js のコメントを直す決定と、excludes・rollback の記述の食い違い。文書は合格の後に変えないため、記録だけ）。結果 `.workbench/spec-review/iss-00583/round-2.json`、検査 `round-2.check.json`（valid、status pass）。
 - 合格した文書の sha256：requirement.cue `780d1e9f749e61cc8edf673dd812b052b4c846317ab36821c7fa3ba36bb84565`、design.cue `3afa08458126b757338ffc125f1d7599430bb22291537857e8c78c5a4fb3e96f`、plan.cue `5c37fddd54524b402fe15b5cb49d7a39453515ccc25145953dff52a20845892b`。
 - 注：round-2 の P3 のとおり、graph.js はコメントだけを直し、コードは変えない（requirement の constraints と D-05 が正）。
+- CP-1（code-reviewer opus / medium、範囲 `982932e47..6d7b2758f`、S-01・S-02）：**合格**。P0〜P3 すべて0。結果 `.workbench/code-review/iss-00583/cp1-round-1.json`、検査 `cp1-round-1.check.json`（valid、status pass）。タスク担当が実データ（housing-lifecycle）を node で並べ、epic-00313 の枠の高さが 971→869px（幅1424）、1073→971px（幅984）に下がることを確かめた。
 
 ## 原因
 
@@ -98,3 +99,5 @@ ID: "iss-00583"
 
 - S-02 コミット / CP-1 HEAD：`6d7b2758f335eb00b88b1a5322d97668edad3e55`（parent `fdebf71ad3f767841df00cf7ac483640b336e774`）。`spec-dock scope check iss-00583`：valid、errors=0、warnings=0。コミット後のブランチは指定どおり、Git の作業ツリーはクリーン。
 - CP-1 のレビュー範囲は `982932e47ca2c8c2befe24c1b3623e10931d2a94..6d7b2758f335eb00b88b1a5322d97668edad3e55`。S-01 / S-02 完了、タスク担当のレビューと返答待ち。
+
+- CP-1：担当者から合格の連絡（`msg_2a8eb007a37c`、code-reviewer opus / medium、P0〜P3すべて0、`.workbench/code-review/iss-00583/cp1-round-1.json`）。テストデータ補正も了承済み。S-03 / S-04 の継続承認。push は担当者が行う。
