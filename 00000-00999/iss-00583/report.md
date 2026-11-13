@@ -17,6 +17,7 @@ ID: "iss-00583"
 - 合格した文書の sha256：requirement.cue `780d1e9f749e61cc8edf673dd812b052b4c846317ab36821c7fa3ba36bb84565`、design.cue `3afa08458126b757338ffc125f1d7599430bb22291537857e8c78c5a4fb3e96f`、plan.cue `5c37fddd54524b402fe15b5cb49d7a39453515ccc25145953dff52a20845892b`。
 - 注：round-2 の P3 のとおり、graph.js はコメントだけを直し、コードは変えない（requirement の constraints と D-05 が正）。
 - CP-1（code-reviewer opus / medium、範囲 `982932e47..6d7b2758f`、S-01・S-02）：**合格**。P0〜P3 すべて0。結果 `.workbench/code-review/iss-00583/cp1-round-1.json`、検査 `cp1-round-1.check.json`（valid、status pass）。タスク担当が実データ（housing-lifecycle）を node で並べ、epic-00313 の枠の高さが 971→869px（幅1424）、1073→971px（幅984）に下がることを確かめた。
+- 最終品質ゲート（quality-gate-reviewer opus / medium、second opinion なし、範囲 `982932e47..96e10c32f`）：**合格**（attempt 1）。P0〜P3 すべて0、coverage complete。test lane：`make lint` exit 0、`uv run pytest` exit 0（3769 passed / 7 skipped）。closure `.workbench/final-quality-gate/iss-00583-fqg-1/closure.md`（worktree `/Volumes/990p2t/workspace/worktrees/orca/spec-dock/iss-00583`）。
 
 ## 原因
 
@@ -76,12 +77,6 @@ ID: "iss-00583"
 - S-03：`test_initiatives_wrap_where_the_whole_shows_largest` を `test_initiatives_wrap_at_the_width_seen` に改め、2×2という倍率由来の期待を、1400 / 1920 の各行が見える幅以内であるという R-02 の期待へ変更。`test_without_a_height_the_top_level_wraps_at_the_width_seen` は `test_height_does_not_change_top_level_rows` に改め、同じ幅で高さあり / なしの全座標が一致することと、幅省略時も高さが影響しないことを追加。広げ直しの固定テストの幅1400での行数を2から4へ変更（自然な枠幅のままでは1行1つしか入らないため）。鎖は1行を保つ期待を維持し、単独 Initiative が次の棚の左端、28px下に来ることを明示した。いずれも承認済みの iss-00575 の判断の変更（R-02 / D-05 / D-06）による。
 
 - S-04：`test_frames_follow_activity_and_boxes_put_done_below` の最上位だけを `[init-00001, epic-00020, epic-00030, init-00060]` から `[epic-00030, init-00060, epic-00020, init-00001]` に更新。依存の塊30→60が先、単独20はその右の空き、背の高い単独1は下の棚に入る（D-01 / D-03）。同じ置き場の中の活動順、内側の Epic、Issue の完了順、木の順序の期待は維持。コメントにも理由を追記。
-
-## Outcome
-
-## Verification
-
-## Residual Risks / Follow-ups
 
 ## 実装の記録
 
@@ -155,3 +150,23 @@ ID: "iss-00583"
 | S-02（CP-1 合格） | `6d7b2758f335eb00b88b1a5322d97668edad3e55` |
 | S-03 | `d011cef068703c788b387922b3fd004d9894c115` |
 | S-04 | `96e10c32f7754299336a376df5add564b98163e3` |
+
+## Outcome
+
+- 構造の図の入れ子の配置（`views/graph/layout.js`）で、依存でつながった塊を先に棚へ置き、つながりのない Scope を、塊の棚の右の列、低い塊の下の順に詰め、入らないものだけを下の棚に置くようにした。塊のない段は今までと同じ座標。置き場は gaps のない配置で一度決め、配線の広げ直しの回でも固定し、描く棚の高さは子の最大にした。
+- 最上位の `widestRoom`（倍率で切れ目を選ぶ）をやめ、ほかの段と同じく 100% で見える幅で折り返すようにした。`options.height` は受け取るが配置には使わない（graph.js は大きさが変わり終わってからの並べ直しの合図として渡し続ける。graph.js はコメントだけ直した）。
+- 実装担当：Codex GPT-6.1 Sol / medium（`launch.effective` codex gpt-6.1-sol medium、dispatch `ctx_dd41b9b512f9`）。Astra への引き上げはなし。コミット：S-01 `ae7071762`、S-01 補正 `fdebf71ad`、S-02 `6d7b2758f`、S-03 `d011cef06`、S-04 `96e10c32f`。
+
+## Verification
+
+- 仕様のレビュー：round-2 で合格（上の「レビュー記録」）。
+- CP-1 のコードのレビュー：合格（P0〜P3 0）。
+- 最終品質ゲート：合格（上の「レビュー記録」、closure）。
+- 実データの写し：上の「実データの写し」。
+
+## Residual Risks / Follow-ups
+
+- 1つで見える幅を超える Initiative（中の塊を折り返せない。housing-lifecycle で最大 2652px）の行は、今も見える幅を超える。塊を途中で折り返さない決まり（R-03）による。
+- housing-lifecycle では、配線の広げ直しが上限の10回で収まりきらない（`widenLeft` 1〜2。直す前は9回で収まり0）。edgeAudit の違反（AUDIT_KEYS）は0で、線の重なりや箱への当たりはない。続けて収まらない例が増えるなら、iss-00578 の広げの見積もりを見直す。
+- 塊は塊の下に詰めない（D-03 は1つの Scope だけを詰める）。epic-00313 では、短い鎖（333 → 334）の下に空きが残り、次の棚の塊（314 → 318）は下の棚に置かれる。本人が気にするなら、次の Issue で「塊も低い塊の下に詰める」を検討する。
+- spec-review round-2 の P3（graph.js のコメントを直す決定と、excludes・rollback の記述の食い違い）は記録だけ。
