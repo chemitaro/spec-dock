@@ -57,6 +57,8 @@ ID: "iss-00583"
 
 - S-03：`test_initiatives_wrap_where_the_whole_shows_largest` を `test_initiatives_wrap_at_the_width_seen` に改め、2×2という倍率由来の期待を、1400 / 1920 の各行が見える幅以内であるという R-02 の期待へ変更。`test_without_a_height_the_top_level_wraps_at_the_width_seen` は `test_height_does_not_change_top_level_rows` に改め、同じ幅で高さあり / なしの全座標が一致することと、幅省略時も高さが影響しないことを追加。広げ直しの固定テストの幅1400での行数を2から4へ変更（自然な枠幅のままでは1行1つしか入らないため）。鎖は1行を保つ期待を維持し、単独 Initiative が次の棚の左端、28px下に来ることを明示した。いずれも承認済みの iss-00575 の判断の変更（R-02 / D-05 / D-06）による。
 
+- S-04：`test_frames_follow_activity_and_boxes_put_done_below` の最上位だけを `[init-00001, epic-00020, epic-00030, init-00060]` から `[epic-00030, init-00060, epic-00020, init-00001]` に更新。依存の塊30→60が先、単独20はその右の空き、背の高い単独1は下の棚に入る（D-01 / D-03）。同じ置き場の中の活動順、内側の Epic、Issue の完了順、木の順序の期待は維持。コメントにも理由を追記。
+
 ## Outcome
 
 ## Verification
@@ -112,3 +114,12 @@ ID: "iss-00583"
 - `make lint`：exit 0（`s-03-lint.log`）。`git diff --check` 合格。src の views と tests を検索し、widestRoom / shelved / opts.height / 倍率で最上位を選ぶ古い説明が残っていないことを確認。
 
 - S-03 コミット：`125df986a2a51aa7779d28e5676a1461ad7935f2`（parent `6d7b2758f335eb00b88b1a5322d97668edad3e55`）。Scope check valid、errors=0、warnings=0、Gitクリーン。ただし git-autocommit が今回だけ英語の文を生成したため、日本語の指定に合わない。共有認可契約 A2 では履歴の書き換えは通常認可の外なので、修正方法を担当者に確認する。日本語訳案 `.workbench/implement/iss-00583/s-03-message-ja.txt`。自分から push は実施していない。
+
+- 担当者の明示許可 `msg_1b53921b2472` に従い、未公開の S-03 のメッセージだけを amend。現在の S-03 コミットは `d011cef068703c788b387922b3fd004d9894c115`（parent は変わらず `6d7b2758f335eb00b88b1a5322d97668edad3e55`）。旧 `125df986a` と Git の tree が一致し、差分を変えていないことを確認。既存の Co-Authored-By 等の行はなかった。push なし。
+
+### S-04（残る読み順の期待値と全体の検証）
+
+- 変更は前から記録していた1つの旧読み順の期待と、その理由のコメントだけ。API 文書を node で配置した `activity-after.json` を使い、塊30→60、空きの単独20、下の単独1という受け入れの規則との対応を確認。内側の Epic / Issue の読み順と木の順は変更していない。
+- S-03 の実行に残った1 failed（Red）から、`uv run pytest tests/unit/presentation/test_dashboard_graph_js.py -k frames_follow_activity_and_boxes_put_done_below` が 1 passed / 37 deselected（0.29秒）へ。
+- `make lint`：exit 0（ruff / format / mypy 合格、`s-04-lint.log`）。`spec-dock scope check iss-00583`：valid、errors=0、warnings=0。全体 `uv run pytest` は元の1回を実行中（ログ `s-04-pytest.log`）、結果を待ってから status 完了とコミットを行う。
+- `.workbench/implement/iss-00583` の適用済み草稿4つと診断用の中間出力だけを整理。基準のJS資産、比較入力・出力、再現用 plugin、測定スクリプト、ベースラインと各ステップのログは検証証拠として保持。
