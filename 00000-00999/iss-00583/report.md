@@ -48,6 +48,24 @@ ID: "iss-00583"
 
 ブラウザーのエラーは、どれも0。
 
+## 実データの写し（S-05、タスク担当）
+
+作業ツリーのコード（直す前は `982932e47`、直した後は `96e10c32f`）を `uv run spec-dock dashboard serve --port 18583 --offline --state-root <.workbench/iss-00583/state>` で配り、headless Chrome（`--disable-features=MacAppCodeSignClone`、`Browser.close` で閉じた）で写した。数字は [直す前](artifacts/20261113t154034z-01--before-result.json)、[直した後](artifacts/20261113t154034z-02--after-result.json)、[epic-00313 に絞った後](artifacts/20261113t154034z-03--after-focus313-result.json)。
+
+| リポジトリ | 幅 | 見える幅 | 全体の幅（前 → 後） | 最上位の行（Initiative の数：行の幅） | 写し（前 / 後） |
+|---|---|---|---|---|---|
+| housing-lifecycle | 1440 | 1424 | 5724 → 2700 | 前 [4:5676, 5:4204] → 後 [1, 1, 1, 1, 1, 4:986] | [前](artifacts/20261113t154030z--before-housing-lifecycle-1440.png) / [後](artifacts/20261113t154032z-02--after-housing-lifecycle-1440.png) |
+| housing-lifecycle | 1000 | 984 | 4636 → 2306 | 前 [4:4588, 5:3738] → 後 [1, 1, 1, 1, 1, 3:736, 1] | [前](artifacts/20261113t154030z-02--before-housing-lifecycle-1000.png) / [後](artifacts/20261113t154033z--after-housing-lifecycle-1000.png) |
+| housing-lifecycle | 390 | 374 | 2434 → 2114 | 縦積み（9行）のまま | [前](artifacts/20261113t154031z-01--before-housing-lifecycle-390.png) / [後](artifacts/20261113t154033z-01--after-housing-lifecycle-390.png) |
+| spec-dock | 1440 | 1424 | 1406 → 1406 | 1つずつ3行のまま | [前](artifacts/20261113t154030z-01--before-spec-dock-1440.png) / [後](artifacts/20261113t154031z-03--after-spec-dock-1440.png) |
+| spec-dock | 1000 | 984 | 2102 → 1156 | 前 [2:2102, 1] → 後 1つずつ3行 | [前](artifacts/20261113t154031z--before-spec-dock-1000.png) / [後](artifacts/20261113t154032z--after-spec-dock-1000.png) |
+| spec-dock | 390 | 374 | 1156 → 1156 | 縦積みのまま | [前](artifacts/20261113t154031z-02--before-spec-dock-390.png) / [後](artifacts/20261113t154032z-01--after-spec-dock-390.png) |
+
+- 要望 2（R-02）：2つ以上の Initiative が並ぶ行は、どれも見える幅に収まる（1424 に 986、984 に 736）。見える幅を超える残りは、1つで見える幅より広い Initiative（中の塊を折り返せない。最大 2652）の行だけ。
+- 要望 1（R-01）：epic-00313 に絞った写し（[1440](artifacts/20261113t154033z-02--after-focus313-housing-lifecycle-1440.png)、[1000](artifacts/20261113t154034z--after-focus313-housing-lifecycle-1000.png)）で、つながりのない 332、331、330、329、328 が、背の高い塊（325〜326）の右の列に縦に積まれ、本人の写しの左下の大きな空白がなくなった。node で測った epic-00313 の枠の高さは、幅1424で 971 → 869px、幅984で 1073 → 971px。
+- edgeAudit の違反（AUDIT_KEYS）は、前も後も、どの写しでも0。ブラウザーのエラーは0。
+- 本人の写しは housing-lifecycle（init-00001）のもの。company-os のスナップショットには Scope がなかった。
+
 ## 逸脱と判断
 
 - iss-00575 R-01（最上位は倍率が最大の切れ目）を改め、最上位もほかの段と同じく見える幅で折り返す（R-02、D-05）。理由：本人の要望（2026-11-13）は、100% で画面の幅に収まる折り返し。候補を見える幅以下に限る案も考えたが、横長の画面ではほとんどの場合に最も広い候補（見える幅での折り返し）が選ばれ、違いが残らないので、規則を1つにした。iss-00575 R-03（大きさが変わり終わってからの並べ直し）は graph.js の側でそのまま残る。
