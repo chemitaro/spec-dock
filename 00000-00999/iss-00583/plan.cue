@@ -14,7 +14,7 @@ steps: {
 
 tests: {
 	"T-01": {title: "epic-00313 に似せた合成の構造で、つながりのない5つが最初の塊の棚の縦の範囲の中の、塊の右か下にあり、Epic の枠が直す前より低い（幅 1440）", verifies: ["R-01"]}
-	"T-02": {title: "同じ構造の幅 1000・1440・1920 で、兄弟の四角が重ならず、どの棚も見える幅の中にある（1つで超える塊を除く）", verifies: ["R-01", "F-01"]}
+	"T-02": {title: "同じ構造の幅 1000・1440・1920 で、gaps のない layout と routeLayout が採った回の layout の両方で、兄弟の四角が重ならず、どの棚も見える幅の中にある（1つで超える塊を除く）", verifies: ["R-01", "F-01"]}
 	"T-03": {title: "背の高い1つの枠は、塊の棚の下の棚に置かれ、塊の棚の高さは塊だけで決まる", verifies: ["F-01"]}
 	"T-04": {title: "塊のない段（wide の構造）の座標が直す前と同じ（今の test_groups_without_dependencies_wrap_at_the_width_seen が通る）", verifies: ["F-02"]}
 	"T-05": {title: "1つの Scope どうしは、同じ置き場の中で活動順に並ぶ", verifies: ["F-03"]}

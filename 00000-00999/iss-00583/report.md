@@ -12,7 +12,10 @@ ID: "iss-00583"
 
 ## レビュー記録
 
-（仕様のレビューの合格を記録する）
+- round-1（spec-reviewer opus / high）：合格（P0・P1 なし、P2 1・P3 3）。`.workbench/spec-review/iss-00583/round-1.json`。P2・P3 を任意で反映（`review-response.md`）。
+- round-2（同じレビュアー）：**合格**。P0・P1・P2 なし、P3 1（graph.js のコメントを直す決定と、excludes・rollback の記述の食い違い。文書は合格の後に変えないため、記録だけ）。結果 `.workbench/spec-review/iss-00583/round-2.json`、検査 `round-2.check.json`（valid、status pass）。
+- 合格した文書の sha256：requirement.cue `780d1e9f749e61cc8edf673dd812b052b4c846317ab36821c7fa3ba36bb84565`、design.cue `3afa08458126b757338ffc125f1d7599430bb22291537857e8c78c5a4fb3e96f`、plan.cue `5c37fddd54524b402fe15b5cb49d7a39453515ccc25145953dff52a20845892b`。
+- 注：round-2 の P3 のとおり、graph.js はコメントだけを直し、コードは変えない（requirement の constraints と D-05 が正）。
 
 ## 原因
 

@@ -26,7 +26,7 @@ design: {
 		satisfies: ["R-01", "F-03"]
 		text: """
 			components の結果を今までどおり活動順（各まとまりの最初の Scope の順）に回し、2つ以上で、全部が畳まれないものを groups（gridBlock）に、
-			1つのものを singles（ctx.node）に入れる。全部が畳まれるまとまりのチップ（key.f）は singles の最後に足す。
+			1つのもので畳まれないものを singles（ctx.node）に入れる。今の childrenBlock と同じく、全部が畳まれるかを先に判定し、全部が畳まれるまとまり（1つの片付けの候補を含む）は、まとめて1つのチップ（key.f）にして singles の最後に足す。
 			groups どうし、singles どうしの順は、それぞれ活動順のまま。gridBlock のキー（`${key}~${g}`、g は components の番号）は今までと同じにする。
 			"""
 	}
@@ -51,7 +51,8 @@ design: {
 			   行が埋まれば次の行（縦の間 wrapRow）で入れる。入るのは、行の右の端が塊の幅以下で、下の端が H 以下のとき。
 
 			どの棚のどこにも入らないものは、塊の棚の下に、今までの shelfBlock と同じ棚（活動順、avail で折り返す）で並べる。塊がない段は、
-			すべてがこの棚になるので、直す前と同じ座標になる（F-02）。H は詰めたもので伸ばさない（F-01）。
+			すべてがこの棚になるので、直す前と同じ座標になる（F-02）。置き場を選ぶときの H（gaps のない配置）は、詰めたもので伸ばさない（F-01）。
+			描くときの棚の高さは、どの回でも、棚の子（塊の置き場と右の列）の高さの最大にする。広げ直しの回（D-04）で箱や間が伸びて、詰めたものの下の端が H を超えても、次の棚と重ならない。
 			"""
 	}
 	"D-04": {
@@ -79,6 +80,7 @@ design: {
 			childrenBlock の最上位で widestRoom を呼ぶのをやめ、ほかの段と同じく avail（options.width − 2 × margin、なければ WRAP_WIDTH − 2 × margin）で packBlock に渡す。
 			widestRoom と shelved は消す。最上位の棚の間は今までどおり BASE.world、ほかの段は BASE.wrapRow。
 			layout の options.height は受け取るが使わない（JSDoc を直す。graph.js は今までどおり渡し、大きさが変わり終わってからの並べ直しの合図に使う）。
+			graph.js の seenHeight のコメント（最上位を高さで折り返すという説明）と、tests/js/dashboard_graph_check.mjs の同じ趣旨のコメントは、事実に合わせて直す（コメントだけ。コードは変えない）。
 			縦長の画面では、avail が狭いので、Initiative は1列に積まれる。
 			"""
 	}
@@ -93,7 +95,7 @@ design: {
 			- 背の高い1つ（棚の高さより高い枠）を持つ Initiative。
 			- 塊のない Epic（12の Issue、今の wide の構造で足りる）。
 
-			確かめること：R-01 の受け入れ（棚の範囲、重なりなし、枠の高さが直す前より低い）、F-01（背の高い1つは塊の棚の下）、F-02（塊のない段の座標が直す前と同じ。
+			確かめること：R-01 の受け入れ（棚の範囲、重なりなし、枠の高さが直す前より低い。重なりなしは、gaps のない layout と、routeLayout が採った回の layout の両方で確かめる）、F-01（背の高い1つは塊の棚の下）、F-02（塊のない段の座標が直す前と同じ。
 			今の test_groups_without_dependencies_wrap_at_the_width_seen がそのまま通る）、R-03（gaps ありで置き場が同じ、edgeAudit 0）。
 
 			改める前の決定に合わせた期待の更新：iss-00575 の test_initiatives_wrap_where_the_whole_shows_largest（倍率の切れ目）は、行が見える幅に収まることを確かめる形に改め、
