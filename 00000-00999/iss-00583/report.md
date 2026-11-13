@@ -125,3 +125,15 @@ ID: "iss-00583"
 - `.workbench/implement/iss-00583` の適用済み草稿4つと診断用の中間出力だけを整理。基準のJS資産、比較入力・出力、再現用 plugin、測定スクリプト、ベースラインと各ステップのログは検証証拠として保持。
 
 - 最終検証：`make lint` と `uv run pytest`（全体）が両方合格。既存の失敗は開始時から0件。ソース・テストを固定して最後の1回を完了まで待ち、静かな出力を理由に再実行していない。S-01〜S-04 の status を done にした。最終コミットと Scope check の結果は後記。
+
+- S-04 コミット / 実装完了 HEAD：`96e10c32f7754299336a376df5add564b98163e3`（parent `d011cef068703c788b387922b3fd004d9894c115`）。ブランチ `chemitaro/iss-00583`、Git の作業ツリーはクリーン、author / committer の設定は `chemitaro <84865385+chemitaro@users.noreply.github.com>`。
+- 最後のメッセージは git-autocommit が生成した日本語文を使用。生成器の prompt が scope の省略を許しており、2つの候補に scope がなかったので、確認で確定しなかった。今回の明示指定 `type(scope):` を優先し、生成された本文を維持して既知の `dashboard-graph` だけを付け、通常の `git commit -F` で確定。ツールの設定・実装と Git の履歴は変更していない。
+- 最終 Scope check：valid、errors=0、warnings=0。`make lint` と全体 `uv run pytest` は合格、既存の失敗なし。担当した S-01〜S-04 を完了し、S-05、コードレビュー、最終品質ゲート、PR はタスク担当へ引き渡す。実装担当から push、merge、work finish は行っていない。
+
+| ステップ | コミット |
+|---|---|
+| S-01（Red） | `ae70717625c87e76f633d59146c1eae390d715ea` |
+| S-01 の活動順のデータ補正（開始コミットで Red 再確認） | `fdebf71ad3f767841df00cf7ac483640b336e774` |
+| S-02（CP-1 合格） | `6d7b2758f335eb00b88b1a5322d97668edad3e55` |
+| S-03 | `d011cef068703c788b387922b3fd004d9894c115` |
+| S-04 | `96e10c32f7754299336a376df5add564b98163e3` |
