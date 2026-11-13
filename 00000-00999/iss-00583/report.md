@@ -95,3 +95,6 @@ ID: "iss-00583"
 - 節目の `uv run pytest tests/unit/presentation/test_dashboard_graph_js.py`：37 passed / 1 failed（39.82秒）。唯一の失敗は、S-04で更新する既存 `test_frames_follow_activity_and_boxes_put_done_below` の最上位の読み順（従来は単独の init-00001 が先、今は epic-00030 → init-00060 の依存の塊が先）。この CP-1 では期待をまだ変えず、S-04に残した。ログ `s-02-graph.log`。新規合成構造・代表構造の edgeAudit、250件の1秒制限、塊のない段、木の表示、その他の既存テストは合格。
 - `make lint`：exit 0（ruff / format / mypy、`s-02-lint.log`）。`git diff --check`：合格。利用箇所を検索し、旧 shelfBlock の利用は childrenBlock だけ、wraps の利用は layout 内の再配置とテストの観測だけと確認。router.js の規則は変更なし。
 - CP-1 の前なので widestRoom / shelved と高さの従来動作は保持（S-03 の担当分）。S-03 / S-04 / S-05 は未着手。コミットと Scope check の結果は後記。
+
+- S-02 コミット / CP-1 HEAD：`6d7b2758f335eb00b88b1a5322d97668edad3e55`（parent `fdebf71ad3f767841df00cf7ac483640b336e774`）。`spec-dock scope check iss-00583`：valid、errors=0、warnings=0。コミット後のブランチは指定どおり、Git の作業ツリーはクリーン。
+- CP-1 のレビュー範囲は `982932e47ca2c8c2befe24c1b3623e10931d2a94..6d7b2758f335eb00b88b1a5322d97668edad3e55`。S-01 / S-02 完了、タスク担当のレビューと返答待ち。
