@@ -4,8 +4,8 @@ goal: "マージできる 0.9.1 のリリースの PR（CI 合格、最終品質
 
 steps: {
 	"S-01": {title: "migration.md に 0.9.1 の節を足す（提供側と dogfood、タスク担当）", realizes: ["R-02"], status: "done", session: "owner"}
-	"S-02": {title: "版を 0.9.1 にし、0.9.0 の版固定のテストを外す", realizes: ["R-01"], status: "todo", after: ["S-01"], session: "impl"}
-	"S-03": {title: "static-inventory.json の2行、0.9.0 の fixture、統合テストを足す", realizes: ["R-03", "R-01", "R-02"], status: "todo", after: ["S-02"], session: "impl"}
+	"S-02": {title: "版を 0.9.1 にし、0.9.0 の版固定のテストを外す", realizes: ["R-01"], status: "done", after: ["S-01"], session: "impl"}
+	"S-03": {title: "static-inventory.json の2行、0.9.0 の fixture、統合テストを足す", realizes: ["R-03", "R-01", "R-02"], status: "done", after: ["S-02"], session: "impl"}
 	"S-04": {title: "wheel を隔離した venv で確かめ、配布の手順を report.md に書く（タスク担当）", realizes: ["R-01", "R-04"], status: "todo", after: ["S-03"], session: "owner2"}
 }
 
