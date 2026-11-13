@@ -163,6 +163,7 @@ ID: "iss-00583"
 - CP-1 のコードのレビュー：合格（P0〜P3 0）。
 - 最終品質ゲート：合格（上の「レビュー記録」、closure）。
 - 実データの写し：上の「実データの写し」。
+- PR #584（https://github.com/chemitaro/spec-dock/pull/584）、head `96e10c32f`。CI：すべて合格（provider-tests 17m22s、Provider distribution parity macOS / ubuntu、check、route、spec-dock-check）。observer の結果 observable_ci PASS、merge_readiness READY、mergeStateStatus CLEAN。マージは統括が行う。
 
 ## Residual Risks / Follow-ups
 
