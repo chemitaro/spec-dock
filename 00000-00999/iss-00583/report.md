@@ -74,3 +74,10 @@ ID: "iss-00583"
 - `make lint`：exit 0。`spec-dock scope check iss-00583`：valid、errors=0、warnings=0（status のみ更新）。コミットは後記。
 
 - S-01 コミット：`ae70717625c87e76f633d59146c1eae390d715ea`（テストのみ。Red の証拠を先に保存）。
+
+### S-01 補正（活動順の前提）
+
+- 初回のテストデータでは、推薦順位（先で待つ件数）により4列の塊が先になり、幅1440の最初の棚が低い棚になっていた。初回 Green は 4 failed / 6 passed。規則に反する結果ではなく、狙った棚を作れていないテストの誤りだった。
+- 背の高い塊と2つの短い鎖の入口を作業中として活動順を明示。単独5つのうち作業中が1つという条件、依存の構造、幅、受け入れの強さは保持。広げ直しのテストでも、先の棚に詰めて後の棚と重ならない前提を作るため、入口の活動状態を明示した。
+- 開始コミットの layout.js / router.js / series.js を Git から読み出した `.workbench/implement/iss-00583/baseline-assets` に対して、補正後の同じ API 文書を測定。幅1000 / 1440 / 1920の高さは 1175 / 1073 / 869px（高さ900）。比較の期待値を971から1073へ変更したのは、活動状態を明示したデータに対応させるため。開始コミットのコードは変えていない。出力 `corrected-before.json`。
+- 補正後の Red は同じ assets を選ぶ一時 pytest plugin `baseline_assets.py` で確認（元の pytest コマンドに `-p baseline_assets` と PYTHONPATH を付加）。ログ `s-01-corrected-red.log`。コミットは後記。
