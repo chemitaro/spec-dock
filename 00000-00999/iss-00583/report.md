@@ -57,3 +57,20 @@ ID: "iss-00583"
 ## Verification
 
 ## Residual Risks / Follow-ups
+
+## 実装の記録
+
+### 開始時
+
+- ブランチ `chemitaro/iss-00583`、開始 `982932e47ca2c8c2befe24c1b3623e10931d2a94`、変更なし。requirement / design / plan の SHA-256 は round-2 の合格記録と一致。
+- ベースライン：`make lint` exit 0（ruff / format / mypy 合格）、`uv run pytest` exit 0（3759 passed / 7 skipped、1855.02秒）。既存の失敗なし。詳細 `.workbench/implement/iss-00583/start.md` と同じ場所の `baseline-lint.log`・`baseline-pytest.log`。
+- pstack の bug-fix、原因の修正、証明、振る舞いのテスト、段階的なコミットの参照を確認。実装担当は委譲しない。
+
+### S-01（Red）
+
+- 合成の Epic（単独5つ、鎖2つ、6つから1つへの塊、4列2行の塊）、低い塊の下を埋める Epic、背の高い単独枠を含む Initiative をテストに追加。開始コミットの合成 Epic の高さは、幅1000 / 1440 / 1920で 1175 / 971 / 769px（高さ900）。幅1440の 971px を比較基準としてテストに固定。
+- `uv run pytest tests/unit/presentation/test_dashboard_graph_js.py -k 'single_issues or packed_siblings or widening_keeps_packed or a_tall_single or packed_structures'`：6 failed / 4 passed / 28 deselected（1.40秒）。971pxから縮まない、右の列や塊の下に入らない、背の高い枠が塊と同じ棚に来る、という意図した失敗。ログ `s-01-red.log`。
+- node の確認に routeLayout が採用した配置と path の取得を加え、gaps なし / 採用した配置の重なりと、広げ直しの前後の置き場を観測。audit の幅1000・1440・1920（高さあり）を追加し、250件の測定対象数を 16 + 4×8 から 16 + 7×8 へ更新（検査条件の追加であり、制限の緩和なし）。
+- `make lint`：exit 0。`spec-dock scope check iss-00583`：valid、errors=0、warnings=0（status のみ更新）。コミットは後記。
+
+- S-01 コミット：`ae70717625c87e76f633d59146c1eae390d715ea`（テストのみ。Red の証拠を先に保存）。
