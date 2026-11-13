@@ -55,6 +55,8 @@ ID: "iss-00583"
 
 - S-01 のテストデータを補正：推薦順位は番号だけではなく先で待つ件数を優先するため、当初の合成構造では4列の塊が先に来た。背の高い棚の空きを検証するため、背の高い塊と2つの鎖の入口の活動状態を明示し、開始コミットの資産で高さを測り直した（幅1440：971px → 補正後1073px）。これは合成データと比較基準の対応の補正であり、活動順の規則や受け入れ条件は変更していない。実装後は869px。
 
+- S-03：`test_initiatives_wrap_where_the_whole_shows_largest` を `test_initiatives_wrap_at_the_width_seen` に改め、2×2という倍率由来の期待を、1400 / 1920 の各行が見える幅以内であるという R-02 の期待へ変更。`test_without_a_height_the_top_level_wraps_at_the_width_seen` は `test_height_does_not_change_top_level_rows` に改め、同じ幅で高さあり / なしの全座標が一致することと、幅省略時も高さが影響しないことを追加。広げ直しの固定テストの幅1400での行数を2から4へ変更（自然な枠幅のままでは1行1つしか入らないため）。鎖は1行を保つ期待を維持し、単独 Initiative が次の棚の左端、28px下に来ることを明示した。いずれも承認済みの iss-00575 の判断の変更（R-02 / D-05 / D-06）による。
+
 ## Outcome
 
 ## Verification
@@ -101,3 +103,10 @@ ID: "iss-00583"
 - CP-1 のレビュー範囲は `982932e47ca2c8c2befe24c1b3623e10931d2a94..6d7b2758f335eb00b88b1a5322d97668edad3e55`。S-01 / S-02 完了、タスク担当のレビューと返答待ち。
 
 - CP-1：担当者から合格の連絡（`msg_2a8eb007a37c`、code-reviewer opus / medium、P0〜P3すべて0、`.workbench/code-review/iss-00583/cp1-round-1.json`）。テストデータ補正も了承済み。S-03 / S-04 の継続承認。push は担当者が行う。
+
+### S-03（最上位も見える幅で折り返し）
+
+- childrenBlock が最上位でも avail を packBlock にそのまま渡し、widestRoom / shelved を削除。options.height は渡してよいが配置には使わない。JSDoc、graph.js の seenHeight の2行のコメント、node 確認の同趣旨のコメントを更新。graph.js はコメント行を除いた比較でコードが一致することを確認した。
+- 幅と高さのテスト：`uv run pytest tests/unit/presentation/test_dashboard_graph_js.py -k 'initiatives_wrap_at or height_does_not or a_chain_of_initiatives or rows_stay_when'` は Red 3 failed / 1 passed（0.29秒、`s-03-red.log`）→ Green 4 passed（0.22秒、`s-03-green.log`）。変更前は幅1400の行が1634pxで1352pxの範囲を超えていた。
+- 節目 `uv run pytest tests/unit/presentation/test_dashboard_graph_js.py`：37 passed / 1 failed（36.98秒、`s-03-graph.log`）。残る1件は CP-1 でも記録した旧読み順の期待で、S-04で更新する。
+- `make lint`：exit 0（`s-03-lint.log`）。`git diff --check` 合格。src の views と tests を検索し、widestRoom / shelved / opts.height / 倍率で最上位を選ぶ古い説明が残っていないことを確認。
