@@ -469,8 +469,8 @@ def test_the_default_view_draws_finished_dependencies_between_shown_boxes(contex
 def test_frames_follow_activity_and_boxes_put_done_below(context: dict[str, Any]) -> None:
     home = _ids(context, "home")
     roots = ("init-00001", "epic-00020", "epic-00030", "init-00060")
-    # iss-00560: the top level is shelves of groups too, read from the top and left to right
-    assert _reading(home, roots) == ["init-00001", "epic-00020", "epic-00030", "init-00060"]
+    # iss-00583: 依存の塊30→60を先に置く。単独20はその右の空きへ、背の高い1は下の棚へ。
+    assert _reading(home, roots) == ["epic-00030", "init-00060", "epic-00020", "init-00001"]
     inside = ("epic-00002", "epic-00008", "epic-00012", "epic-00014")
     assert _reading(home, inside) == ["epic-00002", "epic-00014", "epic-00012", "epic-00008"]
     # the finished prerequisite 3 sits left of 5, which waits for it, on its row (stages counting the done ones)
