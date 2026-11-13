@@ -111,7 +111,7 @@ def test_the_250_scope_structure_routes_within_a_second(representative: dict[str
     # iss-00572: "ms" is the node process's CPU time, the least of three runs, so a loaded PC does not stretch it.
     runs = [run for run in representative["audit"] if run["name"] == "generated" and not run["opts"].get("focus")]
     assert (
-        len(runs) == 16 + 4 * 8
+        len(runs) == 16 + 7 * 8
     )  # and the nested ones at a PC's and a phone's width (iss-00560), with a height (iss-00575)
     assert max(run["ms"] for run in runs) < 1000
 
@@ -696,3 +696,196 @@ def test_the_graph_lays_out_again_when_the_room_it_is_seen_in_changes() -> None:
     assert "|${seenWidth()}|${seenHeight()}`" in source  # the width and the height tell a new layout
     assert "seenWidth() === V.width && seenHeight() === V.height" in source  # a zoom keeps the layout
     assert "setTimeout(relayout, RESIZE_SETTLE)" in source  # once the resizing has stopped
+
+
+# --- iss-00583: dependency groups first, single Scopes in the space beside and below them ---------------------
+
+
+def _packing(*, extra_singles: int = 0) -> dict[str, Any]:
+    """Like epic-00313: five singles (one doing), two chains, a six-to-one fan-in and a four-stage two-row grid."""
+    items = [node(800, "epic")]
+    items += [node(n, "issue", parent=800, in_progress=n == 801) for n in range(801, 806)]
+    items += [node(n, "issue", parent=800) for n in range(810, 816)]
+    items += [
+        node(816, "issue", parent=800, blocked_by=(810,)),
+        node(817, "issue", parent=800, blocked_by=(811, 812, 813, 814, 815, 816)),
+    ]
+    for a in (830, 840):
+        items += [node(a, "issue", parent=800), node(a + 1, "issue", parent=800, blocked_by=(a,))]
+    for col in range(4):
+        for row in range(2):
+            n = 850 + col * 2 + row
+            deps = () if col == 0 else ((n - 2,) if col < 3 else (854, 855))
+            items.append(node(n, "issue", parent=800, blocked_by=deps))
+    items += [node(n, "issue", parent=800) for n in range(880, 880 + extra_singles)]
+    return document(snapshot(*items))
+
+
+@pytest.fixture(scope="module")
+def packing(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
+    return _run(
+        tmp_path_factory.mktemp("packing"),
+        {
+            "documents": {"packed": _packing(), "under": _under_group(), "tall": _tall_single()},
+            "layouts": {"packed": {f"w{w}": {"width": w, "height": 900} for w in (1000, 1440, 1920)}},
+            "checks": ["layout", "order", "audit"],
+        },
+    )
+
+
+def test_single_issues_fill_the_first_group_shelf_and_shorten_the_epic(packing: dict[str, Any]) -> None:
+    nodes = _at_key(packing, "packed", "w1440")
+    # Start commit 982932e47, same synthetic API document, width 1440 / height 900: Epic height = 971px.
+    epic = nodes["epic-00800"]
+    assert epic["y2"] - epic["y1"] < 971
+    group_ids = [*range(810, 818), 830, 831]
+    group_nodes = [nodes[f"iss-{n:05d}"] for n in group_ids]
+    top, bottom = min(n["y1"] for n in group_nodes), max(n["y2"] for n in group_nodes)
+    for n in range(801, 806):
+        single = nodes[f"iss-{n:05d}"]
+        assert top <= single["y1"] < single["y2"] <= bottom
+        assert single["x1"] > max(g["x2"] for g in group_nodes)
+
+
+def _under_group(*, next_shelf: bool = False) -> dict[str, Any]:
+    items = [node(900, "epic")]
+    items += [node(n, "issue", parent=900, in_progress=n == 901) for n in range(901, 906)]
+    items += [node(n, "issue", parent=900) for n in range(910, 916)]
+    items += [node(916, "issue", parent=900, blocked_by=tuple(range(910, 916)))]
+    items += [node(930, "issue", parent=900), node(931, "issue", parent=900, blocked_by=(930,))]
+    if next_shelf:
+        items += [node(n, "issue", parent=900, blocked_by=((n - 1,) if n > 940 else ())) for n in range(940, 944)]
+    return document(snapshot(*items))
+
+
+def _tall_single() -> dict[str, Any]:
+    return document(
+        snapshot(
+            node(1000, "initiative"),
+            node(1010, "epic", parent=1000),
+            node(1011, "epic", parent=1000, blocked_by=(1010,)),
+            node(1020, "epic", parent=1000),
+            *(node(n, "issue", parent=1020) for n in range(1021, 1033)),
+            node(1040, "epic", parent=1000),
+        )
+    )
+
+
+def test_single_issues_fill_rows_under_a_short_group_in_activity_order(tmp_path: Path) -> None:
+    result = _run(
+        tmp_path,
+        {
+            "documents": {"under": _under_group()},
+            "layouts": {"under": {"home": {"width": 1000}}},
+            "checks": ["layout", "order"],
+        },
+    )
+    nodes = _at_key(result, "under", "home")
+    left, right = nodes["iss-00930"]["x1"], nodes["iss-00931"]["x2"]
+    bottom = max(nodes[f"iss-{n:05d}"]["y2"] for n in range(910, 917))
+    singles = [nodes[f"iss-{n:05d}"] for n in range(901, 906)]
+    for single in singles:
+        assert left <= single["x1"] < single["x2"] <= right
+        assert nodes["iss-00930"]["y2"] < single["y1"] < single["y2"] <= bottom
+    ordered = [i for i in result["order"]["under"]["epic-00900"] if i in {n["id"] for n in singles}]
+    assert _reading(nodes, tuple(ordered)) == ordered
+    assert len({n["y1"] for n in singles}) == 3  # two columns, then one on the third row
+
+
+def test_a_tall_single_goes_below_and_does_not_grow_the_group_shelf(tmp_path: Path) -> None:
+    result = _run(
+        tmp_path,
+        {"documents": {"tall": _tall_single()}, "layouts": {"tall": {"home": {"width": 1440}}}, "checks": ["layout"]},
+    )
+    nodes = _at_key(result, "tall", "home")
+    a, b, tall, small = (nodes[f"epic-{n:05d}"] for n in (1010, 1011, 1020, 1040))
+    assert tall["y2"] - tall["y1"] > a["y2"] - a["y1"]
+    assert a["y1"] == b["y1"] == small["y1"]
+    assert small["x1"] > b["x2"]
+    assert tall["y1"] == max(a["y2"], b["y2"]) + 14
+
+
+def test_packed_structures_route_cleanly_in_every_view(packing: dict[str, Any]) -> None:
+    assert {run["name"] for run in packing["audit"]} == {"packed", "under", "tall"}
+    assert not [run for run in packing["audit"] if any(run[k] for k in AUDIT_KEYS)]
+
+
+def test_single_issues_stack_in_the_first_right_column_in_activity_order(packing: dict[str, Any]) -> None:
+    nodes = _at_key(packing, "packed", "w1440")
+    order = [i for i in packing["order"]["packed"]["epic-00800"] if i in {f"iss-{n:05d}" for n in range(801, 806)}]
+    singles = [nodes[i] for i in order]
+    assert len({n["x1"] for n in singles}) == 1
+    assert all(b["y1"] == a["y2"] + 14 for a, b in pairwise(singles))
+
+
+def test_single_issues_use_an_existing_right_column_before_starting_another(tmp_path: Path) -> None:
+    result = _run(
+        tmp_path,
+        {
+            "documents": {"packed": _packing(extra_singles=5)},
+            "layouts": {"packed": {"home": {"width": 1920}}},
+            "checks": ["layout", "order"],
+        },
+    )
+    nodes = _at_key(result, "packed", "home")
+    ids = {f"iss-{n:05d}" for n in (*range(801, 806), *range(880, 885))}
+    order = [i for i in result["order"]["packed"]["epic-00800"] if i in ids]
+    first, second = ([nodes[i] for i in order[a : a + 5]] for a in (0, 5))
+    assert len({n["x1"] for n in first}) == len({n["x1"] for n in second}) == 1
+    assert second[0]["x1"] == first[0]["x2"] + 14
+    assert second[0]["y1"] == first[0]["y1"]
+    assert all(b["y1"] == a["y2"] + 14 for column in (first, second) for a, b in pairwise(column))
+
+
+def _overlaps(a: dict[str, Any], b: dict[str, Any]) -> bool:
+    return a["x1"] < b["x2"] and b["x1"] < a["x2"] and a["y1"] < b["y2"] and b["y1"] < a["y2"]
+
+
+@pytest.mark.parametrize("width", [1000, 1440, 1920])
+def test_packed_siblings_do_not_overlap_before_or_after_routing(tmp_path: Path, width: int) -> None:
+    result = _run(
+        tmp_path,
+        {
+            "documents": {"packed": _packing()},
+            "layouts": {
+                "packed": {"plain": {"width": width, "height": 900}, "routed": {"width": width, "height": 900}}
+            },
+            "routed": {"packed": ["routed"]},
+            "checks": ["layout"],
+        },
+    )
+    for key in ("plain", "routed"):
+        nodes = _at_key(result, "packed", key)
+        siblings = [n for n in nodes.values() if n["id"] != "epic-00800"]
+        assert not [(a["id"], b["id"]) for i, a in enumerate(siblings) for b in siblings[i + 1 :] if _overlaps(a, b)]
+        shelves: dict[int, list[dict[str, Any]]] = {}
+        for n in siblings:
+            shelf = next(p["i"] for p in n["path"] if p["c"] == "wrepic-00800")
+            shelves.setdefault(shelf, []).append(n)
+        room = width - 48 - 24
+        for shelf in shelves.values():
+            # This fixture's largest indivisible group is the four-stage grid, 844px, which fits all three widths.
+            assert max(n["x2"] for n in shelf) - min(n["x1"] for n in shelf) <= room
+
+
+def test_widening_keeps_packed_places_and_grows_the_shelf_before_the_next(tmp_path: Path) -> None:
+    # A third group needs the next shelf. Grow a single below the short group beyond the first shelf's initial H.
+    doc = _under_group(next_shelf=True)
+    result = _run(
+        tmp_path,
+        {
+            "documents": {"under": doc},
+            "layouts": {"under": {"plain": {"width": 1000}, "gapped": {"width": 1000}}},
+            "gaps": {"under": {"gapped": {"grow:n:iss-00901": 450, "all.x": 30, "all.y": 30}}},
+            "checks": ["layout"],
+        },
+    )
+    plain, gapped = (_at_key(result, "under", k) for k in ("plain", "gapped"))
+    assert {i: n["path"] for i, n in plain.items()} == {i: n["path"] for i, n in gapped.items()}
+    assert result["layout"]["under"]["plain"]["wraps"] == result["layout"]["under"]["gapped"]["wraps"]
+    assert max(gapped[f"iss-{n:05d}"]["y2"] for n in range(901, 906)) < gapped["iss-00940"]["y1"]
+    siblings = [n for n in gapped.values() if n["id"] != "epic-00900"]
+    assert not [(a["id"], b["id"]) for i, a in enumerate(siblings) for b in siblings[i + 1 :] if _overlaps(a, b)]
+    # New horizontal rows take all.x; vertical slot gaps take all.y.
+    assert gapped["iss-00902"]["x1"] - gapped["iss-00901"]["x2"] == 44
+    assert gapped["iss-00903"]["y1"] - gapped["iss-00901"]["y2"] == 44

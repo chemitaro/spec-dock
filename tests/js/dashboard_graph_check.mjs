@@ -27,7 +27,7 @@ function combos(doc) {
         for (const fold of [true, false]) list.push({ mode, showDone, deps, fold });
   // iss-00560: the groups wrap at the width seen at 100%: a PC (1400px) and a 390px phone (374px)
   // iss-00575: and with the view's height too, where the top level wraps where the whole shows largest
-  for (const [width, height] of [[1400], [374], [1400, 760], [1900, 940]])
+  for (const [width, height] of [[1400], [374], [1400, 760], [1900, 940], [1000, 800], [1440, 900], [1920, 1080]])
     for (const showDone of [false, true])
       for (const deps of ["wait", "all"])
         for (const fold of [true, false]) list.push({ mode: "nest", showDone, deps, fold, width, height });
@@ -64,9 +64,11 @@ if (request.checks.includes("layout")) {
   for (const [name, doc] of Object.entries(request.documents)) {
     const result = {};
     for (const [key, opts] of Object.entries(request.layouts?.[name] || {})) {
-      const L = layout(doc.scopes, doc.cleanup, opts, request.gaps?.[name]?.[key] || {});
+      const L = request.routed?.[name]?.includes(key)
+        ? routeLayout(doc.scopes, doc.cleanup, opts).layout
+        : layout(doc.scopes, doc.cleanup, opts, request.gaps?.[name]?.[key] || {});
       result[key] = {
-        nodes: L.nodes.map((n) => ({ id: n.id, type: n.type, x1: n.x1, y1: n.y1, x2: n.x2, y2: n.y2 })),
+        nodes: L.nodes.map((n) => ({ id: n.id, type: n.type, x1: n.x1, y1: n.y1, x2: n.x2, y2: n.y2, path: n.path })),
         groups: L.groups.map((g) => ({ key: g.key, ids: g.ids, x1: g.x1, y1: g.y1, x2: g.x2, y2: g.y2 })),
         trunks: L.trunks.length,
         edges: L.edges.map((e) => ({ a: e.a, z: e.z, done: e.done, pairs: e.pairs })),
