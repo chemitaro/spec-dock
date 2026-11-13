@@ -52,6 +52,8 @@ ID: "iss-00583"
 - iss-00575 R-01（最上位は倍率が最大の切れ目）を改め、最上位もほかの段と同じく見える幅で折り返す（R-02、D-05）。理由：本人の要望（2026-11-13）は、100% で画面の幅に収まる折り返し。候補を見える幅以下に限る案も考えたが、横長の画面ではほとんどの場合に最も広い候補（見える幅での折り返し）が選ばれ、違いが残らないので、規則を1つにした。iss-00575 R-03（大きさが変わり終わってからの並べ直し）は graph.js の側でそのまま残る。
 - iss-00575 R-02、iss-00556 D-03、iss-00560 の「活動順を変えない」を改める（R-01、D-01、D-03）。理由：本人の要望（塊を左に、ばらばらを右の空きへ）。塊どうし、1つどうしの活動順は保つ（F-03）。塊のない段は今までと同じ（F-02）。
 
+- S-01 のテストデータを補正：推薦順位は番号だけではなく先で待つ件数を優先するため、当初の合成構造では4列の塊が先に来た。背の高い棚の空きを検証するため、背の高い塊と2つの鎖の入口の活動状態を明示し、開始コミットの資産で高さを測り直した（幅1440：971px → 補正後1073px）。これは合成データと比較基準の対応の補正であり、活動順の規則や受け入れ条件は変更していない。実装後は869px。
+
 ## Outcome
 
 ## Verification
@@ -81,3 +83,15 @@ ID: "iss-00583"
 - 背の高い塊と2つの短い鎖の入口を作業中として活動順を明示。単独5つのうち作業中が1つという条件、依存の構造、幅、受け入れの強さは保持。広げ直しのテストでも、先の棚に詰めて後の棚と重ならない前提を作るため、入口の活動状態を明示した。
 - 開始コミットの layout.js / router.js / series.js を Git から読み出した `.workbench/implement/iss-00583/baseline-assets` に対して、補正後の同じ API 文書を測定。幅1000 / 1440 / 1920の高さは 1175 / 1073 / 869px（高さ900）。比較の期待値を971から1073へ変更したのは、活動状態を明示したデータに対応させるため。開始コミットのコードは変えていない。出力 `corrected-before.json`。
 - 補正後の Red は同じ assets を選ぶ一時 pytest plugin `baseline_assets.py` で確認（元の pytest コマンドに `-p baseline_assets` と PYTHONPATH を付加）。ログ `s-01-corrected-red.log`。コミットは後記。
+
+- S-01 補正コミット：`fdebf71ad3f767841df00cf7ac483640b336e774`（parent は `ae70717625c87e76f633d59146c1eae390d715ea`）。補正後 Red は 6 failed / 4 passed / 28 deselected（1.38秒）。
+
+### S-02（Green、CP-1）
+
+- childrenBlock が、従来の components の番号と gridBlock のキーを維持して塊と単独を分離。全体が畳まれるものは従来どおり最後のチップに集約。packPlaces が塊の棚と、既存の右の列 → 新しい右の列 → 左から塊の下の行 → 残りの棚を選ぶ。塊だけの高さを選択の上限に使用。
+- ctx.wraps には棚・塊の置き場・右の列・下の行・残りの棚の要素番号を保存。gaps のある回は ctx.breaks の番号を再使用。描くときは lineBlock が子の最大から棚の高さを測り、広げた単独の下端が次の棚を押し下げる。
+- wr / wc と元の grid のキーを保持し、新たな下の行は `cp<段>~<棚>~<置き場>~<行>`（x）、塊の置き場は `pr<段>~<棚>~<置き場>`（y）、右の列は `pv<段>~<棚>~<列>`（y）。既存の axisOf に適合し、間は gap を使用。下の行は従来の棚と同じく末尾へ順に追加し、埋まった行を閉じて次の行へ進む、と解釈した。
+- 新規10件：`uv run pytest tests/unit/presentation/test_dashboard_graph_js.py -k 'single_issues or packed_siblings or widening_keeps_packed or a_tall_single or packed_structures'` が 10 passed / 28 deselected（1.55秒）。ログ `s-02-focused-corrected.log`。高さは幅1000 / 1440 / 1920で 971 / 869 / 869px（開始コミットの補正後データは1175 / 1073 / 869px）。出力 `after-pack.json`。
+- 節目の `uv run pytest tests/unit/presentation/test_dashboard_graph_js.py`：37 passed / 1 failed（39.82秒）。唯一の失敗は、S-04で更新する既存 `test_frames_follow_activity_and_boxes_put_done_below` の最上位の読み順（従来は単独の init-00001 が先、今は epic-00030 → init-00060 の依存の塊が先）。この CP-1 では期待をまだ変えず、S-04に残した。ログ `s-02-graph.log`。新規合成構造・代表構造の edgeAudit、250件の1秒制限、塊のない段、木の表示、その他の既存テストは合格。
+- `make lint`：exit 0（ruff / format / mypy、`s-02-lint.log`）。`git diff --check`：合格。利用箇所を検索し、旧 shelfBlock の利用は childrenBlock だけ、wraps の利用は layout 内の再配置とテストの観測だけと確認。router.js の規則は変更なし。
+- CP-1 の前なので widestRoom / shelved と高さの従来動作は保持（S-03 の担当分）。S-03 / S-04 / S-05 は未着手。コミットと Scope check の結果は後記。
