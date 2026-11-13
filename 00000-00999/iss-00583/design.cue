@@ -103,6 +103,15 @@ design: {
 			どの期待を、なぜ変えたかは report.md の「逸脱と判断」に書く。
 			"""
 	}
+	"D-07": {
+		title:     "実データの写しの取り方"
+		satisfies: ["R-04"]
+		text: """
+			この PC の状態の置き場から、登録簿と構造のスナップショットを `.workbench/iss-00583/state` に写し、作業ツリーのコード（`uv run spec-dock dashboard serve --offline --state-root`）で配る。
+			headless Chrome で 1440×900、1000×800、390×844 を開き、最初の表示を写す。ページから、見える幅（.gx-view の幅 − 16）、全体の幅、Initiative の枠の位置、
+			window.specdockEdgeAudit() の結果、ページのエラーを取る。直す前の写しは、作業を始めたコミット（982932e47）で取る。
+			"""
+	}
 }
 
 compatibility: "表示の配置だけが変わる。API、データ、URL、保存した設定は変わらない。graph.js が渡す options は同じ。"
