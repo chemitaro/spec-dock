@@ -8,7 +8,7 @@ steps: {
 	"S-01": {title: "塊と空きの詰め込み、塊のない段の不変、背の高い1つ、広げ直しでの固定を確かめるテストを書き、直す前のコードで落ちることを確かめる（Red）", realizes: ["R-01", "R-03", "F-01", "F-02", "F-03"], status: "done", session: "impl"}
 	"S-02": {title: "childrenBlock を塊と1つに分け、packBlock（塊の棚、右の列、塊の下、残りの棚）と入れ物の形、置き場の固定を実装する（Green）", realizes: ["R-01", "R-03", "F-01", "F-02", "F-03"], status: "done", after: ["S-01"], session: "impl"}
 	"S-03": {title: "最上位の widestRoom と shelved を消し、見える幅で折り返す。iss-00575 のテストの期待を改め、見える幅に収まることを確かめるテストを足す", realizes: ["R-02", "R-03"], status: "done", after: ["S-02"], session: "impl"}
-	"S-04": {title: "読み順など、塊を先に置く規則で変わるほかのテストの期待を直し、make lint と全体の pytest を通す", realizes: ["R-01", "R-03"], status: "todo", after: ["S-03"], session: "impl"}
+	"S-04": {title: "読み順など、塊を先に置く規則で変わるほかのテストの期待を直し、make lint と全体の pytest を通す", realizes: ["R-01", "R-03"], status: "doing", after: ["S-03"], session: "impl"}
 	"S-05": {title: "spec-dock と housing-lifecycle の実データで 1440、1000、390 の写しと数字を、直す前と後で report.md に残す", realizes: ["R-04", "R-01", "R-02"], status: "todo", after: ["S-04"], session: "owner"}
 }
 
