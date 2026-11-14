@@ -153,7 +153,13 @@ def test_list_screens_never_ask_for_motion_and_every_screen_draws_with_state_mar
         assert "motion: true" not in (ASSETS / rel).read_text(), rel
     for rel in ("views/graph.js", "views/scope.js"):
         assert "motion: true" in (ASSETS / rel).read_text(), rel
-    for rel in ("views/graph.js", "views/scope.js", "views/board.js", "views/overview.js", "views/_shared/search.js"):
+    for rel in (
+        "views/graph.js",
+        "views/_shared/scope_tabs.js",
+        "views/board.js",
+        "views/overview.js",
+        "views/_shared/search.js",
+    ):
         assert "stateMark(" in (ASSETS / rel).read_text(), rel
     graph = (ASSETS / "views" / "graph.js").read_text()
     for place in ('<div class="gx-r1">', '<p class="pn-why" data-st="${s.state}">'):  # the box and the panel's reason

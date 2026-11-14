@@ -58,7 +58,12 @@ def test_no_screen_reads_outside_the_server() -> None:
 def test_user_text_is_escaped_before_it_enters_html() -> None:
     # Every interpolation of a Scope's title, reason, id or a file name goes through esc().
     raw = re.compile(r"\$\{(?:[a-z]+\.)?(title|name|text|branch|path)\}")
-    for path in [*(VIEWS / f"{name}.js" for name in MINE), SHARED / "parts.js", SHARED / "search.js"]:
+    for path in [
+        *(VIEWS / f"{name}.js" for name in MINE),
+        SHARED / "parts.js",
+        SHARED / "search.js",
+        SHARED / "scope_tabs.js",
+    ]:
         for number, line in enumerate(path.read_text().splitlines(), 1):
             assert not raw.search(line), f"{path.name}:{number}: {line.strip()}"
 
@@ -163,8 +168,6 @@ def test_query_options_round_trip(tmp_path: Path) -> None:
         out.c = logic.withParam(path, "done", true);
         out.d = logic.withParam(out.c, "done", false);
         out.opts = logic.boardOptions(new URLSearchParams("kind=bogus&group=1&done=1"));
-        out.tab = logic.tabOf(new URLSearchParams("tab=deps"));
-        out.badTab = logic.tabOf(new URLSearchParams("tab=x"));
         out.leave = logic.withoutEmbed("/r/github.com/o/r/scopes/iss-00001?tab=docs&embed=1");
         """,
         tmp_path,
@@ -173,7 +176,6 @@ def test_query_options_round_trip(tmp_path: Path) -> None:
     assert out["b"] == "/r/github.com/o/r/board?embed=1"
     assert out["c"].endswith("done=1") and out["d"] == "/r/github.com/o/r/board?embed=1"
     assert out["opts"] == {"kind": "", "group": True, "done": True}
-    assert out["tab"] == "deps" and out["badTab"] == "summary"
     assert out["leave"] == "/r/github.com/o/r/scopes/iss-00001?tab=docs"
 
 

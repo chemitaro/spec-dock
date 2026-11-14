@@ -84,3 +84,10 @@
   & .sd-steps li { display: flex; align-items: center; gap: 6px; font-size: 13px; }
   & .sd-tabpanel[data-tab="docs"] > .sd-progress { margin-bottom: 14px; }
 }
+/* 説明資料のタブ（iss-00587 D-04）：細い帯と、残りの高さを使う枠。 */
+[data-view="scope"] {
+  & .sd-explainbox { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
+  & .sd-explain__bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 24px; font-size: 12.5px; font-weight: 650; color: var(--ds-muted); }
+  & .sd-explain__bar span, & .sd-explain__bar a { display: inline-flex; align-items: center; gap: 4px; }
+  & .sd-explain { display: block; flex: 1; min-height: 0; width: 100%; height: max(480px, calc(100vh - 220px)); border: 1px solid var(--ds-border); border-radius: var(--ds-radius-l); background: var(--ds-bg); }
+}
