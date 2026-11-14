@@ -4,6 +4,7 @@
 import * as api from "../core/api.js";
 import { boardColumns, boardCounts, boardOptions, groupByParent, KINDS, pullRequestNotice, withParam } from "./_shared/logic.js";
 import { createScopePanel } from "./_shared/panel.js";
+import { createOrcaWatch, paintOrcaMarks } from "./_shared/orca_marks.js";
 
 const byNumber = (a, b) => a.number - b.number;
 import { card, emptyState, esc, icon, legend, newTabLink, stateIcon, stateMark } from "./_shared/parts.js";
@@ -23,6 +24,13 @@ const B = {
   docRevision: null,
   token: 0, // the latest read; an older answer is dropped (F-04)
 };
+// orca-web's marks on the cards and in the panel (iss-00592 D-03): after every drawing and on the reader's news.
+function paintOrca() {
+  if (!B.page || !B.ctx?.data) return;
+  paintOrcaMarks(B.page, B.ctx, B.ctx.data);
+  B.pn?.refreshOrca();
+}
+const orcaWatch = createOrcaWatch(paintOrca);
 const plainClick = (event) => event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
 
 function mount(root) {
@@ -40,6 +48,7 @@ function unmount() {
   document.removeEventListener("keydown", onKey);
   window.removeEventListener("resize", placePanel);
   B.token++; // an answer that arrives after leaving the screen is dropped
+  orcaWatch.stop();
   B.pn?.destroy();
   Object.assign(B, { root: null, page: null, pn: null, ctx: null, sel: null, doc: null, docState: "loading", docRevision: null });
 }
@@ -52,6 +61,7 @@ function onCardClick(event) {
   if (!anchor || anchor.closest("dialog") || !B.byId.has(anchor.dataset.id)) return;
   event.preventDefault();
   select(anchor.dataset.id);
+  if (event.target.closest(".sd-orca")) B.pn?.preferTab("agents"); // a pressed mark opens the agents' tab (D-03)
 }
 
 function onKey(event) {
@@ -117,14 +127,14 @@ async function load(id, { keep }) {
 function columnBody(column, ctx, byId, group) {
   const list = (items) => {
     if (!items.length) return `<p class="sd-col__empty">ない</p>`;
-    if (!group) return items.map((item) => card(item, ctx)).join("");
+    if (!group) return items.map((item) => card(item, ctx, { orca: true })).join("");
     return groupByParent(items)
       .map(({ parent, items: members }) => {
         const head = parent && byId.get(parent);
         const label = head
           ? `${stateMark(head, byId, { label: false })}<span class="ds-docid">${esc(head.id)}</span><span>${esc(head.title)}</span>`
           : `<span>最上位</span>`;
-        return `<div class="sd-col__grp">${label}</div>${members.map((item) => card(item, ctx)).join("")}`;
+        return `<div class="sd-col__grp">${label}</div>${members.map((item) => card(item, ctx, { orca: true })).join("")}`;
       })
       .join("");
   };
@@ -164,12 +174,14 @@ function cleanupDialog(ctx, byId) {
 function render(root, ctx) {
   if (B.root !== root || !B.pn || !root.contains(B.pn.element)) mount(root);
   B.ctx = ctx;
+  orcaWatch.follow(ctx.orca);
   const data = ctx.data;
   B.byId = new Map((data?.scopes || []).map((item) => [item.id, item]));
   renderPage(B.page, ctx);
   if (B.sel && !B.byId.has(B.sel)) select(null); // F-02
   else if (B.sel && B.docRevision !== (data?.revision ?? null)) load(B.sel, { keep: true });
   drawPanel();
+  paintOrca();
 }
 
 function renderPage(root, ctx) {

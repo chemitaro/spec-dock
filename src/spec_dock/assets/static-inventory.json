@@ -409,7 +409,7 @@
     {
       "path": "spec-dock/docs/reference_cli.md",
       "source": "spec_dock/docs/reference_cli.md",
-      "sha256": "eddb0f0b931d1bd723d0eced7ba8408bedf191994849e43eeca717cca442eb5c",
+      "sha256": "98c442cf7d7953b595f8948223b0cc9626465c3a7df0c4c4de3ebf3be6818397",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
@@ -437,7 +437,8 @@
         "4afe0a6ee880fbf57767be1d678557cb3334205fcdeb88149ba45d14e5667def",
         "bd67d65e1f6904435ae56c6063d94f625a52477aa1ea9acc8f7633769406572d",
         "94f19d8d4bf2aba725c0b4e79a69528fffe76f3d5e888374dcc03a3a2007befd",
-        "2941d065a250c54b628f6472adab49d363dea2d79645e4ebc8ad3c914e408aa8"
+        "2941d065a250c54b628f6472adab49d363dea2d79645e4ebc8ad3c914e408aa8",
+        "eddb0f0b931d1bd723d0eced7ba8408bedf191994849e43eeca717cca442eb5c"
       ]
     },
     {
