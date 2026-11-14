@@ -152,41 +152,49 @@ function paintMarks(strip, env, state) {
 
 // Keep the chosen item inside the strip's visible part, so its branch can be checked before sending (R-05). Only the
 // strip scrolls (scrollIntoView would move the page or the panel too), and only when the item is outside.
-function revealChosen(strip) {
+function revealChosen(strip, watch) {
   const item = strip.querySelector?.('[aria-current="true"]');
-  if (!item || !strip.getBoundingClientRect) return;
-  const box = strip.getBoundingClientRect();
-  const rect = item.getBoundingClientRect();
-  if (rect.left < box.left) strip.scrollLeft -= box.left - rect.left;
-  else if (rect.right > box.right) strip.scrollLeft += rect.right - box.right;
+  if (item && strip.getBoundingClientRect) {
+    const box = strip.getBoundingClientRect();
+    const rect = item.getBoundingClientRect();
+    if (rect.left < box.left) strip.scrollLeft -= box.left - rect.left;
+    else if (rect.right > box.right) strip.scrollLeft += rect.right - box.right;
+  }
+  watch.expected = strip.scrollLeft; // a scroll event at this position is the strip's own
 }
 
-// The view's stylesheet and the marks may still change the strip's layout after the first paint, so the strip keeps
-// revealing the chosen item on each resize of the strip or the item, until the person moves the strip by hand.
-const followers = new WeakMap(); // strip -> {follow, item, observer}
-function followChosen(strip) {
+// The view's stylesheet and the marks keep changing the items' widths after the first paint (an earlier item's
+// elapsed time can push the chosen one out), so the strip reveals the chosen item again on every paint and on every
+// resize of the strip or an item, until the person scrolls it by hand. A new choice follows again; another Scope
+// draws a new strip.
+const followers = new WeakMap(); // strip -> {follow, expected, items, observer}
+function watchStrip(strip) {
   let watch = followers.get(strip);
-  if (!watch) {
-    watch = { follow: true, item: null, observer: null };
-    if (typeof ResizeObserver === "function") {
-      watch.observer = new ResizeObserver(() => {
-        if (watch.follow) revealChosen(strip);
-      });
-      watch.observer.observe(strip);
-    }
-    for (const type of ["wheel", "pointerdown", "touchstart", "keydown"]) {
-      strip.addEventListener(type, () => { watch.follow = false; }, { passive: true });
-    }
-    followers.set(strip, watch);
+  if (watch) return watch;
+  watch = { follow: true, expected: strip.scrollLeft, items: [], observer: null };
+  if (typeof ResizeObserver === "function") {
+    watch.observer = new ResizeObserver(() => {
+      if (watch.follow) revealChosen(strip, watch);
+    });
+    watch.observer.observe(strip);
   }
-  watch.follow = true;
-  const item = strip.querySelector?.('[aria-current="true"]') ?? null;
-  if (item !== watch.item) {
-    if (watch.item) watch.observer?.unobserve(watch.item);
-    if (item) watch.observer?.observe(item);
-    watch.item = item;
-  }
-  revealChosen(strip);
+  strip.addEventListener(
+    "scroll",
+    () => {
+      if (Math.abs(strip.scrollLeft - watch.expected) > 1) watch.follow = false;
+    },
+    { passive: true },
+  );
+  followers.set(strip, watch);
+  return watch;
+}
+
+function observeItems(strip, watch) {
+  if (!watch.observer) return;
+  for (const item of watch.items) watch.observer.unobserve(item);
+  const current = strip.querySelector?.('[aria-current="true"]');
+  watch.items = [...(strip.querySelectorAll?.(".sd-agentpick") ?? []), ...(current ? [current] : [])];
+  for (const item of new Set(watch.items)) watch.observer.observe(item);
 }
 
 // The strip, painted after the contents (D-04). It writes only its slot and never touches the frame next to it.
@@ -204,7 +212,12 @@ export function paintAgentList(root, env, { redraw } = {}) {
   }
   strip.dataset.chosen = chosen;
   paintMarks(strip, env, state); // the marks widen the items: reveal after them
-  if (moved) followChosen(strip);
+  const watch = watchStrip(strip);
+  if (moved) {
+    watch.follow = true;
+    observeItems(strip, watch);
+  }
+  if (watch.follow) revealChosen(strip, watch);
 
   // The person's pick forgets the losses of this Scope before the click's own handling redraws (R-05).
   const box = root.querySelector('.sd-framebox[data-frame="agents"]');
