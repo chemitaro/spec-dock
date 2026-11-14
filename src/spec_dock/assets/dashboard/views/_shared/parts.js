@@ -93,14 +93,19 @@ export function stateCountList(counts, { done = true } = {}) {
     .join("")}</span>`;
 }
 
+// The empty place an orca-web mark is drawn into (iss-00592 D-02): its HTML depends on the Scope's ID and max only.
+export const orcaSlot = (id, max) => `<span class="sd-orca" data-orca-scope="${esc(id)}" data-orca-max="${max}"></span>`;
+
 // A card on the board and on the detail tabs: an ordinary link to the detail screen (opens in a new tab too).
-export function card(scope, ctx, { parent = null } = {}) {
+// `orca` (the board only) keeps the bottom row with a mark slot at its end; CSS hides the row while it is empty.
+export function card(scope, ctx, { parent = null, orca = false } = {}) {
   const meta = [];
   if (scope.pr) meta.push(prMark(scope.pr, { words: true }));
   if (scope.kind !== "issue" && scope.children?.length) meta.push(`<span>${esc(scope.children.length)}件の配下</span>`);
   const human = humanCount(scope); // iss-00554 D-06: tasks of a person blocking it (and its subtree for a parent)
   if (human.count) meta.push(humanMark(human.count, { descendants: human.descendants, cls: "sd-hm" }));
   if (scope.downstream) meta.push(downMark(scope.downstream));
+  if (orca) meta.push(orcaSlot(scope.id, 4));
   const parentLine = parent ? `<p class="sd-card__parent">${stateMark(parent, scopesOf(ctx.data), { label: false })}<span>${esc(parent.id)}</span><span>${esc(parent.title)}</span></p>` : "";
   return (
     `<a class="sd-card" data-nav data-st="${esc(scope.state)}" data-id="${esc(scope.id)}" href="${esc(ctx.href(scope.path))}">` +

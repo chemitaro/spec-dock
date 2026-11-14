@@ -252,3 +252,6 @@ svg.ds-icon { width: 1em; height: 1em; flex: none; fill: none; stroke: currentCo
   .notices { padding: 8px 10px; }
 }
 
+/* Shared mark slots in the graph, board and panel; visuals belong to orca-web. */
+.sd-orca { display: inline-flex; flex: none; margin-left: auto; }
+.sd-orca:empty { display: none; }

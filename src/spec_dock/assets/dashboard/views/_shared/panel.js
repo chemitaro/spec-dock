@@ -5,17 +5,19 @@
 // It shows only the tabs that say so (visibleTabs), paints the agents strip after the contents, and redraws itself
 // on each orca-web summary (iss-00593 D-04).
 import { ancestors, withoutEmbed, withParam } from "./logic.js";
-import { esc, icon, idleText, kindLabel, mergeBadge, stateChip, stateMark } from "./parts.js";
+import { esc, icon, idleText, kindLabel, mergeBadge, orcaSlot, stateChip, stateMark } from "./parts.js";
+import { themeOf } from "./orca_logic.js";
+import { createOpenButton, paintOrcaMarks } from "./orca_marks.js";
 import { nextOnTap, pickTab, settleSheet, sheetHeights } from "./panel_logic.js";
-import { panelEnv, SCOPE_TABS, visibleTabs } from "./scope_tabs.js";
+import { panelEnv, SCOPE_TABS, TAB_KEYS, visibleTabs } from "./scope_tabs.js";
 import { paintAgentList } from "./agents_tab.js";
 
 const plainClick = (event) => event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
 const PHONE = 640;
 const DRAG_START = 6; // px a finger moves before the sheet follows it
 
-// Write the header or the tab strip only when its HTML changed: the summaries redraw every 10 seconds, and
-// rewriting the same header would restart its moving marks (iss-00593).
+// Write the tab strip only when its HTML changed: the summaries redraw the panel every 10 seconds (iss-00593). The
+// heading row and the cover keep their own comparison (iss-00592 R-02).
 const written = new WeakMap();
 function put(element, html) {
   if (written.get(element) === html) return;
@@ -34,6 +36,9 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
   let snap = "half"; // the phone sheet's height: peek, half or full (D-08)
   let drag = null;
   let skipClick = false; // the click that ends a drag is not a tap
+  let shownHl = null; // the heading row's chips and the cover, written only when their HTML changes (iss-00592 R-02)
+  let shownCover = null;
+  let openButton = null; // orca-web's "open in Orca" in the heading row (D-04)
   let followed = null; // the ctx.orca whose summaries redraw the panel
   let unfollow = null;
 
@@ -62,24 +67,41 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
       `<div class="pn-top"></div><div class="pn-tabs" role="tablist" aria-label="欄のタブ"></div>` +
       `<div class="pn-body" role="tabpanel"></div><div class="pn-foot"></div>`;
     const q = (sel) => aside.querySelector(sel);
-    parts = { top: q(".pn-top"), tabs: q(".pn-tabs"), body: q(".pn-body"), foot: q(".pn-foot") };
+    const top = q(".pn-top");
+    top.innerHTML =
+      `<div class="pn-head"><span class="pn-hl"></span><span class="pn-orca"></span>` +
+      `<button type="button" class="iconbtn pn-close" data-pn-act="close" aria-label="閉じる">${icon("x")}</button></div><div class="pn-cover"></div>`;
+    parts = { top, hl: q(".pn-hl"), orca: q(".pn-orca"), cover: q(".pn-cover"), tabs: q(".pn-tabs"), body: q(".pn-body"), foot: q(".pn-foot") };
     shownHtml = null;
     shownKey = null;
+    shownHl = null;
+    shownCover = null;
+    openButton = createOpenButton(parts.orca, { doc: document }); // a new slot forgets the last button (D-04)
   }
 
+  // The heading row's chips (and the mark slot), and the cover below it.
   function header(scope, byId) {
     const chain = ancestors(byId, scope);
     const pathHtml = chain.length
       ? `<nav class="pn-path" aria-label="親の道筋">${chain.map((item) => `<button type="button" data-pn-goto="${esc(item.id)}" title="${esc(item.title)}">${esc(item.id)}</button>${icon("chevronRight")}`).join("")}<span>${esc(scope.id)}</span></nav>`
       : `<p class="pn-path">${icon("layers")}最上位</p>`;
     const idle = idleText(scope, byId);
-    return (
-      `<div class="pn-head">${stateChip(scope, byId, { motion: true })}<span class="pn-merge">${mergeBadge(scope)}</span><button type="button" class="iconbtn pn-close" data-pn-act="close" aria-label="閉じる">${icon("x")}</button></div>` +
-      `<div class="pn-cover"><p class="pn-kicker"><span class="ds-docid">${esc(scope.id)}</span><span class="pn-kind">#${esc(scope.number)}・${esc(kindLabel(scope.kind))}</span></p><h2 class="pn-title">${esc(scope.title)}</h2>` +
+    return {
+      hl: `${stateChip(scope, byId, { motion: true })}<span class="pn-merge">${mergeBadge(scope)}</span>${orcaSlot(scope.id, 4)}`,
+      cover:
+        `<p class="pn-kicker"><span class="ds-docid">${esc(scope.id)}</span><span class="pn-kind">#${esc(scope.number)}・${esc(kindLabel(scope.kind))}</span></p><h2 class="pn-title">${esc(scope.title)}</h2>` +
       `<p class="pn-why" data-st="${esc(scope.state)}">${stateMark(scope, byId, { motion: true, label: false })}<span>${esc(scope.reason?.text ?? "")}</span></p>` +
-      (idle ? `<p class="pn-idle">${icon("clock")}${esc(idle)}</p>` : "") +
-      `${pathHtml}</div>`
-    );
+        (idle ? `<p class="pn-idle">${icon("clock")}${esc(idle)}</p>` : "") +
+        pathHtml,
+    };
+  }
+
+  // orca-web's marks and button for the shown Scope: after each drawing, on the reader's news and on a theme change.
+  function refreshOrca() {
+    if (!current || !parts || !aside.contains(parts.body)) return;
+    const { ctx, scope } = current;
+    paintOrcaMarks(parts.top, ctx, ctx.data);
+    openButton.update({ orca: ctx.orca, structure: ctx.data, scopeId: scope.id, embed: ctx.embed, theme: themeOf(document, (query) => matchMedia(query)) });
   }
 
   // F-01: the header comes from the structure; the contents say the detail could not be read.
@@ -110,7 +132,15 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
       env = tab === userTab ? first : panelEnv(ctx, scope, state.doc, byId, { params, tab });
     }
     aside.dataset.st = scope.state;
-    put(parts.top, header(scope, byId));
+    const head = header(scope, byId);
+    if (head.hl !== shownHl) {
+      parts.hl.innerHTML = head.hl;
+      shownHl = head.hl;
+    }
+    if (head.cover !== shownCover) {
+      parts.cover.innerHTML = head.cover;
+      shownCover = head.cover;
+    }
     put(parts.tabs, shown.map(({ key, label, count }) => {
       const n = env ? count(env) : null;
       return `<button type="button" role="tab" data-pn-tab="${key}" aria-selected="${tab === key}">${label}${n != null ? `<small>${n}</small>` : ""}</button>`;
@@ -139,6 +169,7 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
     aside.classList.add("is-open");
     aside.setAttribute("aria-hidden", "false");
     applySnap();
+    refreshOrca();
   }
 
   // --- The phone sheet (D-08): three heights, moved only by the grab and the header band -------------------
@@ -209,6 +240,12 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
     if (current) applySnap();
   };
   window.addEventListener("resize", onResize);
+  // The button follows the page's light and dark (D-04): the system's choice and the shell's data-theme.
+  const onTheme = () => refreshOrca();
+  const media = globalThis.matchMedia?.("(prefers-color-scheme: dark)") ?? null;
+  media?.addEventListener("change", onTheme);
+  const themeWatch = typeof MutationObserver === "function" ? new MutationObserver(onTheme) : null;
+  themeWatch?.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 
   aside.addEventListener("click", (event) => {
     if (!current || !parts || !aside.contains(parts.body)) return; // another drawing owns the aside
@@ -218,6 +255,10 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
         snap = nextOnTap(snap); // a tap (or Enter) switches between half and full
         applySnap();
       }
+      return;
+    }
+    if (t.closest(".sd-orca")) {
+      preferTab("agents"); // a pressed mark in the heading opens the agents' tab (iss-00592 D-03)
       return;
     }
     const act = t.closest("[data-pn-act]");
@@ -253,6 +294,13 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
     }
   });
 
+  // Choose a tab as if the person pressed it (iss-00592 D-04); a key outside the shared tabs changes nothing.
+  function preferTab(key) {
+    if (!TAB_KEYS.includes(key)) return;
+    userTab = key;
+    if (current) draw();
+  }
+
   return {
     element: aside,
     show(state) {
@@ -271,12 +319,17 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
       drag = null;
       aside.classList.remove("is-open", "is-dragging");
       aside.setAttribute("aria-hidden", "true");
+      openButton?.reset();
     },
+    preferTab,
+    refreshOrca,
     isOpen: () => current != null,
     snap: () => (isSheet() ? snap : null),
     destroy() {
       follow(null);
       window.removeEventListener("resize", onResize);
+      media?.removeEventListener("change", onTheme);
+      themeWatch?.disconnect();
     },
   };
 }

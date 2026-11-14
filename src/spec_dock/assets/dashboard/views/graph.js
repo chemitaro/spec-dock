@@ -11,6 +11,8 @@ import { audit, svg as edgeSvg } from "./graph/router.js";
 import * as M from "./graph/marks.js";
 import { LEGACY_KEY, PREFS_KEY, restorePrefs } from "./graph/prefs.js";
 import { createScopePanel } from "./_shared/panel.js";
+import { createOrcaWatch, paintOrcaMarks } from "./_shared/orca_marks.js";
+import { orcaSlot } from "./_shared/parts.js";
 
 const { esc, ic, stateIcon, STATES } = M;
 const PHONE = 640;
@@ -91,6 +93,14 @@ const seenWidth = () => Math.max(1, (V.el?.view.clientWidth || innerWidth) - 16)
 const seenHeight = () => Math.max(1, (V.el?.view.clientHeight || innerHeight) - 16);
 const byId = (id) => V.ix?.byId.get(id);
 
+// orca-web's marks in the boxes, the frames and the panel (iss-00592 D-03): after every drawing and on the reader's news.
+function paintOrca() {
+  if (!V.el || !V.ctx || !V.data) return;
+  paintOrcaMarks(V.el.world, V.ctx, V.data);
+  V.pn?.refreshOrca();
+}
+const orcaWatch = createOrcaWatch(paintOrca);
+
 // --- Shell DOM ---------------------------------------------------------------------------------------------
 
 function mount(root) {
@@ -146,6 +156,7 @@ function dispose() {
   V.path = null;
   V.docState = "loading";
   V.docRevision = null;
+  orcaWatch.stop();
   V.pn?.destroy();
   V.pn = null;
 }
@@ -160,6 +171,7 @@ function stopGesture(event) {
 function render(root, ctx) {
   if (V.root !== root || !root.querySelector(".gx")) mount(root);
   V.ctx = ctx;
+  orcaWatch.follow(ctx.orca);
   window.specdockEdgeAudit = edgeAudit;
   const data = ctx.data;
   const focus = ctx.route.params.get("focus") || null;
@@ -198,6 +210,7 @@ function render(root, ctx) {
   }
   paint();
   renderPanel();
+  paintOrca();
 }
 
 // The screen's CSS loads once, after the first render: place the first view when it applies (or after 3s).
@@ -257,9 +270,9 @@ function boxHtml(s, n) {
   let marks;
   if (frame) {
     const { cnt, total } = tally(s.id);
-    marks = `<div class="gx-marks">${M.sbar(cnt, total, 64)}${M.frac(cnt, total)}${M.counts(cnt)}${M.asMark(s.assurance)}${M.hmMark(s)}${M.dnMark(s.downstream)}</div>`;
+    marks = `<div class="gx-marks">${M.sbar(cnt, total, 64)}${M.frac(cnt, total)}${M.counts(cnt)}${M.asMark(s.assurance)}${M.hmMark(s)}${M.dnMark(s.downstream)}${orcaSlot(s.id, 2)}</div>`;
   } else {
-    marks = `<div class="gx-marks">${M.asMark(s.assurance)}${M.prMark(s.pr)}${M.wtMark(s.state === "doing" ? s.branch : null)}${M.hmMark(s)}${M.dnMark(s.downstream)}</div>`;
+    marks = `<div class="gx-marks">${M.asMark(s.assurance)}${M.prMark(s.pr)}${M.wtMark(s.state === "doing" ? s.branch : null)}${M.hmMark(s)}${M.dnMark(s.downstream)}${orcaSlot(s.id, 2)}</div>`;
   }
   return (
     `<div class="gx-box${frame ? " is-frame" : ""}" data-id="${esc(s.id)}" data-st="${s.state}" role="button" tabindex="0" aria-label="${esc(label)}" style="${pos(n)}">` +
@@ -278,7 +291,7 @@ function frameHtml(s, n, cleanup) {
   const head =
     `<div class="gx-fh" data-id="${esc(s.id)}" role="button" tabindex="0" aria-label="${esc(`${s.id} ${s.title}。${STATES[s.state]?.label ?? s.state}`)}">${M.stateMark(s, V.ix.byId, { motion: true })}` +
     (ini ? `<span class="gx-kicker">Initiative</span>` : "") +
-    `<span class="ds-docid">${esc(s.id)}</span><span class="gx-fttl" title="${esc(s.title)}">${esc(s.title)}</span></div>`;
+    `<span class="ds-docid">${esc(s.id)}</span><span class="gx-fttl" title="${esc(s.title)}">${esc(s.title)}</span>${orcaSlot(s.id, 3)}</div>`;
   const meta =
     `<div class="gx-fm">${M.sbar(cnt, total, ini ? 150 : 84)}${M.frac(cnt, total)}${M.counts(cnt)}${M.asMark(s.assurance)}` +
     (cleanup.has(s.id) ? `<span class="cln" title="片付けの候補：${esc(cleanup.get(s.id).text)}" role="img" aria-label="片付けの候補">${ic("box")}</span>` : "") +
@@ -669,6 +682,7 @@ function onTap(target) {
     return;
   }
   if (V.sel !== id) select(id);
+  if (target.closest(".sd-orca")) V.pn?.preferTab("agents"); // a pressed mark opens the agents' tab (D-03)
 }
 
 // --- Zoom and pan ------------------------------------------------------------------------------------------
