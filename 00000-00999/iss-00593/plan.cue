@@ -5,10 +5,10 @@ package spec
 goal: "横の欄と詳しい画面の「エージェント」のタブで、その Scope の worktree のエージェントを選び、orca-web の詳細とチャットを使えるようにする。SpecDock は相手の選びだけを受け持ち、書き込みに関わらない。"
 
 steps: {
-	"S-01": {title: "node のテスト（T-01〜T-03）を先に書いて落ちることを確かめ、views/_shared/agents_logic.js（scopeAgents、agentsVisibility、pickAgent、stripForm、agentFrame、覚えの関数、AGENT_SANDBOX）を D-01 のとおりに作る。関わるテストと make lint を通す", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-07", "F-01", "F-02", "F-04", "F-05", "F-07", "F-08"], status: "todo", session: "impl_ui"}
-	"S-02": {title: "テスト（T-04〜T-06）を先に書いて落ちることを確かめ、agents_tab.js、scope_tabs.js（agents の行、visibleTabs、keep、frameBar の export）、panel.js、scope.js（3つの部分と dispose）、app.js（orcaProblem、replaceParam、明暗）、CSS を D-02〜D-06 のとおりに作る。今のタブのテスト（TAB_KEYS など）を新しい並びに合わせる", realizes: ["R-01", "R-02", "R-03", "R-05", "R-06", "R-07", "F-01", "F-03", "F-05", "F-06", "F-07", "F-08"], status: "todo", after: ["S-01"], session: "impl_ui"}
-	"S-03": {title: "テスト（T-07、T-08）を先に書いて落ちることを確かめ、書き込みに関わらないことの静的なテスト（D-07）と配る文書（D-08）と static-inventory.json を作る。make lint と uv run pytest（全体）を通す", realizes: ["R-04", "R-08"], status: "todo", after: ["S-02"], session: "impl_ui"}
-	"S-04": {title: "試しの orca-web と試しの SpecDock の組で、写し（1440・1000・390、明暗、直す前と後）、sandbox の値での読み・送信・Orca で開く・新しいタブ、確かめ専用の宛先への送信とネットワークの記録、60 秒の本文の残り、Scope を変えたとき・いなくなったとき・iframe の中で移ったとき、届かないとき・埋め込みのときを確かめ、report.md に残す（T-09）", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06", "R-07", "F-01", "F-02", "F-03", "F-05", "F-06", "F-08"], status: "todo", after: ["S-03"], session: "owner"}
+	"S-01": {title: "node のテスト（T-01〜T-03）を先に書いて落ちることを確かめ、views/_shared/agents_logic.js（scopeAgents、agentsVisibility、pickAgent、stripForm、agentFrame、覚えの関数、AGENT_SANDBOX）を D-01 のとおりに作る。関わるテストと make lint を通す", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-07", "F-01", "F-02", "F-04", "F-05", "F-07", "F-08"], status: "done", session: "impl_ui"}
+	"S-02": {title: "テスト（T-04〜T-06）を先に書いて落ちることを確かめ、agents_tab.js、scope_tabs.js（agents の行、visibleTabs、keep、frameBar の export）、panel.js、scope.js（3つの部分と dispose）、app.js（orcaProblem、replaceParam、明暗）、CSS を D-02〜D-06 のとおりに作る。今のタブのテスト（TAB_KEYS など）を新しい並びに合わせる", realizes: ["R-01", "R-02", "R-03", "R-05", "R-06", "R-07", "F-01", "F-03", "F-05", "F-06", "F-07", "F-08"], status: "done", after: ["S-01"], session: "impl_ui"}
+	"S-03": {title: "テスト（T-07、T-08）を先に書いて落ちることを確かめ、書き込みに関わらないことの静的なテスト（D-07）と配る文書（D-08）と static-inventory.json を作る。make lint と uv run pytest（全体）を通す", realizes: ["R-04", "R-08"], status: "done", after: ["S-02"], session: "impl_ui"}
+	"S-04": {title: "試しの orca-web と試しの SpecDock の組で、写し（1440・1000・390、明暗、直す前と後）、sandbox の値での読み・送信・Orca で開く・新しいタブ、確かめ専用の宛先への送信とネットワークの記録、60 秒の本文の残り、Scope を変えたとき・いなくなったとき・iframe の中で移ったとき、届かないとき・埋め込みのときを確かめ、report.md に残す（T-09）", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06", "R-07", "F-01", "F-02", "F-03", "F-05", "F-06", "F-08"], status: "done", after: ["S-03"], session: "owner"}
 }
 
 tests: {

@@ -61,12 +61,32 @@ ID: "iss-00593"
 - iss-00592 との両立：欄の見出しの稼働の印と「Open」と、エージェントのタブ（帯と iframe）が並ぶ。
 - 写し：直す前（`shots/before-*`）と後（`shots/after-*`）、1440・1000・390、明暗、欄と詳しい画面。1000 の上の帯の文字の重なりは直す前の版にもある既存の見た目（この Issue の外）。
 
+## 最終品質ゲート
+
+- 合格：`1094a048962f443658b01b369f09b291a47d6578`（campaign `iss-00593-fqg-2`、attempt 3）。closure は worktree の `.workbench/final-quality-gate/iss-00593-fqg-2/closure.md`。
+- 主（quality-gate-reviewer opus / high）：pass（P3 1）、coverage complete。2人目（ChatGPT GPT-6 / Extra High、モデルの選択 verified）：P0・P1 なし（P2 3）。テスト：`make lint` pass、`uv run pytest` 3909 passed / 7 skipped / 0 failed。
+- 経緯：fqg-1 attempt 1（787a05147）で主の FQG-001（P2）・FQG-002（P3）と2人目の P1 2・P2 2 → 統括の決定（msg_5490fcda8a19）で全部直す（仕様 round-8・round-9、863110f34）。根拠が変わったので fqg-2 に作り直し。fqg-2 attempt 1（863110f34）は全部の道が合格したが、origin/main に iss-00592（PR #597）が入ったので取り込み（f911dd4a8、790c93cac）、attempt 2（790c93cac）で2人目の P1 1（欄の足のリンクが agent を引き継がない）→ 1094a0489 で直し、attempt 3 で合格。分析は `.workbench/final-quality-gate/iss-00593-fqg-{1,2}/review-response.md`。
+- 記録だけの P2/P3（後の Issue の候補）：closure.md の「P2/P3」を参照（FQG-003、欄を開き直した選びの足のリンク、スマホの構造の図の印の2回目の押し〈iss-00592〉、修飾キーつきの押しの覚え、agents が配列でない要約）。
+
 ## 逸脱と判断
 
 - 2026-11-14、実装担当の割り当て（deviation: codex-start-failure）：S-01 の Codex の実装担当（gpt-6.1-sol / medium、dispatch `ctx_fdfd94981884`、launch.effective 一致）が、Orca の構造化のセッションの実行基盤の拒否（Codex のサンドボックスが、書き込み先の chat-scratch が外付けの置き場へのシンボリックリンクの下にあることを拒んだ。原因は本人の Mac の配置で、統括が本人に伝える）で、何も変えずに止まった。方針 §1 の5で統括に返し、統括の了承（msg_cea1846a58b7、iss-00593 に限る）で S-01〜S-03 を1つの Claude の実装担当（Opus 5.5 / high）にまとめた。区切りのレビュー C-1 は S-01 の後のまま。
 
+- 2026-11-14、送信の確かめの宛先（統括の決定 msg_baf8fde71131、案B）：orca-web の send-test はどの Scope にも対応しないので、統括が用意した spec-dock の確かめ専用の worktree `iss-00593-send-test` のエージェントにだけ送った。片付けは統括。
+- 2026-11-14、残るリスクの受け入れ（統括の決定 msg_c06a2f506afa、案1）と、その後の orca-web の iss-00037 のマージ（msg_97715dedcf36）：配る文書は「iss-00037 で埋め込みの中の同じ iframe への移りはなくなった」と書き、F-08 は二重の守り。
+- 2026-11-14、帯の選んだ項目を見える位置へ送る直し（d55516770・f7439f621・a6d11d3ef）は、実機の写しで見つけた R-05 の意味の中の実装の直し（仕様は変えていない）。
+- 2026-11-14、dogfood の写し `spec-dock/docs/reference_cli.md` を配る元と同じにした（787a05147。先例 f2ed8f268。タスク担当が初めに「写しは変えない」と誤って答えたのを正した）。
+- 実装担当の裁量（steps.md）：欄の見出しと帯、詳しい画面の見出しとタブの帯も、文字列が同じなら書き換えない（risks の「目立てば見出しも比べる」の先取り）。開始のコミットの基準は一時の worktree で走らせ、片付けた。
+- 既存の見た目（この Issue の外）：幅 1000 の上の帯で、リポジトリの選びと「構造の図」の文字が重なる（直す前の版にもある）。
+
 ## Outcome
+
+PR は下の Verification の後に記録する。マージは統括が行う。
 
 ## Verification
 
 ## Residual Risks / Follow-ups
+
+- 最終品質ゲートの P2/P3（上の節と closure.md）。どれも別の相手のチャットを開く道ではない。
+- orca-web の要約は、同じセッションを2つのエージェント（`chat:agent-session:…` と `structured-agent-session-…`）として返す（帯に2つ並ぶ。orca-web の側の課題）。
+- 試しの組（ポート 18593・18594・8893）は、本人の確かめのために動かしたまま残す（止め方は統括への報告）。
