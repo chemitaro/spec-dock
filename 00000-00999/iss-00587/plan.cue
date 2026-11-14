@@ -9,9 +9,9 @@ steps: {
 	"S-02": {title: "views/_shared/panel_logic.js（explanationState、defaultTab、pickTab、sheetHeights、settleSheet、nextOnTap）を、node のテストを先に書いて実装する（D-02）", realizes: ["R-02", "R-04", "R-07"], status: "done", after: ["S-01"], session: "impl-sol"}
 	"S-03": {title: "scope.js のタブの中身を views/_shared/scope_tabs.js に移し、env と SCOPE_TABS で描く形にし、説明資料のタブを足す。詳しい画面のタブの選びを pickTab にし、今のテストの期待を直す（D-03、D-04）", realizes: ["R-02", "R-03", "R-04", "R-09", "F-03"], status: "done", after: ["S-02"], session: "impl-ui"}
 	"S-04": {title: "views/_shared/panel.js と panel.css、タブの中身の見た目を scope.css から移した views/_shared/scope_tabs.css（見出し、タブ、中身、下の帯、欄の中のクリック、描き直しで枠とスクロールを保つ）を作り、構造の図の Scope の欄をそれに置き換える。PC の幅と上の帯のずらし、centerOn を直す（D-05、D-06）", realizes: ["R-01", "R-02", "R-03", "R-05", "R-06", "R-08", "F-01", "F-02", "F-04"], status: "done", after: ["S-03"], session: "impl-ui"}
-	"S-05": {title: "ボードで札を押すと同じ欄を開く。欄の aside を描き直しで保ち、列を欄の左に収める（D-07）", realizes: ["R-01", "R-05", "R-08", "F-01", "F-02", "F-04"], status: "todo", after: ["S-04"], session: "impl-ui"}
-	"S-06": {title: "スマホのシートを3段のスワイプにする（取っ手と見出しの帯で引きずる、払う、取っ手のタップ、閉じる、段を保つ、resize）（D-08）", realizes: ["R-07", "R-08"], status: "todo", after: ["S-05"], session: "impl-ui"}
-	"S-07": {title: "静的なテスト（共有の部品の使い方、esc、外への読み込みなし）を足して直し、make lint と全体の pytest を通す", realizes: ["R-01", "R-02", "R-09"], status: "todo", after: ["S-06"], session: "impl-ui"}
+	"S-05": {title: "ボードで札を押すと同じ欄を開く。欄の aside を描き直しで保ち、列を欄の左に収める（D-07）", realizes: ["R-01", "R-05", "R-08", "F-01", "F-02", "F-04"], status: "done", after: ["S-04"], session: "impl-ui"}
+	"S-06": {title: "スマホのシートを3段のスワイプにする（取っ手と見出しの帯で引きずる、払う、取っ手のタップ、閉じる、段を保つ、resize）（D-08）", realizes: ["R-07", "R-08"], status: "done", after: ["S-05"], session: "impl-ui"}
+	"S-07": {title: "静的なテスト（共有の部品の使い方、esc、外への読み込みなし）を足して直し、make lint と全体の pytest を通す", realizes: ["R-01", "R-02", "R-09"], status: "done", after: ["S-06"], session: "impl-ui"}
 	"S-08": {title: "spec-dock の実データで 1440、1000、390 の直す後の写しを撮り、直す前の写しと並べて report.md に残す。390 のスワイプの3段と全体の読みを確かめる", realizes: ["R-10", "R-01", "R-03", "R-05", "R-06", "R-07"], status: "todo", after: ["S-07"], session: "owner"}
 }
 
