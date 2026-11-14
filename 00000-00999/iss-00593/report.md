@@ -81,9 +81,12 @@ ID: "iss-00593"
 
 ## Outcome
 
-PR は下の Verification の後に記録する。マージは統括が行う。
+PR #598（https://github.com/chemitaro/spec-dock/pull/598、head `1094a048962f443658b01b369f09b291a47d6578` = 最終品質ゲートの合格のコミット。記録のコミットはない）。CI：observable_ci PASS、merge_readiness READY（2026-11-14T17:14Z、worktree の `.workbench/coding-task/iss-00593/ci2.json`）。マージは統括が行う。
 
 ## Verification
+
+- `spec-dock scope check iss-00593`：誤りなし、警告なし（手順の status はすべて done）。
+- `make lint` pass、`uv run pytest` 3909 passed / 7 skipped / 0 failed（1094a0489）。実機の確かめは上の S-04 の節。
 
 ## Residual Risks / Follow-ups
 
