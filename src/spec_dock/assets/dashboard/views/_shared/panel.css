@@ -7,6 +7,13 @@
 .sd-pn .pn-top { flex: none; }
 .sd-pn .pn-head { display: flex; align-items: center; gap: 8px; padding: 12px 10px 0 16px; }
 .sd-pn .pn-head .iconbtn { margin-left: auto; width: 32px; height: 32px; font-size: 16px; }
+/* orca-web の印と「Orca で開く」（iss-00592 D-04）。見た目は部品のまま。ボタンは閉じるの左の右端、行の高さは閉じるの 32px のまま */
+.sd-pn .pn-hl { display: contents; }
+.sd-pn .pn-hl .sd-orca { margin-left: 0; }
+.sd-pn .pn-orca { display: inline-flex; align-items: center; height: 24px; flex: none; }
+.sd-pn .pn-orca:empty { display: none; }
+.sd-pn .pn-orca:not(:empty) { margin-left: auto; }
+.sd-pn .pn-orca:not(:empty) + .pn-close { margin-left: 0; }
 .sd-pn .pn-cover { padding: 6px 16px 0; }
 .sd-pn .pn-kicker { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 0; font-size: 12.5px; color: var(--ds-muted); }
 .sd-pn .pn-title { margin: 6px 0 0; font-size: 17px; line-height: 1.5; font-weight: 700; word-break: auto-phrase; text-wrap: pretty; overflow-wrap: anywhere; }
@@ -60,6 +67,7 @@
   /* 全体の段：見出しを「状態の印、ID、題名（1行）、閉じる」の1行に詰め、ほかの行は概要のタブで読む */
   .sd-pn[data-snap="full"] .pn-top { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 6px 0 12px; }
   .sd-pn[data-snap="full"] .pn-head { display: contents; }
+  .sd-pn[data-snap="full"] .pn-orca { order: 3; }
   .sd-pn[data-snap="full"] .pn-close { order: 3; margin-left: 0; }
   .sd-pn[data-snap="full"] .pn-cover { order: 2; flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; padding: 0; }
   .sd-pn[data-snap="full"] :is(.pn-merge, .pn-kind, .pn-why, .pn-idle, .pn-path) { display: none; }

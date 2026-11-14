@@ -159,3 +159,190 @@ def test_slot_styles_stay_shared_and_leave_the_marks_to_orca_web() -> None:
         assert not re.search(r"\.orca-[a-z-]+\s*[{,]", text), path
     panel = (SHARED / "panel.js").read_text()
     assert "data-width" not in panel and "dataset.width" not in panel
+
+
+# --- T-04: the panel's heading ------------------------------------------------------------------------------
+
+PANEL_DOM = """
+const PARTS = [".pn-grab", ".pn-top", ".pn-tabs", ".pn-body", ".pn-foot", ".pn-hl", ".pn-orca", ".pn-cover"];
+class El {
+  constructor(name) {this.name = name; this.dataset = {}; this.children = []; this.writes = 0; this.html = ""; this.scrollTop = 0;}
+  set innerHTML(value) {this.html = value; this.writes++;}
+  get innerHTML() {return this.html;}
+  replaceChildren(...children) {this.children = children;}
+  append(child) {this.children.push(child);}
+  querySelectorAll() {return [];}
+}
+const listeners = {media: 0, observers: 0};
+const theme = {dark: false};
+globalThis.window = {addEventListener() {}, removeEventListener() {}};
+globalThis.innerHeight = 800;
+globalThis.matchMedia = () => ({
+  get matches() {return theme.dark;},
+  addEventListener(type) {assert.equal(type, "change"); listeners.media++;},
+  removeEventListener(type) {assert.equal(type, "change"); listeners.media--;},
+});
+const observed = [];
+globalThis.MutationObserver = class {
+  constructor(fn) {this.fn = fn; observed.push(this);}
+  observe(target, options) {assert.deepEqual(options.attributeFilter, ["data-theme"]); listeners.observers++;}
+  disconnect() {listeners.observers--;}
+};
+globalThis.document = {
+  documentElement: {dataset: {}, clientWidth: 1440},
+  createElement(tag) {return {tag, dataset: {}};},
+};
+const aside = {
+  classList: {add() {}, remove() {}},
+  dataset: {}, style: {setProperty() {}, removeProperty() {}},
+  setAttribute() {}, addEventListener(type, fn) {if (type === "click") this.click = fn;},
+  closest() {return null;},
+  built: 0, html: "",
+  set innerHTML(value) {this.html = value; this.built++; this.parts = new Map(PARTS.map((s) => [s, new El(s)]));},
+  get innerHTML() {return this.html;},
+  querySelector(sel) {return this.parts?.get(sel) ?? null;},
+  contains(el) {return [...(this.parts?.values() ?? [])].includes(el);},
+};
+const panelModule = await import(PANEL_URL);
+const scope = {id: "iss-00007", number: 7, kind: "issue", state: "doing", title: "t", path: "/r/x/scopes/iss-00007", reason: {text: "r"}};
+const structure = {scopes: [scope]};
+const reader = (status = "ok") => ({status: () => status, origin: "http://192.0.2.1:8791", marks: () => null,
+  forScope: (data, id) => (status === "ok" && id === scope.id ? [{id: "wt-7"}] : [])});
+const stateOf = (ctx) => ({ctx: {href: (p) => p, data: structure, embed: false, ...ctx}, scope, doc: null, docState: "loading", byId: new Map([[scope.id, scope]])});
+const pn = panelModule.createScopePanel(aside);
+const part = (sel) => aside.querySelector(sel);
+const scripts = () => part(".pn-orca").children.map((c) => `${c.src}|${c.dataset.worktree}|${c.dataset.theme}|${c.dataset.size}|${Object.keys(c.dataset).sort().join(",")}`);
+"""
+
+
+def run_panel(script: str, tmp_path: Path) -> dict:
+    return run_node(
+        f"const PANEL_URL = {json.dumps((SHARED / 'panel.js').as_uri())};\n" + PANEL_DOM + textwrap.dedent(script),
+        tmp_path,
+    )
+
+
+@needs_node
+def test_the_heading_row_is_built_once_and_redrawn_only_when_it_changes(tmp_path: Path) -> None:
+    out = run_panel(
+        """
+        pn.show(stateOf({orca: reader()}));
+        out.top = part(".pn-top").innerHTML;
+        out.hl = part(".pn-hl").innerHTML;
+        const writes = () => [part(".pn-top").writes, part(".pn-hl").writes, part(".pn-cover").writes];
+        out.first = writes();
+        pn.show(stateOf({orca: reader()}));
+        out.second = writes();
+        pn.show({...stateOf({orca: reader()}), scope: {...scope, title: "other"}});
+        out.third = writes();
+        out.built = aside.built;
+        """,
+        tmp_path,
+    )
+    top = out["top"]
+    assert top.startswith('<div class="pn-head"><span class="pn-hl"></span><span class="pn-orca"></span>')
+    assert '<button type="button" class="iconbtn pn-close" data-pn-act="close" aria-label="閉じる">' in top
+    assert top.endswith('</button></div><div class="pn-cover"></div>')
+    assert "pn-merge" in out["hl"] and 'data-orca-scope="iss-00007" data-orca-max="4"' in out["hl"]
+    assert out["first"] == [1, 1, 1]
+    assert out["second"] == [1, 1, 1]
+    assert out["third"] == [1, 1, 2]
+    assert out["built"] == 1
+
+
+@needs_node
+def test_the_open_button_follows_the_panel(tmp_path: Path) -> None:
+    out = run_panel(
+        """
+        pn.show(stateOf({orca: reader()}));
+        out.first = scripts();
+        const first = part(".pn-orca").children[0];
+        pn.show(stateOf({orca: reader()}));
+        out.same = part(".pn-orca").children[0] === first;
+        theme.dark = true;
+        observed[0].fn();
+        out.dark = scripts();
+        pn.hide();
+        out.hidden = scripts();
+        theme.dark = false;
+        pn.show(stateOf({orca: reader()}));
+        out.again = scripts();
+        aside.innerHTML = "<div>the cleanup list</div>";
+        pn.show(stateOf({orca: reader()}));
+        out.rebuilt = scripts();
+        pn.show(stateOf({orca: reader(), embed: true}));
+        out.embed = scripts();
+        pn.show(stateOf({orca: reader("unreachable")}));
+        out.unreachable = scripts();
+        pn.show(stateOf({orca: null}));
+        out.off = scripts();
+        """,
+        tmp_path,
+    )
+    light = "http://192.0.2.1:8791/embed/open-button.js|wt-7|light|sm|size,theme,worktree"
+    assert out["first"] == [light]
+    assert out["same"] is True
+    assert out["dark"] == [light.replace("|light|", "|dark|")]
+    assert out["hidden"] == []
+    assert out["again"] == [light]
+    assert out["rebuilt"] == [light]
+    assert out["embed"] == [] and out["unreachable"] == [] and out["off"] == []
+
+
+@needs_node
+def test_prefer_tab_chooses_only_shared_tabs_and_marks_ask_for_it(tmp_path: Path) -> None:
+    out = run_panel(
+        """
+        const selected = () => (part(".pn-tabs").innerHTML.match(/data-pn-tab="([a-z]+)" aria-selected="true"/) || [])[1] ?? null;
+        pn.show(stateOf({orca: reader()}));
+        out.start = selected();
+        pn.preferTab("deps");
+        out.deps = selected();
+        pn.preferTab("no-such-tab");
+        out.unknown = selected();
+        const mark = {closest: (sel) => (sel === ".sd-orca" ? mark : null)};
+        pn.preferTab("summary");
+        aside.click({target: mark, button: 0});
+        out.agents = selected();
+        """,
+        tmp_path,
+    )
+    assert out["deps"] == "deps"
+    assert out["unknown"] == "deps"
+    # "agents" arrives with iss-00593; until then a pressed mark keeps the tab.
+    assert out["agents"] == "summary"
+    panel = (SHARED / "panel.js").read_text()
+    click = panel[panel.index('aside.addEventListener("click"') :]
+    assert 'if (t.closest(".sd-orca")) {' in click and 'preferTab("agents");' in click
+
+
+@needs_node
+def test_the_theme_watch_ends_with_the_panel(tmp_path: Path) -> None:
+    out = run_panel(
+        """
+        out.on = {...listeners};
+        pn.destroy();
+        out.off = {...listeners};
+        """,
+        tmp_path,
+    )
+    assert out["on"] == {"media": 1, "observers": 1}
+    assert out["off"] == {"media": 0, "observers": 0}
+
+
+def test_the_heading_css_keeps_the_row_and_the_close_button() -> None:
+    css = (SHARED / "panel.css").read_text()
+    for rule in (
+        ".sd-pn .pn-head .iconbtn { margin-left: auto;",
+        ".sd-pn .pn-hl { display: contents; }",
+        ".sd-pn .pn-orca { display: inline-flex; align-items: center; height: 24px; flex: none; }",
+        ".sd-pn .pn-orca:empty { display: none; }",
+        ".sd-pn .pn-orca:not(:empty) { margin-left: auto; }",
+        ".sd-pn .pn-orca:not(:empty) + .pn-close { margin-left: 0; }",
+    ):
+        assert rule in css, rule
+    panel = (SHARED / "panel.js").read_text()
+    draw = panel[panel.index("  function draw() {") : panel.index("// --- The phone sheet")]
+    assert draw.rstrip().endswith("refreshOrca();\n  }")
+    refresh = panel[panel.index("  function refreshOrca() {") : panel.index("  function draw() {")]
+    assert "paintOrcaMarks(parts.top, ctx, ctx.data)" in refresh and "openButton.update({" in refresh
