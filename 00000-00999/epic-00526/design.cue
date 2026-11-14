@@ -13,7 +13,7 @@ current: """
 	- `views/_shared/scope_tabs.js` の `SCOPE_TABS` は `[{key, label, count(env), render(env)}]` の固定の並びで、`TAB_KEYS` がキーの並び。`panel_logic.js` の `pickTab(wanted, keys, details)` が、wanted が keys になければ既定のタブ（説明資料か概要）を選ぶ。
 	- 横の欄（`views/_shared/panel.js`）は、タブの中身の HTML が前と同じなら中身を置き換えない（`shownHtml`）。描き直しは、構造の改訂が変わったとき（`app.js` の `refresh`、5 秒ごとの確かめ）と、選びが変わったとき。
 	- 詳しい画面（`views/scope.js`）は、描くたびに `root.innerHTML` で全体を置き換える（中の iframe は読み込み直しになる）。
-	- iss-00589 は、文書の枠が残りの高さをすべて使う形（`.pn-body` の flex と、詳しい画面の高さの決め方）を作る。
+	- iss-00589（完了、PR #590）が、文書と説明資料のタブを `<div class="sd-framebox">` の中の `frameBar(left, href)`（1行の帯）と枠（`.sd-docframe`、`.sd-explain`）の形にした。横の欄は `panel.css` の `.pn-body:is([data-tab="docs"], [data-tab="explanation"])` の flex の列と枠の `flex: 1; min-height: 240px`、詳しい画面は `scope.css` の `height: max(420px, calc(100dvh - 120px))`。
 	- epic-00471 の iss-00591 が `ctx.orca`（`status()`、`summary()`、`marks()`、`origin`、`subscribe(fn)`、`forScope(structure, id)`）を作る。iss-00592 は印の置き場の描き方（`views/_shared/orca_marks.js` の `paintOrcaMarks`）と、欄の見出しの「Orca で開く」を作るが、この Epic はそれに頼らない（並べて進められる）。
 	"""
 
@@ -57,7 +57,7 @@ design: {
 			- wanted があるが agents にない → selected null、gone true（F-02：「このエージェントはいなくなった」と示し、一覧に戻す）。
 			- wanted がなく agents が1人 → その agent（R-02：すぐに開く）。
 			- ほか → selected null、gone false（「エージェントを選ぶ」）。
-			一覧の各行は `<button data-pn-param="agent">`（欄）か `<a ... href="?agent=">`（詳しい画面）で、中に印の置き場 `<span class="sd-orca" data-orca-agent="<id>"></span>`、種類、ブランチ（`sd-mono`）を持つ。印は、中身を描いた直後と `ctx.orca.subscribe` の知らせのときに、`ctx.orca.marks().renderAgentMarks(slot, {agents: [agent]}, {size: "sm", max: 1})` で描く（iss-00592 の `paintOrcaMarks` を待たずに作れるよう、iss-00591 の `ctx.orca` だけを使う。iss-00592 が先に入っていれば、その関数に寄せてよい）。
+			一覧の各行は `env.paramLink("agent", id)` の `<a>`（欄は欄の中の選び、詳しい画面は問い合わせ。iss-00587 の文書の選びと同じ）で、中に印の置き場 `<span class="sd-orca" data-orca-agent="<id>"></span>`、種類、ブランチ（`sd-mono`）を持つ。印は、中身を描いた直後と `ctx.orca.subscribe` の知らせのときに、`ctx.orca.marks().renderAgentMarks(slot, {agents: [agent]}, {size: "sm", max: 1})` で描く（iss-00592 の `paintOrcaMarks` を待たずに作れるよう、iss-00591 の `ctx.orca` だけを使う。iss-00592 が先に入っていれば、その関数に寄せてよい）。
 			エージェントが1人で選ばれているときは、一覧を1行の見出し（印、種類、ブランチ）にする。
 			"""
 	}
@@ -72,7 +72,9 @@ design: {
 			iss-00593 の担当は、付けない形と、`allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox` を付けた形の両方で、読み、送信、「Orca で開く」が動くかを試し、付けても全部動くなら付ける。決めた形と理由を report.md に残す。
 			SpecDock は iframe に `postMessage` しない。iframe の URL には `id` と `theme` のほかを載せない（R-04）。
 
-			高さ：横の欄では `.pn-body[data-tab="agents"]` を、iss-00589 の文書のタブと同じ flex の列にし、`.sd-agent` は `flex: 1; min-height: 320px`。詳しい画面では、iss-00589 が文書の枠に使う高さの決め方を `.sd-agent` にも当てる。数値は iss-00589 の結果に合わせ、iss-00593 の担当が写しで確かめる。
+			形と高さ：iss-00589 の文書と説明資料のタブと同じく、`<div class="sd-framebox" data-frame="agents">` の中に、`frameBar(<一覧の1行の見出しか選びの帯>, null)` と iframe を並べる（一覧が2人以上のときは、帯を一覧の選びにする。D-02）。
+			横の欄では `panel.css` の `.pn-body:is([data-tab="docs"], [data-tab="explanation"])` の規則に `[data-tab="agents"]` を足し、`.sd-agent` を `.sd-docframe, .sd-explain` と同じ規則に足す（`flex: 1; min-height: 240px`）。詳しい画面では `scope.css` の枠の高さの規則に `.sd-agent` を足す。
+			理由の知らせ（D-05）のときは枠を出さない。
 			"""
 	}
 	"D-04": {
@@ -81,7 +83,7 @@ design: {
 		text: """
 			- タブの中身の HTML は、Scope の ID、一覧の項目（id、種類、ブランチ）、選び、明暗、reason だけで決まる。印は置き場に後から描くので、印や経過が変わっても HTML の文字列は変わらない。
 			- 欄：今の `shownHtml` の比べ方で、同じ文字列なら中身を置き換えない。Scope が変われば一覧と title が変わるので、中身は置き換えられ、前の iframe は外れる（F-03）。
-			- 詳しい画面：`scope.js` を、見出しとタブの帯と中身の3つの要素に分け、中身（`.sd-tabpanel`）は前の HTML の文字列と同じなら置き換えない（欄と同じ）。Scope の ID が変わったら（別の Scope へ移ったら）必ず置き換える。
+			- 詳しい画面：今の `scope.js` は描くたびに `root.innerHTML` で全体を置き換え、構造の改訂が変わるたび（`app.js` の `refresh`）と `ctx.orca` の知らせのたびに中の iframe が読み込み直しになる。`scope.js` を、見出しとタブの帯と中身の3つの要素に分け、中身（`.sd-tabpanel`）は前の HTML の文字列と同じで同じ Scope なら置き換えない（欄と同じ比べ方）。Scope の ID が変わったら（別の Scope へ移ったら）必ず置き換える。
 			- 要約の読み直しで選んだエージェントがいなくなれば、`pickAgent` が gone を返し、HTML が変わって iframe が外れる（F-02）。
 			- 明暗を変えたときは `theme` が変わるので、置き直しになる（R-07 が許す）。
 			"""

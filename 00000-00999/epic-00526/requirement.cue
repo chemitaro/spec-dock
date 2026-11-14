@@ -26,10 +26,10 @@ background: """
 	- 中には題名と「Orca で開く」、畳んだ詳細（worktree、種類、状態、モデル、親と子、PR と CI）、会話、入力欄と送るボタン。幅 390px 以下では「Orca で開く」を出さない。
 	- 送信の守りはすべて orca-web の中にある：同じオリジンの JSON、`POST /api/token` の短期のトークン、宛先の指紋（表示した宛先と送る宛先が違えば送らない）、設定のファイルの `sendEnabled`（既定は止まっている）、送る前の記録、結果不明の自動の送り直しをしない。会話と送信の API は同じオリジンだけで、CORS を付けない。
 
-	SpecDock の今の状態（2026-11-14 の main `7e50ac583` で確かめた事実）：
+	SpecDock の今の状態（2026-11-14 の main `89f51588a`、iss-00589 の PR #590 のマージの後で確かめた事実）：
 
 	- 横の欄（`views/_shared/panel.js`、iss-00587）と詳しい画面（`views/scope.js`）は、同じタブの並び `SCOPE_TABS`（`views/_shared/scope_tabs.js`）を使い、説明資料、概要、依存、配下、文書、Artifact、人のタスクの順。タブの中身の HTML が同じなら、欄は中身を置き換えない（iss-00587 R-08）。
-	- iss-00589（文書のタブを詰める、作業中）は、文書の枠が残りの高さをすべて使い、二重のスクロールを作らない形を決める。
+	- iss-00589（文書のタブを詰める、2026-11-14 に完了）が、文書と説明資料のタブを、1行の細い帯（`.sd-framebar`、`frameBar(left, href)`）と、その下で残りの高さをすべて使う枠（`.sd-framebox`）の形にそろえた。横の欄では `.pn-body` の flex の列と `flex: 1`、詳しい画面では `height: max(420px, calc(100dvh - 120px))` で高さを決める。
 	- epic-00471 の iss-00591 が、orca-web の場所、要約の読みの輪、Scope と worktree の対応と状態（`core/orca.js`、`core/orca_match.js`）を作る。
 	"""
 
@@ -87,7 +87,7 @@ requirements: {
 		title: "詳細とチャットは orca-web の iframe で、タブの残りの高さをすべて使う"
 		text: """
 			選んだエージェントの `<orca-web>/embed/agent?id=<URL の符号にした id>&theme=<light|dark>` を iframe で置く。`theme` は SpecDock の今の明暗。
-			iframe は、一覧の行の下の残りの高さをすべて使い、枠の外に二重のスクロールを作らない（iss-00589 の文書の枠と同じ方針）。スマホの下から出る欄（3段のシート）でも、全体に広げたときに画面いっぱいに使える。
+			iframe は、一覧の行の下の残りの高さをすべて使い、枠の外に二重のスクロールを作らない（iss-00589 の文書と説明資料の枠と同じ形と高さの決め方）。スマホの下から出る欄（3段のシート）でも、全体に広げたときに画面いっぱいに使える。
 			iframe の `title` に、エージェントの種類と worktree のブランチを書く。
 			"""
 		acceptance: [
