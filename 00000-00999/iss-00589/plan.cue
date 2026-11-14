@@ -5,7 +5,7 @@ package spec
 goal: "文書と説明資料のタブを「1行の帯 ＋ 残りの高さを使う枠」にし、選べる文書を仕様と報告にして、埋め込んだ文書を読む面積を最大にする"
 
 steps: {
-	"S-01": {title: "node のテスト（T-01〜T-03）を先に書いて落ちることを確かめ、scope_tabs.js の docsTab・documentEntries・checkResults・explanationTab と DOC_INFO を D-01〜D-03、D-05、D-06 のとおりに直す。test_dashboard_documents.py の目印を新しい形に合わせる", realizes: ["R-01", "R-02", "R-03", "R-05", "F-01", "F-02"], status: "todo", session: "impl-ui"}
+	"S-01": {title: "node のテスト（T-01〜T-03）を先に書いて落ちることを確かめ、scope_tabs.js の docsTab・documentEntries・checkResults・explanationTab と DOC_INFO を D-01〜D-03、D-05、D-06 のとおりに直す。test_dashboard_documents.py の目印を新しい形に合わせる", realizes: ["R-01", "R-02", "R-03", "R-05", "F-01", "F-02"], status: "doing", session: "impl-ui"}
 	"S-02": {title: "scope_tabs.css・panel.css・scope.css を D-02、D-04 のとおりに直し（帯、セグメント、誤りの帯、枠の伸び、使わない規則の削除）、静的なテスト（T-04）を足す。make lint と uv run pytest（全体）を通す", realizes: ["R-02", "R-03", "R-04", "R-05"], status: "todo", after: ["S-01"], session: "impl-ui"}
 	"S-03": {title: "実データで直した後の写しと測りを撮り、直す前と並べて report.md に残す。--tailscale のサーバーを立てて URL を残す（D-07）", realizes: ["R-06", "R-02", "R-03", "R-04", "R-05"], status: "todo", after: ["S-02"], session: "owner"}
 }
