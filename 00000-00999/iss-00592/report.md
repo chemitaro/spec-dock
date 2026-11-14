@@ -19,6 +19,9 @@ ID: "iss-00592"
   - P3：今の orca-web の main の open-button は幅 260・高さ 26 → S-05 のときの orca-web の main の版を記録し、はみ出すなら report に記す。
 - 合格した文書の sha256：requirement.cue `da41ab88ef83ee338aea2367ec4ed568d4e4d4a4c05a61e6302f9a24ab0140a3`、design.cue `b7bb0b5d5516b6fe529ddca6587161b2c8c35c9810c2164aa701975251cc02e2`、plan.cue `ebf4fff8cea44cb21eb418505881287d4960000375ca3a793c2b77857c8a84ad`、explanation.html `a55de777619835714fdf30498633c29d3a1503ad5c8b8d706fb0ad7d948e236e`。開始のコミット `67abbe6c1`（clean）。
 - 結果の場所：この Issue の worktree の `.workbench/spec-review/iss-00592/`。
+- 最終品質ゲート（quality-gate-reviewer opus / medium、second opinion なし、範囲 `67abbe6c1..0bfa2424f`、観点 functional-correctness・requirements-closure・test-adequacy・security-baseline）：**合格**（attempt 2、`0bfa2424f`）。P0〜P3 0、coverage complete。test lane：`make lint` exit 0、`uv run pytest` exit 0（3871 passed / 7 skipped）。closure は worktree の `.workbench/final-quality-gate/iss-00592-fqg-1/closure.md`。
+  - attempt 1（`c2e68535a`）：review pass（P3 1：配る文書の config_problems の文）、test lane fail（配る文書を変えたのにドッグフードの写し `spec-dock/docs/reference_cli.md` を合わせておらず 3 failed）。`0bfa2424f` で写しを合わせ、P3 の文も直した（`review-response.md`）。
+- 注：plan.cue は合格の後、手順の status だけを done に書き換えている（中身は合格のまま）。
 
 ## 実装の記録
 
@@ -55,6 +58,8 @@ ID: "iss-00592"
 - 実装担当の値は計画どおり。逸脱なし。
 
 ## Outcome
+
+PR #597（https://github.com/chemitaro/spec-dock/pull/597、head `0bfa2424f47382f763510c2a9208c6688746c304`）。マージは統括が行う。
 
 ## Verification
 
