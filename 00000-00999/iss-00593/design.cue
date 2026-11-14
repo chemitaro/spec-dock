@@ -21,8 +21,8 @@ current: """
 	"""
 
 target: """
-	- 新しい `views/_shared/agents_logic.js`（純粋。DOM と ctx を知らない）：`scopeAgents`、`agentsVisibility`、`pickAgent`、`agentFrame`、`AGENT_SANDBOX`。
-	- 新しい `views/_shared/agents_tab.js`：env から入力を集める `agentsState(env)`、タブの中身の `agentsTab(env)`、帯を後から描く `paintAgentList(root, env)`、明暗の `currentTheme()`。
+	- 新しい `views/_shared/agents_logic.js`（純粋。DOM と ctx を知らない）：`scopeAgents`、`agentsVisibility`、`pickAgent`、`stripForm`、`agentFrame`、`AGENT_SANDBOX`。
+	- 新しい `views/_shared/agents_tab.js`：いなくなった覚え（`goneFor`、`forgetGone`）、env から入力を集める `agentsState(env)`、タブの中身の `agentsTab(env)`、帯を後から描く `paintAgentList(root, env)`、明暗の `currentTheme()`。
 	- `scope_tabs.js`：`SCOPE_TABS` の2番目に `agents`、`visibleTabs(env)`、env に `keep(name, value)`。
 	- `panel.js`・`scope.js`：見えるタブだけを描き、中身の HTML が同じなら置き換えず、描いた後に帯を描き、`ctx.orca` の知らせで描き直す。
 	- `app.js`：ctx に `orcaProblem` と `replaceParam`。OS の明暗の変化と `setTheme` で描き直す。
@@ -38,21 +38,25 @@ design: {
 			**`scopeAgents(worktrees)`** → エージェントの並び。`worktrees` は `ctx.orca.forScope` の結果（並びでなければ空として扱う）。worktree の順、その中の `agents` の順に、次の形の項目を作る：
 			`{id, agentType, branch, worktreeId, detail, raw}`。`id` と `detail` が文字列で、`detail` が `/embed/agent?id=` で始まり、そのあとに `&`・`#`・空白を含まない（`/^\\/embed\\/agent\\?id=[^&#\\s]+$/`）エージェントだけを入れる（形の違う項目は使えないので出さない）。`agentType` は文字列でなければ null、`branch` は worktree の `branch` が文字列でなければ null、`worktreeId` は worktree の `id`、`raw` は要約のエージェントそのもの（印を描くため）。同じ `id` が2回出たら最初だけを残す。
 
-			**`agentsVisibility({status, problem, records, agents, wanted, embed})`** → `{show, reason}`。`records` はその Scope の SpecDock の worktree の記録の数、`agents` は `scopeAgents` の結果、`wanted` は今の選び（文字列か null）。出すかどうか（上から順。R-01）：
+			**`agentsVisibility({status, problem, records, agents, wanted, goneIds, embed})`** → `{show, reason}`。`records` はその Scope の SpecDock の worktree の記録の数、`agents` は `scopeAgents` の結果、`wanted` は今の選び（文字列か null）、`goneIds` はその Scope のいなくなった覚え（id の Set。D-02）。出すかどうか（上から順。R-01）：
 			1. `status === "off"` で `problem` がない → `{show: false, reason: null}`。
 			2. `records` が 0 → `{show: false, reason: null}`（F-04）。
 			3. `problem` がある、または `status` が `loading`・`unreachable`・`orca-unreachable`・`orca-starting` → 出す。
-			4. `status === "ok"`：`agents.length > 0`、または `wanted` がある → 出す。ほか → 出さない。
+			4. `status === "ok"`：`agents.length > 0`、`wanted` がある、または `goneIds` が空でない → 出す。ほか → 出さない。
 			5. ほかの `status` の値 → 出さない。
 			理由（出すときだけ、上から順）：`problem` があれば `"config"`、`embed` が真なら `"embed"`（F-05）、`status` が `ok` でなければその値、`ok` なら null。
 
-			**`pickAgent(agents, wanted)`** → `{selected, gone, remember}`（理由が null のときだけ呼ぶ。Epic D-02）：
-			- `wanted` が `gone:` で始まる → `{selected: null, gone: true, remember: null}`。
-			- `wanted` が `agents` のどれかの `id` → `{selected: その項目, gone: false, remember: null}`。
-			- `wanted` があるが `agents` にない → `{selected: null, gone: true, remember: "gone:" + wanted}`（F-02。残ったのが1人でも選ばない）。
-			- `wanted` がなく `agents` が1人 → `{selected: その項目, gone: false, remember: その id}`（R-02）。
-			- ほか → `{selected: null, gone: false, remember: null}`。
+			**`pickAgent(agents, wanted, goneIds)`** → `{selected, gone, remember, addGone}`（理由が null のときだけ呼ぶ。Epic D-02。`goneIds` は id の Set、なければ空として扱う）。上から順：
+			1. `wanted` が `gone:` で始まる → `{selected: null, gone: true, remember: null, addGone: その後ろの id}`（同じ id が `agents` に戻っても開かない）。
+			2. `wanted` が `goneIds` にある → `{selected: null, gone: true, remember: null, addGone: null}`（戻る操作などで、いなくなった id が選びとして戻ってきた）。
+			3. `wanted` が `agents` のどれかの `id` → `{selected: その項目, gone: false, remember: null, addGone: null}`。
+			4. `wanted` があるが `agents` にない → `{selected: null, gone: true, remember: "gone:" + wanted, addGone: wanted}`（F-02。残ったのが1人でも選ばない）。
+			5. `wanted` がなく `goneIds` が空でない → `{selected: null, gone: true, remember: null, addGone: null}`（覚えがある間は自動で選ばない）。
+			6. `wanted` がなく `agents` が1人 → `{selected: その項目, gone: false, remember: その id, addGone: null}`（R-02）。
+			7. ほか → `{selected: null, gone: false, remember: null, addGone: null}`（「選ぶ」）。
 			`gone` のときの、いなくなった相手の名前は出さない（id しか知らないため。知らせは「選んでいたエージェントはいなくなった」）。
+
+			**`stripForm(agents, selected, gone)`** → `"label"` か `"switch"`：`agents.length === 1` で `selected` がその1人のときだけ `"label"`（押せない見出し）、ほかは `"switch"`（gone のときは残りが1人でも押せる項目。round-1 の P1）。
 
 			**`agentFrame(origin, agent, theme)`** → `{src, title}` か null。`origin` が文字列でない、`agent` がない、`theme` が `light`・`dark` でないときは null。`src` は `origin + agent.detail + "&theme=" + theme`（`detail` をそのまま使い、id を符号にし直さない）。`title` は `"エージェント：" + (agentType ?? "種類不明") + "・" + (branch ?? "ブランチ不明")`。
 
@@ -69,13 +73,19 @@ design: {
 			- `pageEnv`：`env.param(name)` が value と違えば `ctx.route = ctx.replaceParam(name, value)`（D-06。履歴を増やさない。`param` と `paramLink` は呼ばれたときの `ctx.route` を読むので、以後の値と道は新しい問い合わせになる）。`ctx.replaceParam` がなければ何もしない。
 			- `panelEnv`：`params.set(name, value)`（受けた `params` の Map をそのまま書き換える。iss-00587 の選びと同じ Map）。
 
-			`agentsState(env)`（`agents_tab.js`）が、env から入力を集めて決め方を呼び、結果を env ごとに1回だけ覚える（WeakMap。同じ env の `visible`・`count`・`render` は同じ答え）：
+			**いなくなった覚え**（`agents_tab.js` のモジュールの中に1つ。R-05）：`gone = {scopeId: null, ids: new Set()}`。
+			- `goneFor(scopeId)`：`gone.scopeId` が違えば、捨てて `{scopeId, ids: new Set()}` にしてから `gone.ids` を返す（別の Scope を示したら捨てる。横の欄と詳しい画面は同時に1つの Scope しか示さず、欄から詳しい画面へ同じ Scope で移っても覚えは残る）。
+			- `forgetGone(scopeId)`：`gone.scopeId` が同じなら `ids` を空にする。人が切り替えの項目を押したときだけ呼ぶ（D-04）。
+			- `pickAgent` の `addGone` があれば `ids` に足す。
+
+			`agentsState(env)`（`agents_tab.js`）が、env から入力を集めて決め方を呼び、結果を env ごとに1回だけ覚える（WeakMap。同じ env の `visible`・`count`・`render` は同じ答え）。**`keep` は呼ばない**（ほかのタブを示す間に選びを書き換えないため。round-1 の P3）：
 			- `status`：`env.ctx.orca?.status() ?? "off"`。`problem`：`env.ctx.orcaProblem ?? null`。`embed`：`env.ctx.embed === true`。
 			- `records`：構造（`env.ctx.data`）の `worktrees.status` が `ok` なら、`env.byId.get(scope.id)?.worktrees` の数、ほかは 0（F-04）。
 			- `agents`：`scopeAgents(env.ctx.orca?.forScope(env.ctx.data, env.scope.id) ?? [])`（状態が ok でなければ `forScope` は空を返す）。
-			- `wanted`：`env.param("agent")`。
-			- 結果：`{...agentsVisibility(...), agents, wanted}`。理由が null なら `pickAgent(agents, wanted)` も呼び、`remember` があれば `env.keep("agent", remember)` を1回呼んで、結果に `pick` として入れる。
-			`visible(env)` は `.show`。`count(env)` は理由が null のとき `agents.length`、ほかは null。`render(env)` は `agentsTab(env)`（D-03、D-05）。
+			- `wanted`：`env.param("agent")`。`goneIds`：`goneFor(env.scope.id)`。
+			- 結果：`{...agentsVisibility(...), agents, wanted, goneIds}`。
+			`visible(env)` は `.show`。`count(env)` は理由が null のとき `agents.length`、ほかは null。
+			`render(env)` は `agentsTab(env)`（D-03、D-05）：理由が null なら `pickAgent(agents, wanted, goneIds)` を呼び、`addGone` を覚えに足し、`remember` があれば `env.keep("agent", remember)` を1回呼ぶ（エージェントのタブを描くときだけ）。結果は同じ env の `paintAgentList` が使えるよう env ごとに覚える。
 			"""
 	}
 	"D-03": {
@@ -113,7 +123,7 @@ design: {
 			**中身の文字列に入れるもの**：Scope の ID、理由、選ばれた項目の `src` と `title`（id・種類・ブランチ・明暗）、gone か「選ぶ」か。ほかのエージェントの数・並び・印・経過は入れない（帯は置き場に後から描く）。そのため、ほかのエージェントの増減では文字列が変わらず、選んだエージェントの種類かブランチか明暗が変われば変わる（R-07 が許す置き直し）。
 
 			**横の欄**（`panel.js`）：
-			- `draw()` は `env` があるとき `visibleTabs(env)` の並びでタブのボタンを描き、`pickTab(userTab, その並びのキー, details)` で選ぶ。`env` がない（読み込み中）ときは `visible` を持つタブを除いた並びを描く。
+			- `draw()` は、詳しい内容が読めていれば、まず `panelEnv(…, {params, tab: userTab})` で仮の env を作り（`visible` はタブによらない）、`visibleTabs(仮の env)` の並びのキーで `pickTab(userTab, キー, details)` を選び、選んだタブが `userTab` と違えば `panelEnv(…, {params, tab})` で env を作り直す（round-1 の P3：env を作るのにタブが要る順の循環を解く）。その並びでタブのボタンを描く。`env` がない（読み込み中）ときは `visible` を持つタブを除いた並びを描く。
 			- 中身は今の `shownHtml` の比べ方のまま。Scope が変われば中身の文字列（`data-orca-agents` の ID を含む）が変わるので置き換えられ、前の iframe は外れる（F-03）。
 			- 中身を描いた後（置き換えたかどうかによらず）、選んだタブが `agents` なら `paintAgentList(parts.body, env)` を呼ぶ。
 			- 知らせ：`draw()` の中で、`state.ctx.orca` が今の購読の相手と違えば、前の購読を外し、`ctx.orca.subscribe(() => { if (current) draw(); })` で付け直す。`hide()` と `destroy()` で外す。
@@ -126,9 +136,10 @@ design: {
 			- 知らせ：モジュールに最後の `{root, ctx}` を覚え、`ctx.orca` が今の購読の相手と違えば付け直す。知らせでは、覚えた root がまだ文書の中にあれば `render(root, ctx)` を呼ぶ。`dispose()` を足して購読を外し、覚えを捨てる（`app.js` は画面を替えるときに `dispose` を呼んでいる）。
 
 			**帯**（`paintAgentList(root, env)`、`agents_tab.js`）：
-			- `root.querySelector("[data-orca-agents]")` がなければ何もしない。`agentsState(env)` の `agents` と選ばれた項目から帯の HTML を作る：1人なら1つの `<span class="sd-agentpick" aria-current="true">`、2人以上なら項目ごとに `<a class="sd-agentpick" ${env.paramLink("agent", id)}>`（選ばれた項目に `aria-current="true"`）。中は `<span class="sd-agentpick__mark" data-orca-agent="<esc(id)>"></span>`、種類（なければ「種類不明」）、ブランチ（`sd-mono`。なければ「ブランチ不明」）。文字はすべて `esc` を通す。
+			- `root.querySelector("[data-orca-agents]")` がなければ何もしない。`agentsState(env)` の `agents` と、同じ env の `render` が決めた選び（`pickAgent` の結果）から帯の HTML を作る：`stripForm` が `"label"` なら1つの `<span class="sd-agentpick" aria-current="true">`、`"switch"` なら項目ごとに `<a class="sd-agentpick" data-agent-pick="<esc(id)>" ${env.paramLink("agent", id)}>`（選ばれた項目にだけ `aria-current="true"`。gone のときはどれにも付けない）。中は `<span class="sd-agentpick__mark" data-orca-agent="<esc(id)>"></span>`、種類（なければ「種類不明」）、ブランチ（`sd-mono`。なければ「ブランチ不明」）。文字はすべて `esc` を通す。
 			- 帯の文字列が前（置き場の `dataset` に覚える）と同じなら置き場の `innerHTML` を書き換えない。印は、各置き場について `marks.buildMarks({agents: [raw]}, {max: 1})` の結果の JSON を前の値と比べ、違うときだけ `marks.renderAgentMarks(slot, {agents: [raw]}, {size: "sm", max: 1})` で描く（作業中の弧が10秒ごとに回り始めに戻らない）。`marks()` が null か、部品が例外を投げたら、印は空のままにし、ほかは描く。
 			- 置き場の `innerHTML` だけを書き換え、隣の iframe に触れない。
+			- 人の選び：置き場に、捕捉の段（capture）の `click` の聞き手を1つだけ付ける（置き場の `dataset` に付けた印で二重に付けない。中身が置き換われば新しい置き場に付く）。`[data-agent-pick]` の上の押しなら、修飾キーの有無によらず `forgetGone(scopeId)` を呼ぶ。押しの既定の動き（欄の `data-pn-param` の処理、詳しい画面の `data-nav` の移動）は止めず、そのあとの描き直しで選んだ相手が開く（覚えを捨てた後なので、`wanted` が前にいなくなった id でも開ける）。
 
 			**明暗**：`currentTheme()` = `document.documentElement.dataset.theme` が `light`・`dark` ならそれ、ほかは `matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"`。描き直しは D-06。
 			"""
@@ -163,10 +174,10 @@ design: {
 		satisfies: ["R-04"]
 		text: """
 			静的なテスト（Python、`tests/unit/infra/test_dashboard_agents_boundary.py`）：
-			- 画面のファイル `core/orca.js`、`core/orca_match.js`、`views/_shared/agents_logic.js`、`views/_shared/agents_tab.js` と、あれば `views/_shared/orca_marks.js`（iss-00592）に、`/api/token`、`/api/send/`、`/api/open`、`/api/settings` と `postMessage` の文字列がない。
+			- 画面のファイルのうち、名前が `core/orca*.js`、`views/_shared/orca_*.js`（iss-00592 の `orca_marks.js`・`orca_logic.js` など、後で足すものを含む）、`views/_shared/agents_*.js` に当たるもの（テストが glob で集め、`agents_logic.js` と `agents_tab.js` と `core/orca.js` があることも確かめる）に、`/api/token`、`/api/send/`、`/api/open`、`/api/settings` と `postMessage` の文字列がない。
 			- `src/spec_dock/assets/dashboard/` の全部の `.js` の `postMessage` の出現は、`core/embed.js` の `window.parent.postMessage` の1か所だけ。
 			- `agents_logic.js` の `AGENT_SANDBOX` が D-01 の値と同じで、`allow-top-navigation` と `allow-forms` を含まない。
-			実機の確かめ（S-04）で、確かめ専用の宛先へ iframe の中から送る間の CDP の `Network.requestWillBeSent`（要求の URL と `frameId`）と `Page.frameNavigated` を記録し、送信の口への要求がすべて iframe の frame から出て、親の frame（最上位）から出ないことを report.md に残す。
+			実機の確かめ（S-04）で、確かめ専用の宛先へ iframe の中から送る間の CDP の `Network.requestWillBeSent`（要求の URL、`type`、`frameId`）と `Page.frameNavigated` を記録し、送信の口への要求がすべて iframe の frame から出て、親の frame（最上位）から出ないこと、親の frame から orca-web のオリジンへの要求が要約の GET と部品（`/embed/agent-marks*.js`、`/embed/agent-marks.css`、`/embed/elapsed.js`）の読み込みだけであることを report.md に残す（iframe の文書 `/embed/agent?…` の読み込みは iframe の frame の要求として数える）。
 			"""
 	}
 	"D-08": {
