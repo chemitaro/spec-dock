@@ -194,6 +194,22 @@ SpecDock 0.5.0 は、`spec-dock/workspace.json` の `schema_version` が 4 の�
 - 常駐のダッシュボードは、パッケージの版の更新の後に、自動で起動し直します（60秒ごとの版の確認。`dashboard service install` のやり直しは要りません）。前面の `serve` は自分で起動し直します。
 - 戻し方：0.9.2 に問題があれば、パッケージを 0.9.1 に戻します。配布資産を 0.9.2 に上げた後なら、その更新の PR（版のファイル `spec-dock/system/spec-dock-version` を含む）を `git revert` して、配布資産を前のバイトに戻します。版のファイルだけを戻すと、0.9.1 の `canonical check` が 0.9.2 の資産を知らない変更として CI を止めます。
 
+## 0.9.3 への更新
+
+0.9.3 は、ダッシュボードと同じPCの orca-web との連携を届ける版です（#596 の orca-web の場所と Scope と worktree の対応、#597 の稼働の印と「Orca で開く」、#598 のエージェントのタブとチャットの埋め込み）。コマンドの数（71）、カタログの形式（format 1）、`workspace.json` の版（4）は変わりません。コマンドの引数と、CLI の JSON の契約も変わりません。ダッシュボードの JSON に項目が足されるだけです（`/api/v1/repositories` の `server.orca_web`、構造の JSON の Scope ごとの `worktrees` と、全体の `worktrees`）。変わる配布資産は、この `docs/migration.md`、版のファイル `spec-dock/system/spec-dock-version`（0.9.3）、`docs/reference_cli.md`（「orca-web との連携」の節と、設定の3段の `orca_web`）の3つです。
+
+- パッケージを 0.9.3 に上げた後、各リポジトリで `spec-dock installation update --target <チェックアウト> --backup-dir <新しい外のディレクトリ> --yes` を実行して配布資産を上げ、通常の PR でコミットします。0.9.2 以前（0.9.0 から）の配布資産のままでも動き、そこから上がります。画面の変更はパッケージが配るので、パッケージを上げるだけで届きます。CI の見本は版のファイルの版の SpecDock を入れて動きます。
+- orca-web との連携（#596〜#598）：
+  - 画面が同じPCの orca-web を直接読み、構造の図の箱と枠、ボードの札、横の欄の見出しに、その Scope に対応する worktree にいるエージェントの稼働の印を出します。横の欄の見出しには「Orca で開く」のボタンを置きます。サーバーは orca-web を読まず、Orca の CLI も呼びません。
+  - 横の欄と詳しい画面のタブの2番目（説明資料の次）に「エージェント」のタブが足され、対応した worktree のエージェントを選んで、orca-web の詳細とチャットをその場で使えます。
+  - Scope と worktree の対応は SpecDock が決めます（worktree のパスの一致、なければ同じリポジトリのブランチ名の一致）。
+- 設定：利用者の設定 `config.json`（`$XDG_CONFIG_HOME/spec-dock/config.json`、なければ `~/.config/spec-dock/config.json`）に、最上位の節 `orca_web` が足されます：`{"schema": "specdock.config/v1", "orca_web": {"enabled": true, "port": 8791}}`。どちらも省け、既定は `enabled: true`、`port: 8791`（1〜65535 の整数）です。節がなければ既定で連携します。壊れた節は連携しない側に倒れ、理由は `spec-dock dashboard list` の `config_problems` と画面に出ます。ほかの節（`dashboard`、`todo`）には影響しません。変えると、起動し直さずに次の要求から効きます。
+- 前提：orca-web の `ORCA_WEB_READ_ORIGINS` に、SpecDock のオリジン（`http://127.0.0.1:47800` と、Tailscale の IP の同じ番号）が入っていること（orca-web の既定）。ほかのオリジンからの読みは orca-web が断ります。`localhost` や MagicDNS の名前で画面を開くと読めません。
+- orca-web がないとき、届かないとき、Orca に届いていないときは、稼働の印も「Orca で開く」も出ず、構造の図とボードは今までどおり動きます。エージェントのタブは、SpecDock の worktree の記録がある Scope でだけ出て、中に理由の知らせ（例「orca-web（<オリジン>）に届かない」）だけを示します。届くようになれば、次の読み（10秒ごと）で印が出ます。連携を止めるときは `config.json` に `"orca_web": {"enabled": false}` を書きます（画面は orca-web に何も要求しません）。
+- 送信：チャットの送信は、エージェントのタブの枠の中の orca-web の画面だけが行います。送れるかは orca-web の設定の `sendEnabled`（既定は止まっている）で決まり、SpecDock は上書きも隠しもしません。送信だけを止めるときは、orca-web の `sendEnabled` を false にします。
+- 常駐のダッシュボードは、パッケージの版の更新の後に、自動で起動し直します（60秒ごとの版の確認。`dashboard service install` のやり直しは要りません）。前面の `serve` は自分で起動し直します。
+- 戻し方：0.9.3 に問題があれば、パッケージを 0.9.2 に戻します。配布資産を 0.9.3 に上げた後なら、その更新の PR（版のファイル `spec-dock/system/spec-dock-version` を含む）を `git revert` して、配布資産を前のバイトに戻します。版のファイルだけを戻すと、0.9.2 の `canonical check` が 0.9.3 の資産を知らない変更として CI を止めます。
+
 ## 新規導入
 
 ```sh
