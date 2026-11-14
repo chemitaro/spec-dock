@@ -693,3 +693,56 @@ def test_the_detail_screen_is_split_into_three_parts() -> None:
     assert 'if (tab === "agents") paintAgentList(panel, env, { redraw });' in scope
     assert "dispose,\n};" in scope and "function dispose() {" in scope
     assert scope.index(".render(env);") < scope.index("const path = ctx.route.path;")  # keep runs before the links
+
+
+@node
+def test_the_strip_scrolls_the_chosen_item_into_view_only_when_needed(tmp_path: Path) -> None:
+    out = _run(
+        """
+        reset();
+        // A strip 200px wide; each item is 100px, placed by its index in the strip's content minus scrollLeft.
+        function scrollingRoot(html) {
+          const root = fakeRoot(html);
+          const strip = root.strip;
+          strip.scrollLeft = 0;
+          strip.getBoundingClientRect = () => ({left: 0, right: 200});
+          strip.querySelector = (sel) => {
+            if (sel !== '[aria-current="true"]') return null;
+            const items = [...strip.innerHTML.matchAll(/<(a|span) class="sd-agentpick"([^>]*)>/g)];
+            const index = items.findIndex((m) => m[2].includes('aria-current="true"'));
+            if (index < 0) return null;
+            return {getBoundingClientRect: () => ({left: index * 100 - strip.scrollLeft, right: index * 100 + 100 - strip.scrollLeft})};
+          };
+          return root;
+        }
+        const agents = ["a", "b", "c", "d", "e"].map((id) => raw(id));
+        world.trees[sid] = [tree("w1", "one", agents)];
+        const paint = (root, wanted) => { const env = panel(new Map([["agent", wanted]])); at.agentsTab(env); at.paintAgentList(root, env); };
+        const root = scrollingRoot(at.agentsTab(panel(new Map([["agent", "d"]]))));
+        paint(root, "d");
+        out.toD = root.strip.scrollLeft; // d spans 300..400: the strip moves right by 200
+        paint(root, "d");
+        out.again = root.strip.scrollLeft; // already in view: unchanged
+        root.strip.scrollLeft = 0; // the person moved the strip back
+        paint(root, "d");
+        out.afterPerson = root.strip.scrollLeft; // the same choice on the next summary: left alone
+        paint(root, "a");
+        out.toA = root.strip.scrollLeft; // a spans 0..100: visible at scrollLeft 0, unchanged
+        root.strip.scrollLeft = 300;
+        paint(root, "b");
+        out.toB = root.strip.scrollLeft; // b spans 100..200, seen at -200..-100: the strip moves left to 100
+        paint(root, "c");
+        out.toC = root.strip.scrollLeft; // c spans 200..300, seen at 100..200: visible, unchanged
+        // No chosen item (gone, or nothing chosen): nothing moves.
+        reset();
+        const none = scrollingRoot(at.agentsTab(panel(new Map())));
+        none.strip.scrollLeft = 50;
+        at.paintAgentList(none, panel(new Map()));
+        out.none = none.strip.scrollLeft;
+        world.trees[sid] = [tree("w1", "one", [raw("a")])];
+        """,
+        tmp_path,
+    )
+    assert out["toD"] == 200 and out["again"] == 200 and out["afterPerson"] == 0
+    assert out["toA"] == 0 and out["toB"] == 100 and out["toC"] == 100
+    assert out["none"] == 50

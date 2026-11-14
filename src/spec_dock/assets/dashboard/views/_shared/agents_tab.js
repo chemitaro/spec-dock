@@ -150,6 +150,17 @@ function paintMarks(strip, env, state) {
   }
 }
 
+// Keep the chosen item inside the strip's visible part, so its branch can be checked before sending (R-05). Only the
+// strip scrolls (scrollIntoView would move the page or the panel too), and only when the item is outside.
+function revealChosen(strip) {
+  const item = strip.querySelector?.('[aria-current="true"]');
+  if (!item || !strip.getBoundingClientRect) return;
+  const box = strip.getBoundingClientRect();
+  const rect = item.getBoundingClientRect();
+  if (rect.left < box.left) strip.scrollLeft -= box.left - rect.left;
+  else if (rect.right > box.right) strip.scrollLeft += rect.right - box.right;
+}
+
 // The strip, painted after the contents (D-04). It writes only its slot and never touches the frame next to it.
 export function paintAgentList(root, env, { redraw } = {}) {
   const strip = root.querySelector("[data-orca-agents]");
@@ -157,9 +168,14 @@ export function paintAgentList(root, env, { redraw } = {}) {
   const state = agentsState(env);
   const pick = picks.get(env) ?? pickAgent(state.agents, state.wanted, state.goneIds);
   const html = stripHtml(env, state, pick);
-  if (strip.dataset.strip !== html) {
-    strip.innerHTML = html;
-    strip.dataset.strip = html;
+  const chosen = pick.gone ? "" : (pick.selected?.id ?? "");
+  if (strip.dataset.strip !== html || strip.dataset.chosen !== chosen) {
+    if (strip.dataset.strip !== html) {
+      strip.innerHTML = html;
+      strip.dataset.strip = html;
+    }
+    strip.dataset.chosen = chosen;
+    revealChosen(strip);
   }
   paintMarks(strip, env, state);
 
