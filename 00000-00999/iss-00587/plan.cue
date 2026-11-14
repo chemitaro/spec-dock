@@ -12,7 +12,7 @@ steps: {
 	"S-05": {title: "ボードで札を押すと同じ欄を開く。欄の aside を描き直しで保ち、列を欄の左に収める（D-07）", realizes: ["R-01", "R-05", "R-08", "F-01", "F-02", "F-04"], status: "done", after: ["S-04"], session: "impl-ui"}
 	"S-06": {title: "スマホのシートを3段のスワイプにする（取っ手と見出しの帯で引きずる、払う、取っ手のタップ、閉じる、段を保つ、resize）（D-08）", realizes: ["R-07", "R-08"], status: "done", after: ["S-05"], session: "impl-ui"}
 	"S-07": {title: "静的なテスト（共有の部品の使い方、esc、外への読み込みなし）を足して直し、make lint と全体の pytest を通す", realizes: ["R-01", "R-02", "R-09"], status: "done", after: ["S-06"], session: "impl-ui"}
-	"S-08": {title: "spec-dock の実データで 1440、1000、390 の直す後の写しを撮り、直す前の写しと並べて report.md に残す。390 のスワイプの3段と全体の読みを確かめる", realizes: ["R-10", "R-01", "R-03", "R-05", "R-06", "R-07"], status: "todo", after: ["S-07"], session: "owner"}
+	"S-08": {title: "spec-dock の実データで 1440、1000、390 の直す後の写しを撮り、直す前の写しと並べて report.md に残す。390 のスワイプの3段と全体の読みを確かめる", realizes: ["R-10", "R-01", "R-03", "R-05", "R-06", "R-07"], status: "done", after: ["S-07"], session: "owner"}
 }
 
 tests: {

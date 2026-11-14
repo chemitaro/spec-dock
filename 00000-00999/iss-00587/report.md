@@ -16,6 +16,8 @@ ID: "iss-00587"
 - 結果の場所：worktree `/Volumes/990p2t/workspace/worktrees/orca/spec-dock/iss-00587` の `.workbench/spec-review/iss-00587/`。
 - CP-1（code-reviewer opus / medium の2人、axis standards と spec、範囲 `928460f48..5b1a7ca65`、S-01〜S-04）：**合格**。どちらも P0・P1 なし、P2 1件ずつ（欄の概要の「前回からの変化」が基準なしの api.scope で図の印と食い違う、欄の見出しが古い詳しい JSON で構造の新しい状態を上書きする）。結果 `.workbench/code-review/iss-00587/cp1-standards-round-1.json`・`cp1-spec-round-1.json`、検査 `*.check.json`（valid、status pass）。P2 の2件は、今回の共通化で入った食い違いなので、タスク担当の判断で S-05 の中で直すよう実装担当に送った。
 - 注：plan.cue は合格の後、手順の status だけを書き換えている（中身は合格のまま）。
+- 最終品質ゲート（quality-gate-reviewer opus / medium、second opinion なし、範囲 `928460f48..1005646d3`、観点 functional-correctness・requirements-closure・test-adequacy・security-baseline）：**合格**（attempt 1）。P0〜P2 0、P3 2（FQG-001 止めてから離しても速い払いと判定されうる、FQG-002 片付けの候補の一覧がスマホで前のシートの段を引き継ぐ。情報のみ）、coverage complete。test lane：`make lint` exit 0、`uv run pytest` exit 0（3796 passed / 7 skipped）。closure `.workbench/final-quality-gate/iss-00587-fqg-1/closure.md`（worktree `/Volumes/990p2t/workspace/worktrees/orca/spec-dock/iss-00587`）。
+- 注：計画の関門の観点 `security` は、契約の観点の名前 `security-baseline` で走らせた。
 
 ## 直す前の写し
 
