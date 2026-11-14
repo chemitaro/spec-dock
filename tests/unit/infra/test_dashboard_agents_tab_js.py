@@ -1011,3 +1011,78 @@ def test_the_marks_compare_and_draw_with_the_same_now(tmp_path: Path) -> None:
     assert out["sameMinute"] == 1 and out["nextMinute"] == 2
     assert out["options"]["build"] == {"max": 1, "now": 1_060_000}
     assert out["options"]["render"] == {"size": "sm", "max": 1, "now": 1_060_000}
+
+
+# --- With iss-00592 in the same panel (the merge of origin/main) ------------------------------------------------
+
+PANEL = """
+const PARTS = [".pn-grab", ".pn-top", ".pn-tabs", ".pn-body", ".pn-foot", ".pn-hl", ".pn-orca", ".pn-cover"];
+class El {
+  constructor(name) { this.name = name; this.dataset = {}; this.children = []; this.writes = 0; this.html = ""; this.scrollTop = 0; }
+  set innerHTML(value) { this.html = value; this.writes++; }
+  get innerHTML() { return this.html; }
+  replaceChildren(...children) { this.children = children; }
+  append(child) { this.children.push(child); }
+  querySelector() { return null; }
+  querySelectorAll() { return []; }
+}
+globalThis.window = {addEventListener() {}, removeEventListener() {}};
+globalThis.innerHeight = 800;
+globalThis.matchMedia = () => ({matches: dark, addEventListener() {}, removeEventListener() {}});
+globalThis.document.createElement = (tag) => ({tag, dataset: {}});
+globalThis.document.documentElement.clientWidth = 1440;
+const aside = {
+  classList: {add() {}, remove() {}}, dataset: {}, style: {setProperty() {}, removeProperty() {}},
+  setAttribute() {}, addEventListener(type, fn) { if (type === "click") this.click = fn; }, closest() { return null; },
+  set innerHTML(value) { this.parts = new Map(PARTS.map((s) => [s, new El(s)])); },
+  querySelector(sel) { return this.parts?.get(sel) ?? null; },
+  contains(el) { return [...(this.parts?.values() ?? [])].includes(el); },
+};
+const panelModule = await import(PANEL_URL);
+const subs2 = [];
+orca.subscribe = (fn) => { subs2.push(fn); return () => subs2.splice(subs2.indexOf(fn), 1); };
+const pn = panelModule.createScopePanel(aside);
+const part = (sel) => aside.querySelector(sel);
+const selected = () => (part(".pn-tabs").innerHTML.match(/data-pn-tab="([a-z]+)" aria-selected="true"/) || [])[1] ?? null;
+const showIt = () => pn.show({ctx: panelCtx(), scope, doc, docState: "ok", byId});
+"""
+
+
+@node
+def test_prefer_tab_and_a_doubled_redraw_in_the_panel_with_the_orca_heading(tmp_path: Path) -> None:
+    out = _run(
+        PANEL.replace("PANEL_URL", json.dumps((SHARED / "panel.js").as_uri()))
+        + """
+        reset();
+        world.trees[sid] = [tree("w1", "one", [raw("a")])];
+        showIt();
+        pn.preferTab("agents");
+        out.withAgents = selected();
+        const body = part(".pn-body");
+        out.frame = body.innerHTML.includes("<iframe");
+        const writes = body.writes;
+        // The same news twice: the panel's own subscription, then the screen's refreshOrca (iss-00592) and show.
+        subs2[0]();
+        pn.refreshOrca();
+        showIt();
+        subs2[0]();
+        out.rewrites = body.writes - writes;
+        // No agents and no choice (the panel closed, a fresh memory): the tab does not show, and the preferred
+        // agents falls back to the default tab.
+        pn.hide();
+        world.trees[sid] = [];
+        reset();
+        showIt();
+        pn.preferTab("agents");
+        out.withoutAgents = selected();
+        out.tabs = [...part(".pn-tabs").innerHTML.matchAll(/data-pn-tab="([a-z]+)"/g)].map((m) => m[1]);
+        pn.hide();
+        out.subscribed = subs2.length;
+        world.trees[sid] = [tree("w1", "one", [raw("a")])];
+        """,
+        tmp_path,
+    )
+    assert out["withAgents"] == "agents" and out["frame"] is True
+    assert out["rewrites"] == 0  # the frame stays
+    assert out["withoutAgents"] == "summary" and "agents" not in out["tabs"]
+    assert out["subscribed"] == 0

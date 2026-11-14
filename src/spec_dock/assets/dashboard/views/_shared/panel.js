@@ -46,7 +46,7 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
     if (orca === followed) return;
     unfollow?.();
     followed = orca ?? null;
-    unfollow = followed ? followed.subscribe(redraw) : null;
+    unfollow = typeof followed?.subscribe === "function" ? followed.subscribe(redraw) : null;
   }
 
   // The panel's own redraw (the summaries, the frame's move) draws with the shell's current ctx, not the one the
@@ -124,6 +124,8 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
     let tab = userTab;
     let env = null;
     let shown = SCOPE_TABS.filter((item) => !item.visible); // while the detail loads, only the tabs that always show
+    // A chosen tab that is not shown while loading (agents) shows the default tab; the choice itself is kept.
+    if (!ready && userTab != null && !shown.some((item) => item.key === userTab)) tab = pickTab(userTab, shown.map((item) => item.key), null);
     if (ready) {
       // Which tabs show does not depend on the tab, so a first env picks the tab and a second one carries it.
       const first = panelEnv(ctx, scope, state.doc, byId, { params, tab: userTab });
