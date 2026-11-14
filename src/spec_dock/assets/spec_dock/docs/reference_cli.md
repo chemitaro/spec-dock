@@ -159,6 +159,38 @@ ARTIFACT_SCOPEの@rootはArtifact所有者だけで、Scope作成/Startの対象
 - **件数の目安**：開いている、エージェントが登録した、`checklist`でない親のタスクの数（`parent_limit`）と、1つの親の開いたサブタスクの数（`subtask_limit`）。超えても登録し、`TODO_LIMIT_EXCEEDED`を警告します。
 - **エラーと警告**：`TODO_INVALID`（2、入力の誤り。`details.problems`、`details.missing`）、`TODO_NESTING_TOO_DEEP`（2）、`TODO_NOT_FOUND`、`TODO_ID_AMBIGUOUS`、`TODO_STATE_INVALID`、`TODO_SUBTASKS_OPEN`、`TODO_PARENT_CLOSED`、`TODO_RECORD_INVALID`、`TODO_SCHEMA_UNSUPPORTED`、`TODO_ID_EXHAUSTED`、`TODO_REGISTRY_UNREADABLE`（登録簿が読めない）、`TODO_REPOSITORY_UNKNOWN`、`TODO_REPOSITORY_UNREADABLE`（どちらも`show <REF>`）（いずれも3）、`TODO_REPOSITORY_INVALID`（2、`--repository`か`REF`の形の誤り）、`TODO_WRITE_INCOMPLETE`（6）、`TODO_CHECK_FAILED`（7）。警告は`TODO_LIMIT_EXCEEDED`、`TODO_SCOPE_UNKNOWN`、`TODO_SETTINGS_INVALID`、`TODO_CONFLICT_COPY`（中身を元のファイルに統合してから写しを消す）、`TODO_RECORD_INVALID`（一覧で読めない記録）、`TODO_FILE_UNKNOWN`、`TODO_CUE_SKIPPED`、`TODO_CUE_FAILED`、集約の`TODO_REPOSITORY_UNREADABLE`、`TODO_REPOSITORY_DUPLICATE`、`TODO_REPOSITORY_UNKNOWN`（登録簿にない`--repository`）。リンクがなければ、ほかのコマンドと同じく`CANONICAL_NOT_LINKED`（次の1手`spec-dock canonical link`）で何も書かずに止まります。
 
+## orca-web との連携
+
+ダッシュボードの画面は、同じPCの orca-web（エージェントの稼働とチャットの画面）を読みます。連携は利用者の設定`config.json`の`orca_web`の節（`{"enabled": true|false, "port": <N>}`。節がなければ有効で`port`は8791）で決まり、画面は`/api/v1/repositories`の`server.orca_web`（`{enabled, origin, port, problem}`）を見ます。サーバーは orca-web に要求を送らず、画面だけが orca-web の要約（`GET /api/worktrees/summary`）と`/embed/`の下の部品を読みます。例のオリジンは`http://127.0.0.1:8791`や`http://192.0.2.10:8791`です。
+
+### エージェントのタブ
+
+横の欄と詳しい画面の共有のタブの2番目（説明資料の次）に「エージェント」のタブ（キー`agents`）があり、その Scope に対応した worktree のエージェントを選んで、orca-web の詳細とチャットをその場で使えます。
+
+- **出す条件**（上から順）：(1) 連携を切っていて（`enabled`が false）、設定の問題がない → 出さない。(2) その Scope に SpecDock の worktree の記録がない → 出さない（要約の Issue の番号や名前で推し量らない）。(3) 設定の`orca_web`の節が壊れているか、orca-web を読んでいる・届かない・Orca に届いていない・Orca を読み始めたところ → 出して、中に理由の知らせを示す。(4) 要約を読めた：対応した worktree のエージェントが1人以上いる → 出す。0人でも、その Scope の選びか、いなくなった覚えがあれば、知らせのために出す。ほかは出さない。数の札は、理由の知らせがないときの、対応した worktree のエージェントの数です。タブが出なくなったら、既定のタブを示します。
+- **選び**：タブの上の1行の帯に、エージェントを稼働の印・種類・ブランチで並べます（入りきらなければ横に動き、折り返しません）。1人なら押さずにその人を選んで開き、その選びを覚えます。2人以上なら切り替えから選びます。選びは、横の欄では欄の中（ページの URL を変えない）、詳しい画面では問い合わせの`agent`に持ちます。自動の選びは履歴を増やさずに問い合わせを書き換え、人が選ぶと普通の移動になります。エージェントのタブを描くときだけ覚え、ほかのタブを見ている間は書き換えません。覚えた選びは、人が選び直すまで、ほかのエージェントに自動で移りません。
+- **いなくなったとき**：選んだエージェントがその Scope の対応した worktree にいなくなったら、枠を外して「選んでいたエージェントはいなくなった」と示し、切り替えに戻します（残りが1人でも自動で開きません）。いなくなったことは、別の Scope を示すまで画面の中で覚え、同じ id が戻っても、戻る操作、欄から詳しい画面への移り、欄の閉じと開き直しでも開きません。人がその Scope で選ぶと覚えを捨てます。ページを読み込み直したときは、問い合わせの`agent=gone:<id>`だけが残ります。Scope を変えると、前の Scope の枠を外します。
+- **送信**：送信は orca-web の枠（`/embed/agent?id=…&theme=light|dark`）の中だけで行われます。SpecDock の画面は orca-web の書き込みの口（`/api/token`、`/api/send/`、`/api/open`、`/api/settings`）を呼ばず、枠に本文・トークン・宛先を渡さず（`postMessage`を使わない）、送れるかを上書きも隠しもしません。送信は orca-web の設定の`sendEnabled`（既定は止まっている）で止められ、止まっているときの理由は orca-web の画面が入力欄の下に示します。
+- **枠**：枠の`sandbox`は`allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox`で、`allow-forms`と`allow-top-navigation`系は付けません。`allow-same-origin`は orca-web の送信の守りと会話の口が同じオリジンを前提にするためで、枠の文書は SpecDock と別のオリジンです。枠の`title`に種類とブランチを書き、送る前に相手の worktree を確かめられます。同じ Scope・同じエージェント（id、種類、ブランチ）・同じ明暗の間は、描き直しでも枠を読み込み直さず、書きかけの本文は消えません。明暗を変えたときと、選んだエージェントの種類かブランチが変わったときは置き直します。
+- **枠の中の移り**：orca-web の iss-00037 で、埋め込みの中の同じ iframe への移りはなくなった（埋め込みのエージェントの画面のリンクは新しいタブで開く）。二重の守りとして、枠が2回目に読み込まれたら（中のリンクで別の相手の画面に移ったとき）、枠を外して知らせ、「選んだエージェントに戻す」を示します。
+
+知らせの言葉と`data-code`：
+
+| `data-code` | 言葉 | 意味と次の1手 |
+| --- | --- | --- |
+| `orca-loading` | orca-web を読んでいる | 画面が orca-web の部品と要約を読み始めたところ。待つ |
+| `orca-unreachable` | orca-web（<オリジン>）に届かない | orca-web の部品か要約を読めない、または要約の形が違う。orca-web が動いているか、orca-web の`ORCA_WEB_READ_ORIGINS`がこの画面のオリジンを許しているかを確かめる。直れば次の読み直し（10 秒）で前の選びに戻る |
+| `orca-shape` | orca-web の要約のエージェントの項目の形が違う（N件） | 対応した worktree のエージェントの項目がどれも、または選んだ相手の項目が、`detail`がその`id`の`/embed/agent?id=`を指さないなどで使えない。いなくなったとは決めず、選びを変えない。orca-web の版を確かめる。一部だけなら使える項目を出し、帯に「形の違う N件は出していない」と示す |
+| `orca-orca-unreachable` | orca-web は動いているが、Orca に届いていない | orca-web の要約の`connection.state`が`unreachable`。Orca を確かめる |
+| `orca-orca-starting` | orca-web が Orca を読み始めたところ | `connection.state`が`starting`。待つ |
+| `orca-config` | 設定の orca_web の節を読めない：<理由> | 利用者の設定`config.json`の`orca_web`の節が壊れている。`spec-dock dashboard list`の`config_problems`に道が出る。直すと、サーバーを起動し直さずに次に開いた画面から効く |
+| `orca-embed` | 埋め込みの画面ではチャットを開けない | `?embed=1`の画面では枠を置かない（orca-web の`frame-ancestors`が埋め込み先を許さない）。リンクで SpecDock を新しいタブで開く |
+| `orca-agent-gone` | 選んでいたエージェントはいなくなった | 選んだエージェントが要約の対応した worktree にいない。帯から選び直す（書きかけの本文は失われる） |
+| `orca-agent-choose` | エージェントを選ぶ | 2人以上いて、まだ選んでいない。帯から選ぶ |
+| `orca-agent-drift` | 選んだのと別のエージェントに移ったので閉じた | 枠の中のリンクで別の相手の画面に移った。「選んだエージェントに戻す」で戻す。移った先の相手と話すときは、Orca で開くか、その相手の Scope のタブで選ぶ |
+
+連携を止めるときは`config.json`に`"orca_web": {"enabled": false}`を書きます（タブも印も消え、画面は orca-web に何も要求しません）。送信だけを止めるときは、orca-web の設定の`sendEnabled`を false にします。
+
 ## JSONと途中失敗
 
 v2はschema_version、command、status、exit_code、data、effects、warnings、error、recoveryです。operation IDや固定engine digestを通常authorityにしません。exit6のeffectsはsucceeded/unknown/not_attemptedを区別します。Gitのargv/stdout/stderr/returncodeを隠蔽せず、unknownなremote結果を成功や未実施と断定しません。
