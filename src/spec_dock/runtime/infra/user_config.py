@@ -17,6 +17,7 @@ from spec_dock.runtime.domain.dashboard_visibility import (
     parse_repository_dashboard,
     parse_user_dashboard,
 )
+from spec_dock.runtime.domain.orca_web import OrcaWebSettings, parse_orca_web
 from spec_dock.runtime.domain.todo_settings import Layer, parse_layer
 from spec_dock.runtime.infra.github_structure import GithubRepository
 
@@ -71,3 +72,10 @@ def read_repository_dashboard(catalog: Path) -> RepositoryDashboard:
         return parse_repository_dashboard(str(path), None, read_error="is a symbolic link")
     payload, error = read_optional(path)
     return parse_repository_dashboard(str(path), payload, read_error=error)
+
+
+def read_user_orca_web(path: Path | None = None) -> OrcaWebSettings:
+    """Read the independent orca_web section, using the same optional-file boundary."""
+    target = path if path is not None else user_config_path()
+    payload, error = read_optional(target)
+    return parse_orca_web(payload, read_error=error)

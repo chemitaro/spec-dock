@@ -20,7 +20,8 @@ from spec_dock.runtime.application.dashboard_progress import issues_in_progress,
 from spec_dock.runtime.domain.canonical_structure import parse_timestamp
 from spec_dock.runtime.domain.dashboard_model import STALE_AFTER, build_model
 from spec_dock.runtime.domain.dashboard_snapshot import structure_confirmed_at
-from spec_dock.runtime.domain.dashboard_visibility import REPOSITORY_FILE, Visibility, resolve_config
+from spec_dock.runtime.domain.dashboard_visibility import REPOSITORY_FILE, ConfigProblem, Visibility, resolve_config
+from spec_dock.runtime.domain.orca_web import OrcaWebSettings
 from spec_dock.runtime.infra.canonical_registry import RegistryUnreadable, read_registry, registry_path
 from spec_dock.runtime.infra.canonical_state import STATE_FILE, catalog_state_dir
 from spec_dock.runtime.infra.dashboard_files import (
@@ -32,7 +33,12 @@ from spec_dock.runtime.infra.dashboard_files import (
 )
 from spec_dock.runtime.infra.dashboard_store import hidden_repositories
 from spec_dock.runtime.infra.github_structure import GithubRepository
-from spec_dock.runtime.infra.user_config import read_repository_dashboard, read_user_dashboard, user_config_path
+from spec_dock.runtime.infra.user_config import (
+    read_repository_dashboard,
+    read_user_dashboard,
+    read_user_orca_web,
+    user_config_path,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -40,7 +46,7 @@ if TYPE_CHECKING:
     from spec_dock.runtime.domain.canonical_sync_state import RegistryEntry
     from spec_dock.runtime.domain.dashboard_model import DashboardModel
     from spec_dock.runtime.domain.dashboard_snapshot import ParsedSnapshot
-    from spec_dock.runtime.domain.dashboard_visibility import ConfigProblem, UserDashboard
+    from spec_dock.runtime.domain.dashboard_visibility import UserDashboard
 
 ReadStatus = Literal["ok", "unreadable", "missing", "unsupported"]
 Lookup = Literal["visible", "hidden", "unknown"]
@@ -122,6 +128,7 @@ class _Listing:
     user: UserDashboard | None = None
     visibility: dict[str, Visibility] = field(default_factory=dict)
     problems: tuple[ConfigProblem, ...] = ()
+    orca_web: OrcaWebSettings = field(default_factory=OrcaWebSettings)
 
 
 class DashboardSite:
@@ -187,6 +194,7 @@ class DashboardSite:
             hidden, marks_read = frozenset(served), False
         settings = self._settings_signatures(entries)
         user = read_user_dashboard(self.user_config)
+        orca_web = read_user_orca_web(self.user_config)
         visibility: dict[str, Visibility] = {}
         problems: list[ConfigProblem] = []
         for key, items in groups.items():
@@ -196,6 +204,8 @@ class DashboardSite:
             problems.extend(problem for problem in config.problems if problem not in problems)
         if user.state == "invalid" and not groups:
             problems.extend(resolve_config(user, (), "").problems)
+        if orca_web.section_problem:
+            problems.append(ConfigProblem("user", str(self.user_config), orca_web.problem or ""))
         problems.sort(key=lambda problem: (problem.layer != "user", problem.path))
         self._listing = _Listing(
             (*files, settings),
@@ -208,6 +218,7 @@ class DashboardSite:
             user,
             visibility,
             tuple(problems),
+            orca_web,
         )
         return self._listing
 
@@ -235,6 +246,10 @@ class DashboardSite:
             listing = self._refresh_listing()
             hidden = sorted(key for key, visibility in listing.visibility.items() if visibility.hidden)
             return (listing.signature, tuple(sorted(listing.hidden)), tuple(hidden))
+
+    def orca_web(self) -> OrcaWebSettings:
+        with self._lock:
+            return self._refresh_listing().orca_web
 
     def config_problems(self) -> tuple[ConfigProblem, ...]:
         """The unreadable settings layers and disagreeing clones, the user's file first."""
