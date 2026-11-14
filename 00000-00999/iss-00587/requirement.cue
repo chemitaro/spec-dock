@@ -145,7 +145,7 @@ requirements: {
 			選んだ Scope の詳しい JSON は、revision が変わったときに読み直す。
 			"""
 		acceptance: [
-			"欄で説明資料を開いたまま、描き直し（render の呼び出し）をしても、iframe の要素が同じもの（=== で等しい）",
+			"欄で説明資料を開いたまま、描き直し（render の呼び出し）と revision の読み直しをしても、iframe の要素が同じもの（=== で等しい）で、iframe の load の回数が増えない",
 		]
 	}
 	"R-09": {

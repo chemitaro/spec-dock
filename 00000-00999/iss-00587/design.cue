@@ -90,16 +90,23 @@ design: {
 		satisfies: ["R-01", "R-02", "R-05", "R-06", "R-08", "F-01", "F-04"]
 		text: """
 			createScopePanel(aside, {onSelect(id), onClose(), extraActions(scope) → HTML}) が {show(state), hide(), isOpen(), element, snap} を返す。
-			show({ctx, scope, doc, byId}) は、scope（構造の JSON の項目）と doc（詳しい JSON、まだないか読めないなら null）で欄を描く。
+			show({ctx, scope, doc, docState, byId}) は、scope（構造の JSON の項目）と doc（詳しい JSON）と docState（"loading"：読み込み中、"ok"：doc がある、"failed"：読めなかった）で欄を描く。
 			- 見出し：状態の札（stateChip、motion: true）、マージの印、閉じる。ID・番号・種類、題名、理由（pn-why）、動きなし、親の道筋（押すと onSelect）。今の graph の見出しを移す。
 			- タブの帯：SCOPE_TABS のボタン（role=tab、aria-selected）。選んだタブは部品が持ち、利用者が押したものを保つ（R-02）。初めは pickTab(null, …)。
-			- 中身：doc があれば選んだタブの render(env)。doc がまだなら「読み込み中」、読めないなら F-01 の知らせ。
+			- 中身：docState が "ok" なら選んだタブの render(env)。"loading" なら「読み込み中」、"failed" なら F-01 の知らせ（data-code="panel-doc-failed"）。revision の読み直しの間は、前の doc で "ok" のまま描く。
 			- 下の帯：「詳しい画面」（<a data-nav href="ctx.href(<詳しい画面の道>?tab=<タブ>)">）、「新しいタブで開く」（target=_blank、embed のない道）、extraActions（図の「この範囲に絞る」）、GitHub。
-			描き直しは、見出し・タブの帯・下の帯を毎回作り直し、中身は「Scope の ID、タブ、doc、タブの中の選び」のどれかが変わったときだけ作り直す。
-			説明資料の枠は、作り直しても src が同じなら前の iframe 要素を移して使う（R-08）。中身のスクロールの位置は、同じ Scope・同じタブの作り直しで戻す。
+			描き直しは、見出し・タブの帯・下の帯を毎回作り直し、中身は、新しく描いた HTML の文字列が前に入れた文字列と違うときだけ入れ替える（同じなら DOM に触れない）。
+			説明資料のタブの HTML は Scope の ID・href・説明資料の状態だけで決まる（件数や時刻を含めない）ので、revision の読み直しで doc が新しくなっても文字列が同じで、iframe は文書から外されず、読み込み直しも起きない（R-08）。
+			iframe 要素を DOM の中で移す、または外して入れ直すことはしない（中の文書が読み込み直される）。
+			中身を入れ替えたときは、同じ Scope・同じタブなら、前の中身のスクロールの位置（.pn-body の scrollTop）を戻す。
 			欄の中のクリック：data-pn-param のリンクは欄の Map を変えて描き直す（修飾キーのときは何もしない＝普通に開く）。data-id を持つリンク（札、link）は、構造にある Scope なら onSelect(id)。
 			ほかのリンクは今までどおり（data-nav はシェルが同じページの中で移す）。
 			panel.css は欄の見た目（今の .gx .panel の見た目を .sd-pn に移す）と、PC の幅 --pn-w: clamp(380px, 44cqw, 720px)（container app）を持つ。
+			タブの中身の見た目：scope.css のうち、タブの中身だけが使う規則（.sd-sec、.sd-kv、.sd-progress、.sd-steps、.sd-stages、.sd-lane、.sd-doc、.sd-docs、.sd-docview、.sd-docframe、.sd-findings、.sd-note、.sd-sub など）を、
+			新しい views/_shared/scope_tabs.css に移し（写さない）、範囲を :is([data-view="scope"], .sd-pn) にする。parts.css の範囲にも .sd-pn を足す（札、知らせ、表などが欄の中で同じ見た目になる）。
+			詳しい画面の見出し・タブの帯など、詳しい画面だけの規則は scope.css に残す。
+			styles：scope.js は parts.css、scope_tabs.css、scope.css。graph.js は今の graph.css に parts.css、scope_tabs.css、panel.css を足す。board.js は parts.css、board.css に scope_tabs.css、panel.css を足す。
+			graph.css の .gx .panel の見た目の規則（片付けの候補の一覧で使うものを除く）は panel.css に移す。
 			"""
 	}
 	"D-06": {
@@ -107,7 +114,7 @@ design: {
 		satisfies: ["R-01", "R-05", "R-08", "F-02", "F-04"]
 		text: """
 			graph.js の renderPanel の Scope の部分を、createScopePanel の show に置き換える。片付けの候補の一覧（V.cleanup）は今の描き方のまま同じ aside に描く（欄の部品は hide してから描く）。
-			select(id) は今のまま api.scope を読み、V.path.doc を欄に渡す（読めなければ doc は null で F-01）。token で古い答えを捨てる（今と同じ、F-04）。
+			select(id) は今のまま api.scope を読み、読む間は docState "loading"、読めたら V.path.doc と "ok"、読めなければ "failed"（F-01）で欄に渡す。token で古い答えを捨てる（今と同じ、F-04）。
 			revision が変わった描き直しで、選んだ Scope の api.scope を読み直す。選んだ Scope が構造にないなら select(null)（今と同じ、F-02）。
 			欄が開いている PC では、.gx に data-panel="open" を付け、上の帯（.gx-bar）の right を var(--pn-w) + 20px にして、道具が欄の左に折り返す。
 			centerOn の右へのずらしは、固定の 190 ではなく、欄の幅の半分。スマホの keepAbovePanel は、シートのいまの高さを使う。
@@ -116,11 +123,11 @@ design: {
 	}
 	"D-07": {
 		title:     "ボード：共有の欄を使う"
-		satisfies: ["R-01", "R-05", "F-02", "F-04"]
+		satisfies: ["R-01", "R-05", "R-08", "F-01", "F-02", "F-04"]
 		text: """
 			board.js は、欄の aside を .sd-page の外（root の直下）に1つ持ち、5秒の描き直しでも作り直さない（root.innerHTML で消さない形にする。ページの中身は子の要素に描く）。
 			root のクリックで、修飾キーなしの左クリックの a.sd-card[data-id] は preventDefault して選ぶ（シェルの interceptLinks は defaultPrevented を見て何もしない）。
-			選ぶと api.scope を読み、token で古い答えを捨て、欄に渡す。Esc で閉じる。dispose で選びと欄を片付ける。
+			選ぶと api.scope を読み、token で古い答えを捨て、docState（D-05）と一緒に欄に渡す。描き直しで data.revision が前と違えば、選んだ Scope の api.scope を読み直す（R-08。読む間は前の doc のまま）。描き直しで選んだ Scope が構造にないなら、選びを外して欄を閉じる（F-02）。Esc で閉じる。dispose で選びと欄を片付ける。
 			欄が開いている PC では、ボードの root に data-panel="open" を付け、.sd-page の右に var(--pn-w) + 20px の余白を足して、列が欄の左に収まる。
 			選んだ札には aria-current="true" と、目に見える枠を付ける。
 			"""
@@ -135,6 +142,9 @@ design: {
 			取っ手のタップは nextOnTap。中身（.pn-body）は overflow: auto と overscroll-behavior: contain で、シートを動かさない。touch-action は、取っ手と見出しの帯だけ none。
 			別の Scope を選んでも段を保ち、最小のときは通常にする。resize で sheetHeights を計算し直し、同じ段に合わせる。
 			PC の幅になったら、--pn-h と段を使わない。reduced motion では transition を外す。
+			全体の段では、画面を最大限に使うため、欄を詰める：見出しは「取っ手、状態の印、ID、題名（1行、はみ出しは…）、閉じる」の1行にし、理由・動きなし・親の道筋・保証などの行は隠す（概要のタブで読める）。
+			下の帯は折り返さない1行にし、ボタンは印だけ（名前は aria-label と title）にする。説明資料のタブの上の帯は 28px 以下。
+			目安：取っ手 16px、見出し 44px、タブの帯 40px、説明資料の帯 28px、下の帯 52px で、390×844 の枠は 844 − 180 ≒ 660px（R-07 の 600px 以上）。
 			"""
 	}
 	"D-09": {

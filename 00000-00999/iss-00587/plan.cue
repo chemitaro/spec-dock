@@ -8,8 +8,8 @@ steps: {
 	"S-01": {title: "Scope の JSON の説明資料の項目に skeleton（true、false、null）を足す。テストを先に書いて落ちることを確かめ、実装する（D-01）", realizes: ["R-03", "F-03"], status: "todo", session: "impl-sol"}
 	"S-02": {title: "views/_shared/panel_logic.js（explanationState、defaultTab、pickTab、sheetHeights、settleSheet、nextOnTap）を、node のテストを先に書いて実装する（D-02）", realizes: ["R-02", "R-04", "R-07"], status: "todo", after: ["S-01"], session: "impl-sol"}
 	"S-03": {title: "scope.js のタブの中身を views/_shared/scope_tabs.js に移し、env と SCOPE_TABS で描く形にし、説明資料のタブを足す。詳しい画面のタブの選びを pickTab にし、今のテストの期待を直す（D-03、D-04）", realizes: ["R-02", "R-03", "R-04", "R-09", "F-03"], status: "todo", after: ["S-02"], session: "impl-ui"}
-	"S-04": {title: "views/_shared/panel.js と panel.css（見出し、タブ、中身、下の帯、欄の中のクリック、描き直しで枠とスクロールを保つ）を作り、構造の図の Scope の欄をそれに置き換える。PC の幅と上の帯のずらし、centerOn を直す（D-05、D-06）", realizes: ["R-01", "R-02", "R-03", "R-05", "R-06", "R-08", "F-01", "F-02", "F-04"], status: "todo", after: ["S-03"], session: "impl-ui"}
-	"S-05": {title: "ボードで札を押すと同じ欄を開く。欄の aside を描き直しで保ち、列を欄の左に収める（D-07）", realizes: ["R-01", "R-05", "F-02", "F-04"], status: "todo", after: ["S-04"], session: "impl-ui"}
+	"S-04": {title: "views/_shared/panel.js と panel.css、タブの中身の見た目を scope.css から移した views/_shared/scope_tabs.css（見出し、タブ、中身、下の帯、欄の中のクリック、描き直しで枠とスクロールを保つ）を作り、構造の図の Scope の欄をそれに置き換える。PC の幅と上の帯のずらし、centerOn を直す（D-05、D-06）", realizes: ["R-01", "R-02", "R-03", "R-05", "R-06", "R-08", "F-01", "F-02", "F-04"], status: "todo", after: ["S-03"], session: "impl-ui"}
+	"S-05": {title: "ボードで札を押すと同じ欄を開く。欄の aside を描き直しで保ち、列を欄の左に収める（D-07）", realizes: ["R-01", "R-05", "R-08", "F-01", "F-02", "F-04"], status: "todo", after: ["S-04"], session: "impl-ui"}
 	"S-06": {title: "スマホのシートを3段のスワイプにする（取っ手と見出しの帯で引きずる、払う、取っ手のタップ、閉じる、段を保つ、resize）（D-08）", realizes: ["R-07", "R-08"], status: "todo", after: ["S-05"], session: "impl-ui"}
 	"S-07": {title: "静的なテスト（共有の部品の使い方、esc、外への読み込みなし）を足して直し、make lint と全体の pytest を通す", realizes: ["R-01", "R-02", "R-09"], status: "todo", after: ["S-06"], session: "impl-ui"}
 	"S-08": {title: "spec-dock の実データで 1440、1000、390 の直す後の写しを撮り、直す前の写しと並べて report.md に残す。390 のスワイプの3段と全体の読みを確かめる", realizes: ["R-10", "R-01", "R-03", "R-05", "R-06", "R-07"], status: "todo", after: ["S-07"], session: "owner"}
@@ -22,7 +22,7 @@ tests: {
 	"T-04": {title: "scope_tabs.js の説明資料のタブが、written で sandbox の iframe（src は href、esc 済み）、skeleton と missing で知らせ（data-code）、unreadable で catalogProblem を返す。欄の env の paramLink が data-pn-param を持ち、ページの env が今と同じ道を作る（node）", verifies: ["R-02", "R-03"]}
 	"T-05": {title: "SCOPE_TABS のキーが explanation から始まる決まった並びで、scope.js と panel.js が SCOPE_TABS からタブを作り、タブの中身の関数が scope.js に残っていない（静的）", verifies: ["R-02", "R-09"]}
 	"T-06": {title: "board.js と graph.js が createScopePanel を使い、ボードの札のクリックが修飾キーのとき欄を開かない分かれを持つ。新しいファイルが外へ読みに行かず、利用者の文字が esc を通る（静的）", verifies: ["R-01"]}
-	"T-07": {title: "実データの写し（1440、1000、390、ボードと構造の図、直す前と後）と、ブラウザーでの測り（欄の幅、帯との重なり、列の右端、iframe の src と sandbox、タブで URL が変わらない、描き直しで iframe が同じ、390 の3段の高さ、全体の枠の高さ、中身のスクロールで高さが変わらない、閉じる）が report.md にある", verifies: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06", "R-07", "R-08", "R-10", "F-02"]}
+	"T-07": {title: "実データの写し（1440、1000、390、ボードと構造の図、直す前と後）と、ブラウザーでの測り（欄の幅、帯との重なり、列の右端、iframe の src と sandbox、タブで URL が変わらない、描き直し（revision の読み直しを含む）で iframe が同じ要素で、その load の回数が増えない、390 の3段の高さ、全体の枠の高さ、中身のスクロールで高さが変わらない、閉じる）が report.md にある", verifies: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06", "R-07", "R-08", "R-10", "F-02"]}
 	"T-08": {title: "欄の詳しい JSON が読めないとき（API を 500 にした状態）、見出しと「詳しい内容を読めなかった」が出て、選びを変えた後の古い答えが出ない（ブラウザーでの確かめ、または panel.js の show を node で呼ぶ）", verifies: ["F-01", "F-04"]}
 }
 
