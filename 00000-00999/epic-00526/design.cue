@@ -62,7 +62,7 @@ design: {
 
 			remember があれば、描いた側がその場で選びを覚える：欄は `params.set("agent", id)`、詳しい画面は `history.replaceState` で問い合わせに `agent=<id>` を足す（シェルに、履歴を増やさずに今の道の問い合わせを1つ書き換え、`ctx.route` も合わせる口 `ctx.replaceParam(name, value)` を足す）。
 			こうして、自動で開いた後は wanted があるので、そのエージェントが消えれば gone になり、別のエージェントへ移らない。人数が増えても選びは変わらない。
-			gone の知らせは、人が一覧から選ぶ（wanted が変わる）か、別のタブ、別の Scope に移る（欄の Map が空になる、詳しい画面の道が変わる）まで残る。
+			gone の知らせは、人が一覧から選ぶ（wanted が変わる）か、別の Scope に移る（欄の Map が空になる、詳しい画面の道が変わる）まで残る。同じ Scope の中でタブを移っても、欄の Map と詳しい画面の問い合わせの `agent` は残るので、知らせも残る。
 
 			一覧の行と印は、タブの中身の HTML には入れず、置き場に後から描く（D-04）。各行は `env.paramLink("agent", id)` の `<a>`（欄は欄の中の選び、詳しい画面は問い合わせ。iss-00587 の文書の選びと同じ）で、中に印の置き場 `<span class="sd-orca" data-orca-agent="<id>"></span>`、種類、ブランチ（`sd-mono`）を持つ。文字は `esc` を通す。
 			印は `ctx.orca.marks().renderAgentMarks(slot, {agents: [agent]}, {size: "sm", max: 1})` で描く（iss-00592 の `paintOrcaMarks` を待たずに作れるよう、iss-00591 の `ctx.orca` だけを使う。iss-00592 が先に入っていれば、その関数に寄せてよい）。
@@ -95,7 +95,7 @@ design: {
 			- 欄：今の `shownHtml` の比べ方で、同じ文字列なら中身を置き換えない。Scope が変われば中身の文字列が変わるので、中身は置き換えられ、前の iframe は外れる（F-03）。
 			- 詳しい画面：今の `scope.js` は描くたびに `root.innerHTML` で全体を置き換え、構造の改訂が変わるたび（`app.js` の `refresh`）と `ctx.orca` の知らせのたびに中の iframe が読み込み直しになる。`scope.js` を、見出しとタブの帯と中身の3つの要素に分け、中身（`.sd-tabpanel`）は前の HTML の文字列と同じで同じ Scope なら置き換えない（欄と同じ比べ方）。Scope の ID が変わったら（別の Scope へ移ったら）必ず置き換える。
 			- 要約の読み直しで選んだエージェントがいなくなれば、`pickAgent` が gone を返し、HTML が変わって iframe が外れる（F-02）。
-			- 明暗を変えたときは `theme` が変わるので、置き直しになる（R-07 が許す）。
+			- 明暗を変えたときは `theme` が変わるので、置き直しになる（R-07 が許す）。選んだエージェントのブランチか種類が変わったときも、HTML（title）が変わって置き直しになる。これは R-07 が許す置き直しで、相手の文脈が変わったことを title で示し直すためのもの。ブランチも種類も同じなら、id が同じエージェントの iframe は残る。
 			- node のテストで、同じ選びのまま一覧の項目が増えたり減ったりしても、タブの中身の HTML の文字列が同じであることを確かめる。
 			"""
 	}
@@ -107,7 +107,7 @@ design: {
 			- loading：「orca-web を読んでいる」。
 			- unreachable：「orca-web（<origin>）に届かない」と、確かめること「orca-web が動いているか、orca-web の ORCA_WEB_READ_ORIGINS がこの画面のオリジン（<location.origin>）を許しているか」。
 			- orca-unreachable：「orca-web は動いているが、Orca に届いていない（connection.state：unreachable）」。orca-starting：「orca-web が Orca を読み始めたところ（connection.state：starting）」。
-			- config：「設定の orca_web の節を読めない：<problem>」と、直すファイル（`config.json`）。
+			- config：「設定の orca_web の節を読めない：<problem>」と、直すファイル（`config.json`）。埋め込みの画面なら、embed と同じ直接開くリンクも添える（F-05）。
 			- embed：「埋め込みの画面ではチャットを開けない」と、同じ道を埋め込みでなく開くリンク（`withoutEmbed(scope.path)`、`target="_blank"`）。
 			状態が ok に戻れば reason が null になり、`pickAgent` は前の選び（欄の Map か問い合わせ）をそのまま使うので、同じエージェントのチャットに戻る（R-06）。
 			`sendEnabled` が false のとき（F-06）、SpecDock は何も描き足さない（orca-web の画面が入力欄の下に理由を出す）。
