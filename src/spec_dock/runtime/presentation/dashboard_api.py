@@ -193,7 +193,7 @@ def scope_item(
     change: ScopeChange | None,
     rank: int | None = None,
     facts: Mapping[str, Mapping[str, object]] | None = None,
-    readings: Mapping[str, Mapping[str, str | None]] | None = None,
+    readings: Mapping[str, Mapping[str, object]] | None = None,
     todos: Annotations | None = None,
     progress: Mapping[str, Mapping[str, object] | None] | None = None,
 ) -> dict[str, object]:
@@ -228,6 +228,7 @@ def scope_item(
         # The CUE assurance level and this PC's worktree branch (iss-00544 D-02); null when unknown.
         "assurance": read.get("assurance"),
         "branch": read.get("branch"),
+        "worktrees": read.get("worktrees", []),
         # Open human tasks blocking it, blocking it or a descendant, and related to it (iss-00554 D-03; not a contract).
         "todos": dict(todos.marks.get(scope.id, NO_TODOS)) if todos is not None else dict(NO_TODOS),
         # The plan's step counts of an Issue in progress (iss-00574 D-07; not a contract); null otherwise.
@@ -256,7 +257,8 @@ def structure_document(
     now: datetime,
     baseline: SeenRecord | None,
     latest: SeenRecord | None,
-    readings: Mapping[str, Mapping[str, str | None]] | None = None,
+    worktrees: Mapping[str, object] | None = None,
+    readings: Mapping[str, Mapping[str, object]] | None = None,
     todos: Annotations | None = None,
     progress: Mapping[str, Mapping[str, object] | None] | None = None,
 ) -> dict[str, object]:
@@ -268,6 +270,9 @@ def structure_document(
         "schema": API_SCHEMA,
         "repository": view.repository.key,
         "revision": view.revision,
+        "worktrees": dict(worktrees)
+        if model is not None and worktrees is not None
+        else {"status": "unreadable", "paths": []},
         "snapshot": _snapshot_block(view, now=now),
         "notices": notices(view, now=now),
         "seen": {
@@ -382,7 +387,7 @@ def scope_document(
     *,
     baseline: SeenRecord | None,
     details: Mapping[str, object] | None = None,
-    readings: Mapping[str, Mapping[str, str | None]] | None = None,
+    readings: Mapping[str, Mapping[str, object]] | None = None,
     todos: Annotations | None = None,
     now: datetime | None = None,
     progress: Mapping[str, Mapping[str, object] | None] | None = None,

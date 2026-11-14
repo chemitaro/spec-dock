@@ -45,6 +45,7 @@ from spec_dock.runtime.application.todo_aggregate import registry_summary_todos
 from spec_dock.runtime.domain.canonical_layout import scope_relative
 from spec_dock.runtime.domain.dashboard_model import seen_scopes
 from spec_dock.runtime.domain.dashboard_visibility import REPOSITORY_FILE
+from spec_dock.runtime.domain.orca_web import OrcaWebOrigin, orca_web_origin
 from spec_dock.runtime.domain.todo_record import TodoError
 from spec_dock.runtime.infra.dashboard_assets import (
     AssetFile,
@@ -74,6 +75,16 @@ _SHELL_CSP: Final = (
     "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;"
     " connect-src 'self'; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"
 )
+
+
+def shell_csp(origin: str | None) -> str:
+    """Extend only the shell's four integration directives."""
+    if origin is None:
+        return _SHELL_CSP
+    allowed = {"script-src", "style-src", "connect-src", "frame-src"}
+    return ";".join(
+        part + (f" {origin}" if part.strip().split()[0] in allowed else "") for part in _SHELL_CSP.split(";")
+    )
 
 
 @dataclass(frozen=True)
@@ -159,10 +170,10 @@ class DashboardHttp:
             status, {"schema": API_SCHEMA, "error": {"code": code, "message": message, "next_steps": list(next_steps)}}
         )
 
-    def _html(self, status: int, body: bytes, *, embed: bool) -> Response:
+    def _html(self, status: int, body: bytes, *, embed: bool, orca_origin: str | None = None) -> Response:
         headers = self._base("text/html; charset=utf-8")
         ancestors = self.embed_ancestors if embed else "'self'"
-        headers.append(("Content-Security-Policy", f"{_SHELL_CSP}; frame-ancestors {ancestors}"))
+        headers.append(("Content-Security-Policy", f"{shell_csp(orca_origin)}; frame-ancestors {ancestors}"))
         return Response(status, headers, body)
 
     def _static(self, asset: AssetFile | None, *, cors: bool) -> Response:
@@ -214,7 +225,7 @@ class DashboardHttp:
         embed = request.param("embed") == "1"
         trimmed = parts[:-1] if parts and parts[-1] == "" else parts
         if not trimmed:
-            return self._shell(embed)
+            return self._shell(request, embed)
         head, rest = trimmed[0], trimmed[1:]
         if head == "assets":
             return self._static(screen_asset(rest), cors=False)
@@ -227,24 +238,30 @@ class DashboardHttp:
         if head == "api" and rest[:1] == ["v1"]:
             return self._api(request, rest[1:])
         if head == "todos" and not rest:
-            return self._shell(embed)  # every repository's human tasks (iss-00554 D-04)
+            return self._shell(request, embed)  # every repository's human tasks (iss-00554 D-04)
         if head == "r" and len(rest) >= 3:
             if rest[2] == "design-system" and len(rest) > 3:
                 asset = design_system_asset(rest[3:])
                 if asset is not None:
                     return self._static(asset, cors=True)
-            return self._repository_page(rest[0], rest[1], rest[2], rest[3:], embed)
+            return self._repository_page(request, rest[0], rest[1], rest[2], rest[3:], embed)
         return self._plain(404, "not found")
 
     # --- Screens -----------------------------------------------------------------------------------------------
 
-    def _shell(self, embed: bool) -> Response:
+    def _orca(self, request: Request) -> OrcaWebOrigin:
+        host = (request.header("host") or "").strip().lower().rpartition(":")[0]
+        return orca_web_origin(self.site.orca_web(), host, self.port)
+
+    def _shell(self, request: Request, embed: bool) -> Response:
         asset = screen_asset(["index.html"])
         if asset is None:
             return self._plain(500, "the dashboard screens are missing from this installation")
-        return self._html(200, asset.body, embed=embed)
+        return self._html(200, asset.body, embed=embed, orca_origin=self._orca(request)["origin"])
 
-    def _repository_page(self, host: str, owner: str, name: str, rest: list[str], embed: bool) -> Response:
+    def _repository_page(
+        self, request: Request, host: str, owner: str, name: str, rest: list[str], embed: bool
+    ) -> Response:
         found, site = self.site.lookup(host, owner, name)
         is_files = rest[:1] == ["files"]
         if found == "unknown" or site is None:
@@ -257,13 +274,13 @@ class DashboardHttp:
             page = _hidden_page(self._hidden_steps(site))
             if is_files:
                 return self._material(404, page, "text/html; charset=utf-8")
-            return self._html(404, page, embed=embed)
+            return self._html(404, page, embed=embed, orca_origin=self._orca(request)["origin"])
         if is_files:
             return self._file(site, rest[1:])
         if len(rest) >= 3 and rest[0] == "scopes" and rest[2] == "doc":
             return self._document(site, rest[1], rest[3:])
         if not rest or (len(rest) == 1 and rest[0] in SCREENS) or (len(rest) == 2 and rest[0] in ("scopes", "todos")):
-            return self._shell(embed)
+            return self._shell(request, embed)
         return self._plain(404, "not found")
 
     def _file(self, site: SiteRepository, rest: list[str]) -> Response:
@@ -352,7 +369,7 @@ class DashboardHttp:
 
     def _api(self, request: Request, parts: list[str]) -> Response:
         if parts == ["repositories"]:
-            return self._json(200, self._repositories())
+            return self._json(200, self._repositories(request))
         if parts == ["todos"]:
             return self._todo_list(request, None)
         if parts == ["todos", "revision"]:
@@ -394,7 +411,7 @@ class DashboardHttp:
             steps.extend(f"edit {path}" for path in paths)
         return tuple(steps)
 
-    def _repositories(self) -> dict[str, object]:
+    def _repositories(self, request: Request) -> dict[str, object]:
         items = []
         for site in self.site.repositories():
             repository = site.repository
@@ -413,6 +430,7 @@ class DashboardHttp:
             "unknown_count": self.site.unknown_count(),
             "marks_unreadable": self.site.marks_unreadable(),
             "server": {
+                "orca_web": self._orca(request),
                 "version": self.version,
                 "started_at": self.started_at,
                 "embed_hosts": list(self.embed_hosts),
@@ -430,7 +448,7 @@ class DashboardHttp:
             wanted = request.param("baseline")
             baseline = (find_seen(self.site.state_root, site.repository, wanted) if wanted else None) or latest
             ids = sorted(view.model.scopes) if view.model is not None else []
-            readings = read_structure_facts(site, ids, self.facts)  # iss-00544 D-02
+            facts = read_structure_facts(site, ids, self.facts)  # iss-00544 D-02
             todos = self.site.todos.annotations(site, view.model)  # iss-00554 D-03
             progress = read_plan_progress(site, issues_in_progress(view.model), self.progress)  # iss-00574 D-07
             document = structure_document(
@@ -438,7 +456,8 @@ class DashboardHttp:
                 now=self.now(),
                 baseline=baseline,
                 latest=latest,
-                readings=readings,
+                readings=facts.readings,
+                worktrees={"status": facts.worktrees_status, "paths": list(facts.paths)},
                 todos=todos,
                 progress=progress,
             )
