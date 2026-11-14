@@ -5,11 +5,11 @@ package spec
 goal: "ダッシュボードが orca-web の場所を知り、要約を1つの輪で読み、SpecDock の worktree の記録と突き合わせて Scope ごとの worktree を決められるようにする（印はまだ描かない）"
 
 steps: {
-	"S-01": {title: "テスト（T-01〜T-03）を先に書いて落ちることを確かめ、domain/orca_web.py、infra の read_user_orca_web、DashboardSite の orca_web と config_problems、dashboard_http.py の shell_csp・_orca・CSP・一覧の API の server.orca_web を D-01、D-02 のとおりに作る", realizes: ["R-01", "R-02", "F-02"], status: "todo", session: "impl"}
-	"S-02": {title: "テスト（T-04、T-05）を先に書いて落ちることを確かめ、構造の API の worktree の記録（文書の上の worktrees と、Scope の項目の worktrees）と、revision の worktree の署名を D-03 のとおりに作る", realizes: ["R-03", "F-03"], status: "todo", after: ["S-01"], session: "impl"}
-	"S-03": {title: "node のテスト（T-06〜T-08）を先に書いて落ちることを確かめ、core/orca_match.js を D-04 のとおりに作る", realizes: ["R-04", "R-05", "F-01", "F-03"], status: "todo", after: ["S-02"], session: "impl"}
-	"S-04": {title: "node のテスト（T-09、T-10）を先に書いて落ちることを確かめ、core/orca.js と app.js の組み込みを D-05 のとおりに作る。make lint と uv run pytest（全体）を通す", realizes: ["R-01", "R-05", "F-01", "F-02"], status: "todo", after: ["S-03"], session: "impl"}
-	"S-05": {title: "隔離した venv と別のポートの試しのサーバーで、常駐の orca-web の実データの対応と、画面のオリジンからの読みが拒まれることを確かめ、report.md に残す（D-06）", realizes: ["R-06"], status: "todo", after: ["S-04"], session: "owner"}
+	"S-01": {title: "テスト（T-01〜T-03）を先に書いて落ちることを確かめ、domain/orca_web.py、infra の read_user_orca_web、DashboardSite の orca_web と config_problems、dashboard_http.py の shell_csp・_orca・CSP・一覧の API の server.orca_web を D-01、D-02 のとおりに作る", realizes: ["R-01", "R-02", "F-02"], status: "done", session: "impl"}
+	"S-02": {title: "テスト（T-04、T-05）を先に書いて落ちることを確かめ、構造の API の worktree の記録（文書の上の worktrees と、Scope の項目の worktrees）と、revision の worktree の署名を D-03 のとおりに作る", realizes: ["R-03", "F-03"], status: "done", after: ["S-01"], session: "impl"}
+	"S-03": {title: "node のテスト（T-06〜T-08）を先に書いて落ちることを確かめ、core/orca_match.js を D-04 のとおりに作る", realizes: ["R-04", "R-05", "F-01", "F-03"], status: "done", after: ["S-02"], session: "impl"}
+	"S-04": {title: "node のテスト（T-09、T-10）を先に書いて落ちることを確かめ、core/orca.js と app.js の組み込みを D-05 のとおりに作る。make lint と uv run pytest（全体）を通す", realizes: ["R-01", "R-05", "F-01", "F-02"], status: "done", after: ["S-03"], session: "impl"}
+	"S-05": {title: "隔離した venv と別のポートの試しのサーバーで、常駐の orca-web の実データの対応と、画面のオリジンからの読みが拒まれることを確かめ、report.md に残す（D-06）", realizes: ["R-06"], status: "done", after: ["S-04"], session: "owner"}
 }
 
 tests: {
