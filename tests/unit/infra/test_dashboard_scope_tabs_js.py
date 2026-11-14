@@ -170,3 +170,22 @@ def test_the_panel_draws_its_tabs_from_the_same_list_and_the_graph_uses_it() -> 
     assert "V.pn.show(" in graph and "V.pn.hide()" in graph
     assert '"/assets/views/_shared/panel.css"' in graph and '"/assets/views/_shared/scope_tabs.css"' in graph
     assert ".gx .panel" not in (VIEWS / "graph.css").read_text()  # the panel's look moved to panel.css
+
+
+def test_the_board_opens_the_same_panel_only_on_a_plain_click() -> None:
+    board = (VIEWS / "board.js").read_text()
+    assert 'import { createScopePanel } from "./_shared/panel.js";' in board
+    assert "B.pn.show(" in board and "B.pn.hide()" in board
+    # a modified or middle click keeps the card's ordinary link to the detail screen (R-01)
+    assert "event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey" in board
+    assert 'event.target.closest("a.sd-card[data-id]")' in board and "event.preventDefault();" in board
+    assert '"/assets/views/_shared/panel.css"' in board and '"/assets/views/_shared/scope_tabs.css"' in board
+    css = (VIEWS / "board.css").read_text()
+    assert '[data-view="board"][data-panel="open"] .sd-page' in css and "var(--pn-w)" in css
+
+
+def test_the_panels_read_against_the_page_baseline_and_keep_the_structure_first() -> None:
+    assert "baseline: state.baseline," in (VIEWS.parent / "app.js").read_text()
+    assert "api.scope(V.ctx.repository, id, V.ctx.baseline)" in (VIEWS / "graph.js").read_text()
+    assert "api.scope(B.ctx.repository, id, B.ctx.baseline)" in (VIEWS / "board.js").read_text()
+    assert "{ ...state.doc.scope, ...state.scope }" in (SHARED / "panel.js").read_text()

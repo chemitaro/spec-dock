@@ -58,7 +58,8 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
     if (!parts || !aside.contains(parts.body)) build();
     const { ctx, docState, byId } = state;
     const ready = docState === "ok" && state.doc?.scope?.id === state.scope.id;
-    const scope = ready ? { ...state.scope, ...state.doc.scope } : state.scope;
+    // The structure wins: an older detail never overrides the newer state and reason the structure shows.
+    const scope = ready ? { ...state.doc.scope, ...state.scope } : state.scope;
     const tab = ready ? pickTab(userTab, TAB_KEYS, state.doc.details) : userTab;
     const env = ready ? panelEnv(ctx, scope, state.doc, byId, { params, tab }) : null;
     aside.dataset.st = scope.state;

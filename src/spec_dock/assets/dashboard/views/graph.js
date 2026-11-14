@@ -408,7 +408,7 @@ async function loadSelected(id, { keep }) {
   V.docRevision = revision; // one read per revision, even when it fails
   let doc = null;
   try {
-    doc = await api.scope(V.ctx.repository, id);
+    doc = await api.scope(V.ctx.repository, id, V.ctx.baseline);
   } catch {
     doc = null; // the selected box alone stays highlighted (F-02)
   }

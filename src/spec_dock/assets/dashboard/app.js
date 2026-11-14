@@ -85,6 +85,7 @@ function render() {
     scope: state.scope,
     repositories: state.repositories,
     embed: state.route.embed,
+    baseline: state.baseline, // the panels read a Scope against the same seen_id as the structure (iss-00587)
     navigate,
     href,
   });
