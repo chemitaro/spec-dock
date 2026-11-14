@@ -161,6 +161,34 @@ function revealChosen(strip) {
   else if (rect.right > box.right) strip.scrollLeft += rect.right - box.right;
 }
 
+// The view's stylesheet and the marks may still change the strip's layout after the first paint, so the strip keeps
+// revealing the chosen item on each resize of the strip or the item, until the person moves the strip by hand.
+const followers = new WeakMap(); // strip -> {follow, item, observer}
+function followChosen(strip) {
+  let watch = followers.get(strip);
+  if (!watch) {
+    watch = { follow: true, item: null, observer: null };
+    if (typeof ResizeObserver === "function") {
+      watch.observer = new ResizeObserver(() => {
+        if (watch.follow) revealChosen(strip);
+      });
+      watch.observer.observe(strip);
+    }
+    for (const type of ["wheel", "pointerdown", "touchstart", "keydown"]) {
+      strip.addEventListener(type, () => { watch.follow = false; }, { passive: true });
+    }
+    followers.set(strip, watch);
+  }
+  watch.follow = true;
+  const item = strip.querySelector?.('[aria-current="true"]') ?? null;
+  if (item !== watch.item) {
+    if (watch.item) watch.observer?.unobserve(watch.item);
+    if (item) watch.observer?.observe(item);
+    watch.item = item;
+  }
+  revealChosen(strip);
+}
+
 // The strip, painted after the contents (D-04). It writes only its slot and never touches the frame next to it.
 export function paintAgentList(root, env, { redraw } = {}) {
   const strip = root.querySelector("[data-orca-agents]");
@@ -169,15 +197,14 @@ export function paintAgentList(root, env, { redraw } = {}) {
   const pick = picks.get(env) ?? pickAgent(state.agents, state.wanted, state.goneIds);
   const html = stripHtml(env, state, pick);
   const chosen = pick.gone ? "" : (pick.selected?.id ?? "");
-  if (strip.dataset.strip !== html || strip.dataset.chosen !== chosen) {
-    if (strip.dataset.strip !== html) {
-      strip.innerHTML = html;
-      strip.dataset.strip = html;
-    }
-    strip.dataset.chosen = chosen;
-    revealChosen(strip);
+  const moved = strip.dataset.strip !== html || strip.dataset.chosen !== chosen;
+  if (strip.dataset.strip !== html) {
+    strip.innerHTML = html;
+    strip.dataset.strip = html;
   }
-  paintMarks(strip, env, state);
+  strip.dataset.chosen = chosen;
+  paintMarks(strip, env, state); // the marks widen the items: reveal after them
+  if (moved) followChosen(strip);
 
   // The person's pick forgets the losses of this Scope before the click's own handling redraws (R-05).
   const box = root.querySelector('.sd-framebox[data-frame="agents"]');

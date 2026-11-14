@@ -746,3 +746,49 @@ def test_the_strip_scrolls_the_chosen_item_into_view_only_when_needed(tmp_path: 
     assert out["toD"] == 200 and out["again"] == 200 and out["afterPerson"] == 0
     assert out["toA"] == 0 and out["toB"] == 100 and out["toC"] == 100
     assert out["none"] == 50
+
+
+@node
+def test_the_strip_follows_late_layout_until_the_person_moves_it(tmp_path: Path) -> None:
+    out = _run(
+        """
+        reset();
+        const observers = [];
+        globalThis.ResizeObserver = class { constructor(fn) { this.fn = fn; this.seen = new Set(); observers.push(this); } observe(el) { this.seen.add(el); } unobserve(el) { this.seen.delete(el); } };
+        // The chosen item starts inside the strip (no CSS yet, no marks) and widens later.
+        let itemRight = 150;
+        const root = fakeRoot('<div class="sd-framebox" data-frame="agents"><div class="sd-agents" data-orca-agents="x"></div></div>');
+        const strip = root.strip;
+        strip.scrollLeft = 0;
+        strip.getBoundingClientRect = () => ({left: 0, right: 200});
+        const item = {getBoundingClientRect: () => ({left: itemRight - 100 - strip.scrollLeft, right: itemRight - strip.scrollLeft})};
+        strip.querySelector = (sel) => (sel === '[aria-current="true"]' ? item : null);
+        world.marks = {buildMarks: () => ["m"], renderAgentMarks: () => { itemRight = 260; }}; // the marks widen the item
+        world.trees[sid] = [tree("w1", "one", [raw("a"), raw("b")])];
+        const env = panel(new Map([["agent", "b"]]));
+        at.agentsTab(env);
+        at.paintAgentList(root, env);
+        out.afterMarks = strip.scrollLeft; // revealed after the marks: 260 - 200
+        out.observed = observers.length === 1 && observers[0].seen.has(strip) && observers[0].seen.has(item);
+        itemRight = 330; // a stylesheet or a font arrives later
+        observers[0].fn();
+        out.afterLayout = strip.scrollLeft;
+        for (const {type, fn} of strip.listeners.filter((l) => ["wheel", "pointerdown", "touchstart", "keydown"].includes(l.type))) out[type] = typeof fn;
+        strip.listeners.find((l) => l.type === "wheel").fn(); // the person moves the strip
+        strip.scrollLeft = 0;
+        itemRight = 400;
+        observers[0].fn();
+        out.afterPerson = strip.scrollLeft;
+        const again = panel(new Map([["agent", "b"]])); at.agentsTab(again); at.paintAgentList(root, again);
+        out.sameChoice = strip.scrollLeft; // the next summary with the same choice leaves it alone
+        out.observerCount = observers.length;
+        delete globalThis.ResizeObserver;
+        world.marks = null;
+        world.trees[sid] = [tree("w1", "one", [raw("a")])];
+        """,
+        tmp_path,
+    )
+    assert out["afterMarks"] == 60 and out["observed"]
+    assert out["afterLayout"] == 130
+    assert {out.get(k) for k in ("wheel", "pointerdown", "touchstart", "keydown")} == {"function"}
+    assert out["afterPerson"] == 0 and out["sameChoice"] == 0 and out["observerCount"] == 1
