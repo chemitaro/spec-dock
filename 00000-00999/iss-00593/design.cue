@@ -49,7 +49,7 @@ design: {
 
 			**`pickAgent(agents, wanted, goneIds)`** → `{selected, gone, remember, addGone}`（理由が null のときだけ呼ぶ。Epic D-02。`goneIds` は id の Set、なければ空として扱う）。上から順：
 			1. `wanted` が `gone:` で始まる → `{selected: null, gone: true, remember: null, addGone: その後ろの id}`（同じ id が `agents` に戻っても開かない）。
-			2. `wanted` が `goneIds` にある → `{selected: null, gone: true, remember: null, addGone: null}`（戻る操作などで、いなくなった id が選びとして戻ってきた）。
+			2. `wanted` が `goneIds` にある → `{selected: null, gone: true, remember: "gone:" + wanted, addGone: null}`（戻る操作などで、いなくなった id が選びとして戻ってきたか、ほかのタブを見ている間に agentsState が覚えに足した。どの順でも、エージェントのタブを描いたときに問い合わせと欄の Map に `gone:<id>` を書き、ページを読み込み直しても開かない。実装担当の問い msg_2c43d31c056f で直した）。
 			3. `wanted` が `agents` のどれかの `id` → `{selected: その項目, gone: false, remember: null, addGone: null}`。
 			4. `wanted` があるが `agents` にない → `{selected: null, gone: true, remember: "gone:" + wanted, addGone: wanted}`（F-02。残ったのが1人でも選ばない）。
 			5. `wanted` がなく `goneIds` が空でない → `{selected: null, gone: true, remember: null, addGone: null}`（覚えがある間は自動で選ばない）。
