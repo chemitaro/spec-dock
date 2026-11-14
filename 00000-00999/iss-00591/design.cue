@@ -104,7 +104,7 @@ design: {
 		text: """
 			最後の実装のコミットから wheel を作り、`.workbench/iss-00591/venv` の隔離した venv に入れ、状態の置き場の写し（`.workbench/iss-00591/state`、道具の環境の状態の置き場から登録簿とスナップショットを写す）で、別のポート（18591）と `--tailscale` で `spec-dock dashboard serve` を立てる。
 			確かめの式 `.workbench/iss-00591/match.mjs`（node）：試しのサーバーの `/api/v1/repositories` と spec-dock の構造の API と、常駐の orca-web の `/api/worktrees/summary` を node から読み（Origin を付けない読みは CORS の対象外）、配る `core/orca_match.js` を import して `matchWorktrees` を走らせ、対応した Scope と worktree の id と path の末尾の名前を出す。
-			ブラウザーの確かめ：headless Chrome で試しの画面を開き、CSP にオリジンが入ること、要約の読みが CORS で拒まれること（コンソールの記録）、`ctx.orca.status()` に当たる状態が unreachable であること、構造の図とボードが描かれることを確かめる（写しは要らない）。
+			ブラウザーの確かめ：headless Chrome で試しの画面を開き、CSP にオリジンが入ること、部品の CSS と import と要約の読みの要求が出て、要約の読みが CORS で拒まれること（CDP のネットワークとコンソールの記録。拒まれた読みは `onError` に入り、状態は unreachable になる）、構造の図とボードが描かれ、ページの例外がないことを確かめる（写しは要らない）。
 			記録は report.md に残す（ユーザー名を含む絶対パスと実際の IP は書かない）。
 			"""
 	}
