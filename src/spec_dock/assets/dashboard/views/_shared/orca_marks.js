@@ -46,3 +46,23 @@ export function createOpenButton(slot, { doc }) {
     },
   };
 }
+
+// Follow the shell's one reader (iss-00592 D-03): one subscription at a time, moved when the reader changes.
+export function createOrcaWatch(onNews) {
+  let reader = null;
+  let off = null;
+  const stop = () => {
+    off?.();
+    off = null;
+    reader = null;
+  };
+  return {
+    follow(orca) {
+      if (orca === reader) return;
+      stop();
+      reader = orca ?? null;
+      off = reader?.subscribe(onNews) ?? null;
+    },
+    stop,
+  };
+}

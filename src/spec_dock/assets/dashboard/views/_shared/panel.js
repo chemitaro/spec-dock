@@ -224,6 +224,13 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
       aside.classList.remove("is-open", "is-dragging");
       aside.setAttribute("aria-hidden", "true");
     },
+    // Choose a tab as if the person pressed it (iss-00592 D-04); a key outside the shared tabs changes nothing.
+    preferTab(key) {
+      if (!TAB_KEYS.includes(key)) return;
+      userTab = key;
+      if (current) draw();
+    },
+    refreshOrca() {},
     isOpen: () => current != null,
     snap: () => (isSheet() ? snap : null),
     destroy() {
