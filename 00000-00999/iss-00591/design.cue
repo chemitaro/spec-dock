@@ -57,7 +57,7 @@ design: {
 		satisfies: ["R-03", "F-03"]
 		text: """
 			- `read_structure_facts` は今の `git worktree list` の1回の読みから、Scope ごとの `worktrees: [{path, branch}]`（名指すブランチのすべて、一覧の順）と、クローンのすべての worktree のパスを作る。戻り値の形は、今の `{ID: {"assurance", "branch"}}` を壊さない形にする（例：`StructureFacts(readings, worktrees_status, paths, by_scope)` の dataclass か、読みの dict に `"worktrees"` を足し、文書の上の値を別の戻り値にする。形は実装担当が決めてよい）。`branch` は今のまま（最初の worktree のブランチ）。
-			- `structure_document` の上に `"worktrees": {"status": "ok" | "unreadable", "paths": [...]}`、`scope_item` に `"worktrees": [{"path", "branch"}]` を足す。カタログがない、`git worktree list` が失敗・時間切れ → `status: "unreadable"`、`paths: []`、各 Scope の `worktrees: []`。`model` がない文書にも上の `worktrees` を置く（`unreadable`）。パスは `GitWorktreeRecord.path` の `str()` のまま。ブランチのない（detached）worktree もパスの一覧には入れる。
+			- `structure_document` の上に `"worktrees": {"status": "ok" | "unreadable", "paths": [...]}`、`scope_item` に `"worktrees": [{"path", "branch"}]` を足す。カタログがない、`git worktree list` が失敗・時間切れ → `status: "unreadable"`、`paths: []`、各 Scope の `worktrees: []`。`model` がない文書にも上の `worktrees` を置く（`unreadable`）。Scope の API（`scope_document`）が同じ `scope_item` で作る `scope.worktrees` は、その応答の `details.worktrees.items` の `{path, branch}` と同じ並びにする（`scope_facts` が `worktrees` も返す。details がなければ `[]`）。パスは `GitWorktreeRecord.path` の `str()` のまま。ブランチのない（detached）worktree もパスの一覧には入れる。
 			- revision：`infra/` に `worktree_signature(checkout: Path | None) -> tuple | None` を足す。`checkout / ".git"` が dir でなければ None。dir なら `HEAD` と、`worktrees/` の dir そのものと、その下の各項目の `HEAD` と `gitdir` の `(名前, mtime_ns, size)` を名前の順に並べた tuple（読めない項目は None の値）。`DashboardSite._revision` の `parts` にこれを足す（`site.checkout`）。`git` を呼ばない。
 			"""
 	}
@@ -103,8 +103,8 @@ design: {
 		satisfies: ["R-06"]
 		text: """
 			最後の実装のコミットから wheel を作り、`.workbench/iss-00591/venv` の隔離した venv に入れ、状態の置き場の写し（`.workbench/iss-00591/state`、道具の環境の状態の置き場から登録簿とスナップショットを写す）で、別のポート（18591）と `--tailscale` で `spec-dock dashboard serve` を立てる。
-			確かめの式 `.workbench/iss-00591/match.mjs`（node）：試しのサーバーの `/api/v1/repositories` と spec-dock の構造の API と、常駐の orca-web の `/api/worktrees/summary` を node から読み（Origin を付けない読みは CORS の対象外）、配る `core/orca_match.js` を import して `matchWorktrees` を走らせ、対応した Scope と worktree の id と path の末尾の名前を出す。
-			ブラウザーの確かめ：headless Chrome で試しの画面を開き、CSP にオリジンが入ること、部品の CSS と import と要約の読みの要求が出て、要約の読みが CORS で拒まれること（CDP のネットワークとコンソールの記録。拒まれた読みは `onError` に入り、状態は unreachable になる）、構造の図とボードが描かれ、ページの例外がないことを確かめる（写しは要らない）。
+			確かめの式 `.workbench/iss-00591/match.mjs`（node）：試しのサーバーの `/api/v1/repositories` と spec-dock の構造の API を node から読み、配る `core/orca.js` の `createOrca(server.orca_web を 127.0.0.1:8791 にしたもの, {importModule, addStylesheet})` を、本物の部品で動かす。`importModule` は、常駐の orca-web の `/embed/` の部品のファイル（agent-marks.js と、それが import するファイル）を node から読んで一時のディレクトリに置き、そこから import する（node の import は http の URL を読めないため。Origin を付けない node の読みは orca-web の CORS の対象外）。部品の `watchWorktreeSummary` は node の `fetch` で常駐の orca-web の要約を読む。状態が ok になったら `forScope` を全 Scope に求め、対応した Scope と worktree の数、id と path の末尾の名前を出して止める。
+			ブラウザーの確かめ：headless Chrome で試しの画面（オリジンが 18591 で、orca-web の `ORCA_WEB_READ_ORIGINS` にない）を開き、CSP にオリジンが入ること、部品の import が 403 で拒まれ（orca-web は部品のファイルも読み取りの CORS で配る）、10 秒後に `?r=1` の import が試されること、要約の GET は出ないこと（読みの輪は import の成功の後に始まる）、構造の図とボードが描かれ、ページの例外がないことを、CDP のネットワークとコンソールの記録で確かめる（写しは要らない）。ブラウザーから本物の要約を読むのは、統括が 47800 の常駐のダッシュボードを新しい版にした後の Epic の確かめに任せる。
 			記録は report.md に残す（ユーザー名を含む絶対パスと実際の IP は書かない）。
 			"""
 	}

@@ -113,12 +113,12 @@ requirements: {
 	"R-06": {
 		title: "常駐の orca-web の実データで、Scope と worktree の対応を確かめて記録する"
 		text: """
-			隔離した venv と一時の状態の置き場で、別のポートの SpecDock（`--tailscale`）を立て、その構造の API と、常駐の orca-web の要約（読むだけ）を `matchWorktrees` に渡して、対応した Scope と worktree の数を report.md に残す。
-			ブラウザーの画面からの読みは、orca-web の `ORCA_WEB_READ_ORIGINS` が別のポートを許さないので、CORS で拒まれて unreachable になることを確かめる（常駐の設定は変えない）。
+			隔離した venv と一時の状態の置き場で、別のポートの SpecDock（`--tailscale`）を立て、その構造の API を、node の上で本物の orca-web の部品と常駐の orca-web の要約（読むだけ）で動かした `core/orca.js` に渡して、対応した Scope と worktree の数を report.md に残す。
+			ブラウザーの画面からは、orca-web の `ORCA_WEB_READ_ORIGINS` が別のポートを許さないので、部品の import が 403 で拒まれて unreachable になり、図とボードが今までどおり動くことを確かめる（常駐の設定は変えない）。
 			"""
 		acceptance: [
-			"report.md に、試しの SpecDock の版とポート、要約の worktree の数、対応した Scope と worktree の数と ID（この Issue の worktree が iss-00591 に対応すること）がある",
-			"report.md に、試しの画面のオリジンからの要約の読みが拒まれ、状態が unreachable で、図とボードが今までどおり描かれたことの記録がある",
+			"report.md に、試しの SpecDock の版とポート、要約の worktree の数、`core/orca.js` の状態が ok になったこと、対応した Scope と worktree の数と ID（この Issue の worktree が iss-00591 に対応すること）がある",
+			"report.md に、試しの画面のオリジンからの部品の import が 403 で拒まれ、`?r=1` で試し直され、要約の GET が出ず、図とボードが今までどおり描かれたことの記録がある",
 		]
 	}
 }
@@ -155,5 +155,7 @@ decisions: [
 	"2026-11-14、タスク担当の判断（Epic の spec-review の P2 の1つ目）：worktree の変化を構造の revision に入れる。`git worktree list` を5秒ごとに呼ばず、main のチェックアウトの `.git` の `HEAD` と `worktrees/` の項目のファイルの時刻と大きさから作る署名を使う（D-03）",
 	"2026-11-14、タスク担当の判断（Epic の spec-review の P2 の3つ目）：実データの確かめの例は、マージで片付けられた iss-00589 ではなく、この Issue の worktree（iss-00591）を使う",
 	"2026-11-14、タスク担当の判断：ファイルそのものが壊れているとき、`orca_web` は無効にし、`config_problems` には今の `dashboard` の行だけを出す（同じファイルの同じ理由を2行にしない）",
+	"2026-11-14、タスク担当の判断（Epic の D-02 の config_problems の具体化）：`port` がダッシュボード自身のポートと同じ誤りは、要求を受けたサーバーだけが知る（`dashboard list` はサーバーなしでも動き、DashboardSite はポートを持たない）ので、`server.orca_web.problem` にだけ出し、`config_problems` には出さない。`config_problems` に出すのは、ファイルだけで決まる節の形と値の誤り",
+	"2026-11-14、タスク担当の判断（仕様のレビューの P2）：orca-web は部品のファイルも読み取りの CORS で配るので、別のポートの試しの画面からは import が 403 になる。本物の部品と要約での `core/orca.js` の確かめは node の上で行い、ブラウザーでは拒まれる側の振る舞いを確かめる",
 	"2026-11-14、本人の指示（依頼書）：サーバー側と純粋な計算の実装は Codex GPT-6.1 Sol / medium",
 ]

@@ -23,7 +23,7 @@ tests: {
 	"T-08": {title: "mergedWorktree：0件 null、1件そのもの、2件で agents の連結と counts の和と最初の id・path・branch（node）", verifies: ["R-04"]}
 	"T-09": {title: "createOrca（差し替えた importModule・addStylesheet・タイマーと、偽の部品の watchWorktreeSummary）：無効な config（null、enabled false、origin なし）で importModule も addStylesheet も呼ばれず status off。有効で CSS と import が1回、watch が1つ、onDocument で ok と知らせ、forScope が対応の並びを返し、同じ structure と要約で matchWorktrees の結果を覚える。onError で unreachable、summary null、forScope 空。import の失敗で unreachable、次の import の URL が ?r=1、成功で watch が始まる。subscribe の外し、購読者の例外がほかを止めない、stop で輪とタイマーが止まる（node）", verifies: ["R-05", "F-01", "F-02"]}
 	"T-10": {title: "app.js が createOrca を一覧の API の server.orca_web で1回だけ作り、render の ctx に orca を渡し、checkServer で作り直さないこと（静的な目印のテスト）。core/orca.js と core/orca_match.js が画面の資産として配られる（/assets/core/… が 200）（Python）", verifies: ["R-05"]}
-	"T-11": {title: "実データの確かめ（S-05）：report.md に、試しの版とポート、要約の worktree の数、対応した Scope と worktree の数と ID（iss-00591 の worktree が iss-00591 に対応する）、画面のオリジンからの読みが CORS で拒まれ、図とボードが描かれたことの記録がある", verifies: ["R-06"]}
+	"T-11": {title: "実データの確かめ（S-05）：report.md に、試しの版とポート、要約の worktree の数、node の上の本物の部品での core/orca.js の状態 ok、対応した Scope と worktree の数と ID（iss-00591 の worktree が iss-00591 に対応する）、画面のオリジンからの部品の import が 403 で拒まれ ?r=1 で試し直され、図とボードが描かれたことの記録がある", verifies: ["R-06"]}
 }
 
 verification: """
@@ -58,7 +58,7 @@ execution: {
 		owner: {task: "実データの確かめ（S-05）", model: "opus", effort: "medium", rationale: "タスク担当（このセッション）。常駐の orca-web を読むだけの受け入れの証拠の取得で、実装ではない"}
 	}
 	reviews: {
-		spec: {role: "仕様のレビュー", after: "S-01", model: "opus", effort: "high"}
+		spec: {role: "仕様のレビュー（実装の前。after は最初の手順の前を指す印として S-01）", after: "S-01", model: "opus", effort: "high"}
 		gate: {role: "最終品質ゲート", after: "S-04", model: "opus", effort: "medium"}
 	}
 }
