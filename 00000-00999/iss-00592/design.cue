@@ -51,7 +51,7 @@ design: {
 			- 置き場ごとの処理は try/catch で囲み、例外の置き場は空にして覚えを空の文字列にする（F-01）。
 			- 新しく作られた置き場は覚えがないので、最初の呼び出しで必ず描く（R-02 の「同じ処理の中で描き直す」）。
 
-			置き場の CSS（`views/_shared/parts.css` に1か所）：`.sd-orca { display: inline-flex; flex: none; margin-left: auto; }`、`.sd-orca:empty { display: none; }`。印の色、形、大きさの指定は置かない（部品の `agent-marks.css` のまま）。
+			置き場の CSS は、構造の図、ボード、横の欄のすべてに効く1か所に置く：シェルの `app.css`（画面の範囲の入れ子の外。`views/_shared/parts.css` は全体が board・scope・overview・todos・`.sd-pn` の範囲の入れ子で、構造の図の `.gx-world` に効かないため使わない）。`.sd-orca { display: inline-flex; flex: none; margin-left: auto; }`、`.sd-orca:empty { display: none; }`（空の置き場は flex の子として消え、`.gx-marks` の gap の幅も取らない）。印の色、形、大きさの指定は置かない（部品の `agent-marks.css` のまま）。
 
 			max の値：Issue の箱と木の表示の枠の箱は 2、枠の見出しは 3、ボードの札と横の欄の見出しは 4。実装の担当が写しで確かめ、箱からはみ出すときは小さくしてよい（記録する）。
 			"""
@@ -77,14 +77,16 @@ design: {
 		satisfies: ["R-01", "R-02", "R-03", "R-04", "F-01", "F-02", "F-03"]
 		text: """
 			`createScopePanel` の `build()` が、`.pn-top` の中に作り直さない見出しの行を作る：
-			`<div class="pn-head"><span class="pn-hl"></span><span class="pn-orca"></span><button class="iconbtn pn-close" data-pn-act="close" …></button></div><div class="pn-cover-slot"></div>`。
-			- `.pn-hl`（状態の札、マージの札、印の置き場（max 4））と、表紙（今の `.pn-cover`）は、`draw()` のたびに HTML を作り、前と同じなら書き換えない（R-02。覚えは `build()` で捨てる）。
-			- `.pn-hl` は `display: contents`（今の `.pn-head` の flex の並びと、スマホの全画面の規則 `.pn-head { display: contents }` の並びを保つ）。閉じるの `margin-left: auto` は `.pn-orca` に移し、`.pn-orca` を閉じるの左に置く。`.pn-orca:empty { display: none }`。
-			- スマホの全画面（`data-snap="full"`）では、今の規則（`.pn-merge` などを隠す）のまま。`.pn-orca` の位置は実装の担当が写しで確かめる。
+			`<div class="pn-head"><span class="pn-hl"></span><span class="pn-orca"></span><button class="iconbtn pn-close" data-pn-act="close" …></button></div><div class="pn-cover"></div>`（`.pn-cover` は今と同じく `.pn-top` の直接の子のまま。包みを足さない）。
+			- `.pn-hl` の中身（状態の札、マージの札、印の置き場（max 4））と `.pn-cover` の中身は、`draw()` のたびに HTML を作り、前と同じなら書き換えない（R-02。覚えは `build()` で捨てる）。
+			- `.pn-hl` は `display: contents`（今の `.pn-head` の flex の並びと、スマホの全画面の規則 `.pn-head { display: contents }` の並びを保つ）。
+			- 閉じるの位置：今の `.sd-pn .pn-head .iconbtn { margin-left: auto }` を残す（ボタンがないとき、閉じるは今と同じく右端）。ボタンがあるときだけ `.pn-orca:not(:empty) { margin-left: auto }` と `.pn-orca:not(:empty) + .pn-close { margin-left: 0 }` で、ボタンを閉じるの左の右端に寄せる。`.pn-orca:empty { display: none }`。
+			- 高さ：`.pn-orca` は `display: inline-flex; align-items: center; height: 24px; flex: none`（orca-web の sm のボタンの高さ 24px。2026-11-14 の統括の連絡）で、見出しの行の高さは今のまま（閉じるの 32px）。ボタンの幅は部品に任せ、SpecDock は幅を決めない（`data-width` を付けず、文字の長さに頼る配置にしない）。
+			- スマホの全画面（`data-snap="full"`）では、今の規則（`.pn-merge` などを隠す、`.pn-cover` の order と flex、閉じるの order 3）のまま。`.pn-orca` は閉じるの左（order 3 の前）に来るよう、実装の担当が写しで確かめる。
 
 			`draw()` の終わりに `paintOrcaMarks(parts.top, ctx, ctx.data)` と `openButton.update({orca: ctx.orca, structure: ctx.data, scopeId, embed: ctx.embed, theme})`。
 
-			`createOpenButton(slot, {doc})`（`orca_marks.js`）：`update(input)` が `openTarget` で `{key, worktreeId}` を求め、前の key と同じなら何もしない。違えば `slot.replaceChildren()`、worktreeId があれば `doc.createElement("script")` に `src = <origin>/embed/open-button.js`、`dataset.worktree`、`dataset.theme`、`dataset.size = "sm"`、`dataset.width`（実装の担当が写しで決める。既定 260 のままでもよい）を付けて slot に足す（`innerHTML` ではスクリプトが動かないため）。`reset()` は覚えを捨てて slot を空にする。
+			`createOpenButton(slot, {doc})`（`orca_marks.js`）：`update(input)` が `openTarget` で `{key, worktreeId}` を求め、前の key と同じなら何もしない。違えば `slot.replaceChildren()`、worktreeId があれば `doc.createElement("script")` に `src = <origin>/embed/open-button.js`、`dataset.worktree`、`dataset.theme`、`dataset.size = "sm"` を付けて（`data-width` と `data-label` は付けない。幅とラベルは部品の既定） slot に足す（`innerHTML` ではスクリプトが動かないため）。`reset()` は覚えを捨てて slot を空にする。
 			- `build()` が走り直したら、新しい slot で `createOpenButton` を作り直す（覚えも捨てる。Epic のレビューの P2）。`hide()` で `reset()`。
 			- 明暗の変化：横の欄は `matchMedia("(prefers-color-scheme: dark)")` の change と、`document.documentElement` の `data-theme` の属性の変化（MutationObserver）で、開いているときに `openButton.update` を呼び直す。`destroy()` で外す。
 			- 要約の知らせ：構造の図とボードが知らせを受けたとき、横の欄に `refreshOrca()`（`paintOrcaMarks(parts.top, …)` と `openButton.update`）を呼ぶ。
@@ -116,5 +118,5 @@ risks: [
 	"iss-00593 も `views/_shared/panel.js` を変える。PR の前に `origin/main` を取り込み、衝突を直してからテストとゲートをやり直す",
 	"部品の `buildMarks` の結果の形が変わっても、比べの key が変わるだけで描きは部品のまま。部品が `buildMarks` を export しなくなれば、F-01 のとおり印が空になる（壊れない）",
 	"構造の図の箱は狭い。max と置き場の CSS で収まらなければ、実装の担当が写しで max を小さくする",
-	"open-button.js の iframe の既定の幅 260 は、横の欄の見出しの行には広い。`data-width` で詰めると、iframe の中の結果の短い文が切れることがある",
+	"orca-web の iss-00035（並行）が「Orca で開く」を小さなボタン（アイコンと Open、sm で高さ 24px、中身に合う既定の幅）に作り直す。SpecDock は幅を部品に任せるので、どちらの版でも置ける。実機の確かめは、そのときの orca-web の main の `dist/` で行い、版を report に書く",
 ]
