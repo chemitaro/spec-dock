@@ -16,8 +16,9 @@ SHARED = VIEWS / "_shared"
 NODE = shutil.which("node")
 node = pytest.mark.skipif(NODE is None, reason="node is not installed")
 
-TAB_KEYS = ["explanation", "summary", "deps", "children", "docs", "artifacts", "todos"]
-TAB_LABELS = ["説明資料", "概要", "依存", "配下", "文書", "Artifact", "人のタスク"]
+# iss-00593 D-02: the agents tab is second (it shows only when visible(env) says so)
+TAB_KEYS = ["explanation", "agents", "summary", "deps", "children", "docs", "artifacts", "todos"]
+TAB_LABELS = ["説明資料", "エージェント", "概要", "依存", "配下", "文書", "Artifact", "人のタスク"]
 MOVED = (
     "summaryTab",
     "depsTab",
@@ -154,7 +155,7 @@ def test_the_detail_screen_draws_its_tabs_from_the_shared_list() -> None:
     scope = (VIEWS / "scope.js").read_text()
     shared = (SHARED / "scope_tabs.js").read_text()
     assert 'from "./_shared/scope_tabs.js"' in scope
-    assert "SCOPE_TABS.map(" in scope and "pickTab(" in scope
+    assert "visibleTabs(env)" in scope and "pickTab(" in scope  # iss-00593: the visible tabs of SCOPE_TABS
     for name in MOVED:
         assert not re.search(rf"function {name}\b", scope), name
         assert re.search(rf"function {name}\b", shared), name
@@ -163,7 +164,7 @@ def test_the_detail_screen_draws_its_tabs_from_the_shared_list() -> None:
 
 def test_the_panel_draws_its_tabs_from_the_same_list_and_the_graph_uses_it() -> None:
     panel = (SHARED / "panel.js").read_text()
-    assert 'from "./scope_tabs.js"' in panel and "SCOPE_TABS.map(" in panel and "pickTab(" in panel
+    assert 'from "./scope_tabs.js"' in panel and "visibleTabs(first)" in panel and "pickTab(" in panel
     assert "export function createScopePanel(" in panel
     graph = (VIEWS / "graph.js").read_text()
     assert 'import { createScopePanel } from "./_shared/panel.js";' in graph
@@ -408,15 +409,18 @@ def test_the_frames_take_the_rest_of_the_height_without_old_rules_or_new_colors(
     shared = (SHARED / "scope_tabs.css").read_text()
     panel = (SHARED / "panel.css").read_text()
     page = (VIEWS / "scope.css").read_text()
-    body = _rules(panel, '.sd-pn .pn-body:is([data-tab="docs"], [data-tab="explanation"])')
+    body = _rules(panel, '.sd-pn .pn-body:is([data-tab="docs"], [data-tab="explanation"], [data-tab="agents"])')
     assert body and "display: flex" in body[0] and "flex-direction: column" in body[0]
     assert "overflow" not in body[0]  # stays auto: only a long error list scrolls (R-04)
     assert "flex: 1" in _rules(panel, ".sd-pn .sd-framebox")[0]
-    frame = _rules(panel, ".sd-pn :is(.sd-docframe, .sd-explain)")[0]
+    frame = _rules(panel, ".sd-pn :is(.sd-docframe, .sd-explain, .sd-agent)")[0]
     assert "flex: 1" in frame and "min-height: 240px" in frame and "height: auto" in frame
     phone = panel[panel.index("@container app (max-width: 640px)") :]
-    assert '.sd-pn .pn-body:is([data-tab="docs"], [data-tab="explanation"]) { padding: 2px 4px 4px; }' in phone
-    on_page = _rules(page, "& :is(.sd-docframe, .sd-explain)")[0]
+    assert (
+        '.sd-pn .pn-body:is([data-tab="docs"], [data-tab="explanation"], [data-tab="agents"]) { padding: 2px 4px 4px; }'
+        in phone
+    )
+    on_page = _rules(page, "& :is(.sd-docframe, .sd-explain, .sd-agent)")[0]
     assert "flex: none" in on_page and "100dvh" in on_page
     assert (
         "& .sd-framebox" in shared

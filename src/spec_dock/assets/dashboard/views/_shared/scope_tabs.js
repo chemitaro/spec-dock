@@ -1,12 +1,15 @@
 // The tabs of a Scope, shared by the detail screen and the panel (iss-00587 D-03, D-04; R-09).
 // Every tab is one row of SCOPE_TABS (key, label, count, render); a new tab is one more row. A tab draws from an
 // env only: the shell's ctx, the Scope, its scopes/<ID> JSON and the structure's byId, plus param/paramLink for the
-// choices inside a tab (the page keeps them in the query; the panel keeps them in its own Map).
+// choices inside a tab (the page keeps them in the query; the panel keeps them in its own Map) and keep, which
+// records a choice the screen made by itself without a new history entry (iss-00593 D-02). A tab with visible(env)
+// shows only when it says so; the others always show.
 import { byRank, fmtDateTime, fmtDay, formatSize, pullRequestNotice, stateCounts, withoutEmbed, withParam } from "./logic.js";
 import { card, changeBadge, emptyState, esc, icon, idleText, prMark, progressBar, scopesOf, stateIcon, stateMark, STATES } from "./parts.js";
 import { explanationState } from "./panel_logic.js";
 import { todoPath, todosPath } from "../../core/route.js";
 import { dueWords, KIND_WORDS } from "../todos/logic.js";
+import { agentsCount, agentsTab, agentsVisible } from "./agents_tab.js";
 
 // The names of the documents the docs tab offers (iss-00589 D-01). The explanation has its own tab.
 const DOC_INFO = { spec: "仕様", requirement: "要件", design: "設計", plan: "計画", report: "報告", adr: "ADR" };
@@ -199,7 +202,7 @@ function documentEntries(details) {
 }
 
 // One thin bar over a frame (iss-00589 D-02, D-05): the left part, and an icon link opening the frame in a new tab.
-function frameBar(left, href) {
+export function frameBar(left, href) {
   const open = href
     ? `<a class="sd-framebar__open" href="${esc(href)}" target="_blank" rel="noopener" aria-label="新しいタブで開く" title="新しいタブで開く">${icon("external")}</a>`
     : "";
@@ -321,6 +324,7 @@ function todoCount(doc) {
 
 export const SCOPE_TABS = [
   { key: "explanation", label: "説明資料", count: () => null, render: explanationTab },
+  { key: "agents", label: "エージェント", visible: agentsVisible, count: agentsCount, render: agentsTab }, // iss-00593 D-02
   { key: "summary", label: "概要", count: () => null, render: summaryTab },
   { key: "deps", label: "依存", count: ({ doc }) => (doc.dependencies?.waits_for?.length || 0) + (doc.dependencies?.waited_by?.length || 0), render: depsTab },
   { key: "children", label: "配下", count: ({ scope }) => (scope.children || []).length, render: childrenTab },
@@ -329,6 +333,9 @@ export const SCOPE_TABS = [
   { key: "todos", label: "人のタスク", count: ({ doc }) => todoCount(doc), render: todosTab }, // iss-00554 D-06
 ];
 export const TAB_KEYS = SCOPE_TABS.map((tab) => tab.key);
+
+// The tabs this env shows, in the shared order (iss-00593 D-02). TAB_KEYS stays every key for `?tab=`.
+export const visibleTabs = (env) => SCOPE_TABS.filter((tab) => !tab.visible || tab.visible(env));
 
 // The detail screen keeps the choices in its query: the same paths as before (Epic R-17).
 export function pageEnv(ctx, scope, doc, byId) {
@@ -340,6 +347,10 @@ export function pageEnv(ctx, scope, doc, byId) {
     byId,
     param: (name) => ctx.route.params.get(name),
     paramLink: (name, value) => `data-nav href="${esc(ctx.href(withParam(ctx.route.path, name, value)))}"`,
+    // A choice the screen made by itself replaces the query in place; later param and paramLink read the new route.
+    keep(name, value) {
+      if (ctx.route.params.get(name) !== value && ctx.replaceParam) ctx.route = ctx.replaceParam(name, value);
+    },
   };
 }
 
@@ -360,5 +371,6 @@ export function panelEnv(ctx, scope, doc, byId, { params, tab }) {
     byId,
     param: (name) => params.get(name) ?? null,
     paramLink: (name, value) => `href="${esc(detail(name, value))}" data-pn-param="${esc(name)}" data-pn-value="${esc(word(value))}"`,
+    keep: (name, value) => params.set(name, value), // the same Map as the person's choices; the page is untouched
   };
 }

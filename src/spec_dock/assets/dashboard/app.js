@@ -9,6 +9,7 @@ import { renderNotices, renderTop } from "./core/topbar.js";
 import { LIVE_MS, movedAt } from "./core/ui.js";
 import { VIEWS } from "./views/index.js";
 import { mountSearch } from "./views/_shared/search.js";
+import { withParam } from "./views/_shared/logic.js";
 
 const REFRESH_MS = 5000;
 const SERVER_MS = 60000; // the server reads the installed version every 60 seconds (iss-00530)
@@ -32,10 +33,13 @@ const state = {
 };
 
 const loadedStyles = new Set();
+let booted = false; // the first render has run: a theme change redraws from then on
 
+// The screens pass the theme on to the frames they hold (the agents tab, iss-00593 D-06), so a change redraws.
 function setTheme(scheme) {
   if (scheme === "auto") delete document.documentElement.dataset.theme;
   else document.documentElement.dataset.theme = scheme;
+  if (booted) render();
 }
 
 const bridge = createEmbedBridge({
@@ -46,6 +50,15 @@ const bridge = createEmbedBridge({
 
 function href(path) {
   return withEmbed(path, state.route.embed);
+}
+
+// A choice a screen keeps by itself replaces the query without a new history entry (iss-00593 D-06). It is called
+// from inside a render, so it neither redraws nor tells the embedding parent.
+function replaceParam(name, value) {
+  const path = withParam(state.route.path, name, value);
+  history.replaceState(null, "", path);
+  state.route = parseRoute(new URL(path, location.origin).href);
+  return state.route;
 }
 
 function ensureStyles(module) {
@@ -88,6 +101,8 @@ function render() {
     repositories: state.repositories,
     embed: state.route.embed,
     orca: state.orca,
+    orcaProblem: state.server?.orca_web?.problem ?? null, // iss-00593 D-06
+    replaceParam,
     baseline: state.baseline, // the panels read a Scope against the same seen_id as the structure (iss-00587)
     navigate,
     href,
@@ -224,6 +239,8 @@ async function boot() {
     }
   }
   render();
+  booted = true;
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", render); // the OS theme (iss-00593 D-06)
   setInterval(refresh, REFRESH_MS);
   setInterval(checkServer, SERVER_MS);
   document.addEventListener("visibilitychange", refresh);

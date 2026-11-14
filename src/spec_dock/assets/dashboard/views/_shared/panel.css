@@ -29,9 +29,9 @@
 .sd-pn .pn-loading { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--ds-muted); font-size: 13px; }
 /* 文書と説明資料のタブ（iss-00589 D-04）：帯と枠だけを並べ、枠がタブの残りの高さをすべて使う。中身の領域は
    スクロールしない（誤りの帯を開いて一覧が長いときだけスクロールする）。 */
-.sd-pn .pn-body:is([data-tab="docs"], [data-tab="explanation"]) { display: flex; flex-direction: column; gap: 4px; padding: 4px 10px 10px; }
+.sd-pn .pn-body:is([data-tab="docs"], [data-tab="explanation"], [data-tab="agents"]) { display: flex; flex-direction: column; gap: 4px; padding: 4px 10px 10px; }
 .sd-pn .sd-framebox { flex: 1; }
-.sd-pn :is(.sd-docframe, .sd-explain) { flex: 1; min-height: 240px; height: auto; }
+.sd-pn :is(.sd-docframe, .sd-explain, .sd-agent) { flex: 1; min-height: 240px; height: auto; }
 .sd-pn .pn-foot { flex: none; display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--ds-border); }
 .sd-pn .pn-foot .is-primary { flex: 1; justify-content: center; }
 .sd-pn .ds-btn { display: inline-flex; align-items: center; gap: .45em; height: 32px; padding: 0 12px; border: 1px solid var(--ds-border); border-radius: 8px; background: var(--ds-surface); color: var(--ds-text-2); font-size: 13px; font-weight: 600; line-height: 1; cursor: pointer; white-space: nowrap; text-decoration: none; }
@@ -52,7 +52,7 @@
   .sd-pn .pn-grab::before { content: ""; display: block; width: 40px; height: 5px; margin: 6px auto 0; border-radius: 99px; background: var(--ds-border-2); opacity: .6; }
   .sd-pn .pn-top { touch-action: none; }
   .sd-pn .pn-head { padding-top: 2px; }
-  .sd-pn .pn-body:is([data-tab="docs"], [data-tab="explanation"]) { padding: 2px 4px 4px; }
+  .sd-pn .pn-body:is([data-tab="docs"], [data-tab="explanation"], [data-tab="agents"]) { padding: 2px 4px 4px; }
   /* 下の帯は折り返さない1行で、ボタンは印だけ（名前は aria-label と title） */
   .sd-pn .pn-foot { flex-wrap: nowrap; gap: 6px; padding: 8px 10px; }
   .sd-pn .pn-foot .ds-btn { flex: 1; justify-content: center; height: 36px; padding: 0 8px; font-size: 0; gap: 0; }
