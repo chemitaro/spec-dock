@@ -162,7 +162,9 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
     shownKey = key;
     parts.body.dataset.tab = tab ?? "";
     if (env && tab === "agents") paintAgentList(parts.body, env, { redraw });
-    const detail = withParam(withoutEmbed(scope.path), "tab", tab ?? "summary");
+    // The detail screen and the new tab carry the panel's agent choice (an id or gone:<id>) like the tabs' links do,
+    // so a lost agent does not open the one left by itself on the new page (iss-00593 R-05, FQG attempt 2).
+    const detail = withParam(withParam(withoutEmbed(scope.path), "agent", params.get("agent") ?? null), "tab", tab ?? "summary");
     parts.foot.innerHTML =
       `<a class="ds-btn is-primary" data-nav href="${esc(ctx.href(detail))}" aria-label="詳しい画面" title="詳しい画面">${icon("arrowRight")}詳しい画面</a>` +
       `<a class="ds-btn" href="${esc(detail)}" target="_blank" rel="noopener" aria-label="新しいタブで開く" title="新しいタブで開く">${icon("external")}新しいタブで開く</a>` +

@@ -414,7 +414,7 @@ def test_a_loss_is_remembered_across_envs_of_the_scope_until_another_scope(tmp_p
         const lost = counting(panel(params));
         out.lost = at.agentsTab(lost); out.lostKept = lost.kept;
         const draws = {};
-        draws.page = at.agentsTab(page("tab=agents")); // the panel's "詳しい画面" carries no agent
+        draws.page = at.agentsTab(page("tab=agents")); // a path to the page without agent=
         draws.reopened = at.agentsTab(panel(new Map())); // the panel closed and opened again
         const backEnv = page("tab=agents&agent=a");
         draws.backOld = at.agentsTab(backEnv); // back to the query with the old id
@@ -1086,3 +1086,32 @@ def test_prefer_tab_and_a_doubled_redraw_in_the_panel_with_the_orca_heading(tmp_
     assert out["rewrites"] == 0  # the frame stays
     assert out["withoutAgents"] == "summary" and "agents" not in out["tabs"]
     assert out["subscribed"] == 0
+
+
+@node
+def test_the_panel_foot_links_carry_the_panel_choice(tmp_path: Path) -> None:  # FQG attempt 2, ChatGPT P1
+    out = _run(
+        PANEL.replace("PANEL_URL", json.dumps((SHARED / "panel.js").as_uri()))
+        + """
+        const hrefs = () => [...part(".pn-foot").innerHTML.matchAll(/<a class="ds-btn[^"]*"( data-nav)? href="([^"]*)"/g)].map((m) => m[2]).slice(0, 2);
+        reset();
+        world.trees[sid] = [tree("w1", "one", [raw("a"), raw("b")])];
+        showIt();
+        out.none = hrefs(); // two agents and no choice yet
+        pn.preferTab("agents");
+        out.noChoice = hrefs();
+        aside.click({target: {closest: (sel) => (sel === "a[data-pn-param]" ? {dataset: {pnParam: "agent", pnValue: "a"}} : null)}, button: 0, preventDefault() {}});
+        out.chosen = hrefs();
+        world.trees[sid] = [tree("w1", "one", [raw("b")])]; // a goes away; b is left alone
+        showIt();
+        out.gone = hrefs();
+        pn.hide();
+        world.trees[sid] = [tree("w1", "one", [raw("a")])];
+        """,
+        tmp_path,
+    )
+    base = "/r/github.com/o/r/scopes/iss-00001"
+    assert out["none"] == [f"{base}?tab=summary"] * 2
+    assert out["noChoice"] == [f"{base}?tab=agents"] * 2
+    assert out["chosen"] == [f"{base}?agent=a&amp;tab=agents"] * 2
+    assert out["gone"] == [f"{base}?agent=gone%3Aa&amp;tab=agents"] * 2
