@@ -48,7 +48,7 @@
   & .sd-framebar__name { display: inline-flex; align-items: center; gap: 4px; min-width: 0; font-size: 12.5px; font-weight: 650; color: var(--ds-muted); white-space: nowrap; }
   & .sd-framebar__open { flex: none; display: grid; place-items: center; width: 24px; height: 24px; margin-left: auto; border-radius: 6px; color: var(--ds-muted); font-size: 15px; }
   & .sd-framebar__open:hover { color: var(--ds-text); background: var(--ds-surface-2); }
-  & :is(.sd-docframe, .sd-explain) { display: block; width: 100%; border: 1px solid var(--ds-border); border-radius: var(--ds-radius-l); background: var(--ds-bg); }
+  & :is(.sd-docframe, .sd-explain, .sd-agent) { display: block; width: 100%; border: 1px solid var(--ds-border); border-radius: var(--ds-radius-l); background: var(--ds-bg); }
   & .sd-checkbar { flex: none; border-radius: var(--ds-radius); background: var(--ds-danger-bg); color: var(--ds-text); font-size: 12.5px; }
   & .sd-checkbar > summary { display: block; height: 28px; padding: 0 8px; line-height: 28px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
   & .sd-checkbar > summary::-webkit-details-marker { display: none; }
@@ -58,4 +58,15 @@
   & .sd-callout > div { min-width: 0; display: grid; gap: 4px; }
   & .sd-steps { margin-top: 10px; padding-left: 0; list-style: none; }
   & .sd-steps li { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+}
+/* エージェントのタブ（iss-00593 D-03）：1行の選びの帯（折り返さず横に動く）と、残りの高さを使う orca-web の枠。
+   選んだ項目は文書の切り替え（.sd-seg）と同じ色の言葉で示す。印の中身は orca-web の部品が描く。 */
+:is([data-view="scope"], .sd-pn) {
+  & .sd-agents { display: flex; align-items: center; gap: 4px; min-width: 0; overflow-x: auto; scrollbar-width: none; white-space: nowrap; }
+  & .sd-agentpick { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 8px; border: 1px solid var(--ds-border); border-radius: var(--ds-radius); font-size: 12.5px; font-weight: 650; line-height: 1; color: var(--ds-text-2); text-decoration: none; }
+  & a.sd-agentpick:hover { color: var(--ds-text); background: var(--ds-surface-2); }
+  & .sd-agentpick[aria-current="true"] { background: var(--ds-accent-soft); color: var(--ds-accent-strong); }
+  & .sd-agentpick__mark { display: inline-flex; align-items: center; }
+  & .sd-agentpick__mark:empty { display: none; }
+  & .sd-agents > .sd-muted { flex: none; font-size: 12px; }
 }

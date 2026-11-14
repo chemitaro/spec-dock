@@ -64,6 +64,7 @@ def test_user_text_is_escaped_before_it_enters_html() -> None:
         SHARED / "search.js",
         SHARED / "scope_tabs.js",
         SHARED / "panel.js",
+        SHARED / "agents_tab.js",  # iss-00593
     ]:
         for number, line in enumerate(path.read_text().splitlines(), 1):
             assert not raw.search(line), f"{path.name}:{number}: {line.strip()}"

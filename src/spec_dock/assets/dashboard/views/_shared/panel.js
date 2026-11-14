@@ -2,16 +2,28 @@
 // header and the same tabs as the detail screen (SCOPE_TABS), keeps the chosen tab and the choices inside a tab in
 // itself (never in the page's query), and leaves the tab's contents alone when a redraw yields the same HTML, so the
 // explanation frame is not loaded again (R-08). The screens select and fetch; the panel only draws.
+// It shows only the tabs that say so (visibleTabs), paints the agents strip after the contents, and redraws itself
+// on each orca-web summary (iss-00593 D-04).
 import { ancestors, withoutEmbed, withParam } from "./logic.js";
 import { esc, icon, idleText, kindLabel, mergeBadge, orcaSlot, stateChip, stateMark } from "./parts.js";
 import { themeOf } from "./orca_logic.js";
 import { createOpenButton, paintOrcaMarks } from "./orca_marks.js";
 import { nextOnTap, pickTab, settleSheet, sheetHeights } from "./panel_logic.js";
-import { panelEnv, SCOPE_TABS, TAB_KEYS } from "./scope_tabs.js";
+import { panelEnv, SCOPE_TABS, TAB_KEYS, visibleTabs } from "./scope_tabs.js";
+import { paintAgentList } from "./agents_tab.js";
 
 const plainClick = (event) => event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
 const PHONE = 640;
 const DRAG_START = 6; // px a finger moves before the sheet follows it
+
+// Write the tab strip only when its HTML changed: the summaries redraw the panel every 10 seconds (iss-00593). The
+// heading row and the cover keep their own comparison (iss-00592 R-02).
+const written = new WeakMap();
+function put(element, html) {
+  if (written.get(element) === html) return;
+  element.innerHTML = html;
+  written.set(element, html);
+}
 
 export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {}, extraActions = () => "" } = {}) {
   aside.classList.add("sd-pn");
@@ -27,6 +39,27 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
   let shownHl = null; // the heading row's chips and the cover, written only when their HTML changes (iss-00592 R-02)
   let shownCover = null;
   let openButton = null; // orca-web's "open in Orca" in the heading row (D-04)
+  let followed = null; // the ctx.orca whose summaries redraw the panel
+  let unfollow = null;
+
+  function follow(orca) {
+    if (orca === followed) return;
+    unfollow?.();
+    followed = orca ?? null;
+    unfollow = typeof followed?.subscribe === "function" ? followed.subscribe(redraw) : null;
+  }
+
+  // The panel's own redraw (the summaries, the frame's move) draws with the shell's current ctx, not the one the
+  // screen last gave, and not while a move waits (iss-00593 D-06, FQG-001).
+  function redraw() {
+    if (!current) return;
+    if (current.ctx.current) {
+      const ctx = current.ctx.current();
+      if (!ctx) return;
+      current = { ...current, ctx };
+    }
+    draw();
+  }
 
   function build() {
     aside.innerHTML =
@@ -84,11 +117,22 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
     const state = current;
     if (!parts || !aside.contains(parts.body)) build();
     const { ctx, docState, byId } = state;
+    follow(ctx.orca);
     const ready = docState === "ok" && state.doc?.scope?.id === state.scope.id;
     // The structure wins: an older detail never overrides the newer state and reason the structure shows.
     const scope = ready ? { ...state.doc.scope, ...state.scope } : state.scope;
-    const tab = ready ? pickTab(userTab, TAB_KEYS, state.doc.details) : userTab;
-    const env = ready ? panelEnv(ctx, scope, state.doc, byId, { params, tab }) : null;
+    let tab = userTab;
+    let env = null;
+    let shown = SCOPE_TABS.filter((item) => !item.visible); // while the detail loads, only the tabs that always show
+    // A chosen tab that is not shown while loading (agents) shows the default tab; the choice itself is kept.
+    if (!ready && userTab != null && !shown.some((item) => item.key === userTab)) tab = pickTab(userTab, shown.map((item) => item.key), null);
+    if (ready) {
+      // Which tabs show does not depend on the tab, so a first env picks the tab and a second one carries it.
+      const first = panelEnv(ctx, scope, state.doc, byId, { params, tab: userTab });
+      shown = visibleTabs(first);
+      tab = pickTab(userTab, shown.map((item) => item.key), state.doc.details);
+      env = tab === userTab ? first : panelEnv(ctx, scope, state.doc, byId, { params, tab });
+    }
     aside.dataset.st = scope.state;
     const head = header(scope, byId);
     if (head.hl !== shownHl) {
@@ -99,12 +143,16 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
       parts.cover.innerHTML = head.cover;
       shownCover = head.cover;
     }
-    parts.tabs.innerHTML = SCOPE_TABS.map(({ key, label, count }) => {
+    put(parts.tabs, shown.map(({ key, label, count }) => {
       const n = env ? count(env) : null;
       return `<button type="button" role="tab" data-pn-tab="${key}" aria-selected="${tab === key}">${label}${n != null ? `<small>${n}</small>` : ""}</button>`;
-    }).join("");
+    }).join(""));
     const html = body(docState, env, tab);
     const key = `${scope.id}|${tab}`;
+    if (parts.body.dataset.dropped) {
+      shownHtml = null; // the shell removed the frame before a move: place it again
+      delete parts.body.dataset.dropped;
+    }
     if (html !== shownHtml) {
       const keep = key === shownKey ? parts.body.scrollTop : 0;
       parts.body.innerHTML = html;
@@ -113,7 +161,10 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
     } else if (key !== shownKey) parts.body.scrollTop = 0;
     shownKey = key;
     parts.body.dataset.tab = tab ?? "";
-    const detail = withParam(withoutEmbed(scope.path), "tab", tab ?? "summary");
+    if (env && tab === "agents") paintAgentList(parts.body, env, { redraw });
+    // The detail screen and the new tab carry the panel's agent choice (an id or gone:<id>) like the tabs' links do,
+    // so a lost agent does not open the one left by itself on the new page (iss-00593 R-05, FQG attempt 2).
+    const detail = withParam(withParam(withoutEmbed(scope.path), "agent", params.get("agent") ?? null), "tab", tab ?? "summary");
     parts.foot.innerHTML =
       `<a class="ds-btn is-primary" data-nav href="${esc(ctx.href(detail))}" aria-label="詳しい画面" title="詳しい画面">${icon("arrowRight")}詳しい画面</a>` +
       `<a class="ds-btn" href="${esc(detail)}" target="_blank" rel="noopener" aria-label="新しいタブで開く" title="新しいタブで開く">${icon("external")}新しいタブで開く</a>` +
@@ -266,6 +317,7 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
     },
     hide() {
       current = null;
+      follow(null);
       params = new Map();
       snap = "half"; // the next opening starts at the usual height
       drag = null;
@@ -278,6 +330,7 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
     isOpen: () => current != null,
     snap: () => (isSheet() ? snap : null),
     destroy() {
+      follow(null);
       window.removeEventListener("resize", onResize);
       media?.removeEventListener("change", onTheme);
       themeWatch?.disconnect();

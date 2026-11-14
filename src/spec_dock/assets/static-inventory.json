@@ -409,10 +409,11 @@
     {
       "path": "spec-dock/docs/reference_cli.md",
       "source": "spec_dock/docs/reference_cli.md",
-      "sha256": "98c442cf7d7953b595f8948223b0cc9626465c3a7df0c4c4de3ebf3be6818397",
+      "sha256": "6b8066f2ad598b16f243307be2073f424ace27167b718de770ba804d44c5c4a8",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
+        "eddb0f0b931d1bd723d0eced7ba8408bedf191994849e43eeca717cca442eb5c",
         "566aa52a4406909bdfe0b4dcac87a93c9f88e4315f07a080708f8dd84b1dff6a",
         "790ff437cb0dc7519b63f92b2587a714a4214c566a7a9ae15c03ff56b698d7a5",
         "891d64db9c0c0b360fe4ebfcbd4634b21ab0d3b6b423abfb108133556167aec5",
@@ -438,7 +439,8 @@
         "bd67d65e1f6904435ae56c6063d94f625a52477aa1ea9acc8f7633769406572d",
         "94f19d8d4bf2aba725c0b4e79a69528fffe76f3d5e888374dcc03a3a2007befd",
         "2941d065a250c54b628f6472adab49d363dea2d79645e4ebc8ad3c914e408aa8",
-        "eddb0f0b931d1bd723d0eced7ba8408bedf191994849e43eeca717cca442eb5c"
+        "b89a70b1ceb2b87996e279caa225bc023cd47c5690f89dc209ba0fa41e7886ce",
+        "98c442cf7d7953b595f8948223b0cc9626465c3a7df0c4c4de3ebf3be6818397"
       ]
     },
     {

@@ -1,5 +1,7 @@
 /* Scope の詳しい画面（iss-00531 D-07）。試作 d2 の detail の部分。 */
 [data-view="scope"] {
+  /* 見出しの包み（iss-00593 D-04）：描き直しの単位を分けるだけで、並びと見た目は今のまま */
+  & .sd-scope-top { display: contents; }
   & .sd-hm-link { text-decoration: none; }
   & .sd-back { display: inline-flex; align-items: center; gap: 4px; margin-bottom: 12px; padding: 4px 0; font-size: 13px; font-weight: 600; text-decoration: none; }
   & .sd-cover { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(16rem, 1fr); border: 1px solid var(--ds-border); border-top: 4px solid var(--st); border-radius: var(--ds-radius-l); background: var(--ds-surface); overflow: hidden; }
@@ -36,5 +38,5 @@
 /* 文書と説明資料のタブ（iss-00589 D-04）：ページでは、枠の高さを画面の高さから決める（120px は上の帯、タブの中の帯、
    間のすき間）。flex: none で、高さの決まらない縦の flex の中でも height が効く。見た目は _shared/scope_tabs.css。 */
 [data-view="scope"] {
-  & :is(.sd-docframe, .sd-explain) { flex: none; height: max(420px, calc(100dvh - 120px)); }
+  & :is(.sd-docframe, .sd-explain, .sd-agent) { flex: none; height: max(420px, calc(100dvh - 120px)); }
 }

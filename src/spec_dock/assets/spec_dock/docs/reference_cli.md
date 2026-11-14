@@ -131,13 +131,6 @@ ARTIFACT_SCOPEの@rootはArtifact所有者だけで、Scope作成/Startの対象
 - **受け付けるもの**：`GET`、`HEAD`と、「見た」の口の`POST`だけ（ほかは405）。`Host`が`127.0.0.1`、`localhost`、TailscaleのIP、MagicDNSの名前と待ち受けの番号の組でなければ421。
 - **資料**：カタログのScopeのディレクトリの通常のファイルを`/r/<host>/<owner>/<name>/files/<ID>/<道>`から配り、すべての応答に`Content-Security-Policy: sandbox allow-scripts allow-popups; frame-ancestors <埋め込みの許可>`と`X-Content-Type-Options: nosniff`を付けます（リンク、`..`、ディレクトリは断ります）。`/ds/`（デザインシステム）と`/vendor/`（図の部品）だけに`Access-Control-Allow-Origin: *`を付けます。
 - **枠の決まり**：通常の画面は`frame-ancestors 'self'`、`?embed=1`の画面と資料は`frame-ancestors 'self' http://127.0.0.1:* http://localhost:*`（Tailscaleで待ち受けるときは`http://<TailscaleのIP>:*`も）。`X-Frame-Options`は付けません。
-- **orca-web との連携**：同じPCで動く orca-web（Orca のエージェントの稼働を読めるサービス）があれば、画面が orca-web を直接読み、構造の図の箱と枠、ボードの札、横の欄の見出しに、その Scope に対応する worktree にいるエージェントの稼働の印（orca-web の部品が描く種類のアイコン、状態の色、経過の `now`・`5m`・`3h`・`2d`）を出し、横の欄の見出しに「Orca で開く」のボタンを置きます。サーバーは orca-web を読まず、Orca の CLI も呼びません。
-  - 場所：`http://<画面を開いたHostの名前>:<port>`（`127.0.0.1`で開けば`http://127.0.0.1:8791`、TailscaleのIP（例 `192.0.2.10`）で開けばその名前の8791）。利用者の設定`config.json`の最上位の節`orca_web`で変えられます：`{"schema": "specdock.config/v1", "orca_web": {"enabled": true, "port": 8791}}`（どちらも省けます。既定は`enabled: true`、`port: 8791`。`port`は1〜65535の整数）。変えると、起動し直さずに次の要求から効きます。
-  - 連携が有効なとき、画面の`Content-Security-Policy`の`script-src`、`style-src`、`connect-src`、`frame-src`に、そのオリジンだけが足されます。`enabled: false`なら今のままで、orca-web に何も要求しません。`GET /api/v1/repositories`の`server.orca_web`（`{enabled, origin, port, problem}`）が画面に場所を伝えます。
-  - 壊れた節（形や値の誤り）は連携しない側に倒れ、ほかの節（`dashboard`、`todo`）には影響しません。理由は`server.orca_web.problem`と`dashboard list`の`config_problems`に出ます。`port`がダッシュボード自身の番号と同じときも連携しない側に倒れ、理由は`server.orca_web.problem`だけに出ます。
-  - 前提：orca-web の`ORCA_WEB_READ_ORIGINS`に、SpecDockのオリジン（`http://127.0.0.1:47800`と、TailscaleのIPの同じ番号）が入っていること（orca-web の既定）。ほかのオリジンからの読みと部品の読み込みは orca-web が断ります。`localhost`やMagicDNSの名前で画面を開くと、orca-web がその名前を受けないため読めません。
-  - 対応：Scope と worktree の対応は SpecDock が決めます（worktree のパスの一致、なければ同じリポジトリのブランチ名の一致）。親の Scope は自分のブランチの worktree があるときだけ印を持ち、配下を合算しません。
-  - 見え方：印は対応した worktree にエージェントがいる Scope だけに出て、ほかは場所も空けません。印を押すと、その Scope の横の欄が開きます。「Orca で開く」は横の欄の見出しだけで、幅390px以下と`?embed=1`の画面には出ません。orca-web に届かない、Orca に届いていない、連携を切っているときは、印もボタンも出ず、図とボードは今までどおり動きます（届くようになれば、次の読み（10秒ごと）で出ます）。
 - **在りかの記録（`specdock.dashboard-server/v1`）**：`<state_root>/dashboard/server.json`に`schema`、`urls.local`、`urls.tailscale`（なければ`null`）、`pid`、`version`、`started_at`。待ち受けを始めた後に書き、止まるときに消します。`pid`が生きていなければ古い記録です。二重起動は`dashboard/server.lock`で防ぎます。
 - **隠す印（`specdock.dashboard-repositories/v1`）**：`<state_root>/dashboard/repositories.json`の`repositories: {<host/owner/name>: {hidden_at}}`。書くのは`dashboard hide`と`show`だけです。
 - **出すリポジトリの決まり**：出すのは「設定の値が出す」かつ「隠す印がない」リポジトリだけです。設定の値は、設定の3段の規則のとおり後の段が勝ちます：初めの値`true` < 利用者の設定の`dashboard.visible`（全体の既定）< 利用者の設定の`dashboard.repositories.<鍵>.visible`（鍵は`owner/name`か`github.com/owner/name`、大文字も受けます）< リポジトリの設定（カタログの根の`dashboard.json`、`{"schema": "specdock.dashboard-settings/v1", "visible": true|false}`）。リポジトリの設定が最も強く、`visible: true`は利用者の`visible: false`も上書きします。隠す印は、設定にかかわらず常に隠します。壊れた設定は飛ばさずに隠す側に倒します：利用者の設定のファイルが読めない、JSONでない、`schema`が違う、`dashboard`の節の形や値が違えば全リポジトリを、カタログの`dashboard.json`が壊れているか、同じリポジトリの2つのクローンの値（`visible`か、なし）が食い違えばそのリポジトリを隠します（`config.source`は`invalid`、理由は`dashboard list`の`config_problems [{layer, path, reason}]`）。`dashboard summary`と`todo list`の`hidden`も同じ値で、動いていない状態のサーバーが最初に読むのと同じに読みます（印が読めなければ隠します）。隠したリポジトリの直接のURLの次の1手は、印なら`spec-dock dashboard show <owner/name>`、設定なら`spec-dock dashboard list`と、直す設定のファイル（`edit <道>`）です。SpecDockは設定のファイルを作らず、書きません。
@@ -155,6 +148,47 @@ ARTIFACT_SCOPEの@rootはArtifact所有者だけで、Scope作成/Startの対象
 - **Tailscale**：`--service --tailscale`で住所が得られなければ`127.0.0.1`だけで起動し、30秒ごとに住所を取り直して、得られたら待ち受けと`Host`の検査と埋め込みの許可と在りかの記録の`urls.tailscale`に足します。
 - **版の更新**：サーバーは60秒ごとに入っているパッケージの版を読み直します。`--service`のサーバーは、版が変わっていれば在りかの記録を消して終了コード75で終わり（CLIのJSONは書きません）、launchdとsystemdが新しい版で起動し直します。前面の`serve`は終わらず、標準エラーに1回知らせ、`/api/v1/repositories`の`server`に`installed_version`と`restart_required: true`を出します。画面は60秒ごとにこれを読み、上の知らせの帯で起動し直しを促します。
 
+## orca-web との連携
+
+ダッシュボードの契約のうち、同じPCの orca-web との連携の約束です（稼働の印と「Orca で開く」、エージェントのタブ）。
+
+- **orca-web との連携**：同じPCで動く orca-web（Orca のエージェントの稼働を読めるサービス）があれば、画面が orca-web を直接読み、構造の図の箱と枠、ボードの札、横の欄の見出しに、その Scope に対応する worktree にいるエージェントの稼働の印（orca-web の部品が描く種類のアイコン、状態の色、経過の `now`・`5m`・`3h`・`2d`）を出し、横の欄の見出しに「Orca で開く」のボタンを置きます。サーバーは orca-web を読まず、Orca の CLI も呼びません。
+  - 場所：`http://<画面を開いたHostの名前>:<port>`（`127.0.0.1`で開けば`http://127.0.0.1:8791`、TailscaleのIP（例 `192.0.2.10`）で開けばその名前の8791）。利用者の設定`config.json`の最上位の節`orca_web`で変えられます：`{"schema": "specdock.config/v1", "orca_web": {"enabled": true, "port": 8791}}`（どちらも省けます。既定は`enabled: true`、`port: 8791`。`port`は1〜65535の整数）。変えると、起動し直さずに次の要求から効きます。
+  - 連携が有効なとき、画面の`Content-Security-Policy`の`script-src`、`style-src`、`connect-src`、`frame-src`に、そのオリジンだけが足されます。`enabled: false`なら今のままで、orca-web に何も要求しません。`GET /api/v1/repositories`の`server.orca_web`（`{enabled, origin, port, problem}`）が画面に場所を伝えます。
+  - 壊れた節（形や値の誤り）は連携しない側に倒れ、ほかの節（`dashboard`、`todo`）には影響しません。理由は`server.orca_web.problem`と`dashboard list`の`config_problems`に出ます。`port`がダッシュボード自身の番号と同じときも連携しない側に倒れ、理由は`server.orca_web.problem`だけに出ます。
+  - 前提：orca-web の`ORCA_WEB_READ_ORIGINS`に、SpecDockのオリジン（`http://127.0.0.1:47800`と、TailscaleのIPの同じ番号）が入っていること（orca-web の既定）。ほかのオリジンからの読みと部品の読み込みは orca-web が断ります。`localhost`やMagicDNSの名前で画面を開くと、orca-web がその名前を受けないため読めません。
+  - 対応：Scope と worktree の対応は SpecDock が決めます（worktree のパスの一致、なければ同じリポジトリのブランチ名の一致）。親の Scope は自分のブランチの worktree があるときだけ印を持ち、配下を合算しません。
+  - 見え方：印は対応した worktree にエージェントがいる Scope だけに出て、ほかは場所も空けません。印を押すと、その Scope の横の欄が開きます。「Orca で開く」は横の欄の見出しだけで、幅390px以下と`?embed=1`の画面には出ません。orca-web に届かない、Orca に届いていない、連携を切っているときは、印もボタンも出ず、図とボードは今までどおり動きます（届くようになれば、次の読み（10秒ごと）で出ます）。
+  - 画面が読むもの：画面から orca-web への要求は、要約の読み（`GET /api/worktrees/summary`）と、`/embed/`の下の部品（`.js`と`.css`）の読み込みだけです。チャットは、エージェントのタブの枠の中の orca-web の画面が読み書きします（下）。
+
+### エージェントのタブ
+
+横の欄と詳しい画面の共有のタブの2番目（説明資料の次）に「エージェント」のタブ（キー`agents`）があり、その Scope に対応した worktree のエージェントを選んで、orca-web の詳細とチャットをその場で使えます。
+
+- **出す条件**（上から順）：(1) 連携を切っていて（`enabled`が false）、設定の問題がない → 出さない。(2) その Scope に SpecDock の worktree の記録がない → 出さない（要約の Issue の番号や名前で推し量らない）。(3) 設定の`orca_web`の節が壊れているか、orca-web を読んでいる・届かない・Orca に届いていない・Orca を読み始めたところ → 出して、中に理由の知らせを示す。(4) 要約を読めた：対応した worktree のエージェントが1人以上いる → 出す。0人でも、その Scope の選びか、いなくなった覚えがあれば、知らせのために出す。ほかは出さない。数の札は、理由の知らせがないときの、対応した worktree のエージェントの数です。タブが出なくなったら、既定のタブを示します。
+- **選び**：タブの上の1行の帯に、エージェントを稼働の印・種類・ブランチで並べます（入りきらなければ横に動き、折り返しません）。1人なら押さずにその人を選んで開き、その選びを覚えます。2人以上なら切り替えから選びます。選びは、横の欄では欄の中（ページの URL を変えない）、詳しい画面では問い合わせの`agent`に持ちます。自動の選びは履歴を増やさずに問い合わせを書き換え、人が選ぶと普通の移動になります。エージェントのタブを描くときだけ覚え、ほかのタブを見ている間は書き換えません。覚えた選びは、人が選び直すまで、ほかのエージェントに自動で移りません。
+- **いなくなったとき**：選んだエージェントがその Scope の対応した worktree にいなくなったら、枠を外して「選んでいたエージェントはいなくなった」と示し、切り替えに戻します（残りが1人でも自動で開きません）。いなくなったことは、別の Scope を示すまで画面の中で覚え、同じ id が戻っても、戻る操作、欄から詳しい画面への移り、欄の閉じと開き直しでも開きません。人がその Scope で選ぶと覚えを捨てます。ページを読み込み直したときは、問い合わせの`agent=gone:<id>`だけが残ります。Scope を変えると、前の Scope の枠を外します。
+- **送信**：送信は orca-web の枠（`/embed/agent?id=…&theme=light|dark`）の中だけで行われます。SpecDock の画面は orca-web の書き込みの口（`/api/token`、`/api/send/`、`/api/open`、`/api/settings`）を呼ばず、枠に本文・トークン・宛先を渡さず（`postMessage`を使わない）、送れるかを上書きも隠しもしません。送信は orca-web の設定の`sendEnabled`（既定は止まっている）で止められ、止まっているときの理由は orca-web の画面が入力欄の下に示します。
+- **枠**：枠の`sandbox`は`allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox`で、`allow-forms`と`allow-top-navigation`系は付けません。`allow-same-origin`は orca-web の送信の守りと会話の口が同じオリジンを前提にするためで、枠の文書は SpecDock と別のオリジンです。枠の`title`に種類とブランチを書き、送る前に相手の worktree を確かめられます。同じ Scope・同じエージェント（id、種類、ブランチ）・同じ明暗の間は、描き直しでも枠を読み込み直さず、書きかけの本文は消えません。明暗を変えたときと、選んだエージェントの種類かブランチが変わったときは置き直します。
+- **枠の中の移り**：orca-web の iss-00037 で、埋め込みの中の同じ iframe への移りはなくなった（埋め込みのエージェントの画面のリンクは新しいタブで開く）。二重の守りとして、枠が2回目に読み込まれたら（中のリンクで別の相手の画面に移ったとき）、枠を外して知らせ、「選んだエージェントに戻す」を示します。
+
+知らせの言葉と`data-code`：
+
+| `data-code` | 言葉 | 意味と次の1手 |
+| --- | --- | --- |
+| `orca-loading` | orca-web を読んでいる | 画面が orca-web の部品と要約を読み始めたところ。待つ |
+| `orca-unreachable` | orca-web（<オリジン>）に届かない | orca-web の部品か要約を読めない、または要約の形が違う。orca-web が動いているか、orca-web の`ORCA_WEB_READ_ORIGINS`がこの画面のオリジンを許しているかを確かめる。直れば次の読み直し（10 秒）で前の選びに戻る |
+| `orca-shape` | orca-web の要約のエージェントの項目の形が違う（N件） | 対応した worktree のエージェントの項目がどれも、または選んだ相手の項目が、`detail`がその`id`の`/embed/agent?id=`を指さないなどで使えない。いなくなったとは決めず、選びを変えない。orca-web の版を確かめる。一部だけなら使える項目を出し、帯に「形の違う N件は出していない」と示す |
+| `orca-orca-unreachable` | orca-web は動いているが、Orca に届いていない | orca-web の要約の`connection.state`が`unreachable`。Orca を確かめる |
+| `orca-orca-starting` | orca-web が Orca を読み始めたところ | `connection.state`が`starting`。待つ |
+| `orca-config` | 設定の orca_web の節を読めない：<理由> | 利用者の設定`config.json`の`orca_web`の節が壊れている。`spec-dock dashboard list`の`config_problems`に道が出る。直すと、サーバーを起動し直さずに次に開いた画面から効く |
+| `orca-embed` | 埋め込みの画面ではチャットを開けない | `?embed=1`の画面では枠を置かない（orca-web の`frame-ancestors`が埋め込み先を許さない）。リンクで SpecDock を新しいタブで開く |
+| `orca-agent-gone` | 選んでいたエージェントはいなくなった | 選んだエージェントが要約の対応した worktree にいない。帯から選び直す（書きかけの本文は失われる） |
+| `orca-agent-choose` | エージェントを選ぶ | 2人以上いて、まだ選んでいない。帯から選ぶ |
+| `orca-agent-drift` | 選んだのと別のエージェントに移ったので閉じた | 枠の中のリンクで別の相手の画面に移った。「選んだエージェントに戻す」で戻す。移った先の相手と話すときは、Orca で開くか、その相手の Scope のタブで選ぶ |
+
+連携を止めるときは`config.json`に`"orca_web": {"enabled": false}`を書きます（タブも印も消え、画面は orca-web に何も要求しません）。送信だけを止めるときは、orca-web の設定の`sendEnabled`を false にします。
+
 ## 人のタスクの契約（`specdock.todo/v1`、`specdock.todo-list/v1`）
 
 `todo`のコマンドが書くのは、そのチェックアウトのリポジトリのカタログ（`spec-dock/initiatives/todos/`）だけです。読むのも同じカタログですが、`todo list --all-repositories`／`--repository`と`todo show <REF>`は、このPCの登録簿にある全カタログの`todos/`を読みます。どれもGitHubに要求を送らず、構造のスナップショットも取り直しません。Scopeの状態、`dependency check`、`work start`の判定は、人のタスクで変わりません（止めている印を示すだけです）。項目を足すのは版を変えずに行い、消すか意味を変えるときは版を上げます。
@@ -162,7 +196,7 @@ ARTIFACT_SCOPEの@rootはArtifact所有者だけで、Scope作成/Startの対象
 - **記録（`specdock.todo/v1`）**：`todos/<作った年月（UTC）>/t-xxxx.json`に1件1つ。閉じても動かさず、消しません。IDは`t-`と4文字（`0-9`と`i`、`l`、`o`、`u`を除く小文字。大文字の入力も受けます）、サブタスクは`t-xxxx.1`。欄は`schema`、`id`、`title`（1行、200文字まで）、`kind`（`decide`、`check`、`operate`、`act`、`todo`、`checklist`）、`status`（`open`、`snoozed`、`done`、`cancelled`）、`created_at`、`updated_at`、`origin {by, role}`、`body`、`options [{key, text}]`、`recommendation {key, reason}`、`reply_to`、`effort`、`due`、`snooze_until`、`scopes {related, blocks}`、`links`、`tags`、`subtasks [{id, title, status, created_at, updated_at, resolution}]`、`resolution {at, by, role, choice, note, record}`、`history [{at, by, role, action, target, note, fields}]`。時刻はUTCの`YYYY-MM-DDTHH:MM:SSZ`。知らない欄は誤りにせず、書き換えるときに残します。型の定義はパッケージの`cue/todo/v1/todo.cue`（`#Todo`）です。
 - **1件の結果**（`add`、`show`、`update`、`done`、`snooze`、`cancel`、`reopen`の`data.result`）：`{todo, derived, ref, repository, path, warnings_detail}`。`derived`は`effective_status`（延期の時刻を過ぎれば`open`）、`overdue`、`due_soon`（24時間以内）、`blocking`、`parent_closable`、`open_subtasks`、`subtask_counts`。`ref`は`<owner>/<name>/t-xxxx`。
 - **一覧（`specdock.todo-list/v1`）**：`schema`、`generated_at`、`mode`、`filters`、`repositories [{repository, catalog, main_checkout, hidden, status, problem, counts {open, blocking, overdue, snoozed, agent_parents {count, limit, source}}, invalid_files, conflict_copies}]`、`items [{ref, repository, path, derived, todo}]`。`filters`は受け取った絞り込みで、`repositories`は`--repository`の鍵の配列です。`mode`は、チェックアウトの中の`repository`（そのカタログの1行）か、集約の`all_repositories`（登録簿の全行。リポジトリ、`main_checkout`、カタログの順）です。`status`は`ok`（形の正しくない記録と衝突の写しは`invalid_files`と`conflict_copies`に並べ、ほかの記録は`items`に返します）、`unreadable`（カタログか`todos/`が読めない。`problem {code, message, next_step}`で、次の1手は`main_checkout`での`canonical link`）、`duplicate`（同じリポジトリの2つ目のクローン。`main_checkout`の道の順で最初の行だけを読みます）。`unreadable`と`duplicate`の行の`counts`は`null`です。`hidden`はダッシュボードに出さないか（出すリポジトリの決まりの最終の値）で、隠したリポジトリも集約に入ります。`repository`の分からない行は`repository`と`ref`が`null`です。集まるのはこのPCの登録簿に載ったカタログだけで、`canonical link --no-schedule`でリンクしたカタログは、そのチェックアウトの中の`todo list`で読みます。
-- **設定の3段**：初めの値（`parent_limit` 20、`subtask_limit` 30、`default_due` `4h`）< 利用者の設定`$XDG_CONFIG_HOME/spec-dock/config.json`（なければ`~/.config/spec-dock/config.json`。`{"schema": "specdock.config/v1", "todo": {...}, "dashboard": {...}, "orca_web": {...}}`）< リポジトリの設定`todos/settings.json`（`{"schema": "specdock.todo-settings/v1", ...}`）。鍵ごとに後の段が勝ちます。壊れた段は丸ごと飛ばし、`TODO_SETTINGS_INVALID`を警告します。同じファイルの`dashboard`の節は、ダッシュボードの契約の「出すリポジトリの決まり」に従い、壊れていれば飛ばさずに隠す側に倒します（`todo`の節の誤りはダッシュボードに影響しません）。`orca_web`の節は、ダッシュボードの契約の「orca-web との連携」に従い、壊れていれば連携しない側に倒します。SpecDockは設定のファイルを作りません。
+- **設定の3段**：初めの値（`parent_limit` 20、`subtask_limit` 30、`default_due` `4h`）< 利用者の設定`$XDG_CONFIG_HOME/spec-dock/config.json`（なければ`~/.config/spec-dock/config.json`。`{"schema": "specdock.config/v1", "todo": {...}, "dashboard": {...}, "orca_web": {...}}`）< リポジトリの設定`todos/settings.json`（`{"schema": "specdock.todo-settings/v1", ...}`）。鍵ごとに後の段が勝ちます。壊れた段は丸ごと飛ばし、`TODO_SETTINGS_INVALID`を警告します。同じファイルの`dashboard`の節は、ダッシュボードの契約の「出すリポジトリの決まり」に従い、壊れていれば飛ばさずに隠す側に倒します（`todo`の節の誤りはダッシュボードに影響しません）。`orca_web`の節は、「orca-web との連携」の節に従い、壊れていれば連携しない側に倒します。SpecDockは設定のファイルを作りません。
 - **件数の目安**：開いている、エージェントが登録した、`checklist`でない親のタスクの数（`parent_limit`）と、1つの親の開いたサブタスクの数（`subtask_limit`）。超えても登録し、`TODO_LIMIT_EXCEEDED`を警告します。
 - **エラーと警告**：`TODO_INVALID`（2、入力の誤り。`details.problems`、`details.missing`）、`TODO_NESTING_TOO_DEEP`（2）、`TODO_NOT_FOUND`、`TODO_ID_AMBIGUOUS`、`TODO_STATE_INVALID`、`TODO_SUBTASKS_OPEN`、`TODO_PARENT_CLOSED`、`TODO_RECORD_INVALID`、`TODO_SCHEMA_UNSUPPORTED`、`TODO_ID_EXHAUSTED`、`TODO_REGISTRY_UNREADABLE`（登録簿が読めない）、`TODO_REPOSITORY_UNKNOWN`、`TODO_REPOSITORY_UNREADABLE`（どちらも`show <REF>`）（いずれも3）、`TODO_REPOSITORY_INVALID`（2、`--repository`か`REF`の形の誤り）、`TODO_WRITE_INCOMPLETE`（6）、`TODO_CHECK_FAILED`（7）。警告は`TODO_LIMIT_EXCEEDED`、`TODO_SCOPE_UNKNOWN`、`TODO_SETTINGS_INVALID`、`TODO_CONFLICT_COPY`（中身を元のファイルに統合してから写しを消す）、`TODO_RECORD_INVALID`（一覧で読めない記録）、`TODO_FILE_UNKNOWN`、`TODO_CUE_SKIPPED`、`TODO_CUE_FAILED`、集約の`TODO_REPOSITORY_UNREADABLE`、`TODO_REPOSITORY_DUPLICATE`、`TODO_REPOSITORY_UNKNOWN`（登録簿にない`--repository`）。リンクがなければ、ほかのコマンドと同じく`CANONICAL_NOT_LINKED`（次の1手`spec-dock canonical link`）で何も書かずに止まります。
 
