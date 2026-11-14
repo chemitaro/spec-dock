@@ -196,7 +196,7 @@ design: {
 		satisfies: ["R-08"]
 		text: """
 			`src/spec_dock/assets/spec_dock/docs/reference_cli.md` に、エージェントのタブの説明を書く。iss-00592 の `orca_web` の節が `origin/main` にあればその節の中に、なければ `## 人のタスクの契約` の節（設定の3段を持つ）の後に `## orca-web との連携` の節を作って書く（後に入る方が1つの節にまとめる。Epic D-07）。
-			書くこと：タブを出す条件（R-01 の4つ）、1人なら自動で開き選びを覚えること、選んだ相手がいなくなったら知らせて自動で移らないこと、選びの持ち方（欄の中、詳しい画面の `agent` の問い合わせ）、送信は orca-web の iframe の中だけで行われ orca-web の設定の `sendEnabled`（既定は止まっている）で止められ SpecDock は書き込みに関わらないこと、iframe の sandbox の値、知らせのすべての言葉の意味（D-05 の `loading`・`unreachable`・`shape`・`orca-unreachable`・`orca-starting`・`config`・`embed` の7つと、D-03 の `gone`・`choose`・`drift` の3つ。どれも `data-code` の名前とともに）。例の IP は 127.0.0.1 と 192.0.2.x だけ。
+			書くこと：タブを出す条件（R-01 の4つ）、1人なら自動で開き選びを覚えること、選んだ相手がいなくなったら知らせて自動で移らないこと、選びの持ち方（欄の中、詳しい画面の `agent` の問い合わせ）、送信は orca-web の iframe の中だけで行われ orca-web の設定の `sendEnabled`（既定は止まっている）で止められ SpecDock は書き込みに関わらないこと、iframe の sandbox の値、iframe の中の親・子のリンクでの移りの残るリスク（risks の記述と同じ。orca-web の iss-00037 が先に入っていればその記述）、知らせのすべての言葉の意味（D-05 の `loading`・`unreachable`・`shape`・`orca-unreachable`・`orca-starting`・`config`・`embed` の7つと、D-03 の `gone`・`choose`・`drift` の3つ。どれも `data-code` の名前とともに）。例の IP は 127.0.0.1 と 192.0.2.x だけ。
 			変えた配る文書と画面の資産の sha256 を `src/spec_dock/assets/static-inventory.json` に合わせる（今の検査のとおり。画面の資産が inventory に入っていなければ、入っているものだけ）。
 			"""
 	}
@@ -211,7 +211,7 @@ compatibility: """
 
 risks: [
 	"orca-web の `/embed/agent` の契約（`detail` の道、`theme`）が変わるとチャットが出なくなる。SpecDock は `detail` をそのまま使い、形が違えばそのエージェントを出さない",
-	"orca-web の画面の中の、親と子のエージェントのリンクは同じ iframe の中で開く（orca-web の動き）。SpecDock はその移りを止められないので、2回目の `load` で iframe を外して知らせる（D-04、F-08）。移った先の画面で送れる時間は残らない：orca-web の `agent.html` の入力欄と送るボタンは `disabled` で始まり、モジュール（`agent-frame.js`）が動いた後の送れるかの問い合わせ（`fetch`、`load` を遅らせない）が返ってから使えるようになる。モジュールと CSS は `load` を遅らせるので、移った先の `load` は送る欄が使えるより前に起き、SpecDock は同じ聞き手の中で iframe を外す（ChatGPT round-3 の P1 への反論。orca-web の main `1a2afed` を読んだ事実）。orca-web が将来、自分で文書を移すようになると（例：自動の読み直し）、この知らせが誤って出る。そのときは orca-web の README の契約に従って見直す",
+	"orca-web の画面の中の、親と子のエージェントのリンクは同じ iframe の中で開く（orca-web の動き）。SpecDock はその移りを止められないので、2回目の `load` で iframe を外して知らせる（D-04、F-08）。移った先の画面で送れる時間は残らない：orca-web の `agent.html` の入力欄と送るボタンは `disabled` で始まり、モジュール（`agent-frame.js`）が動いた後の送れるかの問い合わせ（`fetch`、`load` を遅らせない）が返ってから使えるようになる。モジュールと CSS は `load` を遅らせるので、移った先の `load` は送る欄が使えるより前に起き、SpecDock は同じ聞き手の中で iframe を外す（orca-web の main `1a2afed` を読んだ事実）。ただし HTML の仕様はこの順を保証しない（ChatGPT round-4 の P1）。統括の決定（requirement.cue の decisions、案1）で、この検知で進め、残るリスクとして report.md と配る文書に書き、S-04 で実機の順を記録する。根を断つ修正は orca-web の iss-00037（埋め込みの画面で親と子のリンクを新しいタブで開く）。iss-00037 が先に入っていれば、F-08 は二重の守りとして残し、この risks と配る文書の記述を『orca-web の iss-00037 で、埋め込みの中の同じ iframe への移りはなくなった』に直す。orca-web が将来、自分で文書を移すようになると（例：自動の読み直し）、この知らせが誤って出る。そのときは orca-web の README の契約に従って見直す",
 	"`allow-same-origin` と `allow-scripts` を並べるので、iframe の中の orca-web の画面は自分のオリジンの力をすべて持つ。orca-web は同じ PC の信頼するサービスで、`frame-ancestors` で置き場を SpecDock のオリジンに限っている（Epic の risks）",
 	"要約の知らせのたびに横の欄と詳しい画面が描き直す（10 秒ごと）。中身は同じ文字列なら置き換えないが、見出しと帯は書き換える。重さは写しと操作で確かめ、目立てば見出しも比べる",
 	"orca-web の要約は、同じセッションを2つのエージェント（`chat:agent-session:…` と `structured-agent-session-…`）として返すことがある。SpecDock は要約のまま2つを並べる（どちらを選んでも同じセッションに届く。orca-web の側の課題）",
