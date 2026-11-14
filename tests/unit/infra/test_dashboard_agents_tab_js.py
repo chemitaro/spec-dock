@@ -126,10 +126,12 @@ def test_one_agent_opens_its_frame_and_keeps_the_choice(tmp_path: Path) -> None:
         const env = counting(panel());
         out.html = at.agentsTab(env);
         out.kept = env.kept;
+        reset(); // a fresh Scope memory: otherwise the agent placed last stands in for the empty Map
         const params = new Map();
         const second = counting(panel(params));
         at.agentsTab(second);
         out.map = [...params];
+        reset();
         const onPage = counting(page("tab=agents"));
         at.agentsTab(onPage);
         out.replaced = onPage.ctx.replaced;
@@ -564,11 +566,8 @@ def test_the_panel_shows_the_visible_tabs_paints_the_strip_and_follows_the_summa
     panel = (SHARED / "panel.js").read_text(encoding="utf-8")
     assert "shown = visibleTabs(first);" in panel
     assert "tab = pickTab(userTab, shown.map((item) => item.key), state.doc.details);" in panel
-    assert re.search(
-        r'if \(env && tab === "agents"\) paintAgentList\(parts\.body, env, \{ redraw: \(\) => \{ if \(current\) draw\(\); \} \}\);',
-        panel,
-    )
-    assert "followed.subscribe(() => { if (current) draw(); })" in panel and "follow(ctx.orca);" in panel
+    assert 'if (env && tab === "agents") paintAgentList(parts.body, env, { redraw });' in panel
+    assert "followed.subscribe(redraw)" in panel and "follow(ctx.orca);" in panel
     for name in ("hide()", "destroy()"):
         body = panel[panel.index(f"    {name} {{") :]
         assert body[: body.index("\n    },")].count("follow(null);") == 1, name
@@ -576,7 +575,8 @@ def test_the_panel_shows_the_visible_tabs_paints_the_strip_and_follows_the_summa
 
 def test_the_shell_gives_the_problem_the_quiet_query_and_redraws_on_the_theme() -> None:
     app = (ASSETS / "app.js").read_text(encoding="utf-8")
-    assert "orcaProblem: state.server?.orca_web?.problem ?? null," in app and "    replaceParam,\n" in app
+    assert "orcaProblem: state.server?.orca_web?.problem ?? null," in app
+    assert "ctx.replaceParam = (name, value) => replaceParam(name, value, ctx.route);" in app
     body = app[app.index("function replaceParam(") :]
     body = body[: body.index("\n}\n")]
     assert 'history.replaceState(null, "", path);' in body and "withParam(state.route.path, name, value)" in body
@@ -803,3 +803,211 @@ def test_the_strip_follows_late_layout_until_the_person_moves_it(tmp_path: Path)
     assert out["afterLayout"] == 130 and out["afterRedraw"] == 180
     assert out["afterPerson"] == 0 and out["sameChoice"] == 0 and out["observerCount"] == 1
     assert out["unknownTypes"] == 0
+
+
+# --- The final quality gate, attempt 1 (FQG-001, FQG-002 and the second opinion's P1 and P2) ---------------------
+
+
+@node
+def test_a_loss_is_noted_only_when_the_match_is_known(tmp_path: Path) -> None:
+    out = _run(
+        """
+        reset();
+        // The worktree records cannot be read: no tab, and no loss either.
+        const unread = {...structure, worktrees: {status: "unreadable", paths: []}};
+        world.trees[sid] = [tree("w1", "one", [raw("b")])];
+        const blind = panel(new Map([["agent", "a"]]), {data: unread});
+        out.blind = at.agentsState(blind).show;
+        out.blindGone = [...at.mem.gone];
+        // Every entry is out of shape: a shape notice, and no loss.
+        world.trees[sid] = [tree("w1", "one", [{id: "b", detail: "x"}])];
+        const broken = at.agentsState(panel(new Map([["agent", "a"]])));
+        out.broken = broken.reason;
+        out.brokenGone = [...at.mem.gone];
+        // A known match without a: a loss.
+        world.trees[sid] = [tree("w1", "one", [raw("b")])];
+        at.agentsState(panel(new Map([["agent", "a"]])));
+        out.known = [...at.mem.gone];
+        world.trees[sid] = [tree("w1", "one", [raw("a")])];
+        """,
+        tmp_path,
+    )
+    assert out["blind"] is False and out["blindGone"] == []
+    assert out["broken"] == "shape" and out["brokenGone"] == []
+    assert out["known"] == ["a"]
+
+
+@node
+def test_an_env_without_a_choice_uses_the_last_shown_agent(tmp_path: Path) -> None:
+    out = _run(
+        """
+        reset();
+        world.trees[sid] = [tree("w1", "one", [raw("a"), raw("b")])];
+        // The person picks a in the panel: its frame is placed and remembered as the last one.
+        logic.forgetGone(logic.memoryFor(at.mem, sid), "a");
+        at.agentsTab(panel(new Map([["agent", "a"]])));
+        out.last = at.mem.last;
+        // The panel closes (its Map is empty) and opens again: a, not "choose".
+        out.reopened = at.agentsTab(panel(new Map()));
+        // The page without agent= opens a too.
+        out.page = at.agentsTab(page("tab=agents"));
+        // While the panel is closed, a goes away and b is left alone: reopening does not open b by itself.
+        world.trees[sid] = [tree("w1", "one", [raw("b")])];
+        const params = new Map();
+        const again = counting(panel(params));
+        out.gone = at.agentsTab(again);
+        out.kept = again.kept;
+        // An automatic choice is remembered as the last one too.
+        reset();
+        world.trees[sid] = [tree("w1", "one", [raw("c")])];
+        at.agentsTab(panel(new Map()));
+        out.autoLast = at.mem.last;
+        world.trees[sid] = [tree("w1", "one", [raw("a")])];
+        """,
+        tmp_path,
+    )
+    assert out["last"] == "a"
+    assert "id=a&amp;theme=light" in out["reopened"] and "id=a&amp;theme=light" in out["page"]
+    assert "<iframe" not in out["gone"] and 'data-code="orca-agent-gone"' in out["gone"]
+    assert out["kept"] == [["agent", "gone:a"]]
+    assert out["autoLast"] == "c"
+
+
+@node
+def test_a_summary_during_a_move_never_writes_a_choice_from_the_old_route(tmp_path: Path) -> None:
+    out = _run(
+        SCREEN.replace("SCOPE_VIEW", json.dumps((VIEWS / "scope.js").as_uri()))
+        + """
+        reset();
+        // A model of the shell: one current route, a move that waits for the Scope, current() and replaceParam.
+        const app = {route: null, moving: 0};
+        const shellCtx = () => {
+          const ctx = {...pageCtx(""), scope: doc, route: app.route};
+          ctx.replaceParam = (name, value) => {
+            if (ctx.route.path !== app.route.path) return app.route; // decided on a route that is gone
+            const url = new URL(app.route.path, "http://x");
+            url.searchParams.set(name, value);
+            app.route = {...app.route, path: url.pathname + "?" + url.searchParams.toString(), params: url.searchParams};
+            return app.route;
+          };
+          ctx.current = () => (app.moving ? null : shellCtx());
+          return ctx;
+        };
+        const routeOf = (query) => ({scope: sid, path: scope.path + "?" + query, params: new URLSearchParams(query)});
+        world.trees[sid] = [tree("w1", "one", [raw("a"), raw("b")])];
+        app.route = routeOf("tab=agents");
+        const root = screenRoot();
+        screen.render(root, shellCtx()); // two agents: "choose"
+        out.choose = root.page.parts["sd-tabpanel"].html.includes('data-code="orca-agent-choose"');
+        // The person presses b; the shell sets the new route and waits for the Scope's JSON.
+        app.route = routeOf("tab=agents&agent=b");
+        app.moving++;
+        world.trees[sid] = [tree("w1", "one", [raw("a")])]; // meanwhile b goes away and a is left alone
+        subs[0](); // a summary arrives during the move
+        out.duringMove = {route: app.route.path, frame: root.page.parts["sd-tabpanel"].html.includes("<iframe")};
+        app.moving--;
+        screen.render(root, shellCtx()); // the move ends
+        out.afterMove = {route: app.route.path, html: root.page.parts["sd-tabpanel"].html};
+        subs[0](); // a later summary draws from the shell's current route
+        out.later = app.route.path;
+        // replaceParam refuses a value decided on a route that is no longer current.
+        const stale = shellCtx();
+        stale.route = routeOf("tab=agents");
+        tabs.pageEnv(stale, scope, doc, byId).keep("agent", "a");
+        out.refused = {route: app.route.path, envRoute: stale.route.path};
+        screen.dispose();
+        world.trees[sid] = [tree("w1", "one", [raw("a")])];
+        """,
+        tmp_path,
+    )
+    b = "/r/github.com/o/r/scopes/iss-00001?tab=agents&agent=b"
+    gone = "/r/github.com/o/r/scopes/iss-00001?tab=agents&agent=gone%3Ab"
+    assert out["choose"]
+    assert out["duringMove"] == {"route": b, "frame": False}
+    assert out["afterMove"]["route"] == gone
+    assert "<iframe" not in out["afterMove"]["html"] and 'data-code="orca-agent-gone"' in out["afterMove"]["html"]
+    assert out["later"] == gone
+    assert out["refused"] == {"route": gone, "envRoute": gone}  # nothing written; the env reads the current route
+
+
+@node
+def test_a_dropped_frame_is_placed_again_on_the_next_drawing(tmp_path: Path) -> None:
+    out = _run(
+        SCREEN.replace("SCOPE_VIEW", json.dumps((VIEWS / "scope.js").as_uri()))
+        + """
+        reset();
+        world.trees[sid] = [tree("w1", "one", [raw("a")])];
+        const root = screenRoot();
+        screen.render(root, screenCtx("tab=agents&agent=a"));
+        const panelPart = root.page.parts["sd-tabpanel"];
+        out.first = panelPart.writes;
+        screen.render(root, screenCtx("tab=agents&agent=a"));
+        out.same = panelPart.writes; // the same string: left alone
+        panelPart.dataset.dropped = "1"; // the shell removed the frame before a move
+        screen.render(root, screenCtx("tab=agents&agent=a"));
+        out.redrawn = {writes: panelPart.writes, flag: panelPart.dataset.dropped ?? null, frame: panelPart.html.includes("<iframe")};
+        screen.dispose();
+        """,
+        tmp_path,
+    )
+    assert out["first"] == 1 and out["same"] == 1
+    assert out["redrawn"] == {"writes": 2, "flag": None, "frame": True}
+
+
+def test_the_shell_moves_without_leaving_a_frame_and_redraws_from_the_current_state() -> None:
+    app = (ASSETS / "app.js").read_text(encoding="utf-8")
+    move = app[app.index("async function navigate(") :]
+    move = move[: move.index("\n}\n")]
+    assert "const before = state.route;" in move and "state.route = target;" in move
+    changed = 'target.scope !== before.scope || target.params.get("agent") !== before.params.get("agent")'
+    assert f"if ({changed}) dropAgentFrames();" in move
+    assert move.index("dropAgentFrames();") < move.index("await api.scope(")
+    assert "state.moving += 1;" in move and "state.moving -= 1;" in move
+    assert move.index("state.moving += 1;") < move.index("await api.scope(") < move.index("state.moving -= 1;")
+    early = move[move.index("if (sameScope) render();") :]
+    assert early.index("render();") < early.index("await api.scope(")
+    drop = app[app.index("function dropAgentFrames(") :]
+    drop = drop[: drop.index("\n}\n")]
+    assert (
+        'root.querySelectorAll("iframe.sd-agent")' in drop
+        and '.dataset.dropped = "1";' in drop
+        and "frame.remove();" in drop
+    )
+    assert "current: () => (state.moving ? null : viewCtx())," in app
+    body = app[app.index("function replaceParam(") :]
+    body = body[: body.index("\n}\n")]
+    assert "if (from && from.path !== state.route.path) return state.route;" in body
+    scope = (VIEWS / "scope.js").read_text(encoding="utf-8")
+    assert "last.ctx.current ? last.ctx.current() : last.ctx" in scope and "panel.dataset.dropped" in scope
+    panel = (SHARED / "panel.js").read_text(encoding="utf-8")
+    assert "current.ctx.current" in panel and "parts.body.dataset.dropped" in panel
+
+
+@node
+def test_the_marks_compare_and_draw_with_the_same_now(tmp_path: Path) -> None:
+    out = _run(
+        """
+        reset();
+        let clock = 1_000_000;
+        Date.now = () => clock;
+        const seen = {build: [], render: []};
+        world.marks = {
+          buildMarks: (doc, options) => { seen.build.push(options); return {marks: [{mark: doc.agents[0].mark, elapsed: Math.floor((options.now ?? 0) / 60000)}]}; },
+          renderAgentMarks: (slot, doc, options) => { seen.render.push(options); },
+        };
+        world.trees[sid] = [tree("w1", "one", [raw("a")])];
+        const draw = (root) => { const env = panel(new Map([["agent", "a"]])); const html = at.agentsTab(env); root = root ?? fakeRoot(html); at.paintAgentList(root, env); return root; };
+        const root = draw();
+        draw(root); // the same minute: no new drawing
+        out.sameMinute = seen.render.length;
+        clock += 60_000; // a minute later the elapsed time changes though the state does not
+        draw(root);
+        out.nextMinute = seen.render.length;
+        out.options = {build: seen.build.at(-1), render: seen.render.at(-1)};
+        world.marks = null;
+        """,
+        tmp_path,
+    )
+    assert out["sameMinute"] == 1 and out["nextMinute"] == 2
+    assert out["options"]["build"] == {"max": 1, "now": 1_060_000}
+    assert out["options"]["render"] == {"size": "sm", "max": 1, "now": 1_060_000}

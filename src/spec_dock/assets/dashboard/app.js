@@ -30,6 +30,7 @@ const state = {
   revision: null,
   error: null,
   view: null, // the mounted screen module
+  moving: 0, // moves that set the route and still wait for the Scope's JSON (iss-00593 D-06)
 };
 
 const loadedStyles = new Set();
@@ -53,8 +54,10 @@ function href(path) {
 }
 
 // A choice a screen keeps by itself replaces the query without a new history entry (iss-00593 D-06). It is called
-// from inside a render, so it neither redraws nor tells the embedding parent.
-function replaceParam(name, value) {
+// from inside a render, so it neither redraws nor tells the embedding parent. A choice made by a drawing of another
+// route (`from`, the caller's route) is not written: it must not overwrite a newer choice (FQG-001).
+function replaceParam(name, value, from) {
+  if (from && from.path !== state.route.path) return state.route;
   const path = withParam(state.route.path, name, value);
   history.replaceState(null, "", path);
   state.route = parseRoute(new URL(path, location.origin).href);
@@ -80,6 +83,27 @@ function title() {
   return repo ? `${scope}${module?.title ?? ""} · ${repo} · SpecDock` : "すべてのリポジトリ · SpecDock";
 }
 
+// The ctx a screen draws with. current() gives a new one from the state for a screen's own redraw (the orca-web
+// summaries), or null while a move waits for its Scope (iss-00593 D-06, FQG-001).
+function viewCtx() {
+  const ctx = {
+    repository: state.route.repository,
+    route: state.route,
+    data: state.data,
+    scope: state.scope,
+    repositories: state.repositories,
+    embed: state.route.embed,
+    orca: state.orca,
+    orcaProblem: state.server?.orca_web?.problem ?? null, // iss-00593 D-06
+    current: () => (state.moving ? null : viewCtx()),
+    baseline: state.baseline, // the panels read a Scope against the same seen_id as the structure (iss-00587)
+    navigate,
+    href,
+  };
+  ctx.replaceParam = (name, value) => replaceParam(name, value, ctx.route);
+  return ctx;
+}
+
 function render() {
   const module = VIEWS[state.route.view] || VIEWS.graph;
   document.title = title();
@@ -93,20 +117,7 @@ function render() {
     ensureStyles(module);
     state.view = module;
   }
-  module.render(root, {
-    repository: state.route.repository,
-    route: state.route,
-    data: state.data,
-    scope: state.scope,
-    repositories: state.repositories,
-    embed: state.route.embed,
-    orca: state.orca,
-    orcaProblem: state.server?.orca_web?.problem ?? null, // iss-00593 D-06
-    replaceParam,
-    baseline: state.baseline, // the panels read a Scope against the same seen_id as the structure (iss-00587)
-    navigate,
-    href,
-  });
+  module.render(root, viewCtx());
 }
 
 async function loadRepository() {
@@ -168,11 +179,31 @@ async function navigate(path, { push = true } = {}) {
     return;
   }
   if (push && target.path !== state.route.path) history.pushState(null, "", target.path);
+  const before = state.route;
   state.route = target;
-  state.scope = target.scope ? await api.scope(target.repository, target.scope, state.baseline).catch(() => null) : null;
+  // Another Scope or another agent: no frame of the old agent stays usable while the Scope is read (iss-00593 D-06).
+  if (target.scope !== before.scope || target.params.get("agent") !== before.params.get("agent")) dropAgentFrames();
+  // The same Scope with another query draws at once with the details it has, then again after reading them.
+  const sameScope = target.view === "scope" && target.scope != null && target.scope === before.scope && state.scope?.scope?.id === target.scope;
+  if (sameScope) render();
+  state.moving += 1;
+  try {
+    state.scope = target.scope ? await api.scope(target.repository, target.scope, state.baseline).catch(() => null) : null;
+  } finally {
+    state.moving -= 1;
+  }
   render();
   root.focus({ preventScroll: true });
   bridge.navigated();
+}
+
+// Remove the agent frames before a move; the screens see the mark and place the frame again on their next drawing.
+function dropAgentFrames() {
+  for (const frame of root.querySelectorAll("iframe.sd-agent")) {
+    const holder = frame.closest(".sd-tabpanel, .pn-body");
+    if (holder) holder.dataset.dropped = "1";
+    frame.remove();
+  }
 }
 
 function interceptLinks(event) {

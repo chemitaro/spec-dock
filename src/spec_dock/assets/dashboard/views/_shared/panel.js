@@ -41,7 +41,19 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
     if (orca === followed) return;
     unfollow?.();
     followed = orca ?? null;
-    unfollow = followed ? followed.subscribe(() => { if (current) draw(); }) : null;
+    unfollow = followed ? followed.subscribe(redraw) : null;
+  }
+
+  // The panel's own redraw (the summaries, the frame's move) draws with the shell's current ctx, not the one the
+  // screen last gave, and not while a move waits (iss-00593 D-06, FQG-001).
+  function redraw() {
+    if (!current) return;
+    if (current.ctx.current) {
+      const ctx = current.ctx.current();
+      if (!ctx) return;
+      current = { ...current, ctx };
+    }
+    draw();
   }
 
   function build() {
@@ -105,6 +117,10 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
     }).join(""));
     const html = body(docState, env, tab);
     const key = `${scope.id}|${tab}`;
+    if (parts.body.dataset.dropped) {
+      shownHtml = null; // the shell removed the frame before a move: place it again
+      delete parts.body.dataset.dropped;
+    }
     if (html !== shownHtml) {
       const keep = key === shownKey ? parts.body.scrollTop : 0;
       parts.body.innerHTML = html;
@@ -113,7 +129,7 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
     } else if (key !== shownKey) parts.body.scrollTop = 0;
     shownKey = key;
     parts.body.dataset.tab = tab ?? "";
-    if (env && tab === "agents") paintAgentList(parts.body, env, { redraw: () => { if (current) draw(); } });
+    if (env && tab === "agents") paintAgentList(parts.body, env, { redraw });
     const detail = withParam(withoutEmbed(scope.path), "tab", tab ?? "summary");
     parts.foot.innerHTML =
       `<a class="ds-btn is-primary" data-nav href="${esc(ctx.href(detail))}" aria-label="詳しい画面" title="詳しい画面">${icon("arrowRight")}詳しい画面</a>` +

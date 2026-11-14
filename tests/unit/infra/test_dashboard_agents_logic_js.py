@@ -68,6 +68,10 @@ def test_visibility_table(tmp_path: Path) -> None:  # T-01
         assert.deepEqual(v({agents: [], wanted: "gone:a"}), {show: true, reason: null});
         assert.deepEqual(v({agents: [], goneIds: new Set(["a"])}), {show: true, reason: null});
         assert.deepEqual(v({agents: [], invalid: 1}), {show: true, reason: "shape"});
+        // No usable agent at all: the shape notice, whatever the choice or the losses say (FQG attempt 1, ChatGPT P2).
+        for (const extra of [{wanted: "a"}, {wanted: "gone:a"}, {goneIds: new Set(["a"])}, {wanted: "a", goneIds: new Set(["a"])}]) {
+          assert.deepEqual(v({agents: [], invalid: 1, ...extra}), {show: true, reason: "shape"}, JSON.stringify(extra));
+        }
         assert.deepEqual(v({agents: one, invalid: 1, invalidIds: new Set(["x"])}), {show: true, reason: null});
         assert.deepEqual(v({agents: one, invalid: 1, invalidIds: new Set(["b"]), wanted: "b"}), {show: true, reason: "shape"});
         assert.deepEqual(v({agents: [], invalid: 1, invalidIds: new Set(["b"]), wanted: "b"}), {show: true, reason: "shape"});
@@ -128,20 +132,23 @@ def test_strip_form_and_memory(tmp_path: Path) -> None:  # T-02 stripForm and th
         assert.equal(logic.stripForm([a, b], null, false), "switch");
 
         const mem = logic.createAgentMemory();
-        assert.deepEqual({...mem, gone: [...mem.gone]}, {scopeId: null, gone: [], picked: null, drift: null});
+        assert.deepEqual({...mem, gone: [...mem.gone]}, {scopeId: null, gone: [], picked: null, drift: null, last: null});
         assert.equal(logic.memoryFor(mem, "iss-00001"), mem);
         logic.noteGone(mem, "a", {stale: false});
         logic.noteDrift(mem, "b");
         mem.picked = "c";
+        assert.equal(logic.noteShown(mem, "d"), mem);
         logic.memoryFor(mem, "iss-00001"); // the same Scope keeps everything
         assert.deepEqual([...mem.gone], ["a"]);
         assert.equal(mem.drift, "b");
         assert.equal(mem.picked, "c");
+        assert.equal(mem.last, "d");
         logic.memoryFor(mem, "iss-00002"); // another Scope drops it
         assert.equal(mem.scopeId, "iss-00002");
         assert.deepEqual([...mem.gone], []);
         assert.equal(mem.picked, null);
         assert.equal(mem.drift, null);
+        assert.equal(mem.last, null);
 
         logic.forgetGone(mem, "x");
         assert.equal(mem.picked, "x");
@@ -163,6 +170,7 @@ def test_strip_form_and_memory(tmp_path: Path) -> None:  # T-02 stripForm and th
         assert.deepEqual([...mem.gone], []);
         assert.equal(mem.drift, null);
         assert.equal(mem.picked, "y");
+        assert.equal(mem.last, "y");
         """,
         tmp_path,
     )

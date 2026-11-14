@@ -2,7 +2,7 @@
 // The choice itself is agents_logic.js; this module gathers its inputs from an env, draws the tab's contents as a
 // string that depends only on the Scope, the chosen agent, the theme and the reason (so a redraw leaves the frame
 // alone), and paints the strip into its slot afterwards. It never calls orca-web's write endpoints.
-import { AGENT_SANDBOX, agentFrame, agentsVisibility, createAgentMemory, forgetGone, memoryFor, noteDrift, noteGone, pickAgent, scopeAgents, stripForm } from "./agents_logic.js";
+import { AGENT_SANDBOX, agentFrame, agentsVisibility, createAgentMemory, forgetGone, memoryFor, noteDrift, noteGone, noteShown, pickAgent, scopeAgents, stripForm } from "./agents_logic.js";
 import { withoutEmbed } from "./logic.js";
 import { esc, icon } from "./parts.js";
 import { frameBar } from "./scope_tabs.js";
@@ -30,13 +30,17 @@ export function agentsState(env) {
   const embed = ctx.embed === true;
   const records = ctx.data?.worktrees?.status === "ok" ? (byId.get(scope.id)?.worktrees?.length ?? 0) : 0;
   const { agents, invalid, invalidIds } = scopeAgents(orca?.forScope(ctx.data, scope.id) ?? []);
-  const wanted = env.param("agent") ?? null;
   memoryFor(mem, scope.id);
+  // Without a choice in the query or the Map (a panel opened again, a path without agent=), the agent placed last
+  // in this Scope stands in, so another one left alone never opens by itself (FQG attempt 1).
+  const wanted = env.param("agent") ?? mem.last;
   const goneIds = mem.gone;
-  if (status === "ok" && wanted && !wanted.startsWith("gone:") && !agents.some((item) => item.id === wanted) && !invalidIds.has(wanted)) {
+  const visibility = agentsVisibility({ status, problem, records, agents, invalid, invalidIds, wanted, goneIds, embed });
+  // A loss only when the match is known: ok, readable records and no shape notice (FQG attempt 1, F-04).
+  if (visibility.reason === null && visibility.show && wanted && !wanted.startsWith("gone:") && !agents.some((item) => item.id === wanted) && !invalidIds.has(wanted)) {
     noteGone(mem, wanted, { stale: false });
   }
-  const state = { ...agentsVisibility({ status, problem, records, agents, invalid, invalidIds, wanted, goneIds, embed }), agents, invalid, invalidIds, wanted, goneIds };
+  const state = { ...visibility, agents, invalid, invalidIds, wanted, goneIds };
   states.set(env, state);
   return state;
 }
@@ -105,6 +109,7 @@ export function agentsTab(env) {
     ]);
   } else if (selected) {
     const frame = agentFrame(ctx.orca?.origin, selected, currentTheme());
+    if (frame) noteShown(mem, selected.id);
     main = frame ? `<iframe class="sd-agent" src="${esc(frame.src)}" sandbox="${AGENT_SANDBOX}" referrerpolicy="no-referrer" title="${esc(frame.title)}"></iframe>` : "";
   } else if (pick.gone) {
     main = callout("warning", "orca-agent-gone", "選んでいたエージェントはいなくなった。上から選び直す");
@@ -135,14 +140,15 @@ function paintMarks(strip, env, state) {
   const marks = env.ctx.orca?.marks?.() ?? null;
   if (!marks) return;
   const byId = new Map(state.agents.map((agent) => [agent.id, agent]));
+  const now = Date.now(); // one moment for the comparison and the drawing, so the elapsed time moves (FQG-002)
   for (const slot of strip.querySelectorAll("[data-orca-agent]")) {
     const agent = byId.get(slot.dataset.orcaAgent);
     if (!agent) continue;
     try {
       const doc = { agents: [agent.raw] };
-      const key = JSON.stringify(marks.buildMarks(doc, { max: 1 }));
+      const key = JSON.stringify(marks.buildMarks(doc, { max: 1, now }));
       if (slot.dataset.marks === key) continue;
-      marks.renderAgentMarks(slot, doc, { size: "sm", max: 1 });
+      marks.renderAgentMarks(slot, doc, { size: "sm", max: 1, now });
       slot.dataset.marks = key;
     } catch {
       // a broken part leaves the mark empty; the rest of the strip still draws

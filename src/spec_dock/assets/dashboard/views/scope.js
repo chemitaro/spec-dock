@@ -27,8 +27,12 @@ function follow(orca) {
   unfollow = followed ? followed.subscribe(redraw) : null;
 }
 
+// A redraw of this screen (the summaries, the frame's own move) draws with the shell's current ctx, never an old one,
+// and not while a move waits for its Scope (iss-00593 D-06, FQG-001).
 function redraw() {
-  if (last && last.root.isConnected) render(last.root, last.ctx);
+  if (!last || !last.root.isConnected) return;
+  const ctx = last.ctx.current ? last.ctx.current() : last.ctx;
+  if (ctx) render(last.root, ctx);
 }
 
 // Write a part only when its HTML changed (the tab contents keep their frame; the header keeps its moving marks).
@@ -110,6 +114,11 @@ function render(root, ctx) {
   put(page.querySelector(".sd-scope-top"), top);
   put(page.querySelector(".sd-tabs-row"), row);
   const panel = page.querySelector(".sd-tabpanel");
+  if (panel.dataset.dropped) {
+    // The shell removed the frame before a move: write the contents again even when the string is the same.
+    drawn.delete(panel);
+    delete panel.dataset.dropped;
+  }
   put(panel, body);
   panel.dataset.tab = tab;
   if (tab === "agents") paintAgentList(panel, env, { redraw });

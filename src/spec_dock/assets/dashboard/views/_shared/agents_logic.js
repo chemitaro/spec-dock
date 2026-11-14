@@ -52,8 +52,9 @@ export function agentsVisibility({ status, problem = null, records = 0, agents =
   if (problem) return { show: true, reason: "config" };
   if (embed) return { show: true, reason: "embed" };
   if (status !== "ok") return { show: true, reason: status };
-  const noneLeft = !agents.length && !wanted && !gone.size && invalid > 0;
-  if (noneLeft || (wanted && broken.has(wanted))) return { show: true, reason: "shape" };
+  // No usable agent but some entries out of shape: never read as a loss, whatever the choice says (FQG attempt 1).
+  const noneUsable = !agents.length && invalid > 0;
+  if (noneUsable || (wanted && broken.has(wanted))) return { show: true, reason: "shape" };
   return { show: true, reason: null };
 }
 
@@ -89,9 +90,10 @@ export function agentFrame(origin, agent, theme) {
 }
 
 // What the screen remembers about one Scope until another Scope is shown (R-05, F-08): the ids that went away, the
-// id the person picked last, and the id whose frame moved to another agent's screen.
+// id the person picked last, the id whose frame moved to another agent's screen, and the id whose frame was placed
+// last (the choice of an env that has none, such as a panel opened again; FQG attempt 1).
 export function createAgentMemory() {
-  return { scopeId: null, gone: new Set(), picked: null, drift: null };
+  return { scopeId: null, gone: new Set(), picked: null, drift: null, last: null };
 }
 
 export function memoryFor(mem, scopeId) {
@@ -100,6 +102,7 @@ export function memoryFor(mem, scopeId) {
     mem.gone = new Set();
     mem.picked = null;
     mem.drift = null;
+    mem.last = null;
   }
   return mem;
 }
@@ -116,10 +119,16 @@ export function forgetGone(mem, id) {
   mem.gone = new Set();
   mem.drift = null;
   mem.picked = id;
+  mem.last = id;
   return mem;
 }
 
 export function noteDrift(mem, id) {
   mem.drift = id;
+  return mem;
+}
+
+export function noteShown(mem, id) {
+  mem.last = id;
   return mem;
 }
