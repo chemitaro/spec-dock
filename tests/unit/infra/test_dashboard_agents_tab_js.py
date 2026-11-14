@@ -695,7 +695,6 @@ def test_the_detail_screen_is_split_into_three_parts() -> None:
     assert scope.index(".render(env);") < scope.index("const path = ctx.route.path;")  # keep runs before the links
 
 
-
 @node
 def test_the_strip_scrolls_the_chosen_item_into_view_only_when_needed(tmp_path: Path) -> None:
     out = _run(
