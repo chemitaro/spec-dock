@@ -179,7 +179,7 @@ design: {
 			- `orcaProblem: state.server?.orca_web?.problem ?? null`。
 			- `replaceParam(name, value)`：`const path = withParam(state.route.path, name, value)`（`views/_shared/logic.js` の `withParam`）。`history.replaceState(null, "", path)`、`state.route = parseRoute(new URL(path, location.origin).href)`、`return state.route`。描き直しも `bridge.navigated()` もしない（今の描きの中から呼ばれるため）。
 			移動のとき（最終品質ゲート attempt 1 の FQG-001 と ChatGPT P1。人が選んだのと別の相手の iframe を開かない、前の相手の iframe を送れるまま残さない）：
-			- `navigate(path)` は、`state.route` を新しい道にした直後、詳しい内容を待つ前に、`root` の中の `iframe.sd-agent` をすべて外す（前の相手に送れる時間を残さない）。新しい道が今と同じ Scope の詳しい画面（問い合わせだけが違う）なら、今の詳しい内容（`state.scope`）で待たずに描き、その後で読み直して描く。
+			- `navigate(path)` は、新しい道が今の道と比べて Scope か問い合わせの `agent` が違うときだけ、`state.route` を新しい道にした直後、詳しい内容を待つ前に、`root` の中の `iframe.sd-agent` をすべて外す（前の相手に送れる時間を残さない）。外したときは、詳しい画面と横の欄に覚えた中身の文字列を捨てさせ（`ctx` の口か、外した印を付けた要素で知る）、次の描きで必ず中身を書き換えて置き直す（同じ文字列でも、外したままにしない。spec-reviewer round-8 の P2）。Scope も `agent` も変わらない移り（ボードの絞り込み、構造の図の `focus`、今のタブや今の相手をもう一度押す）では外さない。横の欄の選びは欄の中の Map で、`navigate` を通らない。新しい道が今と同じ Scope の詳しい画面（問い合わせだけが違う）なら、今の詳しい内容（`state.scope`）で待たずに描き、その後で読み直して描く。
 			- 画面の知らせ（`ctx.orca` の購読）での描き直しは、最後に描いた ctx でなく、`app.js` の今の `state.route` を持つ ctx で行う（`ctx.current()` が今の ctx を返す口を足す。横の欄と詳しい画面は描き直しのときにそれを使う）。移動の待ち（`navigate` が新しい道を置いてから描くまで）の間は、知らせでは描かない（`ctx.current()` が null を返す）。
 			- `replaceParam(name, value)` は、呼んだ描きの `ctx.route` が今の `state.route` と同じときだけ書く（違えば何もせずに今の `state.route` を返す）。古い道で決めた選びを、今の道に書かない。
 			明暗の変化：`boot()` で `matchMedia("(prefers-color-scheme: dark)")` の `change` に `render` を付ける。`setTheme(scheme)` は値を変えた後に、起動が済んでいれば `render()` を呼ぶ。描き直しで中身の文字列の `theme` が変わり、iframe だけが置き直される。
