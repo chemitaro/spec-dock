@@ -54,14 +54,17 @@ design: {
 			一覧の項目は、`forScope` の worktree の並びの順、その中の要約の `agents` の順で、`{id, agentType, mark, worktreeId, branch, detail}`。
 			選びのキーは要約のエージェントの `id`。欄は欄の中の選びの Map（iss-00587 の `params`。Scope を変えると空になる）に `agent` として、詳しい画面は問い合わせの `agent` に持つ（`env.param("agent")`、`env.paramLink("agent", id)`）。
 
+			選びの値は、エージェントの `id` か、いなくなったのを見た印の付いた `gone:<id>` のどちらか。
+
 			`pickAgent(agents, wanted)`（`agents_logic.js`、純粋）→ `{selected: agent | null, gone: bool, remember: string | null}`：
+			- wanted が `gone:` で始まる → selected null、gone true（同じ id が要約に戻っても、人が一覧から選び直すまで知らせを残す。戻ったエージェントが同じセッションとは限らないため）。
 			- wanted が agents の id にある → その agent。
-			- wanted があるが agents にない → selected null、gone true（F-02：「このエージェントはいなくなった」と示し、一覧を出す。残ったエージェントが1人でも自動で選ばない）。
+			- wanted があるが agents にない → selected null、gone true、remember に `gone:<wanted>`（F-02：「このエージェントはいなくなった」と示し、一覧を出す。残ったエージェントが1人でも自動で選ばない）。いなくなったと決めるのは、状態が ok の要約で見たときだけ（届かないなどで要約がないときは reason の知らせになり、選びは変えない。R-06）。
 			- wanted がなく agents が1人 → その agent、remember にその id（R-02：すぐに開き、選びとして覚える）。
 			- ほか → selected null、gone false（「エージェントを選ぶ」）。
 
-			remember があれば、描いた側がその場で選びを覚える：欄は `params.set("agent", id)`、詳しい画面は `history.replaceState` で問い合わせに `agent=<id>` を足す（シェルに、履歴を増やさずに今の道の問い合わせを1つ書き換え、`ctx.route` も合わせる口 `ctx.replaceParam(name, value)` を足す）。
-			こうして、自動で開いた後は wanted があるので、そのエージェントが消えれば gone になり、別のエージェントへ移らない。人数が増えても選びは変わらない。
+			remember があれば（自動の選びと、いなくなった印の両方）、描いた側がその場で選びを覚える：欄は `params.set("agent", id)`、詳しい画面は `history.replaceState` で問い合わせに `agent=<id>` を足す（シェルに、履歴を増やさずに今の道の問い合わせを1つ書き換え、`ctx.route` も合わせる口 `ctx.replaceParam(name, value)` を足す）。
+			こうして、自動で開いた後は wanted があるので、そのエージェントが消えれば gone になり、別のエージェントへ移らない。人数が増えても選びは変わらない。一覧から人が選ぶと、値は `gone:` のない id に置き換わる（一覧の行の `paramLink("agent", id)`）。
 			gone の知らせは、人が一覧から選ぶ（wanted が変わる）か、別の Scope に移る（欄の Map が空になる、詳しい画面の道が変わる）まで残る。同じ Scope の中でタブを移っても、欄の Map と詳しい画面の問い合わせの `agent` は残るので、知らせも残る。
 
 			一覧の行と印は、タブの中身の HTML には入れず、置き場に後から描く（D-04）。各行は `env.paramLink("agent", id)` の `<a>`（欄は欄の中の選び、詳しい画面は問い合わせ。iss-00587 の文書の選びと同じ）で、中に印の置き場 `<span class="sd-orca" data-orca-agent="<id>"></span>`、種類、ブランチ（`sd-mono`）を持つ。文字は `esc` を通す。
