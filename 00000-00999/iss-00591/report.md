@@ -16,6 +16,8 @@ ID: "iss-00591"
 - round-2（同じレビュアー）：**合格**。P0〜P3 なし。`round-2.json`、検査 `round-2.check.json`（valid、pass）。
 - 合格した文書の sha256：requirement.cue `ca98d0d4409f4c0130b3c1ecfd1f5d217a486d45c0e537907c675e5263eddbc1`、design.cue `ad630886b2d0ef6da2b17362d6c110d80bd5f7b4f2b7e40d3095c836c708b6f5`、plan.cue `755294cfe08b5ac4916464198b62da667c711edb94c8c2b03947196e625e3e24`。開始のコミット `89f51588a`（clean）。
 - 結果の場所：この Issue の worktree の `.workbench/spec-review/iss-00591/`。
+- 最終品質ゲート（quality-gate-reviewer opus / medium、second opinion なし、範囲 `89f51588a..b7dd1c765`、観点 functional-correctness・requirements-closure・test-adequacy・security-baseline）：**合格**（attempt 1）。P0〜P3 0、coverage complete。test lane：`make lint` exit 0、`uv run pytest` exit 0（3844 passed / 7 skipped）。closure は worktree の `.workbench/final-quality-gate/iss-00591-fqg-1/closure.md`。
+- 注：plan.cue は合格の後、手順の status だけを done に書き換えている（中身は合格のまま）。
 
 ## 実装の記録
 
@@ -43,8 +45,17 @@ HEAD `b7dd1c765` の `git archive` から作った wheel（spec-dock 0.9.1）を
 
 ## 逸脱と判断
 
+- 仕様のレビューの P2 を受けて、S-05 の確かめのやり方を直した（別のポートでは部品の import も orca-web の CORS で拒まれるため、本物の部品と要約での `core/orca.js` の確かめは node の上で行った）。ブラウザーから本物の要約を読む確かめは、47800 の常駐のダッシュボードを新しい版にした後の Epic の確かめに残る。
+- S-03 のコミットの文の amend（未 push、文だけ。タスク担当が認可）。
+- 実装担当の値は計画どおり（Codex gpt-6.1-sol / medium）。逸脱なし。
+
 ## Outcome
+
+PR #596（https://github.com/chemitaro/spec-dock/pull/596、head `b7dd1c765d922a847b26103d0486290d9b7d8bd8`）。マージは統括が行う。
 
 ## Verification
 
 ## Residual Risks / Follow-ups
+
+- iss-00592：印と「Orca で開く」の描き、配る文書（`orca_web` の節、`ORCA_WEB_READ_ORIGINS` の前提、localhost や MagicDNS の名前では読めないこと）。
+- `.git` が dir でない main のチェックアウトでは worktree の署名が None で、worktree の変化だけでは revision が変わらない（design.cue の risks）。
