@@ -189,3 +189,16 @@ def test_the_panels_read_against_the_page_baseline_and_keep_the_structure_first(
     assert "api.scope(V.ctx.repository, id, V.ctx.baseline)" in (VIEWS / "graph.js").read_text()
     assert "api.scope(B.ctx.repository, id, B.ctx.baseline)" in (VIEWS / "board.js").read_text()
     assert "{ ...state.doc.scope, ...state.scope }" in (SHARED / "panel.js").read_text()
+
+
+def test_the_phone_sheet_moves_only_by_the_grab_and_the_header_band() -> None:
+    panel = (SHARED / "panel.js").read_text()
+    for name in ("sheetHeights(innerHeight)", "settleSheet({", "nextOnTap(snap)", "setPointerCapture"):
+        assert name in panel, name
+    assert '<button type="button" class="pn-grab" aria-label="欄の高さを変える">' in panel
+    css = (SHARED / "panel.css").read_text()
+    phone = css[css.index("@container app (max-width: 640px)") :]
+    touch = [line.split("{")[0].strip() for line in phone.splitlines() if "touch-action: none" in line]
+    assert touch == [".sd-pn .pn-grab", ".sd-pn .pn-top"]  # the contents and the frame scroll freely (R-07)
+    assert "height: var(--pn-h" in phone and ".sd-pn.is-dragging iframe { pointer-events: none; }" in phone
+    assert "overscroll-behavior: contain" in css

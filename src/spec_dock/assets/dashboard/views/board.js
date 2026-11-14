@@ -40,6 +40,7 @@ function unmount() {
   document.removeEventListener("keydown", onKey);
   window.removeEventListener("resize", placePanel);
   B.token++; // an answer that arrives after leaving the screen is dropped
+  B.pn?.destroy();
   Object.assign(B, { root: null, page: null, pn: null, ctx: null, sel: null, doc: null, docState: "loading", docRevision: null });
 }
 

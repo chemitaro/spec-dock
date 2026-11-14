@@ -39,13 +39,33 @@
 .sd-pn .ds-btn .ds-icon { font-size: 15px; }
 .sd-pn .ds-btn.is-primary { background: var(--ds-accent); border-color: var(--ds-accent); color: var(--ds-on-accent); }
 .sd-pn .ds-btn.is-primary:hover { background: var(--ds-accent-strong); }
-@media (prefers-reduced-motion: reduce) { .sd-pn { transition: none; } }
 
-/* スマートフォン：画面の下から出るシート。 */
+/* スマートフォン：画面の下から出るシート（D-08）。高さは panel.js が --pn-h（px）で持つ3段：最小・通常・全体。
+   シートを動かすのは取っ手と見出しの帯だけ。中身と説明資料の枠のスクロールはシートを動かさない（R-07）。 */
 @container app (max-width: 640px) {
-  .sd-pn { top: auto; left: 0; right: 0; bottom: 0; width: auto; height: var(--pn-h, 58%); border-radius: 14px 14px 0 0; border-left: 0; border-right: 0; border-bottom: 0; transform: translateY(105%); }
+  .sd-pn { position: fixed; z-index: 35; top: auto; left: 0; right: 0; bottom: 0; width: auto; height: var(--pn-h, 58%); max-height: 100%; border-radius: 14px 14px 0 0; border-left: 0; border-right: 0; border-bottom: 0; transform: translateY(105%); overflow: hidden; transition: transform .26s var(--ds-ease), height .22s var(--ds-ease); }
   .sd-pn.is-open { transform: none; }
-  .sd-pn .pn-grab { display: block; flex: none; width: 100%; height: 16px; margin: 0; padding: 0; border: 0; background: none; cursor: grab; }
+  .sd-pn.is-dragging { transition: none; user-select: none; }
+  .sd-pn.is-dragging iframe { pointer-events: none; }
+  .sd-pn[data-snap="full"] { border-radius: 0; }
+  .sd-pn .pn-grab { display: block; flex: none; width: 100%; height: 16px; margin: 0; padding: 0; border: 0; background: none; cursor: grab; touch-action: none; }
   .sd-pn .pn-grab::before { content: ""; display: block; width: 40px; height: 5px; margin: 6px auto 0; border-radius: 99px; background: var(--ds-border-2); opacity: .6; }
+  .sd-pn .pn-top { touch-action: none; }
   .sd-pn .pn-head { padding-top: 2px; }
+  .sd-pn .pn-body[data-tab="explanation"] { padding: 4px 6px 6px; }
+  .sd-pn .sd-explain__bar { min-height: 20px; font-size: 12px; }
+  /* 下の帯は折り返さない1行で、ボタンは印だけ（名前は aria-label と title） */
+  .sd-pn .pn-foot { flex-wrap: nowrap; gap: 6px; padding: 8px 10px; }
+  .sd-pn .pn-foot .ds-btn { flex: 1; justify-content: center; height: 36px; padding: 0 8px; font-size: 0; gap: 0; }
+  .sd-pn .pn-foot .ds-btn .ds-icon { font-size: 17px; }
+  /* 全体の段：見出しを「状態の印、ID、題名（1行）、閉じる」の1行に詰め、ほかの行は概要のタブで読む */
+  .sd-pn[data-snap="full"] .pn-top { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 6px 0 12px; }
+  .sd-pn[data-snap="full"] .pn-head { display: contents; }
+  .sd-pn[data-snap="full"] .pn-close { order: 3; margin-left: 0; }
+  .sd-pn[data-snap="full"] .pn-cover { order: 2; flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; padding: 0; }
+  .sd-pn[data-snap="full"] :is(.pn-merge, .pn-kind, .pn-why, .pn-idle, .pn-path) { display: none; }
+  .sd-pn[data-snap="full"] .pn-kicker { flex: none; }
+  .sd-pn[data-snap="full"] .pn-title { margin: 0; min-width: 0; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sd-pn[data-snap="full"] .pn-tabs { margin-top: 0; }
 }
+@media (prefers-reduced-motion: reduce) { .sd-pn, .sd-pn.is-open { transition: none; } }

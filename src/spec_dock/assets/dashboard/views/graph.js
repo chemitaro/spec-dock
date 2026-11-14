@@ -123,7 +123,7 @@ function mount(root) {
       centerOn(id);
     },
     onClose: () => select(null),
-    extraActions: (s) => (frameOf(s) ? `<button type="button" class="ds-btn" data-act="focus" data-focus="${esc(s.id)}">${ic("target")}この範囲に絞る</button>` : ""),
+    extraActions: (s) => (frameOf(s) ? `<button type="button" class="ds-btn" data-act="focus" data-focus="${esc(s.id)}" aria-label="この範囲に絞る" title="この範囲に絞る">${ic("target")}この範囲に絞る</button>` : ""),
   });
   bindView();
   V.el.gx.addEventListener("click", onClick);
@@ -146,6 +146,7 @@ function dispose() {
   V.path = null;
   V.docState = "loading";
   V.docRevision = null;
+  V.pn?.destroy();
   V.pn = null;
 }
 

@@ -4,10 +4,12 @@
 // explanation frame is not loaded again (R-08). The screens select and fetch; the panel only draws.
 import { ancestors, withoutEmbed, withParam } from "./logic.js";
 import { esc, icon, idleText, kindLabel, mergeBadge, stateChip, stateMark } from "./parts.js";
-import { pickTab } from "./panel_logic.js";
+import { nextOnTap, pickTab, settleSheet, sheetHeights } from "./panel_logic.js";
 import { panelEnv, SCOPE_TABS, TAB_KEYS } from "./scope_tabs.js";
 
 const plainClick = (event) => event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
+const PHONE = 640;
+const DRAG_START = 6; // px a finger moves before the sheet follows it
 
 export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {}, extraActions = () => "" } = {}) {
   aside.classList.add("sd-pn");
@@ -17,6 +19,9 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
   let params = new Map(); // choices inside a tab (done, doc) for the current Scope
   let shownHtml = null;
   let shownKey = null; // `${id}|${tab}` of the contents in the body
+  let snap = "half"; // the phone sheet's height: peek, half or full (D-08)
+  let drag = null;
+  let skipClick = false; // the click that ends a drag is not a tap
 
   function build() {
     aside.innerHTML =
@@ -36,8 +41,8 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
       : `<p class="pn-path">${icon("layers")}最上位</p>`;
     const idle = idleText(scope, byId);
     return (
-      `<div class="pn-head">${stateChip(scope, byId, { motion: true })}${mergeBadge(scope)}<button type="button" class="iconbtn pn-close" data-pn-act="close" aria-label="閉じる">${icon("x")}</button></div>` +
-      `<div class="pn-cover"><p class="pn-kicker"><span class="ds-docid">${esc(scope.id)}</span>#${esc(scope.number)}・${esc(kindLabel(scope.kind))}</p><h2 class="pn-title">${esc(scope.title)}</h2>` +
+      `<div class="pn-head">${stateChip(scope, byId, { motion: true })}<span class="pn-merge">${mergeBadge(scope)}</span><button type="button" class="iconbtn pn-close" data-pn-act="close" aria-label="閉じる">${icon("x")}</button></div>` +
+      `<div class="pn-cover"><p class="pn-kicker"><span class="ds-docid">${esc(scope.id)}</span><span class="pn-kind">#${esc(scope.number)}・${esc(kindLabel(scope.kind))}</span></p><h2 class="pn-title">${esc(scope.title)}</h2>` +
       `<p class="pn-why" data-st="${esc(scope.state)}">${stateMark(scope, byId, { motion: true, label: false })}<span>${esc(scope.reason?.text ?? "")}</span></p>` +
       (idle ? `<p class="pn-idle">${icon("clock")}${esc(idle)}</p>` : "") +
       `${pathHtml}</div>`
@@ -80,17 +85,94 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
     parts.body.dataset.tab = tab ?? "";
     const detail = withParam(withoutEmbed(scope.path), "tab", tab ?? "summary");
     parts.foot.innerHTML =
-      `<a class="ds-btn is-primary" data-nav href="${esc(ctx.href(detail))}">${icon("arrowRight")}詳しい画面</a>` +
-      `<a class="ds-btn" href="${esc(detail)}" target="_blank" rel="noopener">${icon("external")}新しいタブで開く</a>` +
+      `<a class="ds-btn is-primary" data-nav href="${esc(ctx.href(detail))}" aria-label="詳しい画面" title="詳しい画面">${icon("arrowRight")}詳しい画面</a>` +
+      `<a class="ds-btn" href="${esc(detail)}" target="_blank" rel="noopener" aria-label="新しいタブで開く" title="新しいタブで開く">${icon("external")}新しいタブで開く</a>` +
       extraActions(scope) +
-      (scope.url ? `<a class="ds-btn" href="${esc(scope.url)}" target="_blank" rel="noopener">${icon("external")}GitHub</a>` : "");
+      (scope.url ? `<a class="ds-btn" href="${esc(scope.url)}" target="_blank" rel="noopener" aria-label="GitHub" title="GitHub">${icon("external")}GitHub</a>` : "");
     aside.classList.add("is-open");
     aside.setAttribute("aria-hidden", "false");
+    applySnap();
   }
+
+  // --- The phone sheet (D-08): three heights, moved only by the grab and the header band -------------------
+  const isSheet = () => (aside.closest(".app") || document.documentElement).clientWidth <= PHONE;
+
+  function applySnap() {
+    if (!isSheet()) {
+      aside.style.removeProperty("--pn-h");
+      delete aside.dataset.snap;
+      return;
+    }
+    aside.style.setProperty("--pn-h", `${sheetHeights(innerHeight)[snap]}px`);
+    aside.dataset.snap = snap;
+  }
+
+  function release(event) {
+    if (!drag || event.pointerId !== drag.id) return;
+    const moved = drag.moved;
+    const height = aside.getBoundingClientRect().height;
+    const velocity = drag.velocity;
+    drag = null;
+    aside.classList.remove("is-dragging");
+    if (!moved) return;
+    skipClick = true;
+    setTimeout(() => (skipClick = false), 0);
+    const settled = settleSheet({ height, velocity, heights: sheetHeights(innerHeight) });
+    if (settled === "closed") {
+      snap = "half";
+      applySnap();
+      onClose();
+      return;
+    }
+    snap = settled;
+    applySnap();
+  }
+
+  aside.addEventListener("pointerdown", (event) => {
+    if (!current || !isSheet() || (event.pointerType === "mouse" && event.button !== 0)) return;
+    const t = event.target;
+    const grab = t.closest(".pn-grab");
+    if (!grab && (!t.closest(".pn-top") || t.closest("button, a"))) return; // the contents and frames scroll freely
+    const now = performance.now();
+    drag = { id: event.pointerId, y: event.clientY, h: aside.getBoundingClientRect().height, moved: false, last: { y: event.clientY, t: now }, velocity: 0 };
+  });
+  aside.addEventListener("pointermove", (event) => {
+    if (!drag || event.pointerId !== drag.id) return;
+    const up = drag.y - event.clientY; // up is positive: the sheet grows
+    if (!drag.moved) {
+      if (Math.abs(up) < DRAG_START) return;
+      drag.moved = true;
+      aside.setPointerCapture?.(event.pointerId);
+      aside.classList.add("is-dragging");
+    }
+    const now = performance.now();
+    const dt = now - drag.last.t;
+    if (dt > 0) drag.velocity = (drag.last.y - event.clientY) / dt;
+    drag.last = { y: event.clientY, t: now };
+    aside.style.setProperty("--pn-h", `${Math.max(0, Math.min(innerHeight, drag.h + up))}px`);
+  });
+  aside.addEventListener("pointerup", release);
+  aside.addEventListener("pointercancel", (event) => {
+    if (!drag || event.pointerId !== drag.id) return;
+    drag = null;
+    aside.classList.remove("is-dragging");
+    applySnap();
+  });
+  const onResize = () => {
+    if (current) applySnap();
+  };
+  window.addEventListener("resize", onResize);
 
   aside.addEventListener("click", (event) => {
     if (!current || !parts || !aside.contains(parts.body)) return; // another drawing owns the aside
     const t = event.target;
+    if (t.closest(".pn-grab")) {
+      if (!skipClick && isSheet()) {
+        snap = nextOnTap(snap); // a tap (or Enter) switches between half and full
+        applySnap();
+      }
+      return;
+    }
     const act = t.closest("[data-pn-act]");
     if (act) {
       if (act.dataset.pnAct === "close") onClose();
@@ -127,17 +209,25 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
   return {
     element: aside,
     show(state) {
-      if (current?.scope?.id !== state.scope.id) params = new Map();
+      if (current?.scope?.id !== state.scope.id) {
+        params = new Map();
+        if (snap === "peek") snap = "half"; // another Scope keeps the height, but not the smallest one
+      }
       current = state;
       draw();
     },
     hide() {
       current = null;
       params = new Map();
-      aside.classList.remove("is-open");
+      snap = "half"; // the next opening starts at the usual height
+      drag = null;
+      aside.classList.remove("is-open", "is-dragging");
       aside.setAttribute("aria-hidden", "true");
     },
     isOpen: () => current != null,
-    snap: () => "half",
+    snap: () => (isSheet() ? snap : null),
+    destroy() {
+      window.removeEventListener("resize", onResize);
+    },
   };
 }
