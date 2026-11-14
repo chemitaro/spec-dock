@@ -63,5 +63,5 @@ def orca_web_origin(settings: OrcaWebSettings, host_name: str, own_port: int) ->
         "enabled": enabled,
         "origin": f"http://{host_name.lower()}:{settings.port}" if enabled else None,
         "port": settings.port,
-        "problem": problem,
+        "problem": None if enabled else problem,
     }

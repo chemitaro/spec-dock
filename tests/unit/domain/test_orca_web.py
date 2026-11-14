@@ -84,3 +84,14 @@ def test_origin_uses_admitted_host_and_rejects_its_own_port() -> None:
     assert orca_web_origin(invalid, "127.0.0.1", 47800)["problem"] == invalid.problem
     for port in (1, 65535):
         assert parse_orca_web(payload({"port": port})) == OrcaWebSettings(True, port)
+
+
+def test_enabled_origin_always_returns_a_null_problem() -> None:
+    from spec_dock.runtime.domain.orca_web import OrcaWebSettings, orca_web_origin
+
+    assert orca_web_origin(OrcaWebSettings(True, 9001, "old problem", False), "LOCALHOST", 47800) == {
+        "enabled": True,
+        "origin": "http://localhost:9001",
+        "port": 9001,
+        "problem": None,
+    }
