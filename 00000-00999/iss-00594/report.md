@@ -47,6 +47,15 @@ SpecDock 0.9.2 のリリースの変更を作った。機能のコードは変�
 - 最終品質ゲート（quality-gate-reviewer opus / medium、second opinion なし、範囲 `89f51588a..c73ec459e`）：**合格**（attempt 1）。P0〜P2 0、P3 1（節が ADR を省いて「2つ」と書く。記録だけ）、coverage complete。test lane：`make lint` exit 0、`uv run pytest` exit 0（3804 passed / 7 skipped、30分）。closure `.workbench/final-quality-gate/iss-00594-fqg-1/closure.md`（worktree `/Volumes/990p2t/workspace/worktrees/orca/spec-dock/iss-00594`）。区切りのレビューは計画どおりなし。
 - 実装担当の報告：対象の統合テスト3ファイル 10 passed、`make lint`、`uv lock --check` 合格、全体 3804 passed / 7 skipped。
 - wheel：隔離した venv で `spec-dock --version` が `spec-dock 0.9.2`（Outcome の S-04）。
-- PR #595（https://github.com/chemitaro/spec-dock/pull/595、head c73ec459e）：CI は下に追記。
+- PR #595（https://github.com/chemitaro/spec-dock/pull/595、head c73ec459e）：CI 合格（Provider CI、SpecDock check、Commit identity。observer の結果 OBSERVED_CI_PASS、merge_readiness READY、2026-11-14T08:54Z、`.workbench/coding-task/iss-00594/ci2.json`。最初の observer は provider-tests の30分の間に無通知の上限 600 秒で止まった（exit 4、`ci.json`）ので、上限 3000 秒でやり直した）。
+
+## 逸脱と判断
+
+- S-01 のコミットの件名と本文は git-autocommit が作った（Co-Authored-By はない。0.9.1 と同じ）。
+- CI の observer の再起動（上の Verification）。
+- 最終品質ゲートの P3 1 は記録だけ（closure.md）。
 
 ## Residual Risks / Follow-ups
+
+- `work finish iss-00594` は実行していない（マージの後に統括が行う）。
+- マージの後：タグの確かめ、wheel、導入、必要なら配布資産の更新は統括が行う（上の手順）。
