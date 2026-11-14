@@ -448,7 +448,7 @@ class DashboardHttp:
             wanted = request.param("baseline")
             baseline = (find_seen(self.site.state_root, site.repository, wanted) if wanted else None) or latest
             ids = sorted(view.model.scopes) if view.model is not None else []
-            readings = read_structure_facts(site, ids, self.facts)  # iss-00544 D-02
+            facts = read_structure_facts(site, ids, self.facts)  # iss-00544 D-02
             todos = self.site.todos.annotations(site, view.model)  # iss-00554 D-03
             progress = read_plan_progress(site, issues_in_progress(view.model), self.progress)  # iss-00574 D-07
             document = structure_document(
@@ -456,7 +456,8 @@ class DashboardHttp:
                 now=self.now(),
                 baseline=baseline,
                 latest=latest,
-                readings=readings,
+                readings=facts.readings,
+                worktrees={"status": facts.worktrees_status, "paths": list(facts.paths)},
                 todos=todos,
                 progress=progress,
             )

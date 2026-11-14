@@ -39,6 +39,7 @@ from spec_dock.runtime.infra.user_config import (
     read_user_orca_web,
     user_config_path,
 )
+from spec_dock.runtime.infra.worktree_signature import worktree_signature
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -357,6 +358,7 @@ class DashboardSite:
             step,
             model.pull_request_status if model is not None else None,
             site.problem,
+            worktree_signature(site.checkout),
             self.todos.signature(site),  # CLI-written tasks reach the 5-second refresh (iss-00554 R-07)
             plan_signature(site.catalog, issues_in_progress(model)),  # a rewritten plan too (iss-00574 D-08)
         )

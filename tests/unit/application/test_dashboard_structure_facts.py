@@ -76,11 +76,11 @@ def _locate(*, timeout: float) -> Any:
     return object()
 
 
-def _read(catalog: Path | None, cache: StructureFactsCache, **kwargs: Any) -> dict[str, dict[str, str | None]]:
+def _read(catalog: Path | None, cache: StructureFactsCache, **kwargs: Any) -> dict[str, dict[str, object]]:
     kwargs.setdefault("assurance_reader", Reader())
     kwargs.setdefault("worktree_lister", Lister())
     kwargs.setdefault("cue_locator", _locate)
-    return read_structure_facts(_site(catalog), IDS, cache, **kwargs)
+    return read_structure_facts(_site(catalog), IDS, cache, **kwargs).readings
 
 
 # --- T-02: values ------------------------------------------------------------------------------------------
@@ -97,10 +97,21 @@ def test_cue_scopes_get_their_level_and_worktrees_their_branch(tmp_path: Path) -
     ])
     facts = _read(catalog, StructureFactsCache(), worktree_lister=lister)
     assert facts == {
-        "epic-00001": {"assurance": "strict", "branch": None},
-        "iss-00002": {"assurance": "light", "branch": "chemitaro/iss-00002"},  # the first in the listing's order
-        "iss-00003": {"assurance": None, "branch": None},  # a Markdown Scope has no level
-        "iss-00004": {"assurance": None, "branch": "iss-00004-x"},
+        "epic-00001": {"assurance": "strict", "branch": None, "worktrees": []},
+        "iss-00002": {
+            "assurance": "light",
+            "branch": "chemitaro/iss-00002",
+            "worktrees": [
+                {"path": "/w/a", "branch": "chemitaro/iss-00002"},
+                {"path": "/w/b", "branch": "iss-00002-second"},
+            ],
+        },  # the first in the listing's order
+        "iss-00003": {"assurance": None, "branch": None, "worktrees": []},  # a Markdown Scope has no level
+        "iss-00004": {
+            "assurance": None,
+            "branch": "iss-00004-x",
+            "worktrees": [{"path": "/w/c", "branch": "iss-00004-x"}],
+        },
     }
 
 
@@ -164,8 +175,8 @@ def test_failures_leave_only_their_field_empty(tmp_path: Path) -> None:
 
     failing = Lister(error=GitProcessError(("git",), b"fatal", 128))
     facts = _read(catalog, StructureFactsCache(), assurance_reader=raising, worktree_lister=failing)
-    assert facts["epic-00001"] == {"assurance": "standard", "branch": None}
-    assert facts["iss-00002"] == {"assurance": None, "branch": None}
+    assert facts["epic-00001"] == {"assurance": "standard", "branch": None, "worktrees": []}
+    assert facts["iss-00002"] == {"assurance": None, "branch": None, "worktrees": []}
 
 
 def test_missing_cue_leaves_levels_empty_and_unremembered(tmp_path: Path) -> None:
@@ -186,7 +197,7 @@ def test_no_catalog_means_every_field_is_empty(tmp_path: Path, catalog_state: st
     catalog = None if catalog_state == "ambiguous" else tmp_path / "nowhere"
     lister = Lister([GitWorktreeRecord(Path("/w/a"), "b", "iss-00002")])
     facts = _read(catalog, StructureFactsCache(), worktree_lister=lister)
-    assert all(item == {"assurance": None, "branch": None} for item in facts.values())
+    assert all(item == {"assurance": None, "branch": None, "worktrees": []} for item in facts.values())
 
 
 # --- T-05: the time limit -------------------------------------------------------------------------------------

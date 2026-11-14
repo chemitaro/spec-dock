@@ -15,7 +15,7 @@ from pathlib import Path
 import stat
 import threading
 import time
-from typing import TYPE_CHECKING, Final, Protocol
+from typing import TYPE_CHECKING, Final, Literal, Protocol
 from urllib.parse import quote
 
 from spec_dock.runtime.application.scope_check import read_assurance
@@ -205,7 +205,7 @@ def read_scope_details(
     }
 
 
-def scope_facts(details: dict[str, object]) -> dict[str, str | None]:
+def scope_facts(details: dict[str, object]) -> dict[str, object]:
     """The structure fields `assurance` and `branch` of one Scope, from its details (iss-00544 D-02)."""
     assurance = details.get("assurance")
     worktrees = details.get("worktrees")
@@ -215,6 +215,7 @@ def scope_facts(details: dict[str, object]) -> dict[str, str | None]:
     return {
         "assurance": level if isinstance(level, str) else None,
         "branch": branch if isinstance(branch, str) else None,
+        "worktrees": items if isinstance(items, list) else [],
     }
 
 
@@ -248,18 +249,13 @@ class StructureFactsCache:
     lock: threading.Lock = field(default_factory=threading.Lock, repr=False, compare=False)
 
 
-def _branches(catalog: Path, scope_ids: Sequence[str], lister: WorktreeLister, timeout: float) -> dict[str, str]:
-    try:
-        records = lister(catalog, timeout=timeout)
-    except Exception:  # git missing, slow or failing: every branch is unknown (F-01)
-        return {}
-    found: dict[str, str] = {}
-    for scope_id in scope_ids:
-        for record in records:
-            if record.branch is not None and branch_names_scope(record.branch, scope_id):
-                found[scope_id] = record.branch  # the first in the listing's order
-                break
-    return found
+@dataclass(frozen=True)
+class StructureFacts:
+    """Scope readings and the clone-wide inventory, from one worktree listing."""
+
+    readings: dict[str, dict[str, object]]
+    worktrees_status: Literal["ok", "unreadable"] = "unreadable"
+    paths: tuple[str, ...] = ()
 
 
 def read_structure_facts(
@@ -272,8 +268,8 @@ def read_structure_facts(
     assurance_reader: StructureAssuranceReader | None = None,
     worktree_lister: WorktreeLister | None = None,
     cue_locator: CueLocator | None = None,
-) -> dict[str, dict[str, str | None]]:
-    """`{ID: {"assurance", "branch"}}` for the structure API; never raises, and an unknown value is None.
+) -> StructureFacts:
+    """Scope assurance/branch/worktree readings and clone-wide paths; unknown scalar values are None.
 
     `git worktree list` runs once. A level is read with `cue` only when `requirement.cue`'s time or size changed;
     the external processes of one request share `timeout`. Past it, levels stay None and unremembered, so a later
@@ -282,13 +278,27 @@ def read_structure_facts(
     reader = assurance_reader or read_assurance
     lister = worktree_lister or worktree_list
     locate = cue_locator or locate_cue
-    facts: dict[str, dict[str, str | None]] = {item: {"assurance": None, "branch": None} for item in scope_ids}
+    facts: dict[str, dict[str, object]] = {
+        item: {"assurance": None, "branch": None, "worktrees": []} for item in scope_ids
+    }
     catalog = site.catalog
     if catalog is None or not _is_directory(catalog):
-        return facts
+        return StructureFacts(facts)
     deadline = clock() + timeout
-    for scope_id, branch in _branches(catalog, scope_ids, lister, timeout).items():
-        facts[scope_id]["branch"] = branch
+    status: Literal["ok", "unreadable"] = "ok"
+    try:
+        records = lister(catalog, timeout=timeout)
+    except Exception:  # an unavailable inventory never supplies matching hints
+        records, status = [], "unreadable"
+    paths = tuple(str(record.path) for record in records)
+    for scope_id in scope_ids:
+        items = [
+            {"path": str(record.path), "branch": record.branch}
+            for record in records
+            if record.branch is not None and branch_names_scope(record.branch, scope_id)
+        ]
+        facts[scope_id]["worktrees"] = items
+        facts[scope_id]["branch"] = items[0]["branch"] if items else None
     key = str(catalog)
     with cache.lock:
         old = dict(cache.catalogs.get(key, {}))
@@ -330,4 +340,4 @@ def read_structure_facts(
         facts[scope_id]["assurance"] = level
     with cache.lock:
         cache.catalogs[key] = kept
-    return facts
+    return StructureFacts(facts, status, paths)
