@@ -62,7 +62,9 @@ export function pickAgent(agents, wanted, goneIds) {
   const gone = goneIds ?? new Set();
   const result = (selected, isGone, remember = null, addGone = null, addGoneStale = false) => ({ selected, gone: isGone, remember, addGone, addGoneStale });
   if (wanted && wanted.startsWith(GONE)) return result(null, true, null, wanted.slice(GONE.length), true);
-  if (wanted && gone.has(wanted)) return result(null, true);
+  // A lost id read back (a back move, or a loss noted while another tab showed) is written as gone:<id> too, so a
+  // reload does not open it again.
+  if (wanted && gone.has(wanted)) return result(null, true, GONE + wanted);
   if (wanted) {
     const selected = agents.find((item) => item.id === wanted);
     return selected ? result(selected, false) : result(null, true, GONE + wanted, wanted, false);

@@ -106,8 +106,9 @@ def test_pick_agent_table(tmp_path: Path) -> None:  # T-02 pickAgent
         for (const agents of [[], [a], [a, b]]) {
           assert.deepEqual(pick(agents, "gone:b", none), {selected: null, gone: true, remember: null, addGone: "b", addGoneStale: true});
         }
-        assert.deepEqual(pick([a, b], "b", new Set(["b"])), {selected: null, gone: true, remember: null, addGone: null, addGoneStale: false});
-        assert.deepEqual(pick([a], "a", new Set(["a"])), {selected: null, gone: true, remember: null, addGone: null, addGoneStale: false});
+        assert.deepEqual(pick([a, b], "b", new Set(["b"])), {selected: null, gone: true, remember: "gone:b", addGone: null, addGoneStale: false});
+        assert.deepEqual(pick([a], "a", new Set(["a"])), {selected: null, gone: true, remember: "gone:a", addGone: null, addGoneStale: false});
+        assert.deepEqual(pick([], "a", new Set(["a"])), {selected: null, gone: true, remember: "gone:a", addGone: null, addGoneStale: false});
         assert.deepEqual(pick([a], null, new Set(["b"])), {selected: null, gone: true, remember: null, addGone: null, addGoneStale: false});
         assert.deepEqual(pick([a, b], "a", new Set(["b"])), {selected: a, gone: false, remember: null, addGone: null, addGoneStale: false});
         """,
