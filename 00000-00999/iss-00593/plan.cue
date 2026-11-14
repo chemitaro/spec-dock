@@ -5,7 +5,7 @@ package spec
 goal: "横の欄と詳しい画面の「エージェント」のタブで、その Scope の worktree のエージェントを選び、orca-web の詳細とチャットを使えるようにする。SpecDock は相手の選びだけを受け持ち、書き込みに関わらない。"
 
 steps: {
-	"S-01": {title: "node のテスト（T-01〜T-03）を先に書いて落ちることを確かめ、views/_shared/agents_logic.js（scopeAgents、agentsVisibility、pickAgent、stripForm、agentFrame、覚えの関数、AGENT_SANDBOX）を D-01 のとおりに作る。関わるテストと make lint を通す", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-07", "F-01", "F-02", "F-04", "F-05", "F-07", "F-08"], status: "todo", session: "impl_logic"}
+	"S-01": {title: "node のテスト（T-01〜T-03）を先に書いて落ちることを確かめ、views/_shared/agents_logic.js（scopeAgents、agentsVisibility、pickAgent、stripForm、agentFrame、覚えの関数、AGENT_SANDBOX）を D-01 のとおりに作る。関わるテストと make lint を通す", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-07", "F-01", "F-02", "F-04", "F-05", "F-07", "F-08"], status: "todo", session: "impl_ui"}
 	"S-02": {title: "テスト（T-04〜T-06）を先に書いて落ちることを確かめ、agents_tab.js、scope_tabs.js（agents の行、visibleTabs、keep、frameBar の export）、panel.js、scope.js（3つの部分と dispose）、app.js（orcaProblem、replaceParam、明暗）、CSS を D-02〜D-06 のとおりに作る。今のタブのテスト（TAB_KEYS など）を新しい並びに合わせる", realizes: ["R-01", "R-02", "R-03", "R-05", "R-06", "R-07", "F-01", "F-03", "F-05", "F-06", "F-07", "F-08"], status: "todo", after: ["S-01"], session: "impl_ui"}
 	"S-03": {title: "テスト（T-07、T-08）を先に書いて落ちることを確かめ、書き込みに関わらないことの静的なテスト（D-07）と配る文書（D-08）と static-inventory.json を作る。make lint と uv run pytest（全体）を通す", realizes: ["R-04", "R-08"], status: "todo", after: ["S-02"], session: "impl_ui"}
 	"S-04": {title: "試しの orca-web と試しの SpecDock の組で、写し（1440・1000・390、明暗、直す前と後）、sandbox の値での読み・送信・Orca で開く・新しいタブ、確かめ専用の宛先への送信とネットワークの記録、60 秒の本文の残り、Scope を変えたとき・いなくなったとき・iframe の中で移ったとき、届かないとき・埋め込みのときを確かめ、report.md に残す（T-09）", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06", "R-07", "F-01", "F-02", "F-03", "F-05", "F-06", "F-08"], status: "todo", after: ["S-03"], session: "owner"}
@@ -24,8 +24,8 @@ tests: {
 }
 
 verification: """
-	S-01（実装担当 impl_logic）：T-01〜T-03 と、関わる既存のテスト（`tests/unit/infra/test_dashboard_orca_match_js.py` など）、`make lint`。
-	S-02、S-03（実装担当 impl_ui）：T-04〜T-08 と、関わる既存のテスト（`tests/unit/infra/test_dashboard_scope_tabs_js.py`、`test_dashboard_panel_logic_js.py`、`test_dashboard_screens_js.py`、`test_dashboard_shell_polish.py`、`tests/cli_runtime/test_issue529_dashboard_server.py` など）。S-03 の終わりに `make lint`、`uv run pytest`（全体）。
+	S-01（実装担当 impl_ui）：T-01〜T-03 と、関わる既存のテスト（`tests/unit/infra/test_dashboard_orca_match_js.py` など）、`make lint`。
+	S-02、S-03（同じ実装担当 impl_ui）：T-04〜T-08 と、関わる既存のテスト（`tests/unit/infra/test_dashboard_scope_tabs_js.py`、`test_dashboard_panel_logic_js.py`、`test_dashboard_screens_js.py`、`test_dashboard_shell_polish.py`、`tests/cli_runtime/test_issue529_dashboard_server.py` など）。S-03 の終わりに `make lint`、`uv run pytest`（全体）。
 	S-04（タスク担当）：試しの組（下）と headless Chrome（CDP）。記録と写しは worktree の `.workbench/iss-00593/`、要るものを report.md に写す。
 	試しの組（統括の決定）：
 	- 試しの SpecDock：S-03 の HEAD の `git archive` から作った wheel を隔離した venv に入れ、一時の状態の置き場（`XDG_CONFIG_HOME` も一時の置き場にし、そこの `spec-dock/config.json` に `{"schema": "specdock.config/v1", "orca_web": {"enabled": true, "port": <試しの orca-web のポート>}}`）、別のポート（186xx）、`--tailscale` で `dashboard serve`。登録簿は道具の環境の状態の置き場の写し（サーバーの記録とログを除く）。
@@ -63,8 +63,7 @@ gates: {
 execution: {
 	sessions: {
 		spec:       {task: "仕様化（起動した側が選んだ値の記録）", model: "Opus 5.5", effort: "high", rationale: "統括が方針の「タスク担当 × strict」から選んだ（依頼書 task_94e69dff49b1）"}
-		impl_logic: {task: "実装（S-01）", model: "gpt-6.1-sol", effort: "medium", rationale: "codex。DOM を知らない純粋な決め方で、node のテストで表のように確かめられる。本人の指示（依頼書）で Codex GPT-6.1 Sol / medium を、方針の「テストで確かめられる実装 × strict」と同じ値で選ぶ。失敗や見落としが記録されたときだけ方針 §1 の4で1段上げる"}
-		impl_ui:    {task: "実装（S-02、S-03）", model: "Opus 5.5", effort: "high", rationale: "claude。横の欄と詳しい画面の描き、iframe を残す描き直し、CSS の高さで、画面と一体。本人の指示（依頼書）と方針の「フロントエンドの設計と実装 × strict」で Opus 5.5 / high。S-03 の静的なテストと配る文書は S-02 の画面のファイルの名前と言葉に頼るので、同じセッションが続ける"}
+		impl_ui:    {task: "実装（S-01、S-02、S-03）", model: "Opus 5.5", effort: "high", rationale: "claude。横の欄と詳しい画面の描き、iframe を残す描き直し、CSS の高さで、画面と一体。本人の指示（依頼書）と方針の「フロントエンドの設計と実装 × strict」で Opus 5.5 / high。S-01 は初め Codex GPT-6.1 Sol / medium（impl_logic）に割り当てたが、2026-11-14 に Codex の構造化のセッションが実行基盤の拒否（Orca の chat-scratch の書き込み先がシンボリックリンクの下にある）で何もできずに止まり（dispatch ctx_fdfd94981884）、方針 §1 の5で統括に返した。統括の了承（msg_cea1846a58b7、iss-00593 に限る）で、S-01〜S-03 をこの1つのセッションにまとめる。区切りのレビュー C-1 は S-01 の後のまま"}
 		owner:      {task: "実機の確かめ（S-04）", model: "Opus 5.5", effort: "high", rationale: "タスク担当（このセッション）。試しの組の起動と、送信の確かめと写しの受け入れの証拠の取得で、実装ではない"}
 	}
 	reviews: {
