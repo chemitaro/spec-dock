@@ -76,6 +76,6 @@ export default {
   id: "scope",
   title: "詳しい画面",
   icon: "info",
-  styles: ["/assets/views/_shared/parts.css", "/assets/views/scope.css"],
+  styles: ["/assets/views/_shared/parts.css", "/assets/views/_shared/scope_tabs.css", "/assets/views/scope.css"],
   render,
 };

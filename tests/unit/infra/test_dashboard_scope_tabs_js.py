@@ -159,3 +159,14 @@ def test_the_detail_screen_draws_its_tabs_from_the_shared_list() -> None:
         assert not re.search(rf"function {name}\b", scope), name
         assert re.search(rf"function {name}\b", shared), name
     assert "TABS" not in (SHARED / "logic.js").read_text().replace("SCOPE_TABS", "")
+
+
+def test_the_panel_draws_its_tabs_from_the_same_list_and_the_graph_uses_it() -> None:
+    panel = (SHARED / "panel.js").read_text()
+    assert 'from "./scope_tabs.js"' in panel and "SCOPE_TABS.map(" in panel and "pickTab(" in panel
+    assert "export function createScopePanel(" in panel
+    graph = (VIEWS / "graph.js").read_text()
+    assert 'import { createScopePanel } from "./_shared/panel.js";' in graph
+    assert "V.pn.show(" in graph and "V.pn.hide()" in graph
+    assert '"/assets/views/_shared/panel.css"' in graph and '"/assets/views/_shared/scope_tabs.css"' in graph
+    assert ".gx .panel" not in (VIEWS / "graph.css").read_text()  # the panel's look moved to panel.css

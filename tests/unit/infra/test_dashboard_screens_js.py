@@ -80,7 +80,10 @@ def test_the_screen_styles_stay_inside_the_three_screens() -> None:
     for name in ("parts.css",):
         text = (SHARED / name).read_text()
         # iss-00554: the human-task screens share the parts too
-        assert ':is([data-view="board"], [data-view="scope"], [data-view="overview"], [data-view="todos"])' in text
+        # iss-00587: and the shared Scope panel
+        assert (
+            ':is([data-view="board"], [data-view="scope"], [data-view="overview"], [data-view="todos"], .sd-pn)' in text
+        )
     for name in MINE:
         text = (VIEWS / f"{name}.css").read_text()
         selectors = [line for line in text.splitlines() if line and not line.startswith((" ", "}", "/*", "@"))]
