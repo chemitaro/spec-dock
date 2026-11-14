@@ -68,7 +68,7 @@ requirements: {
 			"""
 		acceptance: [
 			"欄のタブの並びが 説明資料・概要・依存・配下・文書・Artifact・人のタスク で、件数の小さな数字が詳しい画面と同じ",
-			"説明資料が書かれた Scope では説明資料のタブが、雛形のままの Scope（iss-00587 の今）では概要のタブが、最初に選ばれている",
+			"説明資料が書かれた Scope では説明資料のタブが、雛形のままの Scope（epic-00471）では概要のタブが、最初に選ばれている",
 			"タブを押しても location.href が変わらない",
 			"欄の配下のタブで「終わったものも示す」を押しても、ボードの URL の done が変わらない",
 		]
@@ -83,8 +83,8 @@ requirements: {
 			"""
 		acceptance: [
 			"epic-00573（書かれている）で、説明資料のタブに iframe があり、その src が /r/github.com/chemitaro/spec-dock/files/epic-00573/explanation.html、sandbox が allow-scripts allow-popups",
-			"iss-00587（雛形）で、説明資料のタブに枠がなく、雛形のままの知らせがある",
-			"説明資料のない Scope で、まだないの知らせがある",
+			"epic-00471（雛形）で、説明資料のタブに枠がなく、雛形のままの知らせがある",
+			"説明資料のない Scope（iss-00407）で、まだないの知らせがある",
 		]
 	}
 	"R-04": {
@@ -95,7 +95,7 @@ requirements: {
 			"""
 		acceptance: [
 			"/r/…/scopes/epic-00573 で説明資料のタブが選ばれ、/r/…/scopes/epic-00573?tab=summary で概要が選ばれる",
-			"/r/…/scopes/iss-00587 では概要が選ばれる",
+			"/r/…/scopes/epic-00471（雛形）と /r/…/scopes/iss-00407（ない）では概要が選ばれる",
 		]
 	}
 	"R-05": {

@@ -137,6 +137,14 @@ design: {
 			PC の幅になったら、--pn-h と段を使わない。reduced motion では transition を外す。
 			"""
 	}
+	"D-09": {
+		title:     "直す前と後の写しと測り"
+		satisfies: ["R-10"]
+		text: """
+			開始のコミットから作った隔離の venv（ポート 18587）と、作業の木から作った隔離の venv（ポート 18588）で、同じ写しの状態の置き場を配り、
+			.workbench/iss-00587/shoot.mjs（CDP、headless Chrome）で同じ手順を写す。測りは同じスクリプトの JavaScript で取り、写しの道と数を report.md に書く。
+			"""
+	}
 }
 
 compatibility: """
