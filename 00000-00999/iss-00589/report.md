@@ -72,6 +72,8 @@ ID: "iss-00589"
 
 ## Outcome
 
+PR #590（https://github.com/chemitaro/spec-dock/pull/590、head `881280ed33ebc0116e7e864c58334e342f3845cf`）。CI：observable_ci PASS、merge_readiness READY（2026-11-14T07:18Z、`.workbench/coding-task/iss-00589/ci2.json`）。マージは統括が行う。
+
 実装担当：impl-ui（S-01・S-02）claude opus / medium（dispatch ctx_488bf91291e0、launch.effective claude・opus・medium）。Codex の手順はなし（データの形・API の変更がなく、計画の execution に理由を記録）。S-03 はタスク担当（opus / medium）。
 
 ## 逸脱と判断
