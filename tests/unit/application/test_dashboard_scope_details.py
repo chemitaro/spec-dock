@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 import json
+import os
 from pathlib import Path
 import subprocess
 from typing import TYPE_CHECKING, Any
@@ -197,6 +198,57 @@ def test_documents_report_presence_without_following_links(tmp_path: Path) -> No
     assert documents["plan"]["exists"] is False  # a link is not a regular file
     assert documents["explanation"]["href"] == "/r/github.com/o/r/files/iss-00004/explanation.html"
     assert documents["report"] == {"key": "report", "name": "report.md", "exists": False, "href": None}
+
+
+@pytest.mark.parametrize(
+    ("content", "linked", "expected"),
+    [
+        ("<!-- spec-dock:explanation-skeleton -->", False, True),
+        ("<p>書かれた説明資料</p>", False, False),
+        (None, False, None),
+        ("<!-- spec-dock:explanation-skeleton -->", True, None),
+    ],
+)
+def test_only_explanation_reports_skeleton(
+    tmp_path: Path, content: str | None, linked: bool, expected: bool | None
+) -> None:
+    catalog = tmp_path / "c"
+    directory = scope_dir(catalog, "iss-00004")
+    if content is not None:
+        target = tmp_path / "outside.html" if linked else directory / "explanation.html"
+        target.write_text(content)
+        if linked:
+            (directory / "explanation.html").symlink_to(target)
+    documents = _read(_site(catalog))["documents"]
+    explanation = next(item for item in documents if item["key"] == "explanation")
+    assert explanation["skeleton"] is expected
+    assert all("skeleton" not in item for item in documents if item["key"] != "explanation")
+
+
+@pytest.mark.parametrize(("prefix", "expected"), [(256 * 1024 - 39, True), (256 * 1024, False)])
+def test_explanation_skeleton_reads_only_first_256_kib(tmp_path: Path, prefix: int, expected: bool) -> None:
+    catalog = tmp_path / "c"
+    directory = scope_dir(catalog, "iss-00004")
+    (directory / "explanation.html").write_bytes(b"x" * prefix + b"<!-- spec-dock:explanation-skeleton -->")
+    explanation = next(item for item in _read(_site(catalog))["documents"] if item["key"] == "explanation")
+    assert explanation["skeleton"] is expected
+
+
+def test_unreadable_explanation_has_unknown_skeleton(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    catalog = tmp_path / "c"
+    directory = scope_dir(catalog, "iss-00004")
+    explanation_path = directory / "explanation.html"
+    explanation_path.write_text("<!-- spec-dock:explanation-skeleton -->")
+    original_open = os.open
+
+    def denied(path: Any, *args: Any, **kwargs: Any) -> int:
+        if path == explanation_path:
+            raise PermissionError("cannot read explanation")
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(os, "open", denied)
+    explanation = next(item for item in _read(_site(catalog))["documents"] if item["key"] == "explanation")
+    assert explanation["exists"] is True and explanation["skeleton"] is None
 
 
 def test_artifacts_list_regular_files_with_escaped_links(tmp_path: Path) -> None:
