@@ -51,7 +51,7 @@ HEAD `b7dd1c765` の `git archive` から作った wheel（spec-dock 0.9.1）を
 
 ## Outcome
 
-PR #596（https://github.com/chemitaro/spec-dock/pull/596、head `b7dd1c765d922a847b26103d0486290d9b7d8bd8`）。マージは統括が行う。
+PR #596（https://github.com/chemitaro/spec-dock/pull/596、head `b7dd1c765d922a847b26103d0486290d9b7d8bd8`）。CI：observable_ci PASS、merge_readiness READY（2026-11-14T10:56Z、worktree の `.workbench/coding-task/iss-00591/ci2.json`）。マージは統括が行う。
 
 ## Verification
 
