@@ -1,6 +1,6 @@
 /* Shared parts of the board, the detail screen and the overview (iss-00531 D-05), from the adopted design d2.
    Scoped under the three screens so nothing leaks into #532's graph and timeline. */
-:is([data-view="board"], [data-view="scope"], [data-view="overview"], [data-view="todos"]) {
+:is([data-view="board"], [data-view="scope"], [data-view="overview"], [data-view="todos"], .sd-pn) {
   /* ---------- Page ---------- */
   & .sd-page { max-width: var(--ds-wide-max); margin: 0 auto; padding: 20px 24px 64px; }
   & .sd-page-head { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 14px; }
@@ -119,7 +119,7 @@
 }
 
 @container app (max-width: 640px) {
-  :is([data-view="board"], [data-view="scope"], [data-view="overview"], [data-view="todos"]) {
+  :is([data-view="board"], [data-view="scope"], [data-view="overview"], [data-view="todos"], .sd-pn) {
     & .sd-page { padding: 14px 12px 56px; }
     & .sd-page-head h1 { font-size: 1.15rem; }
     & .sd-table { font-size: 12px; }

@@ -305,7 +305,7 @@ def _asset(name: str) -> str:
 
 
 def test_the_detail_screen_frames_documents_in_a_sandbox_and_shows_check_and_progress() -> None:
-    scope = _asset("views/scope.js")
+    scope = _asset("views/_shared/scope_tabs.js")  # the tabs moved out of scope.js (iss-00587 D-03)
     assert 'const FRAME_SANDBOX = "allow-scripts allow-popups";' in scope
     assert 'sandbox="${FRAME_SANDBOX}"' in scope and "allow-same-origin" not in scope
     assert 'referrerpolicy="no-referrer"' in scope
@@ -317,7 +317,7 @@ def test_the_detail_screen_frames_documents_in_a_sandbox_and_shows_check_and_pro
         'data-code="render-failed"',
         'data-code="plan-progress"',
         "doing_steps",
-        'withParam(ctx.route.path, "doc"',
+        'env.paramLink("doc"',
     ):
         assert marker in scope, marker
 

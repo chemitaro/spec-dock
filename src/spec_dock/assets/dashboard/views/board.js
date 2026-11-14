@@ -1,11 +1,118 @@
 // 状態のボード（iss-00531 D-06；Epic R-13、R-14、R-31）。列は 止められている → 着手できる → 作業中 →
 // マージ待ち（マージできる／直す必要あり）→（終わった）。列と並びはサーバーの lane、merge、rank を写すだけ。
+// 札を普通に押すと、構造の図と同じ Scope の欄を開く（iss-00587 D-07）。札は詳しい画面への普通のリンクのまま。
+import * as api from "../core/api.js";
 import { boardColumns, boardCounts, boardOptions, groupByParent, KINDS, pullRequestNotice, withParam } from "./_shared/logic.js";
+import { createScopePanel } from "./_shared/panel.js";
 
 const byNumber = (a, b) => a.number - b.number;
 import { card, emptyState, esc, icon, legend, newTabLink, stateIcon, stateMark } from "./_shared/parts.js";
 
 let dialogScope = null; // the cleanup dialog stays open across the 5-second refresh
+
+// The panel's aside lives beside the page (outside .sd-page) and survives the 5-second redraw (D-07).
+const B = {
+  root: null,
+  page: null, // the element the board is drawn into
+  pn: null,
+  ctx: null,
+  byId: new Map(),
+  sel: null, // the selected Scope ID
+  doc: null, // its scopes/<ID> JSON
+  docState: "loading",
+  docRevision: null,
+  token: 0, // the latest read; an older answer is dropped (F-04)
+};
+const plainClick = (event) => event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
+
+function mount(root) {
+  root.innerHTML = `<div class="sd-board-page"></div><aside class="sd-board-panel" aria-hidden="true" aria-label="Scope の欄"></aside>`;
+  B.root = root;
+  B.page = root.firstElementChild;
+  B.pn = createScopePanel(root.querySelector("aside"), { onSelect: select, onClose: () => select(null) });
+  root.addEventListener("click", onCardClick);
+  document.addEventListener("keydown", onKey);
+  window.addEventListener("resize", placePanel);
+}
+
+function unmount() {
+  B.root?.removeEventListener("click", onCardClick);
+  document.removeEventListener("keydown", onKey);
+  window.removeEventListener("resize", placePanel);
+  B.token++; // an answer that arrives after leaving the screen is dropped
+  B.pn?.destroy();
+  Object.assign(B, { root: null, page: null, pn: null, ctx: null, sel: null, doc: null, docState: "loading", docRevision: null });
+}
+
+// A plain left click on a card selects it; a modified or middle click keeps the ordinary link (R-01). The shell
+// leaves a prevented click alone. Clicks inside the panel are the panel's own.
+function onCardClick(event) {
+  if (event.defaultPrevented || !plainClick(event) || B.pn?.element.contains(event.target)) return;
+  const anchor = event.target.closest("a.sd-card[data-id]");
+  if (!anchor || anchor.closest("dialog") || !B.byId.has(anchor.dataset.id)) return;
+  event.preventDefault();
+  select(anchor.dataset.id);
+}
+
+function onKey(event) {
+  if (event.key !== "Escape" || !B.sel || B.root?.querySelector("dialog[open]")) return;
+  select(null);
+}
+
+// The panel sits under the bands above the board, at the top of the board's own area.
+function placePanel() {
+  if (B.root) B.root.style.setProperty("--pn-top", `${B.root.offsetTop + 10}px`);
+}
+
+function markSelected() {
+  for (const el of B.page.querySelectorAll(".sd-card[aria-current]")) el.removeAttribute("aria-current");
+  if (B.sel) for (const el of B.page.querySelectorAll(`.sd-card[data-id="${CSS.escape(B.sel)}"]`)) el.setAttribute("aria-current", "true");
+}
+
+function drawPanel() {
+  if (!B.pn) return;
+  const scope = B.sel ? B.byId.get(B.sel) : null;
+  if (!scope) {
+    B.pn.hide();
+    delete B.root.dataset.panel;
+  } else {
+    placePanel();
+    B.pn.show({ ctx: B.ctx, scope, doc: B.doc, docState: B.docState, byId: B.byId });
+    B.root.dataset.panel = "open";
+  }
+  markSelected();
+}
+
+function select(id) {
+  B.token++;
+  B.sel = id && B.byId.has(id) ? id : null;
+  B.doc = null;
+  B.docState = "loading";
+  drawPanel();
+  if (B.sel) load(B.sel, { keep: false });
+}
+
+// Read the selected Scope's detail; on a new revision the panel keeps the last answer while it reads again (R-08).
+async function load(id, { keep }) {
+  const token = keep ? ++B.token : B.token;
+  const revision = B.ctx?.data?.revision ?? null;
+  B.docRevision = revision;
+  let doc = null;
+  try {
+    doc = await api.scope(B.ctx.repository, id, B.ctx.baseline);
+  } catch {
+    doc = null;
+  }
+  if (token !== B.token || B.sel !== id) return;
+  if (!doc) {
+    if (keep && B.doc) return;
+    B.docState = "failed"; // F-01
+  } else {
+    B.doc = doc;
+    B.docState = "ok";
+  }
+  drawPanel();
+}
 
 function columnBody(column, ctx, byId, group) {
   const list = (items) => {
@@ -55,6 +162,17 @@ function cleanupDialog(ctx, byId) {
 }
 
 function render(root, ctx) {
+  if (B.root !== root || !B.pn || !root.contains(B.pn.element)) mount(root);
+  B.ctx = ctx;
+  const data = ctx.data;
+  B.byId = new Map((data?.scopes || []).map((item) => [item.id, item]));
+  renderPage(B.page, ctx);
+  if (B.sel && !B.byId.has(B.sel)) select(null); // F-02
+  else if (B.sel && B.docRevision !== (data?.revision ?? null)) load(B.sel, { keep: true });
+  drawPanel();
+}
+
+function renderPage(root, ctx) {
   const data = ctx.data;
   if (!data || !data.scopes?.length) {
     root.innerHTML = `<div class="sd-page">${newTabLink(ctx)}<div class="sd-page-head"><h1>ボード</h1></div>${emptyState("表示できる構造がありません。上の知らせの次の1手を確かめてください。")}</div>`;
@@ -76,7 +194,7 @@ function render(root, ctx) {
   const cleanupCount = (data.cleanup || []).length;
   // Epic R-12: with done hidden, closed parents that still have open descendants stay visible.
   const keptParents = options.done ? [] : data.scopes.filter((item) => item.keep_visible && (!options.kind || item.kind === options.kind)).sort(byNumber);
-  const scrollTop = root.scrollTop;
+  const scrollTop = B.root.scrollTop;
   root.innerHTML =
     `<div class="sd-page">${newTabLink(ctx)}` +
     `<div class="sd-page-head"><h1>ボード</h1><p>Scope ${counts.total}件のうち終わった ${counts.done}件。数は Issue だけを数える。</p></div>` +
@@ -116,7 +234,7 @@ function render(root, ctx) {
       .join("")}</div>` +
     cleanupDialog(ctx, byId) +
     `</div>`;
-  root.scrollTop = scrollTop;
+  B.root.scrollTop = scrollTop;
   const dialog = root.querySelector("#sd-cleanup");
   root.querySelector('[data-act="cleanup"]').addEventListener("click", () => {
     dialogScope = ctx.repository;
@@ -137,9 +255,10 @@ export default {
   id: "board",
   title: "ボード",
   icon: "table",
-  styles: ["/assets/views/_shared/parts.css", "/assets/views/board.css"],
+  styles: ["/assets/views/_shared/parts.css", "/assets/views/_shared/scope_tabs.css", "/assets/views/_shared/panel.css", "/assets/views/board.css"],
   render,
   dispose() {
     dialogScope = null;
+    unmount();
   },
 };

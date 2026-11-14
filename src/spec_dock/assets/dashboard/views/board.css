@@ -60,3 +60,15 @@
   }
   [data-view="board"] .sd-dialog { width: 100vw; max-width: 100vw; margin: auto 0 0; border-radius: 14px 14px 0 0; }
 }
+/* Scope の欄（iss-00587 D-07）：ボードの領域の上端から下に固定し、開いている間は列を欄の左に収める（R-05）。 */
+[data-view="board"] {
+  & > .sd-pn { position: fixed; top: var(--pn-top, 10px); }
+  & .sd-card[aria-current="true"] { outline: 2px solid var(--ds-accent); outline-offset: 1px; }
+}
+[data-view="board"][data-panel="open"] .sd-page { max-width: none; margin-right: calc(var(--pn-w) + 20px); }
+@container app (max-width: 640px) {
+  [data-view="board"] {
+    & > .sd-pn { top: auto; }
+  }
+  [data-view="board"][data-panel="open"] .sd-page { margin-right: 0; }
+}

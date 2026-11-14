@@ -16,14 +16,7 @@ export const KINDS = [
   ...Object.entries(KIND_LABEL),
 ];
 export { KIND_LABEL, PR_STATE_WORDS, STATE_WORDS }; // their home is core/ui.js (iss-00544)
-export const TABS = [
-  ["summary", "概要"],
-  ["deps", "依存"],
-  ["children", "配下"],
-  ["docs", "文書"],
-  ["artifacts", "Artifact"],
-  ["todos", "人のタスク"], // iss-00554 D-06
-];
+// The detail tabs live in views/_shared/scope_tabs.js (SCOPE_TABS, iss-00587 D-03).
 
 export const byRank = (a, b) => (a.rank ?? 1e9) - (b.rank ?? 1e9) || a.number - b.number;
 
@@ -228,11 +221,6 @@ export function ancestors(byId, scope) {
     current = current.parent_id ? byId.get(current.parent_id) : null;
   }
   return chain;
-}
-
-export function tabOf(params) {
-  const tab = params.get("tab") || "summary";
-  return TABS.some(([key]) => key === tab) ? tab : "summary";
 }
 
 export function formatSize(bytes) {

@@ -21,6 +21,7 @@ from urllib.parse import quote
 from spec_dock.runtime.application.scope_check import read_assurance
 from spec_dock.runtime.domain.canonical_layout import scope_relative
 from spec_dock.runtime.domain.canonical_structure import branch_names_scope
+from spec_dock.runtime.domain.explanation_shape import SKELETON_MARKER
 from spec_dock.runtime.infra.cue_tool import CueToolError, locate_cue
 from spec_dock.runtime.infra.git_cli import worktree_list
 
@@ -79,8 +80,22 @@ def _documents(site: SiteRepository, scope_id: str, directory: Path) -> list[dic
         exists = name is not None
         shown = name or names[0]
         href = _files_path(site, scope_id, shown) if exists and key in _LINKED else None
-        found.append({"key": key, "name": shown, "exists": exists, "href": href})
+        document: dict[str, object] = {"key": key, "name": shown, "exists": exists, "href": href}
+        if key == "explanation":
+            document["skeleton"] = _explanation_skeleton(directory / shown) if exists else None
+        found.append(document)
     return found
+
+
+def _explanation_skeleton(path: Path) -> bool | None:
+    try:
+        descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0))
+        with os.fdopen(descriptor, "rb") as stream:
+            if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+                return None
+            return SKELETON_MARKER.encode("utf-8") in stream.read(256 * 1024)
+    except OSError:
+        return None
 
 
 def _artifacts(

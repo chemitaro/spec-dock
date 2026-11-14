@@ -1,0 +1,71 @@
+/* Scope の欄（iss-00587 D-05）。構造の図とボードで同じ部品（_shared/panel.js）。PC は右、スマートフォンは下から。
+   タブの中身の見た目は _shared/scope_tabs.css、札や知らせは _shared/parts.css（どちらも .sd-pn を範囲に含む）。 */
+:is([data-view="graph"], [data-view="board"]) { --pn-w: clamp(380px, 44cqw, 720px); }
+.sd-pn { position: absolute; z-index: 25; top: 10px; right: 10px; bottom: 10px; width: var(--pn-w); display: flex; flex-direction: column; min-height: 0; border: 1px solid var(--ds-border); border-top: 4px solid var(--st, var(--ds-accent)); border-radius: var(--ds-radius-l); background: var(--ds-surface); box-shadow: var(--ds-shadow-l); transform: translateX(calc(100% + 24px)); transition: transform .26s var(--ds-ease); }
+.sd-pn.is-open { transform: none; }
+.sd-pn .pn-grab { display: none; }
+.sd-pn .pn-top { flex: none; }
+.sd-pn .pn-head { display: flex; align-items: center; gap: 8px; padding: 12px 10px 0 16px; }
+.sd-pn .pn-head .iconbtn { margin-left: auto; width: 32px; height: 32px; font-size: 16px; }
+.sd-pn .pn-cover { padding: 6px 16px 0; }
+.sd-pn .pn-kicker { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 0; font-size: 12.5px; color: var(--ds-muted); }
+.sd-pn .pn-title { margin: 6px 0 0; font-size: 17px; line-height: 1.5; font-weight: 700; word-break: auto-phrase; text-wrap: pretty; overflow-wrap: anywhere; }
+.sd-pn .pn-why { display: flex; gap: 8px; align-items: flex-start; margin: 10px 0 0; padding: 8px 12px; border-left: 4px solid var(--st); border-radius: 6px; background: var(--st-bg); color: var(--ds-text); font-size: 13px; font-weight: 600; }
+.sd-pn .pn-why .st-ico { margin-top: 3px; }
+/* 作業中で30分を超えて動きがない（iss-00574 R-05） */
+.sd-pn .pn-idle { display: flex; align-items: center; gap: 6px; margin: 6px 0 0; padding: 0 12px; color: var(--ds-muted); font-size: 12.5px; font-weight: 650; }
+.sd-pn .pn-idle .ds-icon { font-size: 14px; }
+.sd-pn .pn-path { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 4px; margin: 10px 0 0; font-size: 12.5px; color: var(--ds-muted); }
+.sd-pn .pn-path button { border: 0; background: none; padding: 1px 4px; border-radius: 4px; color: var(--ds-link); cursor: pointer; font-family: var(--ds-font-mono); font-size: 12px; text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 35%, transparent); text-underline-offset: .2em; max-width: 22ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sd-pn .pn-path .ds-icon { font-size: 12px; color: var(--ds-faint); }
+/* タブの帯：詳しい画面と同じ並び（SCOPE_TABS）。はみ出しは横に送る。 */
+.sd-pn .pn-tabs { flex: none; display: flex; gap: 2px; margin-top: 10px; padding: 0 8px; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--ds-border); }
+.sd-pn .pn-tabs button { position: relative; flex: none; padding: 8px 10px 9px; border: 0; background: none; color: var(--ds-muted); font: inherit; font-size: 13px; font-weight: 650; white-space: nowrap; cursor: pointer; }
+.sd-pn .pn-tabs button small { margin-left: 4px; padding: 0 6px; border-radius: 999px; background: var(--ds-surface-2); font-size: 11px; color: var(--ds-muted); }
+.sd-pn .pn-tabs button:hover { color: var(--ds-text); }
+.sd-pn .pn-tabs button[aria-selected="true"] { color: var(--ds-accent-strong); }
+.sd-pn .pn-tabs button[aria-selected="true"]::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: 0; height: 2px; border-radius: 2px; background: var(--ds-accent); }
+.sd-pn .pn-body { flex: 1; min-height: 0; padding: 14px 16px 16px; overflow: auto; overscroll-behavior: contain; }
+.sd-pn .pn-loading { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--ds-muted); font-size: 13px; }
+/* 説明資料のタブ：枠がタブの残りの高さをすべて使い、中身は枠の中でスクロールする（R-03）。 */
+.sd-pn .pn-body[data-tab="explanation"] { display: flex; flex-direction: column; padding: 8px 10px 10px; overflow: hidden; }
+.sd-pn .pn-body[data-tab="explanation"] > .sd-explainbox { flex: 1; }
+.sd-pn .sd-explain { height: auto; }
+.sd-pn .sd-docframe { height: min(70vh, 900px); min-height: 360px; }
+.sd-pn .pn-foot { flex: none; display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--ds-border); }
+.sd-pn .pn-foot .is-primary { flex: 1; justify-content: center; }
+.sd-pn .ds-btn { display: inline-flex; align-items: center; gap: .45em; height: 32px; padding: 0 12px; border: 1px solid var(--ds-border); border-radius: 8px; background: var(--ds-surface); color: var(--ds-text-2); font-size: 13px; font-weight: 600; line-height: 1; cursor: pointer; white-space: nowrap; text-decoration: none; }
+.sd-pn .ds-btn:hover { border-color: var(--ds-border-2); color: var(--ds-text); background: var(--ds-surface-2); }
+.sd-pn .ds-btn .ds-icon { font-size: 15px; }
+.sd-pn .ds-btn.is-primary { background: var(--ds-accent); border-color: var(--ds-accent); color: var(--ds-on-accent); }
+.sd-pn .ds-btn.is-primary:hover { background: var(--ds-accent-strong); }
+
+/* スマートフォン：画面の下から出るシート（D-08）。高さは panel.js が --pn-h（px）で持つ3段：最小・通常・全体。
+   シートを動かすのは取っ手と見出しの帯だけ。中身と説明資料の枠のスクロールはシートを動かさない（R-07）。 */
+@container app (max-width: 640px) {
+  .sd-pn { position: fixed; z-index: 35; top: auto; left: 0; right: 0; bottom: 0; width: auto; height: var(--pn-h, 58%); max-height: 100%; border-radius: 14px 14px 0 0; border-left: 0; border-right: 0; border-bottom: 0; transform: translateY(105%); overflow: hidden; transition: transform .26s var(--ds-ease), height .22s var(--ds-ease); }
+  .sd-pn.is-open { transform: none; }
+  .sd-pn.is-dragging { transition: none; user-select: none; }
+  .sd-pn.is-dragging iframe { pointer-events: none; }
+  .sd-pn[data-snap="full"] { border-radius: 0; }
+  .sd-pn .pn-grab { display: block; flex: none; width: 100%; height: 16px; margin: 0; padding: 0; border: 0; background: none; cursor: grab; touch-action: none; }
+  .sd-pn .pn-grab::before { content: ""; display: block; width: 40px; height: 5px; margin: 6px auto 0; border-radius: 99px; background: var(--ds-border-2); opacity: .6; }
+  .sd-pn .pn-top { touch-action: none; }
+  .sd-pn .pn-head { padding-top: 2px; }
+  .sd-pn .pn-body[data-tab="explanation"] { padding: 4px 6px 6px; }
+  .sd-pn .sd-explain__bar { min-height: 20px; font-size: 12px; }
+  /* 下の帯は折り返さない1行で、ボタンは印だけ（名前は aria-label と title） */
+  .sd-pn .pn-foot { flex-wrap: nowrap; gap: 6px; padding: 8px 10px; }
+  .sd-pn .pn-foot .ds-btn { flex: 1; justify-content: center; height: 36px; padding: 0 8px; font-size: 0; gap: 0; }
+  .sd-pn .pn-foot .ds-btn .ds-icon { font-size: 17px; }
+  /* 全体の段：見出しを「状態の印、ID、題名（1行）、閉じる」の1行に詰め、ほかの行は概要のタブで読む */
+  .sd-pn[data-snap="full"] .pn-top { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 6px 0 12px; }
+  .sd-pn[data-snap="full"] .pn-head { display: contents; }
+  .sd-pn[data-snap="full"] .pn-close { order: 3; margin-left: 0; }
+  .sd-pn[data-snap="full"] .pn-cover { order: 2; flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; padding: 0; }
+  .sd-pn[data-snap="full"] :is(.pn-merge, .pn-kind, .pn-why, .pn-idle, .pn-path) { display: none; }
+  .sd-pn[data-snap="full"] .pn-kicker { flex: none; }
+  .sd-pn[data-snap="full"] .pn-title { margin: 0; min-width: 0; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sd-pn[data-snap="full"] .pn-tabs { margin-top: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .sd-pn, .sd-pn.is-open { transition: none; } }

@@ -10,6 +10,7 @@ import { DEFAULTS, index, routeLayout } from "./graph/layout.js";
 import { audit, svg as edgeSvg } from "./graph/router.js";
 import * as M from "./graph/marks.js";
 import { LEGACY_KEY, PREFS_KEY, restorePrefs } from "./graph/prefs.js";
+import { createScopePanel } from "./_shared/panel.js";
 
 const { esc, ic, stateIcon, STATES } = M;
 const PHONE = 640;
@@ -37,6 +38,9 @@ const V = {
   sel: null, // the selected Scope ID
   path: null, // {up, down, roots, related} from the scope API for `sel`
   token: 0, // the latest selection; an older answer is dropped
+  docState: "loading", // the scope API answer for `sel`: loading, ok or failed (iss-00587 F-01)
+  docRevision: null, // the structure revision `path.doc` was read at; a new one reads it again (R-08)
+  pn: null, // the shared Scope panel
   legend: false,
   cleanup: false, // the panel shows the cleanup list
   s: 1,
@@ -96,7 +100,7 @@ function mount(root) {
     `<div class="gx-view" tabindex="0" aria-label="構造の図。ドラッグで移動、Ctrl とホイールか2本指で拡大・縮小"><div class="gx-world"></div></div>` +
     `<div class="gx-bar"><div class="gx-left"><div class="gx-crumbs" hidden></div><div class="gx-next" role="group" aria-label="状態で目立たせる"></div></div><div class="gx-tools"></div></div>` +
     `<div class="legend"></div>` +
-    `<aside class="panel" aria-hidden="true" aria-label="要点"></aside>` +
+    `<aside class="panel" aria-hidden="true" aria-label="Scope の欄"></aside>` +
     `<p class="gx-empty" hidden></p>` +
     `</section>`;
   const q = (sel) => root.querySelector(sel);
@@ -113,6 +117,14 @@ function mount(root) {
     panel: q(".panel"),
     empty: q(".gx-empty"),
   };
+  V.pn = createScopePanel(V.el.panel, {
+    onSelect: (id) => {
+      select(id);
+      centerOn(id);
+    },
+    onClose: () => select(null),
+    extraActions: (s) => (frameOf(s) ? `<button type="button" class="ds-btn" data-act="focus" data-focus="${esc(s.id)}" aria-label="この範囲に絞る" title="この範囲に絞る">${ic("target")}この範囲に絞る</button>` : ""),
+  });
   bindView();
   V.el.gx.addEventListener("click", onClick);
   document.addEventListener("keydown", onKey);
@@ -132,6 +144,10 @@ function dispose() {
   V.fitted = false;
   V.sel = null;
   V.path = null;
+  V.docState = "loading";
+  V.docRevision = null;
+  V.pn?.destroy();
+  V.pn = null;
 }
 
 // Safari zooms the whole page on a pinch unless its gesture events are cancelled (#527 P-5).
@@ -160,6 +176,7 @@ function render(root, ctx) {
     V.desc = descendants(V.ix);
   }
   if (V.sel && !byId(V.sel)) select(null);
+  else if (V.sel && V.docRevision !== data.revision) loadSelected(V.sel, { keep: true });
   // The Scopes moving now key the world too: past their 30 minutes the boxes are drawn again, still (iss-00574 D-04).
   const now = Date.now();
   const live = data.scopes.filter((s) => s.state === "doing" && M.isLive(M.movedAt(s, V.ix.byId), now)).map((s) => s.id);
@@ -371,22 +388,38 @@ function paint() {
 }
 
 async function select(id) {
-  const token = ++V.token;
+  V.token++;
   V.sel = id;
   V.path = null;
+  V.docState = "loading";
   V.cleanup = false;
   if (id) V.hl = null; // the later action wins: a selection replaces the state chip
   paint();
   renderPanel();
   if (id && isPhone()) keepAbovePanel(id);
   if (!id || !V.ctx) return;
+  await loadSelected(id, { keep: false });
+}
+
+// Read the selected Scope's detail. A newer selection or read drops this answer (F-04). On a new revision the
+// panel keeps drawing the last answer while it reads again (keep), and keeps it when the read fails.
+async function loadSelected(id, { keep }) {
+  const token = keep ? ++V.token : V.token;
+  const revision = V.data?.revision ?? null;
+  V.docRevision = revision; // one read per revision, even when it fails
   let doc = null;
   try {
-    doc = await api.scope(V.ctx.repository, id);
+    doc = await api.scope(V.ctx.repository, id, V.ctx.baseline);
   } catch {
     doc = null; // the selected box alone stays highlighted (F-02)
   }
-  if (token !== V.token || !doc) return;
+  if (token !== V.token || V.sel !== id) return;
+  if (!doc) {
+    if (keep && V.path) return;
+    V.docState = "failed"; // F-01: the header from the structure, the contents say so
+    renderPanel();
+    return;
+  }
   const done = byId(id)?.state === "done";
   const down = (done ? doc.downstream_all : doc.downstream) || { direct: [], indirect: [] };
   const up = doc.upstream || { direct: [], indirect: [] };
@@ -397,6 +430,7 @@ async function select(id) {
     roots: new Set(doc.root_waits?.scope_ids || []),
     doc,
   };
+  V.docState = "ok";
   paint();
   renderPanel();
 }
@@ -464,52 +498,17 @@ function renderLegend() {
     `</div>`;
 }
 
-// --- The summary panel -------------------------------------------------------------------------------------
+// --- The Scope panel (iss-00587 D-06): the shared panel, or the cleanup list in the same aside ---------------
 
-function panelPath(s) {
-  const chain = V.ix.ancestors(s.id).slice().reverse();
-  if (!chain.length) return `<p class="path">${ic("layers")}最上位</p>`;
-  return `<nav class="path" aria-label="親の道筋">${chain.map((id) => `<button type="button" data-goto="${esc(id)}" title="${esc(byId(id)?.title ?? "")}">${esc(id)}</button>${ic("chevronRight")}`).join("")}<span>${esc(s.id)}</span></nav>`;
+function frameOf(s) {
+  return s.kind !== "issue" || (V.ix.kids.get(s.id) || []).length > 0;
 }
-
-function panelKv(s) {
-  let h = `<dt>種類</dt><dd>${M.KIND[s.kind] ?? s.kind}</dd>`;
-  if (s.assurance) h += `<dt>保証レベル</dt><dd>${M.asMark(s.assurance)}${esc(s.assurance)}</dd>`;
-  if (s.pr) h += `<dt>PR</dt><dd>${M.prMark(s.pr, true)}</dd>`;
-  else if (s.kind === "issue" && s.state !== "done" && V.data.pull_requests?.status !== "unknown") h += `<dt>PR</dt><dd class="is-muted">まだない</dd>`;
-  if (s.branch) h += `<dt>ブランチ</dt><dd>${M.wtMark(s.branch)}<span class="mono">${esc(s.branch)}</span></dd>`;
-  const of = maxOpenStage(s.parent_id);
-  if (s.state !== "done" && of >= 2 && s.stage?.open) h += `<dt>段</dt><dd>${M.stageMark(s.stage.open, of)}${of}段のうち ${s.stage.open}段目</dd>`;
-  if (s.downstream) h += `<dt>後に続く</dt><dd>${M.dnMark(s.downstream)}${s.downstream}件</dd>`;
-  const human = M.humanCount(s);
-  if (human.count) {
-    const tab = V.ctx.href(`${s.path}?tab=todos`);
-    h += `<dt>人のタスク</dt><dd>${M.hmMark(s)}<a data-nav href="${esc(tab)}">${human.count}件${human.descendants ? "（配下を含む）" : ""}を見る</a></dd>`;
-  }
-  if (s.change) h += `<dt>変化</dt><dd><span class="lg-chg"></span>${esc(M.changeText(s.change))}</dd>`;
-  const roots = V.path?.roots;
-  if (roots?.size) h += `<dt>大もと</dt><dd>${[...roots].map((id) => `<button type="button" class="ds-docid" data-goto="${esc(id)}">${esc(id)}</button>`).join(" ")}</dd>`;
-  return h;
-}
-
-function panelStats(s) {
-  if (s.kind === "issue" && !(V.ix.kids.get(s.id) || []).length) return "";
-  const { cnt, total } = tally(s.id);
-  return (
-    `<div class="pn-stats"><div class="pn-stats__head"><b>配下の進み具合</b>${M.frac(cnt, total)}</div>${M.sbar(cnt, total, 300)}` +
-    `<ul>${M.BAR_ORDER.map((st) => `<li data-st="${st}">${stateIcon(st, false)}${STATES[st].label}<b>${cnt[st]}</b></li>`).join("")}</ul></div>`
-  );
-}
-
-const mergeBadge = (s) =>
-  s.merge
-    ? `<span class="ds-badge" data-tone="${s.merge === "needs_fix" ? "danger" : "accent"}">${ic(s.merge === "needs_fix" ? "zap" : "branch")}${s.merge === "needs_fix" ? "マージ待ち・直す必要あり" : "マージ待ち・マージできる"}</span>`
-    : "";
 
 function renderPanel() {
   const panel = V.el?.panel;
   if (!panel) return;
   if (V.cleanup) {
+    V.pn.hide();
     const list = V.cleanup;
     panel.dataset.st = "unknown";
     panel.innerHTML =
@@ -520,36 +519,19 @@ function renderPanel() {
           return `<li><button type="button" data-goto="${esc(c.id)}">${stateIcon(s?.state || "unknown", false)}<span class="ds-docid">${esc(c.id)}</span><span class="pn-clean__t">${esc(s?.title ?? "")}</span></button><small>${esc(c.text)}</small></li>`;
         })
         .join("")}</ul></div>`;
-    open(panel);
+    panel.classList.add("is-open");
+    panel.setAttribute("aria-hidden", "false");
+    V.el.gx.dataset.panel = "open";
     return;
   }
   const s = V.sel ? byId(V.sel) : null;
   if (!s) {
-    panel.classList.remove("is-open");
-    panel.setAttribute("aria-hidden", "true");
+    V.pn.hide();
+    delete V.el.gx.dataset.panel;
     return;
   }
-  const frame = s.kind !== "issue" || (V.ix.kids.get(s.id) || []).length > 0;
-  panel.dataset.st = s.state;
-  panel.innerHTML =
-    `<div class="pn-grab"></div><div class="pn-head">${M.stateChip(s, V.ix.byId, { motion: true })}${mergeBadge(s)}<button type="button" class="iconbtn" data-act="close" aria-label="閉じる">${ic("x")}</button></div>` +
-    `<div class="pn-body"><p class="pn-kicker"><span class="ds-docid">${esc(s.id)}</span>#${s.number}・${M.KIND[s.kind] ?? s.kind}</p><h2 class="pn-title">${esc(s.title)}</h2>` +
-    `<p class="pn-why" data-st="${s.state}">${M.stateMark(s, V.ix.byId, { motion: true, label: false })}<span>${esc(s.reason?.text ?? "")}</span></p>${idleLine(s)}${panelPath(s)}<dl class="kv">${panelKv(s)}</dl>${panelStats(s)}</div>` +
-    `<div class="pn-foot"><a class="ds-btn is-primary" data-nav href="${esc(V.ctx.href(s.path))}">詳しく${ic("arrowRight")}</a>` +
-    (frame ? `<button type="button" class="ds-btn" data-act="focus" data-focus="${esc(s.id)}">${ic("target")}この範囲に絞る</button>` : "") +
-    `<a class="ds-btn" href="${esc(s.url)}" target="_blank" rel="noopener">${ic("external")}GitHub</a></div>`;
-  open(panel);
-}
-
-// "N分動きなし" under the reason of a Scope in progress that has not moved for 30 minutes (iss-00574 R-05).
-function idleLine(s) {
-  const idle = M.idleText(s, V.ix.byId);
-  return idle ? `<p class="pn-idle">${ic("clock")}${esc(idle)}</p>` : "";
-}
-
-function open(panel) {
-  panel.classList.add("is-open");
-  panel.setAttribute("aria-hidden", "false");
+  V.pn.show({ ctx: V.ctx, scope: s, doc: V.path?.doc ?? null, docState: V.docState, byId: V.ix.byId });
+  V.el.gx.dataset.panel = "open";
 }
 
 // --- Events ------------------------------------------------------------------------------------------------
@@ -605,6 +587,7 @@ function onClick(event) {
       V.token++;
       V.sel = null;
       V.path = null;
+      V.docState = "loading";
       renderPanel();
     }
     paint();
@@ -774,7 +757,8 @@ function centerOn(id) {
   if (!el) return;
   const vb = V.el.view.getBoundingClientRect();
   const b = el.getBoundingClientRect();
-  const off = isPhone() ? 0 : V.el.panel.classList.contains("is-open") ? 190 : 0;
+  // the middle of the room the panel leaves (iss-00587 D-06): half of its width and its 10px margin
+  const off = isPhone() ? 0 : V.el.panel.classList.contains("is-open") ? (V.el.panel.offsetWidth + 10) / 2 : 0;
   V.tx += vb.left + vb.width / 2 - off - (b.left + b.width / 2);
   V.ty += vb.top + (isPhone() ? vb.height * 0.3 : vb.height / 2) - (b.top + b.height / 2);
   applyT();
@@ -913,7 +897,7 @@ export default {
   id: "graph",
   title: "構造の図",
   icon: "layers",
-  styles: ["/assets/views/graph.css"],
+  styles: ["/assets/views/_shared/parts.css", "/assets/views/_shared/scope_tabs.css", "/assets/views/_shared/panel.css", "/assets/views/graph.css"],
   render,
   dispose,
 };

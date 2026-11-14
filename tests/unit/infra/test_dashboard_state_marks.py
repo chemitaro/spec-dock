@@ -153,12 +153,21 @@ def test_list_screens_never_ask_for_motion_and_every_screen_draws_with_state_mar
         assert "motion: true" not in (ASSETS / rel).read_text(), rel
     for rel in ("views/graph.js", "views/scope.js"):
         assert "motion: true" in (ASSETS / rel).read_text(), rel
-    for rel in ("views/graph.js", "views/scope.js", "views/board.js", "views/overview.js", "views/_shared/search.js"):
+    for rel in (
+        "views/graph.js",
+        "views/_shared/scope_tabs.js",
+        "views/board.js",
+        "views/overview.js",
+        "views/_shared/search.js",
+    ):
         assert "stateMark(" in (ASSETS / rel).read_text(), rel
     graph = (ASSETS / "views" / "graph.js").read_text()
-    for place in ('<div class="gx-r1">', '<p class="pn-why" data-st="${s.state}">'):  # the box and the panel's reason
-        assert re.search(re.escape(place) + r"\$\{M\.stateMark\(s, V\.ix\.byId, \{ motion: true", graph), place
-    assert "${M.stateChip(s, V.ix.byId, { motion: true })}" in graph  # the panel's chip
+    place = '<div class="gx-r1">'  # the box
+    assert re.search(re.escape(place) + r"\$\{M\.stateMark\(s, V\.ix\.byId, \{ motion: true", graph), place
+    panel = (ASSETS / "views" / "_shared" / "panel.js").read_text()  # the shared panel (iss-00587 D-05)
+    place = '<p class="pn-why" data-st="${esc(scope.state)}">'  # the panel's reason
+    assert re.search(re.escape(place) + r"\$\{stateMark\(scope, byId, \{ motion: true", panel), place
+    assert "${stateChip(scope, byId, { motion: true })}" in panel  # the panel's chip
 
 
 def test_the_shell_redraws_when_the_live_window_ends() -> None:
