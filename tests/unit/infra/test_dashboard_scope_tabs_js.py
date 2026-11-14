@@ -395,3 +395,51 @@ def test_the_explanation_tab_uses_the_same_bar_and_redraws_to_the_same_string(tm
         written,
     )
     assert out["same"] and out["docsSame"] and out["panelSame"]  # F-02
+
+
+def _rules(css: str, selector: str) -> list[str]:
+    """The bodies of the rules whose selector is exactly `selector` (whitespace-trimmed)."""
+    css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    return [m.group(2) for m in re.finditer(r"([^{};]+)\{([^{}]*)\}", css) if m.group(1).strip() == selector]
+
+
+def test_the_frames_take_the_rest_of_the_height_without_old_rules_or_new_colors() -> None:
+    """iss-00589 T-04: one bar over a frame that grows in the panel and fills the screen on the page."""
+    shared = (SHARED / "scope_tabs.css").read_text()
+    panel = (SHARED / "panel.css").read_text()
+    page = (VIEWS / "scope.css").read_text()
+    body = _rules(panel, '.sd-pn .pn-body:is([data-tab="docs"], [data-tab="explanation"])')
+    assert body and "display: flex" in body[0] and "flex-direction: column" in body[0]
+    assert "overflow" not in body[0]  # stays auto: only a long error list scrolls (R-04)
+    assert "flex: 1" in _rules(panel, ".sd-pn .sd-framebox")[0]
+    frame = _rules(panel, ".sd-pn :is(.sd-docframe, .sd-explain)")[0]
+    assert "flex: 1" in frame and "min-height: 240px" in frame and "height: auto" in frame
+    phone = panel[panel.index("@container app (max-width: 640px)") :]
+    assert '.sd-pn .pn-body:is([data-tab="docs"], [data-tab="explanation"]) { padding: 2px 4px 4px; }' in phone
+    on_page = _rules(page, "& :is(.sd-docframe, .sd-explain)")[0]
+    assert "flex: none" in on_page and "100dvh" in on_page
+    assert (
+        "& .sd-framebox" in shared
+        and "& .sd-framebar" in shared
+        and "& .sd-seg" in shared
+        and "& .sd-checkbar" in shared
+    )
+    assert "height: 24px" in _rules(shared, "& .sd-framebar")[0]
+    seg = _rules(shared, "& .sd-seg")[0]
+    assert "min-width: 0" in seg and "overflow-x: auto" in seg
+    summary = _rules(shared, "& .sd-checkbar > summary")[0]
+    assert "height: 28px" in summary and "white-space: nowrap" in summary and "text-overflow: ellipsis" in summary
+    for css in (shared, panel, page):
+        for gone in (
+            ".sd-docs",
+            ".sd-doc ",
+            ".sd-doc[",
+            ".sd-doc__",
+            ".sd-docview",
+            ".sd-explainbox",
+            ".sd-explain__bar",
+            "min(70vh",
+            "min(78vh",
+        ):
+            assert gone not in css, gone
+        assert not re.search(r"#[0-9a-fA-F]{3}|rgba?\(|hsla?\(", css)  # the design system's tokens only
