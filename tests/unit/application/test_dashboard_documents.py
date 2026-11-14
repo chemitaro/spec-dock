@@ -304,7 +304,7 @@ def _asset(name: str) -> str:
     return asset.body.decode("utf-8")
 
 
-def test_the_detail_screen_frames_documents_in_a_sandbox_and_shows_check_and_progress() -> None:
+def test_the_detail_screen_frames_documents_in_a_sandbox_and_shows_check_errors() -> None:
     scope = _asset("views/_shared/scope_tabs.js")  # the tabs moved out of scope.js (iss-00587 D-03)
     assert 'const FRAME_SANDBOX = "allow-scripts allow-popups";' in scope
     assert 'sandbox="${FRAME_SANDBOX}"' in scope and "allow-same-origin" not in scope
@@ -313,13 +313,18 @@ def test_the_detail_screen_frames_documents_in_a_sandbox_and_shows_check_and_pro
         "details.spec",
         "details.adrs",
         "details.check",
-        "details.progress",
         'data-code="render-failed"',
-        'data-code="plan-progress"',
-        "doing_steps",
+        'data-code="check-invalid"',
+        'class="sd-framebox" data-frame="docs"',
+        '<nav class="sd-seg" aria-label="文書">',
         'env.paramLink("doc"',
     ):
         assert marker in scope, marker
+    # the plan progress stays only in the summary tab (iss-00589 R-03)
+    docs = scope[scope.index("function docsTab(") : scope.index("function artifactsTab(")]
+    assert "planProgress(" not in docs and "details.progress" not in docs
+    summary = scope[scope.index("function summaryTab(") : scope.index("function depsTab(")]
+    assert "planProgress(progress)" in summary and 'data-code="plan-progress"' in scope and "doing_steps" in scope
 
 
 def test_the_top_band_asks_for_a_restart_only_when_the_server_says_so() -> None:
