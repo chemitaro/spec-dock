@@ -14,6 +14,8 @@ ID: "iss-00589"
 - round-2（同じレビュアー）：**合格**。P0〜P3 なし。`round-2.json`、検査 `round-2.check.json`（valid、status pass）。
 - 合格した文書の sha256：requirement.cue `ad2eae3c40c5636d2b5d00467a59e36f1d989e081eb0d56d2848b43a3a81ebb5`、design.cue `3070c360a832b7f3128b16a670e20e81ad2c39b0ea0d476390b5b29e8b02450a`、plan.cue `7186130c5d8ccf338160f41a3fa81b0e7fdd119e4ae88d2565656eeadfa6b7ca`。
 - 結果の場所：worktree `/Volumes/990p2t/workspace/worktrees/orca/spec-dock/iss-00589` の `.workbench/spec-review/iss-00589/`。
+- 最終品質ゲート（quality-gate-reviewer opus / medium、second opinion なし、範囲 `7e50ac583..881280ed3`、観点 functional-correctness・requirements-closure・test-adequacy・security-baseline）：**合格**（attempt 1）。P0〜P3 0、coverage complete。test lane：`make lint` exit 0、`uv run pytest` exit 0（3801 passed / 7 skipped）。closure `/Volumes/990p2t/workspace/worktrees/orca/spec-dock/iss-00589/.workbench/final-quality-gate/iss-00589-fqg-1/closure.md`。
+- 注：plan.cue は合格の後、手順の status だけを書き換えている（中身は合格のまま）。
 
 ## 直す前の写し
 
@@ -64,9 +66,21 @@ ID: "iss-00589"
 
 ## 実装の記録
 
+- S-01（6f067a753）：scope_tabs.js の docsTab・documentEntries・checkResults・explanationTab・DOC_INFO。node のテスト T-01〜T-03 を先に書いて落ちることを確かめた。test_dashboard_documents.py の目印を合わせた。
+- S-02（881280ed3）：scope_tabs.css・panel.css・scope.css。静的なテスト T-04。
+- S-03（タスク担当）：実データの写しと測り（上の表）、tailnet のサーバー。
+
 ## Outcome
 
+実装担当：impl-ui（S-01・S-02）claude opus / medium（dispatch ctx_488bf91291e0、launch.effective claude・opus・medium）。Codex の手順はなし（データの形・API の変更がなく、計画の execution に理由を記録）。S-03 はタスク担当（opus / medium）。
+
 ## 逸脱と判断
+
+- 実装担当の開始のコミットの pytest の基準線は、走らせている間に作業の木を編集したため無効になった（lint は合格）。HEAD で失敗 0 なので、既存の失敗の区別は要らない。
+- 実装担当が、git-autocommit が付けなかった Co-Authored-By を、未公開の2つのコミットに amend で足した（公開前）。
+- 最初の状態の写しが古く、知らせの帯で欄が低くなったので、状態を写し直して直す前と後を撮り直した。
+- 誤りの帯の高さは、実データに誤りのある Scope がないので、配った scope_tabs.js で描いた帯を差し込んで測った（設計 D-07 のとおり）。
+- 後の提案：欄の見出し（状態、題名、理由、道筋）とタブの帯が PC の欄で約 234px を取る。全体の段のスマホと同じように、文書・説明資料のタブでは見出しを1行に畳む選択肢がある（今回は範囲外）。
 
 ## Verification
 
