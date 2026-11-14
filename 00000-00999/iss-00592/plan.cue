@@ -5,12 +5,12 @@ package spec
 goal: "構造の図の箱と枠、ボードの札、横の欄の見出しに orca-web の稼働の印を出し、横の欄に「Orca で開く」を置き、配る文書に連携の設定を書く。本物の orca-web に対する写しで確かめる"
 
 steps: {
-	"S-01": {title: "node のテスト（T-01）を先に書いて落ちることを確かめ、views/_shared/orca_logic.js（slotWorktree、marksKey、openTarget、themeOf）を D-01 のとおりに作る", realizes: ["R-01", "R-02", "R-04", "F-01", "F-02", "F-03", "F-04"], status: "todo", session: "impl-sol"}
-	"S-02": {title: "偽の DOM と偽の部品の node のテスト（T-02）を先に書いて落ちることを確かめ、views/_shared/orca_marks.js（paintOrcaMarks、createOpenButton）と置き場の CSS を D-02、D-04 の createOpenButton のとおりに作る", realizes: ["R-01", "R-02", "R-04", "F-01", "F-02", "F-03", "F-04"], status: "todo", after: ["S-01"], session: "impl-sol"}
-	"S-03": {title: "テスト（T-03）を先に書き、構造の図（boxHtml、frameHtml、render、知らせ、onClick・onTap）とボード（card の orca、renderPage の後の描き、onCardClick）に D-03 のとおりに組み込む", realizes: ["R-01", "R-02", "R-03"], status: "todo", after: ["S-02"], session: "impl"}
-	"S-04": {title: "テスト（T-04）を先に書き、横の欄（作り直さない見出しの行、.pn-hl と表紙の比べ、印、createOpenButton、明暗の見張り、preferTab、refreshOrca）を D-04 のとおりに作る。make lint と uv run pytest（全体）を通す", realizes: ["R-01", "R-02", "R-03", "R-04", "F-01", "F-02", "F-03"], status: "todo", after: ["S-03"], session: "impl"}
-	"S-05": {title: "隔離した venv の試しの SpecDock と試しの orca-web で、直す前（開始のコミット）と後の写し（構造の図・ボード・横の欄、1440・1000・390、明暗）、orca-web を止めたときの写し、iframe の読み込みの回数、埋め込みの画面を確かめ、report.md の材料（写しと記録）を Workbench に残す。max と見出しの行のボタンの位置を写しで決め、変えたらコミットする", realizes: ["R-01", "R-02", "R-03", "R-04", "F-01", "F-03"], status: "todo", after: ["S-04"], session: "impl"}
-	"S-06": {title: "配る文書に orca_web の節と前提と見え方を D-05 のとおりに書き、static-inventory.json の sha256 を合わせ、T-05 を通す。report.md に S-05 の写しと記録をまとめる", realizes: ["R-05"], status: "todo", after: ["S-05"], session: "owner"}
+	"S-01": {title: "node のテスト（T-01）を先に書いて落ちることを確かめ、views/_shared/orca_logic.js（slotWorktree、marksKey、openTarget、themeOf）を D-01 のとおりに作る", realizes: ["R-01", "R-02", "R-04", "F-01", "F-02", "F-03", "F-04"], status: "done", session: "impl-sol"}
+	"S-02": {title: "偽の DOM と偽の部品の node のテスト（T-02）を先に書いて落ちることを確かめ、views/_shared/orca_marks.js（paintOrcaMarks、createOpenButton）と置き場の CSS を D-02、D-04 の createOpenButton のとおりに作る", realizes: ["R-01", "R-02", "R-04", "F-01", "F-02", "F-03", "F-04"], status: "done", after: ["S-01"], session: "impl-sol"}
+	"S-03": {title: "テスト（T-03）を先に書き、構造の図（boxHtml、frameHtml、render、知らせ、onClick・onTap）とボード（card の orca、renderPage の後の描き、onCardClick）に D-03 のとおりに組み込む", realizes: ["R-01", "R-02", "R-03"], status: "done", after: ["S-02"], session: "impl"}
+	"S-04": {title: "テスト（T-04）を先に書き、横の欄（作り直さない見出しの行、.pn-hl と表紙の比べ、印、createOpenButton、明暗の見張り、preferTab、refreshOrca）を D-04 のとおりに作る。make lint と uv run pytest（全体）を通す", realizes: ["R-01", "R-02", "R-03", "R-04", "F-01", "F-02", "F-03"], status: "done", after: ["S-03"], session: "impl"}
+	"S-05": {title: "隔離した venv の試しの SpecDock と試しの orca-web で、直す前（開始のコミット）と後の写し（構造の図・ボード・横の欄、1440・1000・390、明暗）、orca-web を止めたときの写し、iframe の読み込みの回数、埋め込みの画面を確かめ、report.md の材料（写しと記録）を Workbench に残す。max と見出しの行のボタンの位置を写しで決め、変えたらコミットする", realizes: ["R-01", "R-02", "R-03", "R-04", "F-01", "F-03"], status: "done", after: ["S-04"], session: "impl"}
+	"S-06": {title: "配る文書に orca_web の節と前提と見え方を D-05 のとおりに書き、static-inventory.json の sha256 を合わせ、T-05 を通す。report.md に S-05 の写しと記録をまとめる", realizes: ["R-05"], status: "done", after: ["S-05"], session: "owner"}
 }
 
 tests: {
