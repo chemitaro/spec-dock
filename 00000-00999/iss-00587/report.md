@@ -53,6 +53,20 @@ ID: "iss-00587"
 
 ## Outcome
 
+PR #588（https://github.com/chemitaro/spec-dock/pull/588、head `1005646d37a21e13e87d6a13c9a3827d3dfb8aef`）。CI：observable_ci PASS、merge_readiness READY（2026-11-14T03:50Z、`.workbench/coding-task/iss-00587/ci.json`）。マージは統括が行う。
+
+実装担当：impl-sol（S-01・S-02）codex gpt-6.1-sol / medium（dispatch ctx_d3e3ec01e551、launch.effective codex・gpt-6.1-sol・medium）。impl-ui（S-03〜S-07）claude opus / medium（dispatch ctx_cf23f16fe852、launch.effective claude・opus・medium）。S-08 はタスク担当（opus / medium）。
+
+## 逸脱と判断
+
+- S-02 のコミットの件名が英語（git-autocommit が作った。本文は日本語）。公開前だが履歴は書き換えていない。
+- CP-1 の P2 2件は、規則では記録だけだが、今回の共通化で入った食い違いなので、タスク担当の判断で S-05 の中で直した。
+- 最終品質ゲートの観点 `security` は契約の名前 `security-baseline` で走らせた。
+- 直す前のサーバー（18587）は、同じ状態の置き場の鍵を持つため、直した後のサーバー（18588）を立てる前に止めた（直す前の写しは撮り終えていた）。
+- スマホの下の帯は、通常の段でも印だけになる（設計は全体の段だけを決めていた）。
+- 後の提案：FQG-001（止めてから離したときの速さ）、FQG-002（片付けの候補の一覧がシートの段を引き継ぐ）、スマホの下の帯で「新しいタブで開く」と GitHub が同じ印。
+
+
 ## Verification
 
 ## Residual Risks / Follow-ups
