@@ -45,7 +45,7 @@ design: {
 			4. `status === "ok"`：`agents.length > 0`、`wanted` がある、または `goneIds` が空でない → 出す。ほか → 出さない。
 			5. ほかの `status` の値 → 出さない。
 			4 の続き：`status === "ok"` で上のどれにも当たらず、`invalid > 0`（入力に `invalid` と `invalidIds` を足す）→ 出す（理由 `"shape"`。対応した worktree にエージェントがいるのに、どれも形が違う。F-01）。
-			理由（出すときだけ、上から順）：`problem` があれば `"config"`、`embed` が真なら `"embed"`（F-05）、`status` が `ok` でなければその値、`ok` で次のどちらかなら `"shape"`：(a) `agents` が0人・`wanted` も `goneIds` もなく `invalid > 0`、(b) `wanted` が `invalidIds` にある（選んだ相手の項目の形が違う。いなくなったのではないので、`pickAgent` を呼ばず、覚えも選びも変えない。項目が直れば次の知らせで同じ相手に戻る。ChatGPT round-3 の P1）。ほかは null。形の違う項目が一部だけで、選んだ相手の項目は使えるなら、理由は null のままで、帯に1行の注を出す（D-04）。
+			理由（出すときだけ、上から順）：`problem` があれば `"config"`、`embed` が真なら `"embed"`（F-05）、`status` が `ok` でなければその値、`ok` で次のどちらかなら `"shape"`：(a) `agents` が0人で `invalid > 0`（`wanted` や `goneIds` の有無によらない。全部の項目が形違いの要約は、いなくなったことの根拠にしない。最終品質ゲート attempt 1 の ChatGPT P2）、(b) `wanted` が `invalidIds` にある（選んだ相手の項目の形が違う。いなくなったのではないので、`pickAgent` を呼ばず、覚えも選びも変えない。項目が直れば次の知らせで同じ相手に戻る。ChatGPT round-3 の P1）。ほかは null。形の違う項目が一部だけで、選んだ相手の項目は使えるなら、理由は null のままで、帯に1行の注を出す（D-04）。
 
 			**`pickAgent(agents, wanted, goneIds)`** → `{selected, gone, remember, addGone}`（理由が null のときだけ呼ぶ。Epic D-02。`goneIds` は id の Set、なければ空として扱う）。上から順：
 			1. `wanted` が `gone:` で始まる → `{selected: null, gone: true, remember: null, addGone: その後ろの id}`（同じ id が `agents` に戻っても開かない）。
@@ -61,11 +61,13 @@ design: {
 
 			**`agentFrame(origin, agent, theme)`** → `{src, title}` か null。`origin` が文字列でない、`agent` がない、`theme` が `light`・`dark` でないときは null。`src` は `origin + agent.detail + "&theme=" + theme`（`detail` をそのまま使い、id を符号にし直さない）。`title` は `"エージェント：" + (agentType ?? "種類不明") + "・" + (branch ?? "ブランチ不明")`。
 
-			**いなくなった覚えと、移った覚え**（純粋な関数。状態は呼ぶ側が持つ1つのオブジェクト `mem = createAgentMemory()` = `{scopeId: null, gone: new Set(), picked: null, drift: null}`。R-05、F-08）：
-			- `memoryFor(mem, scopeId)`：`mem.scopeId` が違えば `gone` を空、`picked` と `drift` を null にして `scopeId` を変える（別の Scope を示したら捨てる）。`mem` を返す。
+			**いなくなった覚えと、移った覚え**（純粋な関数。状態は呼ぶ側が持つ1つのオブジェクト `mem = createAgentMemory()` = `{scopeId: null, gone: new Set(), picked: null, drift: null, last: null}`。R-05、F-08）：
+			- `last` は、その Scope で最後に iframe を置いた相手の id（自動の選びも人の選びも）。欄を閉じて空になった Map や、`agent` を持たない道で同じ Scope に戻ったとき、選びの代わりに使う（最終品質ゲート attempt 1 の ChatGPT P1：欄を閉じている間に A が消えて B だけになっても、開き直して B を自動で開かない）。`noteShown(mem, id)` で書く。
+			- `memoryFor(mem, scopeId)`：`mem.scopeId` が違えば `gone` を空、`picked`・`drift`・`last` を null にして `scopeId` を変える（別の Scope を示したら捨てる）。`mem` を返す。
 			- `noteGone(mem, id, {stale})`：`stale` が真（問い合わせや Map に残った古い `gone:<id>` を読んだとき。pickAgent の規則1）で `id === mem.picked` なら足さない（人が選び直した直後の描き直しで、古い問い合わせが覚えを戻さない。spec-reviewer round-2 の P3）。ほかは `gone` に足し、`id === mem.picked` なら `picked` を null にする。
-			- `forgetGone(mem, id)`：`gone` を空、`drift` を null、`picked` を `id` にする（人が切り替えの項目か、移った知らせの「戻す」を押したとき）。
+			- `forgetGone(mem, id)`：`gone` を空、`drift` を null、`picked` と `last` を `id` にする（人が切り替えの項目か、移った知らせの「戻す」を押したとき）。
 			- `noteDrift(mem, id)`：`drift` を `id` にする（iframe の中で別の文書に移った。D-04）。
+			- `noteShown(mem, id)`：`last` を `id` にする（agentsTab が iframe を置く文字列を返すとき）。
 			pickAgent の結果の `addGone` は、規則1なら `{stale: true}`、規則4なら `{stale: false}` で `noteGone` に渡す（結果に `addGoneStale` を足す）。
 
 			**`AGENT_SANDBOX`** = `"allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"`（D-03）。
@@ -87,8 +89,8 @@ design: {
 			- `status`：`env.ctx.orca?.status() ?? "off"`。`problem`：`env.ctx.orcaProblem ?? null`。`embed`：`env.ctx.embed === true`。
 			- `records`：構造（`env.ctx.data`）の `worktrees.status` が `ok` なら、`env.byId.get(scope.id)?.worktrees` の数、ほかは 0（F-04）。
 			- `const {agents, invalid, invalidIds} = scopeAgents(env.ctx.orca?.forScope(env.ctx.data, env.scope.id) ?? [])`（状態が ok でなければ `forScope` は空を返す。返り値のオブジェクトを分けて受ける。ChatGPT round-3 の P1）。
-			- `wanted`：`env.param("agent")`。`memoryFor(mem, env.scope.id)` を呼び、`goneIds` は `mem.gone`。
-			- 状態が `ok` で、`wanted` が `gone:` で始まらない id で、`agents` にも `invalidIds` にもないときは、ここで `noteGone(mem, wanted, {stale: false})` を呼ぶ（覚えに足すだけで、`keep` は呼ばない。ほかのタブを見ている間に相手が消えて同じ id で戻っても、後でエージェントのタブを開いたときに開かない。spec-reviewer round-2 の P2）。
+			- `memoryFor(mem, env.scope.id)` を呼び、`goneIds` は `mem.gone`。`wanted`：`env.param("agent") ?? mem.last`（問い合わせや Map に選びがなければ、同じ Scope で最後に置いた相手。`last` から来た選びは、規則6の自動の選びに当たらず、いなくなっていれば規則4で gone になる）。
+			- 理由が null（状態が `ok`、構造の `worktrees.status` が `ok` で `records > 0`、形の違いでない）で、`wanted` が `gone:` で始まらない id で、`agents` にも `invalidIds` にもないときだけ、ここで `noteGone(mem, wanted, {stale: false})` を呼ぶ（覚えに足すだけで、`keep` は呼ばない。ほかのタブを見ている間に相手が消えて同じ id で戻っても、後でエージェントのタブを開いたときに開かない。spec-reviewer round-2 の P2）。SpecDock の worktree の記録を読めないときや、全部の項目が形違いのときは、対応を決められないので足さない（最終品質ゲート attempt 1 の ChatGPT P2、F-04）。
 			- 結果：`{...agentsVisibility(...), agents, invalid, invalidIds, wanted, goneIds}`。
 			`visible(env)` は `.show`。`count(env)` は理由が null のとき `agents.length`、ほかは null。
 			`render(env)` は `agentsTab(env)`（D-03、D-05）：理由が null なら `pickAgent(agents, wanted, goneIds)` を呼び、`addGone` を `noteGone` で覚えに足し、`remember` があれば `env.keep("agent", remember)` を1回呼ぶ（エージェントのタブを描くときだけ）。結果は同じ env の `paintAgentList` が使えるよう env ごとに覚える。
@@ -144,7 +146,7 @@ design: {
 
 			**帯**（`paintAgentList(root, env)`、`agents_tab.js`）：
 			- `root.querySelector("[data-orca-agents]")` がなければ何もしない。`agentsState(env)` の `agents` と、同じ env の `render` が決めた選び（`pickAgent` の結果）から帯の HTML を作る：`stripForm` が `"label"` なら1つの `<span class="sd-agentpick" aria-current="true">`、`"switch"` なら項目ごとに `<a class="sd-agentpick" data-agent-pick="<esc(id)>" ${env.paramLink("agent", id)}>`（選ばれた項目にだけ `aria-current="true"`。gone のときはどれにも付けない）。中は `<span class="sd-agentpick__mark" data-orca-agent="<esc(id)>"></span>`、種類（なければ「種類不明」）、ブランチ（`sd-mono`。なければ「ブランチ不明」）。文字はすべて `esc` を通す。
-			- 帯の文字列が前（置き場の `dataset` に覚える）と同じなら置き場の `innerHTML` を書き換えない。印は、各置き場について `marks.buildMarks({agents: [raw]}, {max: 1})` の結果の JSON を前の値と比べ、違うときだけ `marks.renderAgentMarks(slot, {agents: [raw]}, {size: "sm", max: 1})` で描く（作業中の弧が10秒ごとに回り始めに戻らない）。`marks()` が null か、部品が例外を投げたら、印は空のままにし、ほかは描く。
+			- 帯の文字列が前（置き場の `dataset` に覚える）と同じなら置き場の `innerHTML` を書き換えない。印は、各置き場について `marks.buildMarks({agents: [raw]}, {now, max: 1})` の結果の JSON を前の値と比べ、違うときだけ `marks.renderAgentMarks(slot, {agents: [raw]}, {now, size: "sm", max: 1})` で描く（`now` は1回の描きで1つの `Date.now()`。経過の文字が変われば描き直す。最終品質ゲート attempt 1 の FQG-002）（作業中の弧が10秒ごとに回り始めに戻らない）。`marks()` が null か、部品が例外を投げたら、印は空のままにし、ほかは描く。
 			- 置き場の `innerHTML` だけを書き換え、隣の iframe に触れない。
 			- iframe の中での移り（F-08）：`paintAgentList` は枠の中の `iframe.sd-agent` に、`load` の聞き手を1つだけ付ける（iframe の `dataset` の印で二重に付けない）。聞き手は読み込みの回数を数え、2回目からは、同じ聞き手の中で（待たずに）`noteDrift(mem, 選ばれた項目の id)` を呼び、`paintAgentList(root, env, {redraw})` で受けた `redraw()` を呼ぶ（中身の文字列が移った知らせに変わり、iframe が外れる）。`redraw` がなければ、その iframe の要素を自分で外す（`iframe.remove()`）。orca-web の `/embed/agent` の画面は、自分で別の文書に移らない（`location` を書き換えず、移るのは同じ iframe で開く親と子のエージェントのリンクだけ。orca-web の main `1a2afed` の `web/embed/` を読んだ事実）ので、2回目の `load` は人がそのリンクを押したときに当たる。明暗の変化などで iframe が置き直されれば、新しい要素で数え直す。
 			- `redraw` は、横の欄では `() => { if (current) draw(); }`、詳しい画面では覚えた `{root, ctx}` での `render`。
@@ -176,6 +178,10 @@ design: {
 			`app.js` の `render()` が作る ctx に2つを足す（ほかは変えない）：
 			- `orcaProblem: state.server?.orca_web?.problem ?? null`。
 			- `replaceParam(name, value)`：`const path = withParam(state.route.path, name, value)`（`views/_shared/logic.js` の `withParam`）。`history.replaceState(null, "", path)`、`state.route = parseRoute(new URL(path, location.origin).href)`、`return state.route`。描き直しも `bridge.navigated()` もしない（今の描きの中から呼ばれるため）。
+			移動のとき（最終品質ゲート attempt 1 の FQG-001 と ChatGPT P1。人が選んだのと別の相手の iframe を開かない、前の相手の iframe を送れるまま残さない）：
+			- `navigate(path)` は、`state.route` を新しい道にした直後、詳しい内容を待つ前に、`root` の中の `iframe.sd-agent` をすべて外す（前の相手に送れる時間を残さない）。新しい道が今と同じ Scope の詳しい画面（問い合わせだけが違う）なら、今の詳しい内容（`state.scope`）で待たずに描き、その後で読み直して描く。
+			- 画面の知らせ（`ctx.orca` の購読）での描き直しは、最後に描いた ctx でなく、`app.js` の今の `state.route` を持つ ctx で行う（`ctx.current()` が今の ctx を返す口を足す。横の欄と詳しい画面は描き直しのときにそれを使う）。移動の待ち（`navigate` が新しい道を置いてから描くまで）の間は、知らせでは描かない（`ctx.current()` が null を返す）。
+			- `replaceParam(name, value)` は、呼んだ描きの `ctx.route` が今の `state.route` と同じときだけ書く（違えば何もせずに今の `state.route` を返す）。古い道で決めた選びを、今の道に書かない。
 			明暗の変化：`boot()` で `matchMedia("(prefers-color-scheme: dark)")` の `change` に `render` を付ける。`setTheme(scheme)` は値を変えた後に、起動が済んでいれば `render()` を呼ぶ。描き直しで中身の文字列の `theme` が変わり、iframe だけが置き直される。
 			`ctx.orca` の知らせの購読は、横の欄と詳しい画面が自分で持つ（D-04）。`app.js` は購読しない（iss-00592 が構造の図とボードの購読を足すのと重ならない）。
 			"""
