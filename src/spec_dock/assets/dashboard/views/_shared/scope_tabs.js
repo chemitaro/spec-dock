@@ -8,15 +8,8 @@ import { explanationState } from "./panel_logic.js";
 import { todoPath, todosPath } from "../../core/route.js";
 import { dueWords, KIND_WORDS } from "../todos/logic.js";
 
-const DOC_INFO = {
-  spec: ["要件・設計・計画", "CUE の正本から、その場で描く"],
-  requirement: ["要件", "何を満たすか"],
-  design: ["設計", "どう作るか"],
-  plan: ["計画", "どの順で進めるか"],
-  explanation: ["説明資料", "人が読む説明（新しいタブ）"],
-  report: ["報告", "実装の記録"],
-  adr: ["ADR", "決めたことの記録"],
-};
+// The names of the documents the docs tab offers (iss-00589 D-01). The explanation has its own tab.
+const DOC_INFO = { spec: "仕様", requirement: "要件", design: "設計", plan: "計画", report: "報告", adr: "ADR" };
 // The document frame runs each page in an opaque origin, like the server's own sandbox header (iss-00535 F-02).
 const FRAME_SANDBOX = "allow-scripts allow-popups";
 
@@ -187,19 +180,30 @@ function catalogProblem(details) {
   return `<div class="sd-callout" data-tone="warning" data-code="catalog-${esc(details?.catalog ?? "unreadable")}">${icon("book")}<div><p class="sd-callout__title">${esc(text)}</p><p>次の1手：${steps.map((step) => `<code>${esc(step)}</code>`).join("、")}</p></div></div>`;
 }
 
-// Every document the tab can show: id (the `doc` query), label key, file name, frame path, new-tab path.
+// Every document the docs tab offers (iss-00589 D-01): id (the `doc` query), key, label, file name, frame path.
+// The explanation is left out: it has its own tab. An ADR is named by its file name, as several may sit side by side.
 function documentEntries(details) {
   const entries = [];
   if (details.spec) {
     const names = details.documents.filter((item) => item.name.endsWith(".cue") && item.exists).map((item) => item.name);
-    entries.push({ id: "spec", key: "spec", name: names.join("・") || "requirement.cue", view: details.spec, exists: true });
+    entries.push({ id: "spec", key: "spec", label: DOC_INFO.spec, name: names.join("・") || "requirement.cue", view: details.spec, exists: true });
   }
   for (const item of details.documents) {
-    if (details.spec && item.name.endsWith(".cue")) continue;
-    entries.push({ id: item.key, key: item.key, name: item.name, view: item.view, href: item.href, exists: item.exists });
+    if (item.key === "explanation" || (details.spec && item.name.endsWith(".cue"))) continue;
+    entries.push({ id: item.key, key: item.key, label: DOC_INFO[item.key] ?? item.key, name: item.name, view: item.view, exists: item.exists });
   }
-  for (const adr of details.adrs || []) entries.push({ id: "adr:" + adr.path, key: "adr", name: adr.name, view: adr.view, exists: true });
+  for (const adr of details.adrs || []) {
+    entries.push({ id: "adr:" + adr.path, key: "adr", label: adr.name.replace(/\.md$/, ""), name: adr.name, view: adr.view, exists: true });
+  }
   return entries;
+}
+
+// One thin bar over a frame (iss-00589 D-02, D-05): the left part, and an icon link opening the frame in a new tab.
+function frameBar(left, href) {
+  const open = href
+    ? `<a class="sd-framebar__open" href="${esc(href)}" target="_blank" rel="noopener" aria-label="新しいタブで開く" title="新しいタブで開く">${icon("external")}</a>`
+    : "";
+  return `<div class="sd-framebar">${left}${open}</div>`;
 }
 
 function checkResults(check, scopeId) {
@@ -207,15 +211,15 @@ function checkResults(check, scopeId) {
   if (check.status === "failed") {
     return `<div class="sd-callout" data-tone="warning" data-code="render-failed">${icon("zap")}<div><p class="sd-callout__title">文書を描けませんでした（<code>${esc(check.code)}</code>）</p><p>${esc(check.message)}</p><p>次の1手：${(check.next_steps || []).map((step) => `<code>${esc(step)}</code>`).join("、")}</p></div></div>`;
   }
-  const row = (item, tone) => `<li><span class="sd-badge" data-tone="${tone}">${esc(item.code)}</span> ${esc(item.message)}${item.file ? ` <span class="sd-muted sd-mono">${esc(item.file)}</span>` : ""}</li>`;
+  // No band without errors, even with warnings (iss-00589 D-03): one closed line, the list opens below it.
   const errors = check.errors || [];
+  if (!errors.length) return "";
   const warnings = check.warnings || [];
-  const head = errors.length
-    ? `<p class="sd-callout__title">検査の誤り ${errors.length}件・警告 ${warnings.length}件</p>`
-    : `<p class="sd-callout__title">検査の誤りなし${warnings.length ? `（警告 ${warnings.length}件）` : ""}</p>`;
-  const list = errors.length + warnings.length ? `<ul class="sd-list sd-findings">${errors.map((item) => row(item, "danger")).join("")}${warnings.map((item) => row(item, "warning")).join("")}</ul>` : "";
-  const next = errors.length ? `<p>次の1手：<code>spec-dock scope check ${esc(scopeId)}</code></p>` : "";
-  return `<div class="sd-callout" data-tone="${errors.length ? "danger" : warnings.length ? "warning" : "note"}" data-code="check-${errors.length ? "invalid" : "ok"}">${icon(errors.length ? "zap" : "check")}<div>${head}${list}${next}</div></div>`;
+  const row = (item, tone) => `<li><span class="sd-badge" data-tone="${tone}">${esc(item.code)}</span> ${esc(item.message)}${item.file ? ` <span class="sd-muted sd-mono">${esc(item.file)}</span>` : ""}</li>`;
+  return (
+    `<details class="sd-checkbar" data-code="check-invalid"><summary>${icon("zap")}検査の誤り ${errors.length}件（警告 ${warnings.length}件） <code>spec-dock scope check ${esc(scopeId)}</code></summary>` +
+    `<ul class="sd-list sd-findings">${errors.map((item) => row(item, "danger")).join("")}${warnings.map((item) => row(item, "warning")).join("")}</ul></details>`
+  );
 }
 
 function docsTab(env) {
@@ -226,34 +230,23 @@ function docsTab(env) {
   const shown = entries.filter((item) => item.view);
   const wanted = env.param("doc");
   const selected = shown.find((item) => item.id === wanted) || shown[0] || null;
-  const cards = entries
+  const check = details.check;
+  if (!selected) return checkResults(check, doc.scope.id) + emptyState("画面の中で読める文書はまだない。");
+  const items = entries
     .map((item) => {
-      const [label, note] = DOC_INFO[item.key] ?? [item.key, ""];
-      const current = selected && item.id === selected.id;
-      const head = `<div class="sd-doc__head"><span class="sd-doc__icon">${icon(item.key === "explanation" ? "book" : "file")}</span><div><p class="sd-doc__title">${esc(label)}</p><p class="sd-mono">${esc(item.name)}</p></div></div><p>${esc(note)}</p>`;
-      let actions;
-      if (item.view) {
-        actions = `<p class="sd-doc__actions"><a ${env.paramLink("doc", item.id === "spec" && !wanted ? null : item.id)}${current ? ' aria-current="true"' : ""}>${icon("arrowDown")}${current ? "ここに表示中" : "ここに表示"}</a><a href="${esc(item.view)}" target="_blank" rel="noopener">${icon("external")}新しいタブ</a></p>`;
-      } else if (item.href) {
-        actions = `<p><a href="${esc(item.href)}" target="_blank" rel="noopener">${icon("external")}新しいタブで開く</a></p>`;
-      } else {
-        actions = `<p><span class="sd-muted">${item.exists ? "ある" : "まだない"}</span></p>`;
-      }
-      return `<div class="sd-doc" data-has="${item.exists}"${current ? ' data-current="true"' : ""}>${head}${actions}</div>`;
+      if (!item.view) return `<span aria-disabled="true" title="${esc(item.name)}（まだない）">${esc(item.label)}</span>`;
+      const current = item.id === selected.id ? ' aria-current="true"' : "";
+      return `<a ${env.paramLink("doc", item.id === "spec" && !wanted ? null : item.id)}${current} title="${esc(item.name)}">${esc(item.label)}</a>`;
     })
     .join("");
-  const check = details.check;
-  let viewer;
-  if (!selected) viewer = emptyState("画面の中で読める文書はまだない。");
-  else if (selected.id === "spec" && check?.status === "failed") viewer = "";
-  else {
-    const [label] = DOC_INFO[selected.key] ?? [selected.key];
-    viewer = `<iframe class="sd-docframe" src="${esc(selected.view)}" sandbox="${FRAME_SANDBOX}" referrerpolicy="no-referrer" loading="lazy" title="${esc(label)}：${esc(selected.name)}"></iframe>`;
-  }
-  const progress = details.progress
-    ? section(icon("check"), "計画の進み具合", `${details.progress.done}／${details.progress.total} 終わった`) + planProgress(details.progress)
-    : "";
-  return checkResults(check, doc.scope.id) + progress + `<div class="sd-docs">${cards}</div>` + `<div class="sd-docview">${viewer}</div>`;
+  const frame =
+    selected.id === "spec" && check?.status === "failed"
+      ? ""
+      : `<iframe class="sd-docframe" src="${esc(selected.view)}" sandbox="${FRAME_SANDBOX}" referrerpolicy="no-referrer" loading="lazy" title="${esc(selected.label)}：${esc(selected.name)}"></iframe>`;
+  return (
+    checkResults(check, doc.scope.id) +
+    `<div class="sd-framebox" data-frame="docs">${frameBar(`<nav class="sd-seg" aria-label="文書">${items}</nav>`, selected.view)}${frame}</div>`
+  );
 }
 
 function artifactsTab({ doc }) {
@@ -310,7 +303,7 @@ function explanationTab({ scope, doc }) {
   const open = (label) => `<a href="${esc(href)}" target="_blank" rel="noopener">${icon("external")}${label}</a>`;
   if (state === "written") {
     return (
-      `<div class="sd-explainbox"><div class="sd-explain__bar"><span>${icon("book")}説明資料</span>${open("新しいタブで開く")}</div>` +
+      `<div class="sd-framebox" data-frame="explanation">${frameBar(`<span class="sd-framebar__name">${icon("book")}説明資料</span>`, href)}` +
       `<iframe class="sd-explain" src="${esc(href)}" sandbox="${FRAME_SANDBOX}" referrerpolicy="no-referrer" title="説明資料：${esc(scope.id)}"></iframe></div>`
     );
   }

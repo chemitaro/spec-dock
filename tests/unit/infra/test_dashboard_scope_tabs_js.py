@@ -202,3 +202,244 @@ def test_the_phone_sheet_moves_only_by_the_grab_and_the_header_band() -> None:
     assert touch == [".sd-pn .pn-grab", ".sd-pn .pn-top"]  # the contents and the frame scroll freely (R-07)
     assert "height: var(--pn-h" in phone and ".sd-pn.is-dragging iframe { pointer-events: none; }" in phone
     assert "overscroll-behavior: contain" in css
+
+
+# --- The docs tab and the explanation tab as one bar and a frame (iss-00589 T-01〜T-03) ----------------------
+
+DOCS = (
+    FIXTURE
+    + """
+const base = "/r/github.com/o/r/scopes/epic-00001/doc";
+const files = "/r/github.com/o/r/files/epic-00001";
+const cue = (name) => ({key: name.split(".")[0], name, exists: true, href: `${files}/${name}`, view: base});
+const cueDetails = ({report = true, check = {status: "ok", complete: true, errors: [], warnings: [], next_steps: []}} = {}) => ({
+  catalog: "ok",
+  spec: base,
+  documents: [
+    cue("requirement.cue"), cue("design.cue"), cue("plan.cue"),
+    {key: "explanation", name: "explanation.html", exists: true, href: `${files}/explanation.html`, view: null},
+    {key: "report", name: "report.md", exists: report, href: report ? `${files}/report.md` : null, view: report ? `${base}/report.md` : null},
+  ],
+  adrs: [{name: "20260101t000000z-adr-keep-it.md", path: "artifacts/20260101t000000z-adr-keep-it.md", view: `${base}/artifacts/20260101t000000z-adr-keep-it.md`}],
+  artifacts: [],
+  check,
+  progress: {total: 2, done: 1, doing: 1, todo: 0, dropped: 0, doing_steps: [{id: "S-02", title: "上書きを止める"}]},
+});
+const mdDetails = () => ({
+  catalog: "ok",
+  spec: null,
+  documents: ["requirement", "design", "plan", "report"].map((key) => ({key, name: `${key}.md`, exists: true, href: `${files}/${key}.md`, view: `${base}/${key}.md`}))
+    .concat([{key: "explanation", name: "explanation.html", exists: false, href: null, view: null}]),
+  adrs: [],
+  artifacts: [],
+  check: null,
+  progress: null,
+});
+const docsTab = tabs.SCOPE_TABS.find((tab) => tab.key === "docs");
+const pageAt = (query) => ({...ctx, route: {path: `/r/github.com/o/r/scopes/epic-00001?${query}`, params: new URLSearchParams(query)}});
+const docsPage = (details, query = "tab=docs") => docsTab.render(tabs.pageEnv(pageAt(query), scope, {scope, details}, byId));
+const docsPanel = (details, params = new Map()) => docsTab.render(tabs.panelEnv(ctx, scope, {scope, details}, byId, {params, tab: "docs"}));
+const segOf = (html) => {
+  const nav = html.match(/<nav class="sd-seg"[^>]*>(.*?)<\\/nav>/s);
+  if (!nav) return null;
+  return [...nav[1].matchAll(/<(a|span) ([^>]*)>(.*?)<\\/\\1>/gs)].map((m) => ({tag: m[1], attrs: m[2], text: m[3].replace(/<[^>]*>/g, "")}));
+};
+const openOf = (html) => (html.match(/<a class="sd-framebar__open"[^>]*>/) || [null])[0];
+const frameOf = (html) => (html.match(/<iframe [^>]*>/) || [null])[0];
+"""
+)
+
+
+@node
+def test_a_cue_scope_offers_the_spec_and_the_report_in_one_bar(tmp_path: Path) -> None:
+    out = _run(
+        DOCS
+        + """
+        const html = docsPage(cueDetails());
+        out.html = html; out.seg = segOf(html); out.open = openOf(html); out.frame = frameOf(html);
+        const missing = docsPage(cueDetails({report: false}));
+        out.missingSeg = segOf(missing);
+        const report = docsPage(cueDetails(), "tab=docs&doc=report");
+        out.reportSeg = segOf(report); out.reportOpen = openOf(report); out.reportFrame = frameOf(report);
+        out.compat = segOf(docsPage(cueDetails(), "tab=docs&doc=explanation"));
+        """,
+        tmp_path,
+    )
+    html = out["html"]
+    assert [item["text"] for item in out["seg"]] == ["仕様", "報告", "20260101t000000z-adr-keep-it"]
+    assert "説明資料" not in html and not re.search(r'class="sd-doc(?:s|"| |__)', html)
+    assert 'data-code="plan-progress"' not in html and 'data-code="check-' not in html  # R-03
+    assert html.startswith('<div class="sd-framebox" data-frame="docs"><div class="sd-framebar">')
+    spec, report, adr = out["seg"]
+    assert (
+        spec["tag"] == "a"
+        and 'aria-current="true"' in spec["attrs"]
+        and 'title="requirement.cue・design.cue・plan.cue"' in spec["attrs"]
+    )
+    assert 'href="/r/github.com/o/r/scopes/epic-00001?tab=docs&amp;embed=1"' in spec["attrs"]  # no wanted: null
+    assert report["tag"] == "a" and "aria-current" not in report["attrs"] and 'title="report.md"' in report["attrs"]
+    assert "doc=report" in report["attrs"] and "data-nav" in report["attrs"]
+    assert adr["tag"] == "a" and ("doc=adr%3Aartifacts" in adr["attrs"] or "doc=adr:artifacts" in adr["attrs"])
+    opener = out["open"]
+    assert (
+        'href="/r/github.com/o/r/scopes/epic-00001/doc"' in opener
+        and 'target="_blank"' in opener
+        and 'rel="noopener"' in opener
+    )
+    assert 'aria-label="新しいタブで開く"' in opener and 'title="新しいタブで開く"' in opener
+    frame = out["frame"]
+    assert 'class="sd-docframe"' in frame and 'src="/r/github.com/o/r/scopes/epic-00001/doc"' in frame
+    assert (
+        'sandbox="allow-scripts allow-popups"' in frame
+        and 'referrerpolicy="no-referrer"' in frame
+        and 'loading="lazy"' in frame
+    )
+    gone = out["missingSeg"][1]
+    assert (
+        gone["tag"] == "span"
+        and 'aria-disabled="true"' in gone["attrs"]
+        and "まだない" in gone["attrs"]
+        and gone["text"] == "報告"
+    )
+    assert 'aria-current="true"' in out["reportSeg"][1]["attrs"] and "aria-current" not in out["reportSeg"][0]["attrs"]
+    assert "doc=spec" in out["reportSeg"][0]["attrs"]
+    assert 'href="/r/github.com/o/r/scopes/epic-00001/doc/report.md"' in out["reportOpen"]
+    assert 'src="/r/github.com/o/r/scopes/epic-00001/doc/report.md"' in out["reportFrame"]
+    assert 'aria-current="true"' in out["compat"][0]["attrs"]  # ?doc=explanation shows the spec
+
+
+@node
+def test_the_panel_switches_documents_inside_itself(tmp_path: Path) -> None:
+    out = _run(
+        DOCS
+        + """
+        out.seg = segOf(docsPanel(cueDetails()));
+        const report = docsPanel(cueDetails(), new Map([["doc", "report"]]));
+        out.reportSeg = segOf(report); out.reportOpen = openOf(report); out.reportFrame = frameOf(report);
+        """,
+        tmp_path,
+    )
+    for item in out["seg"]:
+        assert 'data-pn-param="doc"' in item["attrs"] and "data-nav" not in item["attrs"], item
+    assert 'data-pn-value=""' in out["seg"][0]["attrs"] and 'data-pn-value="report"' in out["seg"][1]["attrs"]
+    assert 'aria-current="true"' in out["reportSeg"][1]["attrs"]
+    assert 'href="/r/github.com/o/r/scopes/epic-00001/doc/report.md"' in out["reportOpen"]
+    assert 'src="/r/github.com/o/r/scopes/epic-00001/doc/report.md"' in out["reportFrame"]
+
+
+@node
+def test_the_check_band_shows_only_errors_and_failures_keep_their_notice(tmp_path: Path) -> None:
+    out = _run(
+        DOCS
+        + """
+        const finding = (code, message) => ({code, message, file: "epic-00001/plan.cue"});
+        out.warnOnly = docsPage(cueDetails({check: {status: "ok", complete: true, errors: [], warnings: [finding("W1", "w")], next_steps: []}}));
+        out.invalid = docsPage(cueDetails({check: {status: "invalid", complete: false, errors: [finding("E1", "<b>bad</b>"), finding("E2", "also")], warnings: [finding("W1", "w")], next_steps: ["spec-dock scope check epic-00001"]}}));
+        out.failed = docsPage(cueDetails({check: {status: "failed", code: "CUE_NOT_FOUND", message: "no cue", next_steps: ["spec-dock scope check epic-00001"]}}));
+        out.failedReport = docsPage(cueDetails({check: {status: "failed", code: "CUE_NOT_FOUND", message: "no cue", next_steps: []}}), "tab=docs&doc=report");
+        out.md = docsPage(mdDetails());
+        out.mdSeg = segOf(out.md);
+        out.catalog = docsPage({catalog: "scope_missing", next_steps: []});
+        out.empty = docsPage({catalog: "ok", spec: null, documents: [{key: "explanation", name: "explanation.html", exists: false, href: null, view: null}], adrs: [], artifacts: [], check: null, progress: null});
+        """,
+        tmp_path,
+    )
+    assert "check-" not in out["warnOnly"] and "sd-checkbar" not in out["warnOnly"]
+    invalid = out["invalid"]
+    band = re.search(
+        r'<details class="sd-checkbar" data-code="check-invalid"><summary>(.*?)</summary>(.*?)</details>', invalid, re.S
+    )
+    assert band is not None
+    assert (
+        "検査の誤り 2件" in band.group(1)
+        and "警告 1件" in band.group(1)
+        and "<code>spec-dock scope check epic-00001</code>" in band.group(1)
+    )
+    assert band.group(2).startswith('<ul class="sd-list sd-findings">') and band.group(2).count("<li>") == 3
+    assert "&lt;b&gt;bad&lt;/b&gt;" in invalid and "<b>bad</b>" not in invalid
+    assert invalid.index("sd-checkbar") < invalid.index('class="sd-framebar"')  # above the bar
+    assert 'data-code="render-failed"' in out["failed"] and "<iframe" not in out["failed"]  # F-01
+    assert 'class="sd-framebar"' in out["failed"]  # the report stays one click away
+    assert 'src="/r/github.com/o/r/scopes/epic-00001/doc/report.md"' in out["failedReport"]
+    assert [item["text"] for item in out["mdSeg"]] == ["要件", "設計", "計画", "報告"]
+    assert "説明資料" not in out["md"] and 'aria-current="true"' in out["mdSeg"][0]["attrs"]
+    assert 'src="/r/github.com/o/r/scopes/epic-00001/doc/requirement.md"' in out["md"]
+    assert 'data-code="catalog-scope_missing"' in out["catalog"] and "<iframe" not in out["catalog"]
+    assert "画面の中で読める文書はまだない。" in out["empty"] and "<iframe" not in out["empty"]
+
+
+@node
+def test_the_explanation_tab_uses_the_same_bar_and_redraws_to_the_same_string(tmp_path: Path) -> None:
+    out = _run(
+        DOCS
+        + """
+        const expl = {key: "explanation", name: "explanation.html", exists: true, href, skeleton: false};
+        out.written = draw(expl);
+        out.same = draw(expl) === out.written;
+        out.docsSame = docsPage(cueDetails(), "tab=docs&doc=report") === docsPage(cueDetails(), "tab=docs&doc=report");
+        out.panelSame = docsPanel(cueDetails()) === docsPanel(cueDetails());
+        """,
+        tmp_path,
+    )
+    written = out["written"]
+    assert written.startswith(
+        '<div class="sd-framebox" data-frame="explanation"><div class="sd-framebar"><span class="sd-framebar__name">'
+    )
+    assert "説明資料</span>" in written and "sd-explainbox" not in written and "sd-explain__bar" not in written
+    assert re.search(
+        r'<a class="sd-framebar__open" href="[^"]*explanation\.html[^"]*" target="_blank" rel="noopener" aria-label="新しいタブで開く"',
+        written,
+    )
+    assert re.search(
+        r'<iframe class="sd-explain" src="[^"]*explanation\.html\?a=1&amp;b=&lt;x&gt;" sandbox="allow-scripts allow-popups" referrerpolicy="no-referrer"',
+        written,
+    )
+    assert out["same"] and out["docsSame"] and out["panelSame"]  # F-02
+
+
+def _rules(css: str, selector: str) -> list[str]:
+    """The bodies of the rules whose selector is exactly `selector` (whitespace-trimmed)."""
+    css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    return [m.group(2) for m in re.finditer(r"([^{};]+)\{([^{}]*)\}", css) if m.group(1).strip() == selector]
+
+
+def test_the_frames_take_the_rest_of_the_height_without_old_rules_or_new_colors() -> None:
+    """iss-00589 T-04: one bar over a frame that grows in the panel and fills the screen on the page."""
+    shared = (SHARED / "scope_tabs.css").read_text()
+    panel = (SHARED / "panel.css").read_text()
+    page = (VIEWS / "scope.css").read_text()
+    body = _rules(panel, '.sd-pn .pn-body:is([data-tab="docs"], [data-tab="explanation"])')
+    assert body and "display: flex" in body[0] and "flex-direction: column" in body[0]
+    assert "overflow" not in body[0]  # stays auto: only a long error list scrolls (R-04)
+    assert "flex: 1" in _rules(panel, ".sd-pn .sd-framebox")[0]
+    frame = _rules(panel, ".sd-pn :is(.sd-docframe, .sd-explain)")[0]
+    assert "flex: 1" in frame and "min-height: 240px" in frame and "height: auto" in frame
+    phone = panel[panel.index("@container app (max-width: 640px)") :]
+    assert '.sd-pn .pn-body:is([data-tab="docs"], [data-tab="explanation"]) { padding: 2px 4px 4px; }' in phone
+    on_page = _rules(page, "& :is(.sd-docframe, .sd-explain)")[0]
+    assert "flex: none" in on_page and "100dvh" in on_page
+    assert (
+        "& .sd-framebox" in shared
+        and "& .sd-framebar" in shared
+        and "& .sd-seg" in shared
+        and "& .sd-checkbar" in shared
+    )
+    assert "height: 24px" in _rules(shared, "& .sd-framebar")[0]
+    seg = _rules(shared, "& .sd-seg")[0]
+    assert "min-width: 0" in seg and "overflow-x: auto" in seg
+    summary = _rules(shared, "& .sd-checkbar > summary")[0]
+    assert "height: 28px" in summary and "white-space: nowrap" in summary and "text-overflow: ellipsis" in summary
+    for css in (shared, panel, page):
+        for gone in (
+            ".sd-docs",
+            ".sd-doc ",
+            ".sd-doc[",
+            ".sd-doc__",
+            ".sd-docview",
+            ".sd-explainbox",
+            ".sd-explain__bar",
+            "min(70vh",
+            "min(78vh",
+        ):
+            assert gone not in css, gone
+        assert not re.search(r"#[0-9a-fA-F]{3}|rgba?\(|hsla?\(", css)  # the design system's tokens only
