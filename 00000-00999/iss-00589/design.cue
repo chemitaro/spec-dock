@@ -33,11 +33,11 @@ design: {
 	"D-02": {
 		title: "1行の帯（.sd-framebar）と、セグメントの切り替え（.sd-seg）"
 		text: """
-			HTML：`<div class="sd-framebox" data-frame="docs"><div class="sd-framebar"><nav class="sd-seg" aria-label="文書">…</nav><a class="sd-framebar__open" href="<view>" target="_blank" rel="noopener" aria-label="新しいタブで開く" title="新しいタブで開く">${icon("external")}<span>新しいタブ</span></a></div><iframe class="sd-docframe" …></iframe></div>`。
+			HTML：`<div class="sd-framebox" data-frame="docs"><div class="sd-framebar"><nav class="sd-seg" aria-label="文書">…</nav><a class="sd-framebar__open" href="<view>" target="_blank" rel="noopener" aria-label="新しいタブで開く" title="新しいタブで開く">${icon("external")}</a></div><iframe class="sd-docframe" …></iframe></div>`。
 			.sd-seg の項目：選べる項目は `<a ${env.paramLink("doc", id)}>`（spec で wanted がないときは今と同じく null を渡す）で、選んでいる項目に aria-current="true"。選べない項目は `<span aria-disabled="true" title="まだない">`。
 			項目の title にファイル名（requirement.cue・design.cue・plan.cue など）を入れる。iframe の属性（src、sandbox、referrerpolicy、loading、title）は今のまま。
-			見た目：帯は高さ 28px（min-height）、.sd-seg は角丸 var(--ds-radius) の枠（var(--ds-border)）の中に 24px の項目を並べ、選んでいる項目は var(--ds-accent-soft) の地と var(--ds-accent-strong) の字。
-			新しいタブのリンクは 12px の字と印。幅が狭い（欄で .sd-seg がはみ出す）ときは、.sd-seg が横にスクロールし、リンクの字（span）は 640px 以下の幅で隠して印だけにする（名前は aria-label と title）。
+			見た目：帯は高さ 24px（height、どの幅でも）、.sd-seg は角丸 var(--ds-radius) の枠（var(--ds-border)）の中に高さ 22px の項目（字 12.5px）を並べ、選んでいる項目は var(--ds-accent-soft) の地と var(--ds-accent-strong) の字。
+			新しいタブのリンクは印だけ（24×24px の当たり、印 15px）。幅が狭い（欄で .sd-seg がはみ出す）ときは、.sd-seg が横にスクロールする（min-width: 0、overflow-x: auto）。
 			"""
 		satisfies: ["R-02"]
 	}
@@ -45,7 +45,7 @@ design: {
 		title: "誤りの帯（checkResults の詰め）と、計画の進み具合を外す"
 		text: """
 			checkResults(check, scopeId)：status が failed なら今の render-failed の知らせ（変えない）。errors が 0 件なら "" を返す（警告だけでも出さない）。
-			errors があれば `<details class="sd-checkbar" data-code="check-invalid"><summary>${icon("zap")}検査の誤り N件（警告 M件） <code>spec-dock scope check <ID></code></summary><ul class="sd-list sd-findings">…</ul></details>`。summary は1行（white-space: nowrap、はみ出しは省略）、地は var(--ds-danger-bg)、字は var(--ds-text)。
+			errors があれば `<details class="sd-checkbar" data-code="check-invalid"><summary>${icon("zap")}検査の誤り N件（警告 M件） <code>spec-dock scope check <ID></code></summary><ul class="sd-list sd-findings">…</ul></details>`。summary は1行（高さ 28px、white-space: nowrap、overflow: hidden、text-overflow: ellipsis）、地は var(--ds-danger-bg)、字は var(--ds-text)。開いたときだけ一覧が下に出る。
 			docsTab から planProgress の呼び出しを除く（概要のタブの planProgress はそのまま）。
 			"""
 		satisfies: ["R-03"]
@@ -53,12 +53,17 @@ design: {
 	"D-04": {
 		title: "枠に残りの高さを使わせる"
 		text: """
-			欄（panel.css）：`.sd-pn .pn-body:is([data-tab="docs"], [data-tab="explanation"]) { display: flex; flex-direction: column; gap: 6px; padding: 6px 10px 10px; }`。
-			中身は overflow: auto のまま（誤りの帯を開いて一覧が長いときだけスクロールする）。`.sd-framebox { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 4px; }`、
-			枠 `.sd-docframe, .sd-explain { flex: 1; min-height: 240px; height: auto; }`。今の `.sd-pn .sd-docframe { height: min(70vh, 900px); … }` と `.sd-pn .sd-explain { height: auto; }` は置き換える。
-			スマホ（@container app (max-width: 640px)）では、今の説明資料と同じく padding を 4px 6px 6px に詰める。
-			詳しい画面（scope.css）：`.sd-docframe, .sd-explain { height: max(420px, calc(100dvh - 120px)); }`（120px は上の帯（ページの見出し）と、帯の行と、間のすき間）。ページは今と同じく、画面がスクロールして枠に届く。
-			scope_tabs.css の共有の規則（.sd-framebox、.sd-framebar、.sd-seg、.sd-checkbar、枠の枠線と角丸）は [data-view="scope"] と .sd-pn の両方に効く。
+			共有（scope_tabs.css、[data-view="scope"] と .sd-pn の両方）：`.sd-framebox { display: flex; flex-direction: column; gap: 2px; min-height: 0; }`、枠の見た目
+			`:is(.sd-docframe, .sd-explain) { display: block; width: 100%; border: 1px solid var(--ds-border); border-radius: var(--ds-radius-l); background: var(--ds-bg); }`。
+			枠の高さはここでは決めない。今の共有の `.sd-explain { flex: 1; min-height: 0; … }` と `.sd-docframe { height: min(78vh, 1100px); min-height: 420px; … }` はこの規則に置き換える。
+			欄（panel.css）：今の `.sd-pn .pn-body[data-tab="explanation"] { …; padding: 8px 10px 10px; overflow: hidden; }`、`> .sd-explainbox { flex: 1; }`、`.sd-pn .sd-explain { height: auto; }`、
+			`.sd-pn .sd-docframe { height: min(70vh, 900px); … }` を消し、次に置き換える：
+			`.sd-pn .pn-body:is([data-tab="docs"], [data-tab="explanation"]) { display: flex; flex-direction: column; gap: 4px; padding: 4px 10px 10px; }`（overflow は auto のまま。誤りの帯を開いて一覧が長いときだけスクロールする）、
+			`.sd-pn .sd-framebox { flex: 1; }`、`.sd-pn :is(.sd-docframe, .sd-explain) { flex: 1; min-height: 240px; height: auto; }`。
+			スマホ（@container app (max-width: 640px)）：`.sd-pn .pn-body:is([data-tab="docs"], [data-tab="explanation"]) { padding: 2px 4px 4px; }`（今の `[data-tab="explanation"] { padding: 4px 6px 6px; }` と `.sd-explain__bar` の規則は消す）。
+			これで、PC の欄の説明資料の枠の上端は 4 + 24 + 2 = 30px（R-05 の 32px 以内）、390×844 の全体の段では中身 688px から 688 − 2 − 24 − 2 − 4 = 656px（直す前 652px より高い）。
+			詳しい画面（scope.css）：`[data-view="scope"] :is(.sd-docframe, .sd-explain) { flex: none; height: max(420px, calc(100dvh - 120px)); }`（flex: none で、高さの決まらない縦の flex の中でも height が効く。今の `.sd-explain { flex: none; height: max(480px, calc(100vh - 220px)); }` を置き換える。
+			120px は上の帯（ページの見出し）と、帯の行と、間のすき間）。ページは今と同じく、画面がスクロールして枠に届く。
 			今の .sd-docs、.sd-doc*、.sd-docview、.sd-explainbox、.sd-explain__bar、`:is(.sd-tabpanel, .pn-body)[data-tab="docs"] > .sd-progress` の規則は、使われなくなるので消す。
 			"""
 		satisfies: ["R-04", "R-05"]
@@ -83,7 +88,9 @@ design: {
 		title: "写しと測り（タスク担当）"
 		text: """
 			.workbench/iss-00589/shoot.mjs（headless Chrome、CDP、--disable-features=MacAppCodeSignClone、Browser.close）で、epic-00573 を、詳しい画面と構造の図の欄の文書・説明資料のタブ、
-			1440×900、1000×800、390×844 の全体の段で撮り、枠の上端・高さ・見える高さ・欄に対する割合・中身のスクロールの有無を測る。直す前は開始のコミットの venv（ポート 18589）、
+			1440×900、1000×800、390×844 の全体の段で撮り、枠の上端・高さ・見える高さ・欄に対する割合・中身のスクロールの有無・帯の高さを測る。
+			誤りの帯（R-03）は、実データに誤りのある Scope がないとき、欄の文書のタブを開いたページで、配られた scope_tabs.js を import して checkResults と同じ HTML（誤り3件・長い文の errors を持つ check）を
+			描き、切り替えの行の上に差し込んで、閉じた状態の高さを 1000×800 と 390×844 で測る（checkResults を export するか、docsTab に誤りのある details を渡して描く）。直す前は開始のコミットの venv（ポート 18589）、
 			直した後は作業の木の wheel の venv（ポート 18590、--tailscale）。状態の置き場は .workbench/iss-00589/state の写し。道具の環境と常駐のダッシュボード（47800）には触れない。
 			"""
 		satisfies: ["R-06"]
