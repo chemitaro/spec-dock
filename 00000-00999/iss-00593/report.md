@@ -20,6 +20,8 @@ ID: "iss-00593"
 - 2026-11-14 仕様の訂正と再レビュー：**合格**（round-6、spec-reviewer の同じレビュアー、P3 2）。変えたのは plan.cue の実行の割り当てだけ（S-01 を impl_logic〈Codex〉から impl_ui〈Claude Opus 5.5 / high〉へ。理由は下の「逸脱と判断」）。要件・設計・説明資料は round-5 の合格の版のまま。ChatGPT は、割り当てだけの訂正なので回していない（round-5 の合格の版の要件・設計・テストは変わらない）。
   - 合格の版の sha256：requirement.cue `4373c5d66ea9261f0211ad7c17cbfa40984f4963e09bf6267d4e2356e9566ba6`、design.cue `28b8bac6cb612c5ee0436f35ee5ea8ba4107af69b6d1bf3e060b2d3587f915cd`、plan.cue `584ba8ae5e2782adb40195fbafbe180a71922d4aa0d18078b87ff6e27c342168`、explanation.html `c9f8d5672209a36c563a298e376dc804333884a0b301a3611ae79fcd4a9e3e78`。結果 `.workbench/spec-review/iss-00593/round-6.json`（検査 valid、pass）。
   - P3（記録だけ）：plan.cue の C-1 の reason の「別の実装担当の作ったもの」は、今は同じ実装担当（関門としてはそのまま成り立つ）。requirement.cue の decisions の「純粋な計算を Codex」は、下の逸脱で置き換わった（iss-00593 に限る）。
+- 2026-11-14 仕様の訂正と再レビュー：**合格**（round-7、spec-reviewer の同じレビュアー、P3 2〈前からの残り〉）。実装担当 impl_ui の問い（msg_2c43d31c056f）で、ほかのタブの間に覚えに足された id は pickAgent の規則2に当たり、問い合わせに `gone:<id>` が入らず、読み込み直しの後に R-05・F-02 が成り立たない穴が見つかった。D-01 の規則2の remember を `"gone:" + wanted` に、plan.cue の T-02 の行を合わせた。ChatGPT は、規則1つの値の訂正なので回していない。
+  - 合格の版の sha256：requirement.cue `4373c5d66ea9261f0211ad7c17cbfa40984f4963e09bf6267d4e2356e9566ba6`、design.cue `fd768249b27be9d79737e80475f59a0a038aa0214e9e0680ae069a10942ad5d1`、plan.cue `de4863575b35d567c18527966d8060130ababde8b06591310d0031fca1d151dd`、explanation.html `c9f8d5672209a36c563a298e376dc804333884a0b301a3611ae79fcd4a9e3e78`。worktree の HEAD `130ff2b70`（clean）。結果 `.workbench/spec-review/iss-00593/round-7.json`（検査 valid、pass）。
 
 ## 逸脱と判断
 
