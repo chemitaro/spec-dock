@@ -3,6 +3,7 @@
 // calls their render(root, ctx) whenever the data or the route changes and never knows their insides.
 import * as api from "./core/api.js";
 import { createEmbedBridge } from "./core/embed.js";
+import { createOrca } from "./core/orca.js";
 import { parseRoute, withEmbed } from "./core/route.js";
 import { renderNotices, renderTop } from "./core/topbar.js";
 import { LIVE_MS, movedAt } from "./core/ui.js";
@@ -19,6 +20,7 @@ const noticeArea = document.getElementById("notices");
 const state = {
   route: parseRoute(location.href),
   repositories: [],
+  orca: null, // one reader shared by every screen
   server: null, // the listing's `server` (version, restart_required)
   data: null, // structure JSON of the current repository
   loadedAt: 0, // performance.now() when data arrived; the band counts the age on from it
@@ -85,6 +87,7 @@ function render() {
     scope: state.scope,
     repositories: state.repositories,
     embed: state.route.embed,
+    orca: state.orca,
     baseline: state.baseline, // the panels read a Scope against the same seen_id as the structure (iss-00587)
     navigate,
     href,
@@ -207,6 +210,7 @@ async function boot() {
     bridge.setAllowedHosts([]);
     state.error = `リポジトリの一覧を読めませんでした（${error.message}）。`;
   }
+  state.orca = createOrca(state.server?.orca_web ?? null);
   if (state.route.repository) {
     await loadRepository();
     if (state.data) {

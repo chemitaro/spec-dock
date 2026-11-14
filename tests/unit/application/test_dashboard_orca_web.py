@@ -131,3 +131,24 @@ def test_http_origin_and_shell_policy_follow_admitted_host_and_live_settings(tmp
     hide_repository(site.state_root, GithubRepository("o", "r"), now=NOW)
     hidden = get(http, f"/r/{REPOSITORY}/")
     assert hidden.status == 404 and "http://127.0.0.1:8791" in (hidden.header("content-security-policy") or "")
+
+
+def test_shell_creates_one_shared_reader_and_serves_its_modules(tmp_path: Path) -> None:
+    site, _config, _catalog = environment(tmp_path)
+    http = http_for(site)
+    for name in ("orca.js", "orca_match.js"):
+        response = get(http, f"/assets/core/{name}")
+        assert response.status == 200
+        assert response.header("content-type") == "text/javascript; charset=utf-8"
+    response = get(http, "/assets/app.js")
+    assert response.status == 200
+    source = response.body.decode()
+    assert 'import { createOrca } from "./core/orca.js";' in source
+    assert source.count("createOrca(") == 1
+    boot = source.split("async function boot()", 1)[1]
+    assert "state.orca = createOrca(state.server?.orca_web ?? null);" in boot
+    assert boot.index("state.orca = createOrca(") > boot.index("state.server = listing.server ?? null;")
+    check_server = source.split("async function checkServer()", 1)[1].split("async function boot()", 1)[0]
+    assert "createOrca" not in check_server and "state.orca =" not in check_server
+    render = source.split("module.render(root, {", 1)[1].split("});", 1)[0]
+    assert "orca: state.orca," in render
