@@ -35,8 +35,8 @@ design: {
 		text: """
 			`views/_shared/agents_logic.js` は import を持たない ES Module（node で直接読める）。
 
-			**`scopeAgents(worktrees)`** → `{agents, invalid}`。`worktrees` は `ctx.orca.forScope` の結果（並びでなければ空として扱う）。worktree の順、その中の `agents` の順に、次の形の項目を作って `agents` に入れる：
-			`{id, agentType, branch, worktreeId, detail, raw}`。入れるのは、`id` が空でない文字列で、`detail` が `"/embed/agent?id=" + encodeURIComponent(id)` と**完全に同じ**エージェントだけ（orca-web の `src/summary/build.ts` が作る形。iframe の宛先の id と、帯と title と選びの id が必ず同じになる。ChatGPT round-2 の P1）。ほかの項目（id がない、detail が違う道か違う id を指す、文字列でない）は使えないので入れず、`invalid` に数える（同じ id の2回目は数えずに捨てる）。`agentType` は文字列でなければ null、`branch` は worktree の `branch` が文字列でなければ null、`worktreeId` は worktree の `id`、`raw` は要約のエージェントそのもの（印を描くため）。同じ `id` が2回出たら最初だけを残す。
+			**`scopeAgents(worktrees)`** → `{agents, invalid, invalidIds}`。`worktrees` は `ctx.orca.forScope` の結果（並びでなければ空として扱う）。worktree の順、その中の `agents` の順に、次の形の項目を作って `agents` に入れる：
+			`{id, agentType, branch, worktreeId, detail, raw}`。入れるのは、`id` が空でない文字列で、`detail` が `"/embed/agent?id=" + encodeURIComponent(id)` と**完全に同じ**エージェントだけ（orca-web の `src/summary/build.ts` が作る形。iframe の宛先の id と、帯と title と選びの id が必ず同じになる。ChatGPT round-2 の P1）。ほかの項目（id がない、detail が違う道か違う id を指す、文字列でない）は使えないので入れず、`invalid` に数え、`id` が空でない文字列ならその id を `invalidIds`（Set）に入れる（同じ id の2回目は数えずに捨てる）。返り値は `{agents, invalid, invalidIds}`。`agentType` は文字列でなければ null、`branch` は worktree の `branch` が文字列でなければ null、`worktreeId` は worktree の `id`、`raw` は要約のエージェントそのもの（印を描くため）。同じ `id` が2回出たら最初だけを残す。
 
 			**`agentsVisibility({status, problem, records, agents, wanted, goneIds, embed})`** → `{show, reason}`。`records` はその Scope の SpecDock の worktree の記録の数、`agents` は `scopeAgents` の結果、`wanted` は今の選び（文字列か null）、`goneIds` はその Scope のいなくなった覚え（id の Set。D-02）。出すかどうか（上から順。R-01）：
 			1. `status === "off"` で `problem` がない → `{show: false, reason: null}`。
@@ -44,8 +44,8 @@ design: {
 			3. `problem` がある、または `status` が `loading`・`unreachable`・`orca-unreachable`・`orca-starting` → 出す。
 			4. `status === "ok"`：`agents.length > 0`、`wanted` がある、または `goneIds` が空でない → 出す。ほか → 出さない。
 			5. ほかの `status` の値 → 出さない。
-			4 の続き：`status === "ok"` で上のどれにも当たらず、`invalid > 0`（入力に `invalid` を足す）→ 出す（理由 `"shape"`。対応した worktree にエージェントがいるのに、どれも形が違う。F-01）。
-			理由（出すときだけ、上から順）：`problem` があれば `"config"`、`embed` が真なら `"embed"`（F-05）、`status` が `ok` でなければその値、`ok` で `agents` が0人・`wanted` も `goneIds` もなく `invalid > 0` なら `"shape"`、ほかは null。形の違う項目が一部だけなら理由は null のままで、帯に1行の注を出す（D-04）。
+			4 の続き：`status === "ok"` で上のどれにも当たらず、`invalid > 0`（入力に `invalid` と `invalidIds` を足す）→ 出す（理由 `"shape"`。対応した worktree にエージェントがいるのに、どれも形が違う。F-01）。
+			理由（出すときだけ、上から順）：`problem` があれば `"config"`、`embed` が真なら `"embed"`（F-05）、`status` が `ok` でなければその値、`ok` で次のどちらかなら `"shape"`：(a) `agents` が0人・`wanted` も `goneIds` もなく `invalid > 0`、(b) `wanted` が `invalidIds` にある（選んだ相手の項目の形が違う。いなくなったのではないので、`pickAgent` を呼ばず、覚えも選びも変えない。項目が直れば次の知らせで同じ相手に戻る。ChatGPT round-3 の P1）。ほかは null。形の違う項目が一部だけで、選んだ相手の項目は使えるなら、理由は null のままで、帯に1行の注を出す（D-04）。
 
 			**`pickAgent(agents, wanted, goneIds)`** → `{selected, gone, remember, addGone}`（理由が null のときだけ呼ぶ。Epic D-02。`goneIds` は id の Set、なければ空として扱う）。上から順：
 			1. `wanted` が `gone:` で始まる → `{selected: null, gone: true, remember: null, addGone: その後ろの id}`（同じ id が `agents` に戻っても開かない）。
@@ -86,10 +86,10 @@ design: {
 			`agentsState(env)`（`agents_tab.js`）が、env から入力を集めて決め方を呼び、結果を env ごとに1回だけ覚える（WeakMap。同じ env の `visible`・`count`・`render` は同じ答え）。**`keep` は呼ばない**（ほかのタブを示す間に選びを書き換えないため。round-1 の P3）：
 			- `status`：`env.ctx.orca?.status() ?? "off"`。`problem`：`env.ctx.orcaProblem ?? null`。`embed`：`env.ctx.embed === true`。
 			- `records`：構造（`env.ctx.data`）の `worktrees.status` が `ok` なら、`env.byId.get(scope.id)?.worktrees` の数、ほかは 0（F-04）。
-			- `agents`：`scopeAgents(env.ctx.orca?.forScope(env.ctx.data, env.scope.id) ?? [])`（状態が ok でなければ `forScope` は空を返す）。
+			- `const {agents, invalid, invalidIds} = scopeAgents(env.ctx.orca?.forScope(env.ctx.data, env.scope.id) ?? [])`（状態が ok でなければ `forScope` は空を返す。返り値のオブジェクトを分けて受ける。ChatGPT round-3 の P1）。
 			- `wanted`：`env.param("agent")`。`memoryFor(mem, env.scope.id)` を呼び、`goneIds` は `mem.gone`。
-			- 状態が `ok` で、`wanted` が `gone:` で始まらない id で、`agents` にないときは、ここで `noteGone(mem, wanted, {stale: false})` を呼ぶ（覚えに足すだけで、`keep` は呼ばない。ほかのタブを見ている間に相手が消えて同じ id で戻っても、後でエージェントのタブを開いたときに開かない。spec-reviewer round-2 の P2）。
-			- 結果：`{...agentsVisibility(...), agents, invalid, wanted, goneIds}`。
+			- 状態が `ok` で、`wanted` が `gone:` で始まらない id で、`agents` にも `invalidIds` にもないときは、ここで `noteGone(mem, wanted, {stale: false})` を呼ぶ（覚えに足すだけで、`keep` は呼ばない。ほかのタブを見ている間に相手が消えて同じ id で戻っても、後でエージェントのタブを開いたときに開かない。spec-reviewer round-2 の P2）。
+			- 結果：`{...agentsVisibility(...), agents, invalid, invalidIds, wanted, goneIds}`。
 			`visible(env)` は `.show`。`count(env)` は理由が null のとき `agents.length`、ほかは null。
 			`render(env)` は `agentsTab(env)`（D-03、D-05）：理由が null なら `pickAgent(agents, wanted, goneIds)` を呼び、`addGone` を `noteGone` で覚えに足し、`remember` があれば `env.keep("agent", remember)` を1回呼ぶ（エージェントのタブを描くときだけ）。結果は同じ env の `paintAgentList` が使えるよう env ごとに覚える。
 			"""
@@ -132,21 +132,21 @@ design: {
 			**横の欄**（`panel.js`）：
 			- `draw()` は、詳しい内容が読めていれば、まず `panelEnv(…, {params, tab: userTab})` で仮の env を作り（`visible` はタブによらない）、`visibleTabs(仮の env)` の並びのキーで `pickTab(userTab, キー, details)` を選び、選んだタブが `userTab` と違えば `panelEnv(…, {params, tab})` で env を作り直す（round-1 の P3：env を作るのにタブが要る順の循環を解く）。その並びでタブのボタンを描く。`env` がない（読み込み中）ときは `visible` を持つタブを除いた並びを描く。
 			- 中身は今の `shownHtml` の比べ方のまま。Scope が変われば中身の文字列（`data-orca-agents` の ID を含む）が変わるので置き換えられ、前の iframe は外れる（F-03）。
-			- 中身を描いた後（置き換えたかどうかによらず）、選んだタブが `agents` なら `paintAgentList(parts.body, env)` を呼ぶ。
+			- 中身を描いた後（置き換えたかどうかによらず）、選んだタブが `agents` なら `paintAgentList(parts.body, env, {redraw: () => { if (current) draw(); }})` を呼ぶ。
 			- 知らせ：`draw()` の中で、`state.ctx.orca` が今の購読の相手と違えば、前の購読を外し、`ctx.orca.subscribe(() => { if (current) draw(); })` で付け直す。`hide()` と `destroy()` で外す。
 
 			**詳しい画面**（`scope.js`）：
 			- 描く順を、見えるタブの並び（`visibleTabs(env)`）→ `pickTab` → 中身の HTML（`render(env)`。ここで `keep` が `ctx.route` を書き換えうる）→ 見出しとタブの帯の HTML（書き換えた後の `ctx.route.path` で道を作る）にする。
 			- `.sd-page` の子を、見出し（`<div class="sd-scope-top">` に `newTabLink`・`.sd-back`・`header.sd-cover` を入れる。CSS で `display: contents` にして今の並びと見た目を保つ）、`.sd-tabs-row`、`.sd-tabpanel` の3つにする。`.sd-page` に `data-scope="<ID>"` を付ける。
 			- 前に描いた `.sd-page` がこの root にあり、その `data-scope` が今の Scope の ID と同じなら、見出しと帯は `innerHTML` を書き換え、中身は前に描いた文字列（モジュールの中に覚える）と違うときだけ書き換える。`.sd-tabpanel` の `data-tab` は毎回合わせる。違う Scope、初めて、または Scope を読めないときの描き方（`emptyState`）では、今と同じく全体を書き換え、覚えた文字列を捨てる（F-03）。
-			- 中身を描いた後、選んだタブが `agents` なら `paintAgentList(.sd-tabpanel, env)` を呼ぶ。
+			- 中身を描いた後、選んだタブが `agents` なら `paintAgentList(.sd-tabpanel, env, {redraw: () => render(root, ctx)})` を呼ぶ（覚えた `{root, ctx}` で。root が文書の中になければ何もしない）。
 			- 知らせ：モジュールに最後の `{root, ctx}` を覚え、`ctx.orca` が今の購読の相手と違えば付け直す。知らせでは、覚えた root がまだ文書の中にあれば `render(root, ctx)` を呼ぶ。`dispose()` を足して購読を外し、覚えを捨てる（`app.js` は画面を替えるときに `dispose` を呼んでいる）。
 
 			**帯**（`paintAgentList(root, env)`、`agents_tab.js`）：
 			- `root.querySelector("[data-orca-agents]")` がなければ何もしない。`agentsState(env)` の `agents` と、同じ env の `render` が決めた選び（`pickAgent` の結果）から帯の HTML を作る：`stripForm` が `"label"` なら1つの `<span class="sd-agentpick" aria-current="true">`、`"switch"` なら項目ごとに `<a class="sd-agentpick" data-agent-pick="<esc(id)>" ${env.paramLink("agent", id)}>`（選ばれた項目にだけ `aria-current="true"`。gone のときはどれにも付けない）。中は `<span class="sd-agentpick__mark" data-orca-agent="<esc(id)>"></span>`、種類（なければ「種類不明」）、ブランチ（`sd-mono`。なければ「ブランチ不明」）。文字はすべて `esc` を通す。
 			- 帯の文字列が前（置き場の `dataset` に覚える）と同じなら置き場の `innerHTML` を書き換えない。印は、各置き場について `marks.buildMarks({agents: [raw]}, {max: 1})` の結果の JSON を前の値と比べ、違うときだけ `marks.renderAgentMarks(slot, {agents: [raw]}, {size: "sm", max: 1})` で描く（作業中の弧が10秒ごとに回り始めに戻らない）。`marks()` が null か、部品が例外を投げたら、印は空のままにし、ほかは描く。
 			- 置き場の `innerHTML` だけを書き換え、隣の iframe に触れない。
-			- iframe の中での移り（F-08）：`paintAgentList` は枠の中の `iframe.sd-agent` に、`load` の聞き手を1つだけ付ける（iframe の `dataset` の印で二重に付けない）。聞き手は読み込みの回数を数え、2回目からは `noteDrift(mem, 選ばれた項目の id)` を呼び、`paintAgentList(root, env, {redraw})` で受けた `redraw()` を呼ぶ（中身の文字列が移った知らせに変わり、iframe が外れる）。orca-web の `/embed/agent` の画面は、自分で別の文書に移らない（`location` を書き換えず、移るのは同じ iframe で開く親と子のエージェントのリンクだけ。orca-web の main `1a2afed` の `web/embed/` を読んだ事実）ので、2回目の `load` は人がそのリンクを押したときに当たる。明暗の変化などで iframe が置き直されれば、新しい要素で数え直す。
+			- iframe の中での移り（F-08）：`paintAgentList` は枠の中の `iframe.sd-agent` に、`load` の聞き手を1つだけ付ける（iframe の `dataset` の印で二重に付けない）。聞き手は読み込みの回数を数え、2回目からは、同じ聞き手の中で（待たずに）`noteDrift(mem, 選ばれた項目の id)` を呼び、`paintAgentList(root, env, {redraw})` で受けた `redraw()` を呼ぶ（中身の文字列が移った知らせに変わり、iframe が外れる）。`redraw` がなければ、その iframe の要素を自分で外す（`iframe.remove()`）。orca-web の `/embed/agent` の画面は、自分で別の文書に移らない（`location` を書き換えず、移るのは同じ iframe で開く親と子のエージェントのリンクだけ。orca-web の main `1a2afed` の `web/embed/` を読んだ事実）ので、2回目の `load` は人がそのリンクを押したときに当たる。明暗の変化などで iframe が置き直されれば、新しい要素で数え直す。
 			- `redraw` は、横の欄では `() => { if (current) draw(); }`、詳しい画面では覚えた `{root, ctx}` での `render`。
 			- 形の違う項目が一部だけあるとき（`invalid > 0` で理由が null）、帯の終わりに `<span class="sd-muted">形の違う N件は出していない</span>` を足す（帯の文字列に入る。中身の文字列には入らない）。
 			- 人の選び：枠（`.sd-framebox[data-frame="agents"]`）に、捕捉の段（capture）の `click` の聞き手を1つだけ付ける（枠の `dataset` に付けた印で二重に付けない。中身が置き換われば新しい枠に付く）。`[data-agent-pick]` の上の押しなら、修飾キーの有無によらず `forgetGone(mem, その id)` を呼ぶ。押しの既定の動き（欄の `data-pn-param` の処理、詳しい画面の `data-nav` の移動）は止めず、そのあとの描き直しで選んだ相手が開く（覚えを捨てた後なので、`wanted` が前にいなくなった id でも開ける）。
@@ -196,7 +196,7 @@ design: {
 		satisfies: ["R-08"]
 		text: """
 			`src/spec_dock/assets/spec_dock/docs/reference_cli.md` に、エージェントのタブの説明を書く。iss-00592 の `orca_web` の節が `origin/main` にあればその節の中に、なければ `## 人のタスクの契約` の節（設定の3段を持つ）の後に `## orca-web との連携` の節を作って書く（後に入る方が1つの節にまとめる。Epic D-07）。
-			書くこと：タブを出す条件（R-01 の4つ）、1人なら自動で開き選びを覚えること、選んだ相手がいなくなったら知らせて自動で移らないこと、選びの持ち方（欄の中、詳しい画面の `agent` の問い合わせ）、送信は orca-web の iframe の中だけで行われ orca-web の設定の `sendEnabled`（既定は止まっている）で止められ SpecDock は書き込みに関わらないこと、iframe の sandbox の値、知らせの5つの言葉の意味。例の IP は 127.0.0.1 と 192.0.2.x だけ。
+			書くこと：タブを出す条件（R-01 の4つ）、1人なら自動で開き選びを覚えること、選んだ相手がいなくなったら知らせて自動で移らないこと、選びの持ち方（欄の中、詳しい画面の `agent` の問い合わせ）、送信は orca-web の iframe の中だけで行われ orca-web の設定の `sendEnabled`（既定は止まっている）で止められ SpecDock は書き込みに関わらないこと、iframe の sandbox の値、知らせのすべての言葉の意味（D-05 の `loading`・`unreachable`・`shape`・`orca-unreachable`・`orca-starting`・`config`・`embed` の7つと、D-03 の `gone`・`choose`・`drift` の3つ。どれも `data-code` の名前とともに）。例の IP は 127.0.0.1 と 192.0.2.x だけ。
 			変えた配る文書と画面の資産の sha256 を `src/spec_dock/assets/static-inventory.json` に合わせる（今の検査のとおり。画面の資産が inventory に入っていなければ、入っているものだけ）。
 			"""
 	}
@@ -211,7 +211,7 @@ compatibility: """
 
 risks: [
 	"orca-web の `/embed/agent` の契約（`detail` の道、`theme`）が変わるとチャットが出なくなる。SpecDock は `detail` をそのまま使い、形が違えばそのエージェントを出さない",
-	"orca-web の画面の中の、親と子のエージェントのリンクは同じ iframe の中で開く（orca-web の動き）。SpecDock はその移りを止められないので、2回目の `load` で iframe を外して知らせる（D-04、F-08）。移った先の画面は一瞬だけ見えうるが、外すまでの間に送る操作を終えるのは難しい。orca-web が将来、自分で文書を移すようになると（例：自動の読み直し）、この知らせが誤って出る。そのときは orca-web の README の契約に従って見直す",
+	"orca-web の画面の中の、親と子のエージェントのリンクは同じ iframe の中で開く（orca-web の動き）。SpecDock はその移りを止められないので、2回目の `load` で iframe を外して知らせる（D-04、F-08）。移った先の画面で送れる時間は残らない：orca-web の `agent.html` の入力欄と送るボタンは `disabled` で始まり、モジュール（`agent-frame.js`）が動いた後の送れるかの問い合わせ（`fetch`、`load` を遅らせない）が返ってから使えるようになる。モジュールと CSS は `load` を遅らせるので、移った先の `load` は送る欄が使えるより前に起き、SpecDock は同じ聞き手の中で iframe を外す（ChatGPT round-3 の P1 への反論。orca-web の main `1a2afed` を読んだ事実）。orca-web が将来、自分で文書を移すようになると（例：自動の読み直し）、この知らせが誤って出る。そのときは orca-web の README の契約に従って見直す",
 	"`allow-same-origin` と `allow-scripts` を並べるので、iframe の中の orca-web の画面は自分のオリジンの力をすべて持つ。orca-web は同じ PC の信頼するサービスで、`frame-ancestors` で置き場を SpecDock のオリジンに限っている（Epic の risks）",
 	"要約の知らせのたびに横の欄と詳しい画面が描き直す（10 秒ごと）。中身は同じ文字列なら置き換えないが、見出しと帯は書き換える。重さは写しと操作で確かめ、目立てば見出しも比べる",
 	"orca-web の要約は、同じセッションを2つのエージェント（`chat:agent-session:…` と `structured-agent-session-…`）として返すことがある。SpecDock は要約のまま2つを並べる（どちらを選んでも同じセッションに届く。orca-web の側の課題）",
