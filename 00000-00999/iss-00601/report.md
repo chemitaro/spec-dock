@@ -78,7 +78,7 @@ iss-00593 の最終品質ゲートで「記録だけ」とした5点（主の P3
 
 ## Verification
 
-- 基準の全体のテスト（main `16f0cf122`、この worktree）：`uv run pytest -q` の結果は下に記す。
+- 基準の全体のテスト（main `16f0cf122`、この worktree）：`uv run pytest -q` は 3912 passed / 7 skipped / 0 failed（exit 0、31分18秒）。
 - node による純粋な部分の確かめ（スクラッチの `probe.mjs`、`agents_logic.js` を読むだけ）：
   - 項目5：`scopeAgents([{id:"w1",branch:"b",agents:{id:"A"}}])` → `{n:0, invalid:0}`、`agentsVisibility({status:"ok",records:1,…,wanted:"A"})` → `{show:true, reason:null}`、`pickAgent([], "A", {A})` → `remember:"gone:A"`。
   - 項目1・2：2人のうち last の A を選ぶ `pickAgent` → `remember:null, selected:A`。
