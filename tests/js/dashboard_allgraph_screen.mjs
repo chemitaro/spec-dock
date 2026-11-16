@@ -12,7 +12,7 @@
 // Prints {runs: {name: [snapshot after the first render, after each step]}}.
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
-import { Element, fakeOrca, install, json, settle } from "./fake_dom.mjs";
+import { Element, fakeOrca, hooks, install, json, settle } from "./fake_dom.mjs";
 
 const [assets, requestPath] = process.argv.slice(2);
 const request = JSON.parse(readFileSync(requestPath, "utf8"));
@@ -83,6 +83,7 @@ function snap(root, orca) {
   return {
     repos,
     worldClass: world.className,
+    transform: world.style.transform,
     size: [world.style.width, world.style.height],
     next: q(".gx-next").innerHTML,
     tools: q(".gx-tools").innerHTML,
@@ -161,6 +162,15 @@ for (const r of request.runs) {
   calls.length = 0;
   for (const [k, v] of Object.entries(run.saved || {})) page.store.set(k, v);
   globalThis.innerWidth = run.width ?? 1440;
+  // run.view {width, height, bar}: the graph area's size and the bottom of the bar above it (px), for the fit
+  hooks.sizes = run.view ? (el) => (el.classList?.contains("gx-view") ? { width: run.view.width, height: run.view.height } : null) : null;
+  hooks.rect = run.view
+    ? (el) => {
+        if (el.classList?.contains("gx-view")) return { left: 0, top: 0, right: run.view.width, bottom: run.view.height, width: run.view.width, height: run.view.height };
+        if (el.classList?.contains("gx-next") || el.classList?.contains("gx-tools")) return { left: 0, top: 0, right: 100, bottom: run.view.bar, width: 100, height: run.view.bar };
+        return null;
+      }
+    : null;
   const root = new Element("main");
   root.setAttribute("data-view", "allgraph");
   const orca = run.orca ? fakeOrca(run.orca) : null;

@@ -865,7 +865,9 @@ const fitScale = () => {
   const top = barBottom() + 8;
   return Math.min(1, (v.clientWidth - 16) / L.width, (v.clientHeight - top - 16) / L.height);
 };
-const minScale = () => Math.max(0.02, Math.min(0.12, fitScale()));
+// The structure graph's least zoom (0.12, or what shows the whole graph) with a lower floor: every repository's
+// graph in one world can need less than graph.js's 0.02 to fit (R-07; e.g. 12812 × 38520 px at 1000 or 390 px).
+const minScale = () => Math.max(0.002, Math.min(0.12, fitScale()));
 
 function fit() {
   const v = A.el.view;

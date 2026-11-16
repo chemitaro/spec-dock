@@ -435,3 +435,36 @@ def test_the_line_check_reports_every_repository(out: dict[str, Any]) -> None:
     assert key("spec-dock") in audit["repos"] and key("taikyohiyou_project") in audit["repos"]
     for name in ("boxHits", "ownHits", "overlaps", "diagonal", "portShare", "failed", "missing", "markOverflow"):
         assert name in audit["total"], name
+
+
+def test_fit_holds_a_world_that_needs_less_than_the_graphs_least_zoom(tmp_path: Path) -> None:
+    """R-07: 'fit' shows every frame even when that takes a zoom below the structure graph's 0.02 (iss-00614)."""
+    view = {"width": 300, "height": 120, "bar": 50}
+    run = base("tiny", view=view, saved={KEY: json.dumps({"range": "all"})}, steps=[{"act": "fit"}])
+    shot = _run(tmp_path, [run])["tiny"]["shots"][1]
+    width, height = (float(v.removesuffix("px")) for v in shot["size"])
+    top = view["bar"] + 8
+    fit = min(1, (view["width"] - 16) / width, (view["height"] - top - 16) / height)
+    assert fit < 0.02, (width, height)
+    m = re.fullmatch(r"translate\(([-\d.e]+)px, ([-\d.e]+)px\) scale\(([-\d.e]+)\)", shot["transform"])
+    assert m, shot["transform"]
+    tx, ty, s = (float(x) for x in m.groups())
+    assert s == pytest.approx(fit)
+    assert tx >= 0 and tx + width * s <= view["width"] + 1e-6
+    assert ty >= top and ty + height * s <= view["height"] + 1e-6
+
+
+def test_the_tier_badges_look_like_the_shared_badges() -> None:
+    """FQG-001: parts.css draws .sd-badge only on its own screens; allgraph.css gives the tiers the same look."""
+    css = re.sub(r"/\*.*?\*/", "", CSS.read_text(encoding="utf-8"), flags=re.S)
+    rule = re.search(r"\.ax-tier \.sd-badge \{([^}]*)\}", css)
+    assert rule, "no rule for the tier badges"
+    for decl in (
+        "border: 1px solid var(--ds-border)",
+        "border-radius: 999px",
+        "background: var(--ds-surface-2)",
+        "color: var(--ds-text-2)",
+        "font-size: 11.5px",
+        "font-weight: 700",
+    ):
+        assert decl in rule.group(1), decl
