@@ -78,3 +78,7 @@ ID: "iss-00613"
 - 大文字と小文字を区別しないファイルシステムで、登録の道の大文字が違うと親子を見落としうる（平らに出るだけ。design.cue の risks）。
 - 絶対の道でない行の中のものは、さらに外の出す祖先から札を数えるので、その行のディレクトリの名前が札に出る（F-05 の仕様どおり。実際の登録では起こらない）。
 - 次：iss-00614（画面）が `parent`・`tier` を読む。
+
+## PR と CI
+
+- PR #619（https://github.com/chemitaro/spec-dock/pull/619）、head `ee33f0679`（合格したコミット。記録だけのコミットはない）。CI（watch-pr-checks の最終の観測）：observable_ci PASS、merge_readiness READY（Provider CI、SpecDock check、Commit identity すべて success）。マージは統括が行う。
