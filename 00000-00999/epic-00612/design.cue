@@ -42,7 +42,7 @@ design: {
 		text: """
 			`_repositories` の各リポジトリに `"parent": <鍵か null>` と `"tier": [<札>…]` を足す。今の項目、並び（鍵の順）、`schema` は変えない。
 			`parent` は、同じ応答の `repositories` にある鍵だけを指す（出さないリポジトリを指さない）。道とカタログの文字列は応答に入れない。
-			`reference_cli.md` の「ダッシュボードのサーバーの契約」の API の行に、2つの項目、決め方（チェックアウトの道のいちばん近い祖先、段の札の写し、隠したものと ambiguous の扱い）、道を返さないことを書く。
+			`src/spec_dock/assets/spec_dock/docs/reference_cli.md` の「ダッシュボードのサーバーの契約」の API の行に、2つの項目、決め方（チェックアウトの道のいちばん近い祖先、段の札の写し、隠したものと ambiguous の扱い）、道を返さないことを書く。
 			"""
 		satisfies: ["R-03", "F-02", "F-03"]
 	}
@@ -53,7 +53,7 @@ design: {
 			- `core/topbar.js` の `ALL_TABS` を ［overview `/` 横断の概況 globe］［allgraph `/graph` 横断の構造 layers］［todos `/todos` 人のタスク person］にする。
 			- `views/index.js` の `VIEWS` に `allgraph` を足す。`app.js` の `title` に「横断の構造 · すべてのリポジトリ · SpecDock」、`interceptLinks` の殻の道に `/graph` を足す。
 			- サーバーの `_get` で、`graph` だけの道を殻（`_shell`）にする。
-			- `reference_cli.md` の「画面の道」に `/graph`（と今ある `/todos`）を書く。
+			- 同じ文書の「画面の道」に `/graph`（と今ある `/todos`）を書く。
 			"""
 		satisfies: ["R-04"]
 	}
@@ -64,7 +64,8 @@ design: {
 
 			- 入力：`repos` は一覧の API の並びの `[{repository, parent, tier, owner, name}]`。`sizes` は鍵ごとの `{status: "loading"|"failed"|"ok", w, h, shown}`（ok のとき `w`・`h` はそのリポジトリの `layout` の幅と高さ、`shown` は見える箱・枠・塊の数）。`options` は `{range, width}`（width は図の領域の 100% での幅）。
 			- 木：`parent` が同じ一覧にあればその子、なければ最上位。循環は起こらないが、たどった鍵を覚えて二度目は最上位に置く。兄弟は一覧の並び。
-			- 出すか：`all`・`now` ではすべて。`next` では、`status` が ok で `shown` が0のリポジトリは、出す子がなければ出さない（R-06）。`loading` と `failed` は出す（F-01）。
+			- 状態の決め方（画面の側）：構造の API が HTTP で失敗した → `failed`。答えが返ったが `snapshot.status` が `ok` でなく `scopes` が空 → `failed`（理由は概況と同じ `overviewWarnings`）。`scopes` があれば、`snapshot.status` によらず `ok` で、その `scopes` を描き、`ok` でない理由（前回読めたものを描いている、など）は見出しの下の警告の帯に出す（概況と構造の図と同じ扱い）。`sizes` にはこの警告の有無 `warn`（info でない警告があるか）も渡す。
+			- 出すか：`all`・`now` ではすべて。`next` では、`status` が ok で `shown` が0で `warn` がないリポジトリは、出す子がなければ出さない（R-06）。`warn` のある ok のリポジトリは、`shown` が0でも理由のために出す（F-01）。`loading` と `failed` は出す（F-01）。
 			- 枠の形：見出しの行（高さ `REPO.head`）、中の構造の図（`w × h`。`next` で `shown` が0の入れ物、Scope のないリポジトリ、読み込み中、読めない、のときは、1行の文の高さか0）、その下に子の枠の棚。子の枠は、親の中の使える幅（`width − 2·REPO.pad·深さ`、下限 `REPO.minW`）で左から右へ詰め、入らなければ次の行へ。枠の幅は、見出しの最小の幅、中の図の幅、子の棚の幅の最大に左右の余白を足したもの。
 			- 最上位も同じ詰め方で、図の領域の幅で折り返す。
 			- 出力：鍵ごとの `{x1, y1, x2, y2, depth, body: {x, y}}`（body は中の構造の図の原点）と、出した鍵の並び、全体の幅と高さ。
@@ -78,7 +79,7 @@ design: {
 			- 読み込み：`ctx.repositories`（殻が読んだ一覧）の各リポジトリの構造を `api.structure(repo, null)` で並べて読み、届いたものから描く。各リポジトリについて `routeLayout(scopes, cleanup, {mode: "nest", range, width: その深さで使える幅})` を求め、鍵ごとに（revision、range、幅、30分の動きの印）の組で覚える。組が同じなら計算し直さない（R-09）。重い計算で画面が固まらないよう、リポジトリの間で一度描画に戻す（`requestAnimationFrame` か `setTimeout(0)`）。
 			- 更新：5秒ごと（`document.hidden` でないとき）に各リポジトリの `api.revision` を読み、変わったものだけ構造を読み直す（R-09）。「見た」は送らない。
 			- 描画：`compose` の結果で、リポジトリごとに `<section class="ax-repo" data-repo="<鍵>">` を置き、見出し（folder のアイコン、`owner/name`、段の札を `sd-badge` で、札が2つ以上なら「 › 」でつなぐ。読めないときは理由）と、中の構造の図の層（今の箱・枠・塊・線の HTML を、そのリポジトリの `layout` の座標で、body の原点だけずらして置く）を描く。拡大・移動は全体の1つの世界（`gx-world` と同じ transform）で行う。
-			- 部品の共有：`graph.js` の箱・枠・塊・線の HTML を作る関数（`boxHtml`、`frameHtml`、`chipHtml` と、線の class の決め方）を `views/graph/draw.js` に取り出し、構造（`data`、`ix`、`desc`、`cleanup`、range）を引数で受けるようにする。`graph.js` はそれを呼ぶだけにし、出す HTML を変えない（今のテストと写しの比べで確かめる）。
+			- 部品の共有：`graph.js` の箱・枠・塊・線の HTML を作る関数（`boxHtml`、`frameHtml`、`chipHtml` と、線の class の決め方）を `views/graph/draw.js` に取り出し、構造（`data`、`ix`、`desc`、`cleanup`、range）を引数で受けるようにする。`graph.js` はそれを呼ぶだけにし、出す HTML を変えない（取り出す前後で、同じ構造の graph.js の DOM が一致することを写しの比べで確かめる）。graph.js のソースの文字列を調べる今のテストは、調べるファイルを draw.js に移し、確かめる文字列と数は変えない（requirement.cue の constraints の2つ目）。
 			- リポジトリの枠の見え方：Initiative の枠と違う形（例：見出しに folder のアイコンと名前の帯、2px の線や二重線、角の丸みの違い）を、今の色の札（`--sd-*`、`--ds-*`）だけで作る。新しい色の値は足さない（R-05）。
 			- 見せる範囲：道具の帯に、構造の図と同じ『全体・いま・これから』と、状態で目立たせる札、凡例、収める、拡大・縮小を置く。入れ子と木の切り替えはない。範囲の覚えは `localStorage` の `specdock.allgraph.v1`（`{range}`、読めなければ既定の `next`）。構造の図の `specdock.graph.v3` には触れない（R-06）。
 			- 空のとき：表示しているリポジトリが0なら概況と同じ知らせ。`next` で出す枠がなければ F-04 の知らせ。
@@ -89,7 +90,7 @@ design: {
 		title: "選び・横の欄・稼働の印を、リポジトリの文脈で扱う"
 		text: """
 			- 選びの鍵は（リポジトリ、Scope の ID）の組。DOM の探しは、まずリポジトリの枠（`data-repo`）、その中で `data-id` で行う（R-05 の「ほかのリポジトリの箱と混ざらない」）。
-			- 横の欄：`createScopePanel` を1つ置き、選んだリポジトリの文脈 `{...ctx, repository: 鍵, data: そのリポジトリの構造}` で `show` する。スコープの API は `api.scope(鍵, ID, null)`。『詳しい画面』は `scope.path`（`/r/<鍵>/scopes/<ID>`）で、殻の `interceptLinks` が別のリポジトリへのページの読み込みにする。『この範囲に絞る』は、そのリポジトリの構造の図 `/r/<鍵>/?focus=<ID>` へ移る。
+			- 横の欄：`createScopePanel` を1つ置き、選んだリポジトリの文脈 `{...ctx, repository: 鍵, data: そのリポジトリの構造, current}` で `show` する。`current` も上書きし、殻の `ctx.current()` が返す文脈に、同じ `repository` とそのとき覚えているそのリポジトリの構造を重ねて返す（殻の答えが null なら null）。欄が orca-web の知らせなどで自分で描き直しても、リポジトリの文脈を失わない（`panel.js` の redraw は `current.ctx.current()` で文脈を取り直すため）。スコープの API は `api.scope(鍵, ID, null)`。『詳しい画面』は `scope.path`（`/r/<鍵>/scopes/<ID>`）で、殻の `interceptLinks` が別のリポジトリへのページの読み込みにする。『この範囲に絞る』は、そのリポジトリの構造の図 `/r/<鍵>/?focus=<ID>` へ移る。
 			- 上流・下流の目立たせと依存の線は、そのリポジトリの `layout` と線の中だけで行う（ほかのリポジトリの枠は目立たせない）。
 			- 稼働の印：`paintOrcaMarks(リポジトリの枠の要素, ctx, そのリポジトリの構造)` を、描くたびと orca-web の知らせのたびに、リポジトリごとに呼ぶ。
 			- 状態で目立たせる札の数は、出しているすべてのリポジトリの合計。

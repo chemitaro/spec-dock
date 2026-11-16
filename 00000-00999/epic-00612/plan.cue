@@ -28,7 +28,7 @@ slices: {
 
 verification: """
 	iss-00613：単体テストと HTTP のテスト（`uv run pytest tests/unit/application`）、`make lint`、全テスト。
-	iss-00614：組み立ての node のテスト、`graph.js` の今のテストがそのまま通ること、実データ（この PC の状態の置き場の写し）の 1440・1000・390 × 明・暗 × 3つの範囲の写しと edgeAudit の違反0、ブラウザーのエラー0を report.md に残す。
+	iss-00614：組み立ての node のテスト、`graph.js` の振る舞いのテストがそのまま通り、ソースの文字列のテストは調べる場所だけを draw.js に移して同じ中身で通ること（requirement.cue の constraints の2つ目）、実データ（この PC の状態の置き場の写し）の 1440・1000・390 × 明・暗 × 3つの範囲の写しと edgeAudit の違反0、ブラウザーのエラー0を report.md に残す。
 	最後に統括がブラウザーで、company-os の入れ子、spec-dock と orca-web が外にあること、『これから』の既定を確かめる。
 	"""
 
