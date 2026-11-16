@@ -5,7 +5,7 @@ package spec
 goal: "`GET /api/v1/repositories` が各リポジトリの `parent` と `tier` を返し、道を出さず、契約の文書に書かれている状態にする（サーバーの側だけ、画面は変えない）"
 
 steps: {
-	"S-01": {title: "T-01〜T-06 のテストを先に書き、開始のコミットで落ちる（`dashboard_nesting` がない、`parent`・`tier` がない）ことを確かめる（Red）。`tests/unit/application/test_dashboard_nesting.py`（純粋な関数）と `tests/unit/application/test_dashboard_repositories_nesting.py`（`DashboardSite` と HTTP、`tmp_path` の合成の登録簿）に置く", realizes: ["R-01", "R-02", "R-03", "F-02", "F-03", "F-05"], status: "todo", session: "impl-sol"}
+	"S-01": {title: "T-01〜T-06 のテストを先に書き、開始のコミットで落ちる（`dashboard_nesting` がない、`parent`・`tier` がない）ことを確かめる（Red）。`tests/unit/application/test_dashboard_nesting.py`（純粋な関数）と `tests/unit/application/test_dashboard_repositories_nesting.py`（`DashboardSite` と HTTP、`tmp_path` の合成の登録簿）に置く", realizes: ["R-01", "R-02", "R-03", "F-02", "F-03", "F-05"], status: "doing", session: "impl-sol"}
 	"S-02": {title: "`dashboard_nesting.py`（D-01）、`DashboardSite` の `nesting` と `nested_repositories()`（D-02）、`_repositories` の `parent`・`tier`（D-03）を実装し、S-01 のテストと今のダッシュボードのテストを通す（Green）", realizes: ["R-01", "R-02", "R-03", "F-02", "F-03", "F-05"], status: "todo", after: ["S-01"], session: "impl-sol"}
 	"S-03": {title: "`reference_cli.md` の契約と `static-inventory.json` の sha256（D-04）を直し、T-07 を足して通す。`make lint` と全体の `uv run pytest` を通す", realizes: ["R-03"], status: "todo", after: ["S-02"], session: "impl-sol"}
 	"S-04": {title: "実機の確かめ：作業ツリーの wheel を隔離した venv に入れ、この PC の状態の置き場の写し（一時の置き場）で `dashboard serve --offline --state-root` を別のポートで立て、`/api/v1/repositories` の `parent`・`tier` が company-os の入れ子と、外の spec-dock・orca-web（最上位）になり、応答に道がないことを report.md に残す（T-08）", realizes: ["R-01", "R-02", "R-03"], status: "todo", after: ["S-03"], session: "owner"}
