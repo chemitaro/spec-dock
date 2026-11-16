@@ -77,4 +77,4 @@ ID: "iss-00620"
 - 印の並び順は orca-web の部品の順（orca-web の iss-00043 で『指揮の上流が左』に改まる予定。SpecDock は並べ替えない）。
 - 配布の手引き（リリースノート）は 0.9.5 のリリースの Issue で「エージェントの行」を書く。
 - 試しのサーバー 18622・18799 は本人の確かめまで残す。
-- PR https://github.com/chemitaro/spec-dock/pull/622（head `5b170ecb7`）。CI は観測中。マージは統括が行う。
+- PR https://github.com/chemitaro/spec-dock/pull/622（head `5b170ecb7`）。CI（Actions と Commit Status）は observable_ci PASS、merge_readiness READY（`.workbench/iss-00620/pr-checks.json`）。マージは統括が行う。
