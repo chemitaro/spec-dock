@@ -1,0 +1,1162 @@
+[
+ {
+  "name": "spec-dock",
+  "width": 1440,
+  "theme": "light",
+  "range": "all",
+  "audit": {
+   "segments": 665,
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "list": [],
+   "edges": 211,
+   "iters": 7,
+   "ms": 557,
+   "unmapped": 0,
+   "widenLeft": 0,
+   "missing": 0,
+   "drift": 0,
+   "mode": "nest"
+  },
+  "tools": {
+   "x": 909,
+   "y": 169,
+   "w": 519,
+   "h": 32
+  },
+  "groups": [
+   "見せる範囲"
+  ],
+  "pressed": [
+   "全体"
+  ],
+  "depsButtons": 0,
+  "lines": 0,
+  "scrollW": 1440,
+  "innerW": 1440,
+  "errors": [
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED",
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED"
+  ]
+ },
+ {
+  "name": "spec-dock",
+  "width": 1440,
+  "theme": "light",
+  "range": "now",
+  "audit": {
+   "segments": 19,
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "list": [],
+   "edges": 5,
+   "iters": 5,
+   "ms": 9,
+   "unmapped": 0,
+   "widenLeft": 0,
+   "missing": 0,
+   "drift": 0,
+   "mode": "nest"
+  },
+  "tools": {
+   "x": 909,
+   "y": 169,
+   "w": 519,
+   "h": 32
+  },
+  "groups": [
+   "見せる範囲"
+  ],
+  "pressed": [
+   "いま"
+  ],
+  "depsButtons": 0,
+  "lines": 0,
+  "scrollW": 1440,
+  "innerW": 1440,
+  "errors": [
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED",
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "shot": "after-spec-dock-1440-light-now.png"
+ },
+ {
+  "name": "spec-dock",
+  "width": 1440,
+  "theme": "light",
+  "range": "next",
+  "audit": {
+   "segments": 0,
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "list": [],
+   "edges": 0,
+   "iters": 0,
+   "ms": 1,
+   "unmapped": 0,
+   "widenLeft": 0,
+   "missing": 0,
+   "drift": 0,
+   "mode": "nest"
+  },
+  "tools": {
+   "x": 901,
+   "y": 169,
+   "w": 527,
+   "h": 32
+  },
+  "groups": [
+   "見せる範囲"
+  ],
+  "pressed": [
+   "これから"
+  ],
+  "depsButtons": 0,
+  "lines": 0,
+  "scrollW": 1440,
+  "innerW": 1440,
+  "errors": [
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED",
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED"
+  ]
+ },
+ {
+  "name": "spec-dock",
+  "width": 1440,
+  "theme": "dark",
+  "range": "all",
+  "audit": {
+   "segments": 665,
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "list": [],
+   "edges": 211,
+   "iters": 7,
+   "ms": 548,
+   "unmapped": 0,
+   "widenLeft": 0,
+   "missing": 0,
+   "drift": 0,
+   "mode": "nest"
+  },
+  "tools": {
+   "x": 909,
+   "y": 169,
+   "w": 519,
+   "h": 32
+  },
+  "groups": [
+   "見せる範囲"
+  ],
+  "pressed": [
+   "全体"
+  ],
+  "depsButtons": 0,
+  "lines": 0,
+  "scrollW": 1440,
+  "innerW": 1440,
+  "errors": [
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED",
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED"
+  ]
+ },
+ {
+  "name": "spec-dock",
+  "width": 1440,
+  "theme": "dark",
+  "range": "now",
+  "audit": {
+   "segments": 19,
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "list": [],
+   "edges": 5,
+   "iters": 5,
+   "ms": 9,
+   "unmapped": 0,
+   "widenLeft": 0,
+   "missing": 0,
+   "drift": 0,
+   "mode": "nest"
+  },
+  "tools": {
+   "x": 909,
+   "y": 169,
+   "w": 519,
+   "h": 32
+  },
+  "groups": [
+   "見せる範囲"
+  ],
+  "pressed": [
+   "いま"
+  ],
+  "depsButtons": 0,
+  "lines": 0,
+  "scrollW": 1440,
+  "innerW": 1440,
+  "errors": [
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED",
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "shot": "after-spec-dock-1440-dark-now.png"
+ },
+ {
+  "name": "spec-dock",
+  "width": 1440,
+  "theme": "dark",
+  "range": "next",
+  "audit": {
+   "segments": 0,
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "list": [],
+   "edges": 0,
+   "iters": 0,
+   "ms": 1,
+   "unmapped": 0,
+   "widenLeft": 0,
+   "missing": 0,
+   "drift": 0,
+   "mode": "nest"
+  },
+  "tools": {
+   "x": 901,
+   "y": 169,
+   "w": 527,
+   "h": 32
+  },
+  "groups": [
+   "見せる範囲"
+  ],
+  "pressed": [
+   "これから"
+  ],
+  "depsButtons": 0,
+  "lines": 0,
+  "scrollW": 1440,
+  "innerW": 1440,
+  "errors": [
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED",
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED"
+  ]
+ },
+ {
+  "name": "spec-dock",
+  "width": 390,
+  "theme": "light",
+  "range": "all",
+  "audit": {
+   "segments": 661,
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "list": [],
+   "edges": 211,
+   "iters": 5,
+   "ms": 237,
+   "unmapped": 0,
+   "widenLeft": 0,
+   "missing": 0,
+   "drift": 0,
+   "mode": "nest"
+  },
+  "tools": {
+   "x": 348,
+   "y": 593,
+   "w": 32,
+   "h": 239
+  },
+  "groups": [
+   "見せる範囲"
+  ],
+  "pressed": [
+   "全体"
+  ],
+  "depsButtons": 0,
+  "lines": 0,
+  "scrollW": 390,
+  "innerW": 390,
+  "errors": [
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED",
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED"
+  ]
+ },
+ {
+  "name": "spec-dock",
+  "width": 390,
+  "theme": "light",
+  "range": "now",
+  "audit": {
+   "segments": 15,
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "list": [],
+   "edges": 5,
+   "iters": 1,
+   "ms": 2,
+   "unmapped": 0,
+   "widenLeft": 0,
+   "missing": 0,
+   "drift": 0,
+   "mode": "nest"
+  },
+  "tools": {
+   "x": 348,
+   "y": 593,
+   "w": 32,
+   "h": 239
+  },
+  "groups": [
+   "見せる範囲"
+  ],
+  "pressed": [
+   "いま"
+  ],
+  "depsButtons": 0,
+  "lines": 0,
+  "scrollW": 390,
+  "innerW": 390,
+  "errors": [
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED",
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "shot": "after-spec-dock-390-light-now.png"
+ },
+ {
+  "name": "spec-dock",
+  "width": 390,
+  "theme": "light",
+  "range": "next",
+  "audit": {
+   "segments": 0,
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "list": [],
+   "edges": 0,
+   "iters": 0,
+   "ms": 1,
+   "unmapped": 0,
+   "widenLeft": 0,
+   "missing": 0,
+   "drift": 0,
+   "mode": "nest"
+  },
+  "tools": {
+   "x": 348,
+   "y": 593,
+   "w": 32,
+   "h": 239
+  },
+  "groups": [
+   "見せる範囲"
+  ],
+  "pressed": [
+   "これから"
+  ],
+  "depsButtons": 0,
+  "lines": 0,
+  "scrollW": 390,
+  "innerW": 390,
+  "errors": [
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED",
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED"
+  ]
+ },
+ {
+  "name": "spec-dock",
+  "width": 390,
+  "theme": "dark",
+  "range": "all",
+  "audit": {
+   "segments": 661,
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "list": [],
+   "edges": 211,
+   "iters": 5,
+   "ms": 242,
+   "unmapped": 0,
+   "widenLeft": 0,
+   "missing": 0,
+   "drift": 0,
+   "mode": "nest"
+  },
+  "tools": {
+   "x": 348,
+   "y": 593,
+   "w": 32,
+   "h": 239
+  },
+  "groups": [
+   "見せる範囲"
+  ],
+  "pressed": [
+   "全体"
+  ],
+  "depsButtons": 0,
+  "lines": 0,
+  "scrollW": 390,
+  "innerW": 390,
+  "errors": [
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED",
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED"
+  ]
+ },
+ {
+  "name": "spec-dock",
+  "width": 390,
+  "theme": "dark",
+  "range": "now",
+  "audit": {
+   "segments": 15,
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "list": [],
+   "edges": 5,
+   "iters": 1,
+   "ms": 2,
+   "unmapped": 0,
+   "widenLeft": 0,
+   "missing": 0,
+   "drift": 0,
+   "mode": "nest"
+  },
+  "tools": {
+   "x": 348,
+   "y": 593,
+   "w": 32,
+   "h": 239
+  },
+  "groups": [
+   "見せる範囲"
+  ],
+  "pressed": [
+   "いま"
+  ],
+  "depsButtons": 0,
+  "lines": 0,
+  "scrollW": 390,
+  "innerW": 390,
+  "errors": [
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED",
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "shot": "after-spec-dock-390-dark-now.png"
+ },
+ {
+  "name": "spec-dock",
+  "width": 390,
+  "theme": "dark",
+  "range": "next",
+  "audit": {
+   "segments": 0,
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "list": [],
+   "edges": 0,
+   "iters": 0,
+   "ms": 1,
+   "unmapped": 0,
+   "widenLeft": 0,
+   "missing": 0,
+   "drift": 0,
+   "mode": "nest"
+  },
+  "tools": {
+   "x": 348,
+   "y": 593,
+   "w": 32,
+   "h": 239
+  },
+  "groups": [
+   "見せる範囲"
+  ],
+  "pressed": [
+   "これから"
+  ],
+  "depsButtons": 0,
+  "lines": 0,
+  "scrollW": 390,
+  "innerW": 390,
+  "errors": [
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED",
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED"
+  ]
+ },
+ {
+  "name": "housing-lifecycle",
+  "width": 1440,
+  "theme": "light",
+  "range": "all",
+  "audit": {
+   "segments": 372,
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "list": [],
+   "edges": 134,
+   "iters": 10,
+   "ms": 382,
+   "unmapped": 0,
+   "widenLeft": 3,
+   "missing": 0,
+   "drift": 0,
+   "mode": "nest"
+  },
+  "tools": {
+   "x": 909,
+   "y": 169,
+   "w": 519,
+   "h": 32
+  },
+  "groups": [
+   "見せる範囲"
+  ],
+  "pressed": [
+   "全体"
+  ],
+  "depsButtons": 0,
+  "lines": 0,
+  "scrollW": 1440,
+  "innerW": 1440,
+  "errors": [
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED",
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED"
+  ]
+ },
+ {
+  "name": "housing-lifecycle",
+  "width": 1440,
+  "theme": "light",
+  "range": "now",
+  "audit": {
+   "segments": 102,
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "list": [],
+   "edges": 36,
+   "iters": 10,
+   "ms": 67,
+   "unmapped": 0,
+   "widenLeft": 2,
+   "missing": 0,
+   "drift": 0,
+   "mode": "nest"
+  },
+  "tools": {
+   "x": 909,
+   "y": 169,
+   "w": 519,
+   "h": 32
+  },
+  "groups": [
+   "見せる範囲"
+  ],
+  "pressed": [
+   "いま"
+  ],
+  "depsButtons": 0,
+  "lines": 0,
+  "scrollW": 1440,
+  "innerW": 1440,
+  "errors": [
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED",
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "shot": "after-housing-lifecycle-1440-light-now.png"
+ },
+ {
+  "name": "housing-lifecycle",
+  "width": 1440,
+  "theme": "light",
+  "range": "next",
+  "audit": {
+   "segments": 25,
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "list": [],
+   "edges": 11,
+   "iters": 9,
+   "ms": 9,
+   "unmapped": 0,
+   "widenLeft": 0,
+   "missing": 0,
+   "drift": 0,
+   "mode": "nest"
+  },
+  "tools": {
+   "x": 909,
+   "y": 169,
+   "w": 519,
+   "h": 32
+  },
+  "groups": [
+   "見せる範囲"
+  ],
+  "pressed": [
+   "これから"
+  ],
+  "depsButtons": 0,
+  "lines": 0,
+  "scrollW": 1440,
+  "innerW": 1440,
+  "errors": [
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED",
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED"
+  ]
+ },
+ {
+  "name": "housing-lifecycle",
+  "width": 1440,
+  "theme": "dark",
+  "range": "all",
+  "audit": {
+   "segments": 372,
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "list": [],
+   "edges": 134,
+   "iters": 10,
+   "ms": 387,
+   "unmapped": 0,
+   "widenLeft": 3,
+   "missing": 0,
+   "drift": 0,
+   "mode": "nest"
+  },
+  "tools": {
+   "x": 909,
+   "y": 169,
+   "w": 519,
+   "h": 32
+  },
+  "groups": [
+   "見せる範囲"
+  ],
+  "pressed": [
+   "全体"
+  ],
+  "depsButtons": 0,
+  "lines": 0,
+  "scrollW": 1440,
+  "innerW": 1440,
+  "errors": [
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED",
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED"
+  ]
+ },
+ {
+  "name": "housing-lifecycle",
+  "width": 1440,
+  "theme": "dark",
+  "range": "now",
+  "audit": {
+   "segments": 102,
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "list": [],
+   "edges": 36,
+   "iters": 10,
+   "ms": 67,
+   "unmapped": 0,
+   "widenLeft": 2,
+   "missing": 0,
+   "drift": 0,
+   "mode": "nest"
+  },
+  "tools": {
+   "x": 909,
+   "y": 169,
+   "w": 519,
+   "h": 32
+  },
+  "groups": [
+   "見せる範囲"
+  ],
+  "pressed": [
+   "いま"
+  ],
+  "depsButtons": 0,
+  "lines": 0,
+  "scrollW": 1440,
+  "innerW": 1440,
+  "errors": [
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED",
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "shot": "after-housing-lifecycle-1440-dark-now.png"
+ },
+ {
+  "name": "housing-lifecycle",
+  "width": 1440,
+  "theme": "dark",
+  "range": "next",
+  "audit": {
+   "segments": 25,
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "list": [],
+   "edges": 11,
+   "iters": 9,
+   "ms": 9,
+   "unmapped": 0,
+   "widenLeft": 0,
+   "missing": 0,
+   "drift": 0,
+   "mode": "nest"
+  },
+  "tools": {
+   "x": 909,
+   "y": 169,
+   "w": 519,
+   "h": 32
+  },
+  "groups": [
+   "見せる範囲"
+  ],
+  "pressed": [
+   "これから"
+  ],
+  "depsButtons": 0,
+  "lines": 0,
+  "scrollW": 1440,
+  "innerW": 1440,
+  "errors": [
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED",
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED"
+  ]
+ },
+ {
+  "name": "housing-lifecycle",
+  "width": 390,
+  "theme": "light",
+  "range": "all",
+  "audit": {
+   "segments": 368,
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "list": [],
+   "edges": 134,
+   "iters": 10,
+   "ms": 505,
+   "unmapped": 0,
+   "widenLeft": 6,
+   "missing": 0,
+   "drift": 0,
+   "mode": "nest"
+  },
+  "tools": {
+   "x": 348,
+   "y": 593,
+   "w": 32,
+   "h": 239
+  },
+  "groups": [
+   "見せる範囲"
+  ],
+  "pressed": [
+   "全体"
+  ],
+  "depsButtons": 0,
+  "lines": 0,
+  "scrollW": 390,
+  "innerW": 390,
+  "errors": [
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED",
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED"
+  ]
+ },
+ {
+  "name": "housing-lifecycle",
+  "width": 390,
+  "theme": "light",
+  "range": "now",
+  "audit": {
+   "segments": 100,
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "list": [],
+   "edges": 36,
+   "iters": 10,
+   "ms": 49,
+   "unmapped": 0,
+   "widenLeft": 1,
+   "missing": 0,
+   "drift": 0,
+   "mode": "nest"
+  },
+  "tools": {
+   "x": 348,
+   "y": 593,
+   "w": 32,
+   "h": 239
+  },
+  "groups": [
+   "見せる範囲"
+  ],
+  "pressed": [
+   "いま"
+  ],
+  "depsButtons": 0,
+  "lines": 0,
+  "scrollW": 390,
+  "innerW": 390,
+  "errors": [
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED",
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "shot": "after-housing-lifecycle-390-light-now.png"
+ },
+ {
+  "name": "housing-lifecycle",
+  "width": 390,
+  "theme": "light",
+  "range": "next",
+  "audit": {
+   "segments": 25,
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "list": [],
+   "edges": 11,
+   "iters": 9,
+   "ms": 9,
+   "unmapped": 0,
+   "widenLeft": 0,
+   "missing": 0,
+   "drift": 0,
+   "mode": "nest"
+  },
+  "tools": {
+   "x": 348,
+   "y": 593,
+   "w": 32,
+   "h": 239
+  },
+  "groups": [
+   "見せる範囲"
+  ],
+  "pressed": [
+   "これから"
+  ],
+  "depsButtons": 0,
+  "lines": 0,
+  "scrollW": 390,
+  "innerW": 390,
+  "errors": [
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED",
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED"
+  ]
+ },
+ {
+  "name": "housing-lifecycle",
+  "width": 390,
+  "theme": "dark",
+  "range": "all",
+  "audit": {
+   "segments": 368,
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "list": [],
+   "edges": 134,
+   "iters": 10,
+   "ms": 505,
+   "unmapped": 0,
+   "widenLeft": 6,
+   "missing": 0,
+   "drift": 0,
+   "mode": "nest"
+  },
+  "tools": {
+   "x": 348,
+   "y": 593,
+   "w": 32,
+   "h": 239
+  },
+  "groups": [
+   "見せる範囲"
+  ],
+  "pressed": [
+   "全体"
+  ],
+  "depsButtons": 0,
+  "lines": 0,
+  "scrollW": 390,
+  "innerW": 390,
+  "errors": [
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED",
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED"
+  ]
+ },
+ {
+  "name": "housing-lifecycle",
+  "width": 390,
+  "theme": "dark",
+  "range": "now",
+  "audit": {
+   "segments": 100,
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "list": [],
+   "edges": 36,
+   "iters": 10,
+   "ms": 50,
+   "unmapped": 0,
+   "widenLeft": 1,
+   "missing": 0,
+   "drift": 0,
+   "mode": "nest"
+  },
+  "tools": {
+   "x": 348,
+   "y": 593,
+   "w": 32,
+   "h": 239
+  },
+  "groups": [
+   "見せる範囲"
+  ],
+  "pressed": [
+   "いま"
+  ],
+  "depsButtons": 0,
+  "lines": 0,
+  "scrollW": 390,
+  "innerW": 390,
+  "errors": [
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED",
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "shot": "after-housing-lifecycle-390-dark-now.png"
+ },
+ {
+  "name": "housing-lifecycle",
+  "width": 390,
+  "theme": "dark",
+  "range": "next",
+  "audit": {
+   "segments": 25,
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "list": [],
+   "edges": 11,
+   "iters": 9,
+   "ms": 8,
+   "unmapped": 0,
+   "widenLeft": 0,
+   "missing": 0,
+   "drift": 0,
+   "mode": "nest"
+  },
+  "tools": {
+   "x": 348,
+   "y": 593,
+   "w": 32,
+   "h": 239
+  },
+  "groups": [
+   "見せる範囲"
+  ],
+  "pressed": [
+   "これから"
+  ],
+  "depsButtons": 0,
+  "lines": 0,
+  "scrollW": 390,
+  "innerW": 390,
+  "errors": [
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED",
+   "Access to script at 'http://127.0.0.1:8791/embed/agent-marks.js' from origin 'http://127.0.0.1:18607' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+   "Failed to load resource: net::ERR_FAILED"
+  ]
+ }
+]
