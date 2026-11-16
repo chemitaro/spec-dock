@@ -35,6 +35,14 @@ ID: "iss-00614"
   - FQG-001（P3）：段の札の `sd-badge` は parts.css の範囲（board・scope・overview・todos・.sd-pn）の外で見た目が当たらなかった。parts.css の範囲に allgraph を足すと構造の図の部品（`.sd-orca` など）にも共有の規則が当たり構造の図と見え方が変わりうるため、allgraph.css に `.gx .ax-tier .sd-badge` として既定の調子の同じ見た目（今の色の札だけ、新しい色の値と札なし）を書いた。テスト `test_the_tier_badges_look_like_the_shared_badges` を先に書いて落ちることを確かめた。
   - 検証：`make lint` pass、`uv run pytest tests/unit/presentation tests/unit/infra tests/unit/application tests/cli_runtime/test_issue529_dashboard_server.py -k dashboard` 465 passed。static-inventory.json は dashboard の資産を持たないので変わらない。
 
+## 最終品質ゲート
+
+- キャンペーン iss-00614-fqg-1（`1208670ec`、origin/main の 0.9.5 #625 を取り込んだ後）：review lane 合格（P3 1：段の札の見た目、FQG-001）。仕様の変更（R-07、統括 msg_df4ba7148ea7）で打ち切り、test lane は途中で止めた（古くなったため）。FQG-001 は `23e32e182` で直した。
+- キャンペーン iss-00614-fqg-2（quality-gate-reviewer opus / medium、second opinion なし、範囲 `7f7dd2b1d..HEAD`、観点 functional-correctness・requirements-closure・test-adequacy、test_commands `make lint`・`uv run pytest`）：
+  - attempt 01（`23e32e182`）：review lane 合格（P3 1）。test lane は、PR の前に origin/main（#626、iss-00624 の揺れるテストの隔離）を取り込むため途中で止めた。
+  - attempt 02（`908da8b53`、#626 の取り込みだけで iss-00614 のコードは同じ）：review lane 合格（P0〜P2 0、P3 1、coverage complete）、`make lint` exit 0、`uv run pytest` exit 0（4052 passed、7 skipped）。**合格**。closure は iss-00614 の worktree の `.workbench/final-quality-gate/iss-00614-fqg-2/closure.md`。
+  - P3（記録だけ）：配置を待つ間の警告の行の重なり（『次の提案』に書いた）。
+
 ## 実機の写し（S-06、タスク担当）
 
 - `23e32e182` を `git archive` から wheel にし、隔離した venv と、この PC の状態の置き場の写し（`.workbench/iss-00614/state`）、`XDG_CONFIG_HOME` の試しの設定（`orca_web.port` 18799）で、`spec-dock dashboard serve --offline --tailscale --port 18614` を立てた。常駐の 47800 と 8791、道具の環境には触れていない。
@@ -72,6 +80,16 @@ ID: "iss-00614"
 
 ## Outcome
 
+ダッシュボードに『横断の構造』（`/graph`）を足した。表示しているすべてのリポジトリの構造の図を、一覧の API の `parent`・`tier` に従う入れ子のリポジトリの枠（見出しに名前と段の札）に入れて1枚に描く。既定の範囲は『これから』で、見えるものがないリポジトリは出さず、見える子を持つ親は入れ物として出す。箱を押すとそのリポジトリの文脈で横の欄が開き、稼働の印もエージェントの行に出る。構造の図（graph.js）の箱・枠・塊の HTML は draw.js に取り出して共有し、取り出す前の HTML の写しと1文字も違わない。枠の組み立て（compose.js）は DOM のない計算で、後の『指揮の帯』のために枠ごとの帯の高さを受ける（今は0）。
+
 ## Verification
 
+- 仕様のレビュー合格（round-3、仕様の変更の後に round-4）。
+- 最終品質ゲート合格（`908da8b53`、review P0〜P2 0、`make lint`・全体の pytest 4052 passed）。
+- 実機：9つの登録の写しで 1440・1000・390 × 明・暗 × 3範囲、ブラウザーのエラー0、横のスクロールなし、『収める』で収まる、線の検査の違反は単体の構造の図と同じ数で新しい違反0（表は上）。
+
 ## Residual Risks / Follow-ups
+
+- 線の違反（housing-lifecycle・taikyohiyou_project の『全体』『いま』の一部の幅）は、単体の構造の図と同じく残る。iss-00627 で直す（『次の提案』）。
+- Epic epic-00612 の文書を、この Issue の仕様の変更に合わせる（『次の提案』）。
+- 試しのサーバー 18614・18799 は本人の確かめまで残す。
