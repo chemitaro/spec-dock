@@ -2,6 +2,10 @@
 // their parents, and each one's laid-out structure graph, the rectangles of the repository frames nested as the
 // company is (company-os → business → product …), which to show in the chosen range, and the band each frame can
 // take later between its heading and its contents.
+// Inside a frame, below its heading, warnings and band, its own graph comes first and its children follow in the
+// list's order, left to right in rows no wider than the frame's usable width (iss-00629 D-01): a child that fits sits
+// right of the graph. A frame without a graph (loading, no Scope, nothing in this range) puts its children below its
+// line. Sibling frames, the top level included, wrap the same way.
 // Pure computation: no DOM, the same px as graph/layout.js. Each repository's graph inside keeps its own layout and
 // its own margin (SIZE.margin); this module only places the frames around them.
 
@@ -10,7 +14,7 @@ export const REPO = {
   head: 40, // the heading row (.ax-head)
   warn: 24, // one warning's row (.ax-warn li)
   line: 28, // one line of text as the contents: loading, no Scope, nothing in this range (.ax-line)
-  pad: 16, // inside the frame: left, right and bottom, and between the contents and the shelf of children
+  pad: 16, // inside the frame: left, right and bottom, and between a line of text and the shelf of children
   gap: 16, // between sibling frames, across and down
   minW: 360, // the least width the contents can use
   headW: 280, // the heading's least width
@@ -107,11 +111,24 @@ export function compose(repos, sizes = {}, options = {}) {
     const warnH = (size.warns || 0) * REPO.warn;
     const bandH = Math.max(0, Number(bands[key]) || 0);
     const bodyY = REPO.head + warnH + bandH;
-    const shelf = pack(shown, bodyWidth(width, depth));
-    const shelfY = bodyY + body.h + (body.h > 0 ? REPO.pad : 0);
-    const h = (shown.length ? shelfY + shelf.h : bodyY + body.h) + REPO.pad;
-    const w = Math.max(REPO.headW, body.w, shelf.w) + 2 * REPO.pad;
-    const b = { key, depth, w, h, warnH, bandH, bodyY, body, shown, shelf, shelfY };
+    const limit = bodyWidth(width, depth);
+    let at;
+    let h;
+    let w;
+    if (body.kind === "graph") {
+      // the graph and the children in one flow: the graph is its first item, at (0, 0)
+      const flow = pack([body, ...shown], limit);
+      at = flow.at.slice(1).map((o) => ({ x: o.x, y: bodyY + o.y }));
+      h = bodyY + flow.h + REPO.pad;
+      w = Math.max(REPO.headW, flow.w) + 2 * REPO.pad;
+    } else {
+      const shelf = pack(shown, limit);
+      const shelfY = bodyY + body.h + (body.h > 0 ? REPO.pad : 0);
+      at = shelf.at.map((o) => ({ x: o.x, y: shelfY + o.y }));
+      h = (shown.length ? shelfY + shelf.h : bodyY + body.h) + REPO.pad;
+      w = Math.max(REPO.headW, body.w, shelf.w) + 2 * REPO.pad;
+    }
+    const b = { key, depth, w, h, warnH, bandH, bodyY, body, shown, at };
     box.set(key, b);
     return b;
   };
@@ -129,7 +146,7 @@ export function compose(repos, sizes = {}, options = {}) {
     const body = { kind: b.body.kind, x: x1 + REPO.pad, y: y1 + b.bodyY, w: b.body.kind === "graph" ? b.body.w : 0, h: b.body.h };
     frames.set(b.key, { key: b.key, depth: b.depth, x1, y1, x2, y2, head, warn, band, body });
     order.push(b.key);
-    b.shown.forEach((k, i) => place(k, x1 + REPO.pad + b.shelf.at[i].x, y1 + b.shelfY + b.shelf.at[i].y));
+    b.shown.forEach((k, i) => place(k, x1 + REPO.pad + b.at[i].x, y1 + b.at[i].y));
   };
   tops.forEach((b, i) => place(b, REPO.margin + top.at[i].x, REPO.margin + top.at[i].y));
   return { frames, order, width: top.w + 2 * REPO.margin, height: top.h + 2 * REPO.margin };

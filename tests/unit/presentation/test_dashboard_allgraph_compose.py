@@ -104,7 +104,7 @@ def body_rect(f: dict) -> dict:
 
 
 def check_no_overlap(out: dict, shape: dict[str, tuple[str | None, list[str]]] = SHAPE) -> None:
-    """R-03's second criterion: a child is inside its parent, below the parent's body, apart from its siblings."""
+    """A child is inside its parent, apart from the parent's body and from its siblings (iss-00629 R-01)."""
     frames = out["frames"]
     kids: dict[str | None, list[str]] = {}
     for n, (p, _) in shape.items():
@@ -115,9 +115,23 @@ def check_no_overlap(out: dict, shape: dict[str, tuple[str | None, list[str]]] =
             if parent:
                 assert inside(frames[parent], frames[c]), (parent, c)
                 assert apart(body_rect(frames[parent]), frames[c]), (parent, c)
-                assert frames[c]["y1"] >= frames[parent]["body"]["y"] + frames[parent]["body"]["h"], (parent, c)
         for a, b in combinations(children, 2):
             assert apart(frames[a], frames[b]), (a, b)
+
+
+def check_rows(out: dict, width: int, shape: dict[str, tuple[str | None, list[str]]] = SHAPE) -> None:
+    """iss-00629 R-01: in a frame, a row of two or more (the graph and the children) fits in bodyWidth of its depth."""
+    frames = out["frames"]
+    for f in frames.values():
+        kids = [frames[key(n)] for n, (p, _) in shape.items() if p and key(p) == f["key"] and key(n) in frames]
+        items = ([body_rect(f)] if f["body"]["kind"] == "graph" else []) + kids
+        limit = max(REPO["minW"], width - 2 * REPO["margin"] - 2 * REPO["pad"] * (f["depth"] + 1))
+        rows: dict[float, list[dict]] = {}
+        for it in items:
+            rows.setdefault(it["y1"], []).append(it)
+        for row in rows.values():
+            if len(row) > 1:
+                assert max(it["x2"] for it in row) <= f["x1"] + REPO["pad"] + limit, f["key"]
 
 
 # --- T-01: the nesting ------------------------------------------------------------------------------------------
@@ -145,6 +159,7 @@ def test_the_nine_registrations_nest_as_the_company_does(tmp_path: Path) -> None
     for n in ("spec-dock", "orca-web"):
         assert apart(co, f[key(n)]), n
     check_no_overlap(got)
+    check_rows(got, 1400)
     depth = {k: v["depth"] for k, v in f.items()}
     assert depth[key("company-os")] == 0 and depth[key("input-devices")] == 1 and depth[key("yubisaki")] == 2
     # depth first, a parent before its children, siblings in the list's order
@@ -210,7 +225,89 @@ def test_the_top_level_and_the_shelves_wrap_at_their_widths(tmp_path: Path) -> N
     first_row = [k for k in kids if k["y1"] == kids[0]["y1"]]
     for a, b in pairwise(first_row):
         assert b["x1"] == a["x2"] + REPO["gap"]
+    # iss-00629 R-01: the graph (620) + gap + generic-mona (692) = 1328 is past 1320, so the children start below it
+    body = parent["body"]
+    assert min(k["y1"] for k in kids) == body["y"] + body["h"] + REPO["gap"]
     check_no_overlap(got)
+    check_rows(got, width)
+
+
+SIDE = {"p": (None, []), "a": ("p", PRODUCT), "b": ("p", PRODUCT), "c": ("p", PRODUCT)}
+
+
+def test_children_that_fit_sit_right_of_the_parents_graph_and_the_rest_wrap(tmp_path: Path) -> None:
+    # bodyWidth(1400, 0) = 1352; the graph 600, a and b 332 each: 600 + 16 + 332 + 16 + 332 = 1296 fit, c (432) not
+    sizes = {key("p"): ok(600, 400), key("a"): ok(300, 100), key("b"): ok(300, 500), key("c"): ok(400, 100)}
+    got = one(tmp_path, {"repos": repos(SIDE), "sizes": sizes, "options": {"range": "all", "width": 1400}})
+    assert got["order"] == [key(n) for n in ("p", "a", "b", "c")]
+    f = got["frames"]
+    p, a, b, c = (f[key(n)] for n in ("p", "a", "b", "c"))
+    assert p["body"] == {"kind": "graph", "x": p["x1"] + REPO["pad"], "y": p["y1"] + REPO["head"], "w": 600, "h": 400}
+    assert a["y1"] == b["y1"] == p["body"]["y"]
+    assert a["x1"] == p["body"]["x"] + 600 + REPO["gap"]
+    assert b["x1"] == a["x2"] + REPO["gap"]
+    # the row is as tall as its tallest: b (40 + 500 + 16 = 556)
+    assert b["y2"] - b["y1"] == 556
+    assert (c["x1"], c["y1"]) == (p["body"]["x"], p["body"]["y"] + 556 + REPO["gap"])
+    assert p["y2"] == c["y2"] + REPO["pad"]
+    assert p["x2"] - p["x1"] == 1296 + 2 * REPO["pad"]
+    check_no_overlap(got, SIDE)
+    check_rows(got, 1400, SIDE)
+
+
+def test_a_graph_wider_than_the_body_width_puts_every_child_below_it(tmp_path: Path) -> None:
+    # F-01: the graph alone is past bodyWidth(1400, 0) = 1352
+    sizes = {key("p"): ok(1400, 400), key("a"): ok(300, 100), key("b"): ok(300, 100), key("c"): ok(300, 100)}
+    got = one(tmp_path, {"repos": repos(SIDE), "sizes": sizes, "options": {"range": "all", "width": 1400}})
+    f = got["frames"]
+    p, a, b, c = (f[key(n)] for n in ("p", "a", "b", "c"))
+    below = p["body"]["y"] + 400 + REPO["gap"]
+    assert a["y1"] == b["y1"] == c["y1"] == below
+    assert a["x1"] == p["body"]["x"] and b["x1"] == a["x2"] + REPO["gap"] and c["x1"] == b["x2"] + REPO["gap"]
+    assert p["x2"] - p["x1"] == 1400 + 2 * REPO["pad"]
+    assert inside(p, c)
+    check_no_overlap(got, SIDE)
+    check_rows(got, 1400, SIDE)
+
+
+def test_a_parent_without_a_graph_puts_its_children_below_its_line(tmp_path: Path) -> None:
+    # loading, empty and quiet in all: one line, then the padding; in next, an empty body: right below the heading
+    narrow = {key(n): ok(300, 100) for n in ("a", "b", "c")}
+    cases = {
+        "loading": {
+            "repos": repos(SIDE),
+            "sizes": {**narrow, key("p"): {"status": "loading"}},
+            "options": {"range": "all", "width": 1400},
+        },
+        "empty": {
+            "repos": repos(SIDE),
+            "sizes": {**narrow, key("p"): empty()},
+            "options": {"range": "all", "width": 1400},
+        },
+        "quiet": {
+            "repos": repos(SIDE),
+            "sizes": {**narrow, key("p"): quiet()},
+            "options": {"range": "all", "width": 1400},
+        },
+        "next": {
+            "repos": repos(SIDE),
+            "sizes": {**narrow, key("p"): quiet()},
+            "options": {"range": "next", "width": 1400},
+        },
+    }
+    out = run(tmp_path, cases)["cases"]
+    for name, top in (
+        ("loading", REPO["line"] + REPO["pad"]),
+        ("empty", REPO["line"] + REPO["pad"]),
+        ("quiet", REPO["line"] + REPO["pad"]),
+        ("next", 0),
+    ):
+        f = out[name]["frames"]
+        p = f[key("p")]
+        assert p["body"]["kind"] != "graph", name
+        assert {f[key(n)]["y1"] for n in ("a", "b", "c")} == {p["y1"] + REPO["head"] + top}, name
+        assert f[key("a")]["x1"] == p["x1"] + REPO["pad"], name
+        check_no_overlap(out[name], SIDE)
 
 
 def test_body_width_is_the_width_less_the_margins_and_paddings_with_a_floor(tmp_path: Path) -> None:
@@ -337,3 +434,29 @@ def test_a_band_moves_the_body_and_the_shelf_down_and_no_band_is_zero(tmp_path: 
     for n in ("generic-mona", "tenting-cradle", "yubisaki"):
         assert out["band"]["frames"][key(n)]["y1"] - b["y1"] == out["plain"]["frames"][key(n)]["y1"] - a["y1"] + 30
     check_no_overlap(out["band"])
+
+
+def test_a_band_moves_the_graph_the_children_beside_it_and_their_children_down(tmp_path: Path) -> None:
+    # T-02 with iss-00629's rows: p's graph with a (and a's child g) and b beside it
+    shape = {"p": (None, []), "a": ("p", BUSINESS), "b": ("p", BUSINESS), "g": ("a", PRODUCT)}
+    sizes = {key("p"): ok(500, 600), key("a"): ok(300, 100), key("b"): ok(300, 100), key("g"): ok(200, 80)}
+    opts: dict[str, Any] = {"range": "all", "width": 1400}
+    cases = {
+        "plain": {"repos": repos(shape), "sizes": sizes, "options": opts},
+        "zeros": {"repos": repos(shape), "sizes": sizes, "options": {**opts, "bands": {key(n): 0 for n in shape}}},
+        "band": {"repos": repos(shape), "sizes": sizes, "options": {**opts, "bands": {key("p"): 30}}},
+    }
+    out = run(tmp_path, cases)["cases"]
+    assert out["plain"] == out["zeros"]
+    pa, pb = out["plain"]["frames"], out["band"]["frames"]
+    assert pa[key("a")]["y1"] == pa[key("p")]["body"]["y"]  # a sits beside the graph
+    p = pb[key("p")]
+    assert p["band"] == {"x1": p["x1"], "y1": p["y1"] + REPO["head"], "x2": p["x2"], "y2": p["y1"] + REPO["head"] + 30}
+    assert p["body"]["y"] == pa[key("p")]["body"]["y"] + 30
+    assert p["y2"] - p["y1"] == pa[key("p")]["y2"] - pa[key("p")]["y1"] + 30
+    for n in ("a", "b", "g"):
+        assert pb[key(n)]["y1"] == pa[key(n)]["y1"] + 30, n
+        assert pb[key(n)]["y2"] == pa[key(n)]["y2"] + 30, n
+        assert pb[key(n)]["x1"] == pa[key(n)]["x1"], n
+    check_no_overlap(out["band"], shape)
+    check_rows(out["band"], 1400, shape)
