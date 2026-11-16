@@ -32,6 +32,24 @@ ID: "iss-00603"
   - `uv run pytest tests/unit/presentation/test_dashboard_graph_js.py tests/unit/presentation/test_dashboard_graph_range.py tests/unit/presentation/test_dashboard_graph_toolbar.py tests/unit/infra/test_dashboard_shell_polish.py tests/unit/infra/test_dashboard_state_marks.py tests/unit/infra/test_dashboard_orca_views_js.py tests/unit/infra/test_dashboard_scope_tabs_js.py tests/unit/infra/test_dashboard_orca_marks_js.py`：126 passed。`tests/unit/presentation/test_dashboard_small_screens.py`：2 passed。`make lint` pass。dashboard の資産は static-inventory.json に載っていないので更新なし。
 - S-05（HEAD `8ae1600af`、コードの変更なし）：`make lint` pass（ruff check・ruff format check・mypy）。`uv run pytest`（全体）：3942 passed、7 skipped、1802s（開始時の uptime load 5.9）。新しい失敗・既存の失敗ともになし。ログ `.workbench/implement/iss-00603/s05-pytest.log`。
 
+## 実データの写し（S-06、タスク担当）
+
+- origin/main（iss-00602、`094772a9f`）を取り込んだ `464673519` のコードを wheel にし、隔離した venv（`.workbench/iss-00603/venv`）に入れた。この PC の状態の置き場の写し（`.workbench/iss-00603/state`）を `spec-dock dashboard serve --port 18633 --offline --tailscale --state-root …` で配った（18603 は iss-00602 の試しが使っていたので避けた。常駐の 47800 と道具の環境には触れていない）。
+- headless Chrome（`--disable-features=MacAppCodeSignClone`、CDP `Browser.close` で閉じた）で、spec-dock と housing-lifecycle × 全体・いま・これから × 1440・390 × 明・暗 の24枚を写した（スクリプト `.workbench/iss-00603/shoot.mjs`、全部の数字 [result.json](artifacts/20261116t060917z--result.json)）。**edgeAudit の違反はすべて0、ブラウザーのエラーは0**。押されたボタンはどれも選んだ範囲だけ。390px では道具の帯の幅 32px（縦の1つの部品）で、ページの横はみ出しなし。
+
+| リポジトリ | 範囲 | 箱 | 枠 | 畳んだ塊 | 候補の印 | 線 | 写し |
+|---|---|---|---|---|---|---|---|
+| spec-dock | 全体 | 300 | 36 | 0 | 2 | 211 | [1440 明](artifacts/20261116t060917z-01--spec-dock-1440-light-all.png) |
+| spec-dock | いま | 33 | 28 | 2 | 0 | 5 | [1440 明](artifacts/20261116t060917z-02--spec-dock-1440-light-now.png) |
+| spec-dock | これから | 6 | 6 | 0 | 0 | 0 | [1440 明](artifacts/20261116t060918z--spec-dock-1440-light-next.png)、[390 暗](artifacts/20261116t060918z-01--spec-dock-390-dark-next.png) |
+| housing-lifecycle | 全体 | 342 | 67 | 0 | 12 | 134 | [1440 明](artifacts/20261116t060918z-02--housing-lifecycle-1440-light-all.png) |
+| housing-lifecycle | いま | 119 | 34 | 6 | 0 | 36 | [1440 明](artifacts/20261116t060918z-03--housing-lifecycle-1440-light-now.png)、[390 明](artifacts/20261116t060919z--housing-lifecycle-390-light-now.png) |
+| housing-lifecycle | これから | 23 | 26 | 0 | 0 | 11 | [1440 暗](artifacts/20261116t060918z-04--housing-lifecycle-1440-dark-next.png)、[390 暗](artifacts/20261116t060919z-01--housing-lifecycle-390-dark-next.png) |
+
+- 「いま」は直す前の既定と同じ見え方（畳んだ塊 2・6）。「全体」では畳まず、候補の箱・枠に印。「これから」では state done の Scope が1つも出ない（同じ構造を node で layout に通し、range next の nodes のうち done は spec-dock 0／12、housing-lifecycle 0／49、畳んだ塊 0 を確かめた。この2つのデータには、候補でない開いた子孫を持つ閉じた親 b がない）。result.json の `done` の数は、DOM の `[data-st="done"]`（枠の内訳の棒の部品を含む）を数えたもので、Scope の数ではない。
+- 観察：spec-dock の「これから」で init-00468 が中のない小さな枠として出る。init-00468 は開いていて（着手できる）候補でなく、開いた子孫は片付けの候補 a の epic-00512 だけなので、D-02 の規則どおり（自身が候補でない開いたものなので出る）。
+- 試しの URL（本人の確かめ用、確かめまで残す）：tailnet `http://100.85.74.8:18633/`（spec-dock は `/r/github.com/chemitaro/spec-dock/`、housing-lifecycle は `/r/github.com/chemitaro/housing-lifecycle/`）。止め方：`lsof -nP -iTCP:18633 -sTCP:LISTEN` の PID に `kill <PID>`（またはこのセッションに頼む）。
+
 ## Outcome
 
 ## Verification
