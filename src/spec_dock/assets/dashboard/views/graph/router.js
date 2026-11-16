@@ -84,9 +84,14 @@ function assignPorts(G) {
     list.forEach((it, j) => { it.e[end ? "y2" : "y1"] = ys[j]; it.e[end ? "k2" : "k1"] = list.length; });
   });
   // まっすぐ届く線：入口の辺にその線だけなら、入口を出口の高さにそろえて、段差のない1本にする
+  // ただし、入口の辺のすぐ左で向かい合う障害物（線の出る箱でない）がその高さに出口を持つときはそろえない（iss-00627 D-05）。
+  // どちらも寄せで動かない端の線分なので、同じ高さだと重なったまま解けない
   G.edges.forEach(e => {
     const Z = G.obs[e.z];
-    if (e.k2 === 1 && e.y1 >= Z.p1 && e.y1 <= Z.p2) e.y2 = e.y1;
+    if (!(e.k2 === 1 && e.y1 >= Z.p1 && e.y1 <= Z.p2)) return;
+    const f = facing(G, Z, e.y1);
+    if (f >= 0 && f !== e.a && (exits.get(f) || []).some(v => Math.abs(v - e.y1) < C.S - 0.5)) return;
+    e.y2 = e.y1;
   });
 }
 
@@ -275,8 +280,9 @@ function range(sg, G, V) {
   // 範囲が箱1つ分より広い線分（隣の列や行に箱のない所を通る）は、A* の位置にとどめる（iss-00578）。範囲の端や
   // 範囲の中央は A* の位置から遠く、線が遠回りになる。ほかの線分との間隔を守るときだけ lo〜hi の中で動く
   const wide = !!G.nested && hi - lo > C.WIDE;   // 木では左の狭い所に長い線が並ぶので、寄せて車線を分ける
+  const flo0 = dlo0, fhi0 = dhi0;   // 縮める前の目指す範囲（iss-00627 D-04：近い組が残る束は、これで並べ直す）
   if (wide) dlo0 = dhi0 = Math.min(Math.max(sg.pos, dlo0), dhi0);
-  return { lo, hi, lob, hib, wide, dlo: lob === -2 ? lo : Math.min(lo + pad, Math.max(lo, sg.pos)), dhi: hib === -2 ? hi : Math.max(hi - pad, Math.min(hi, sg.pos)), dlo0, dhi0 };
+  return { flo0, fhi0, lo, hi, lob, hib, wide, dlo: lob === -2 ? lo : Math.min(lo + pad, Math.max(lo, sg.pos)), dhi: hib === -2 ? hi : Math.max(hi - pad, Math.min(hi, sg.pos)), dlo0, dhi0 };
 }
 function crossCount(A, B) {   // A を B の手前（左・上）に置いたときの交差の数
   let c = 0;
@@ -328,74 +334,118 @@ function nudgePass(G, routes, V, widen) {
   const par = L.map((_, i) => i), find = i => (par[i] === i ? i : (par[i] = find(par[i])));
   for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) if (conf(L[i], L[j])) par[find(i)] = find(j);
   const groups = new Map(); L.forEach((sg, i) => { const r = find(i); if (!groups.has(r)) groups.set(r, []); groups.get(r).push(sg); });
+  // 並べた結果で、重なる2本（別の線、どちらかが動く）の位置の差が S − 0.5 より小さい組の数（iss-00627）
+  const closePairs = r => {
+    let n = 0;
+    r.ord.forEach(sg => r.nb.get(sg).forEach(t => {
+      if (t.ri === sg.ri || !(sg.movable || t.movable) || r.x.get(sg) > r.x.get(t) || (r.x.get(sg) === r.x.get(t) && r.ord.indexOf(sg) > r.ord.indexOf(t))) return;
+      if (Math.min(sg.b, t.b) - Math.max(sg.a, t.a) > 0.5 && Math.abs(r.x.get(sg) - r.x.get(t)) < C.S - 0.5) n++;
+    }));
+    return n;
+  };
   groups.forEach(gr => {
     if (!gr.some(sg => sg.movable)) return;
-    const cmp = (A, B) => {
-      // 動かない線分との前後は、動く線分が入れる側（片方だけなら）にする（iss-00578）
-      if (A.movable !== B.movable) {
-        const m = A.movable ? A : B, f = A.movable ? B : A;
-        const before = m.dlo0 + C.S <= f.pos + 0.5, after = f.pos + C.S <= m.dhi0 + 0.5;
-        if (before !== after) return (before ? -1 : 1) * (A.movable ? 1 : -1);
+    // 並べて詰め、中央へ寄せる（今の並べ方）。{ord, x, over, nb} を返す
+    const arrange = () => {
+      const cmp = (A, B) => {
+        // 動かない線分との前後は、動く線分が入れる側（片方だけなら）にする（iss-00578）
+        if (A.movable !== B.movable) {
+          const m = A.movable ? A : B, f = A.movable ? B : A;
+          const before = m.dlo0 + C.S <= f.pos + 0.5, after = f.pos + C.S <= m.dhi0 + 0.5;
+          if (before !== after) return (before ? -1 : 1) * (A.movable ? 1 : -1);
+        }
+        if (!A.movable || !B.movable) return A.pos - B.pos || A.ri - B.ri;
+        const ab = crossCount(A, B), ba = crossCount(B, A);
+        return ab !== ba ? ab - ba : (A.pos - B.pos || A.ri - B.ri);
+      };
+      // 並びの順：重なる組ごとに「交差の少ないほうの前後」を決め、その前後関係で並べる（閉路は位置の小さいものから切る）
+      const m = gr.length, after = gr.map(() => []), indeg = new Array(m).fill(0), nb = new Map(gr.map(sg => [sg, []]));
+      for (let i = 0; i < m; i++) for (let j = i + 1; j < m; j++) {
+        if (!conf(gr[i], gr[j])) continue;
+        nb.get(gr[i]).push(gr[j]); nb.get(gr[j]).push(gr[i]);
+        if (cmp(gr[i], gr[j]) <= 0) { after[i].push(j); indeg[j]++; } else { after[j].push(i); indeg[i]++; }
       }
-      if (!A.movable || !B.movable) return A.pos - B.pos || A.ri - B.ri;
-      const ab = crossCount(A, B), ba = crossCount(B, A);
-      return ab !== ba ? ab - ba : (A.pos - B.pos || A.ri - B.ri);
+      const ord = [], used = new Array(m).fill(false), byPos = (i, j) => gr[i].pos - gr[j].pos || gr[i].ri - gr[j].ri;
+      while (ord.length < m) {
+        let cand = []; for (let i = 0; i < m; i++) if (!used[i] && indeg[i] === 0) cand.push(i);
+        if (!cand.length) for (let i = 0; i < m; i++) if (!used[i]) cand.push(i);
+        cand.sort(byPos); const i = cand[0]; used[i] = true; ord.push(gr[i]);
+        after[i].forEach(j => indeg[j]--);
+      }
+      // 詰める：手前から、望む範囲の下端と、手前の重なる線分 + S のうち大きいほう
+      // 並びの順は通り道の範囲を見ないので、範囲の広い線分が、別の通り道の鎖に押されたまま、狭い線分や動かない線分の
+      // 手前に並ぶことがある（iss-00578）。押されて自分の上端（動かない線分は自分の位置）を超える線分があれば、それを
+      // 押している鎖を手前へたどり、それより奥へ逃げられる線分（範囲がそれより奥まであり、それの奥に入る余地がある）を、
+      // それのすぐ奥へ回して詰め直す（12回まで。押されの合計が減らなければ、その前の並びに戻してやめる）
+      let x = new Map(), over = 0, prev = null;
+      const by = new Map(), at = new Map();
+      for (let tries = 0; ; tries++) {
+        over = 0; let move = null, total = 0;
+        ord.forEach((sg, i) => at.set(sg, i));
+        ord.forEach((sg, i) => {
+          let req = sg.dlo0, push = null;
+          for (const t of nb.get(sg)) if (at.get(t) < i && x.get(t) + C.S > req) { req = x.get(t) + C.S; push = t; }
+          by.set(sg, push);
+          const cap = sg.movable ? (sg.wide ? sg.hi : sg.dhi0) : sg.pos, top = sg.movable ? sg.hi : sg.pos;
+          over = Math.max(over, req - cap);
+          if (req > cap + 0.5) total += req - cap;
+          x.set(sg, sg.movable ? req : sg.pos);
+          if (move || tries >= 12 || req <= cap + 0.5) return;
+          const base = sg.movable ? sg.dlo0 : sg.pos;
+          for (let p = push; p && !move; p = by.get(p)) if (p.movable && p.hi > top + EPS && base + C.S <= p.dhi0 + 0.5) move = { sg, p };
+        });
+        if (prev && total >= prev.total - 0.5) { ord.splice(0, ord.length, ...prev.ord); x = prev.x; over = prev.over; break; }
+        if (!move) break;
+        prev = { ord: ord.slice(), x: new Map(x), over, total };
+        const rest = ord.filter(t => t !== move.p), k = rest.indexOf(move.sg) + 1;
+        ord.splice(0, ord.length, ...rest.slice(0, k), move.p, ...rest.slice(k));
+      }
+      // 中央へ寄せる：余りの半分だけ奥へ動かし、奥から順に間隔と上端を守る
+      // 広い線分は寄せない（A* の位置にとどめる）ので、余りに数えない
+      let slack = Infinity; ord.forEach(sg => { if (sg.movable && !sg.wide) slack = Math.min(slack, sg.dhi0 - x.get(sg)); });
+      const sh = slack > 0 && isFinite(slack) ? slack / 2 : 0;
+      for (let i = ord.length - 1; i >= 0; i--) {
+        const sg = ord[i]; if (!sg.movable) continue;
+        // 目指す範囲からあふれた線分は、重ねずに本来の範囲（lo〜hi）へはみ出す（iss-00578）
+        const cap = sg.wide || x.get(sg) > sg.dhi0 + 0.5 ? sg.hi : sg.dhi0;
+        let v = x.get(sg) + (sg.wide ? 0 : sh); v = Math.min(v, Math.max(cap, sg.lo));
+        for (let t = i + 1; t < ord.length; t++) if (conf(ord[t], sg)) v = Math.min(v, x.get(ord[t]) - C.S);
+        v = Math.max(v, sg.lo); v = Math.min(v, sg.hi);
+        x.set(sg, v);
+      }
+      return { ord, x, over, nb };
     };
-    // 並びの順：重なる組ごとに「交差の少ないほうの前後」を決め、その前後関係で並べる（閉路は位置の小さいものから切る）
-    const m = gr.length, after = gr.map(() => []), indeg = new Array(m).fill(0), nb = new Map(gr.map(sg => [sg, []]));
-    for (let i = 0; i < m; i++) for (let j = i + 1; j < m; j++) {
-      if (!conf(gr[i], gr[j])) continue;
-      nb.get(gr[i]).push(gr[j]); nb.get(gr[j]).push(gr[i]);
-      if (cmp(gr[i], gr[j]) <= 0) { after[i].push(j); indeg[j]++; } else { after[j].push(i); indeg[i]++; }
+    let res = arrange(), close = closePairs(res);
+    // iss-00627 D-04：近い組（重なる2本が S − 0.5 より近い）が残る束だけを並べ直す。
+    // (a) 広い線分を A* の位置に留めた並べ方が近い組を残すなら、広い線分も目指す範囲の全体で並べ直す
+    if (close && gr.some(sg => sg.wide)) {
+      gr.forEach(sg => { if (sg.wide) { sg.wide = false; sg.dlo0 = sg.flo0; sg.dhi0 = sg.fhi0; } });
+      res = arrange(); close = closePairs(res);
     }
-    const ord = [], used = new Array(m).fill(false), byPos = (i, j) => gr[i].pos - gr[j].pos || gr[i].ri - gr[j].ri;
-    while (ord.length < m) {
-      let cand = []; for (let i = 0; i < m; i++) if (!used[i] && indeg[i] === 0) cand.push(i);
-      if (!cand.length) for (let i = 0; i < m; i++) if (!used[i]) cand.push(i);
-      cand.sort(byPos); const i = cand[0]; used[i] = true; ord.push(gr[i]);
-      after[i].forEach(j => indeg[j]--);
+    // (b) それでも残るなら、動く線分を、並びの順に、手前の動く線分 + S と、動かない線分から S 以上離れた位置へ飛ばす。
+    // 入口の辺に S おきに並ぶ動かない線分（櫛）の間に挟まった線分を、櫛の外へ出す。範囲の内に収まり、近い組が減るときだけ採る
+    if (close) {
+      const x = new Map(); let over = 0;
+      res.ord.forEach(sg => { if (!sg.movable) x.set(sg, sg.pos); });
+      for (const sg of res.ord) {
+        if (!sg.movable) continue;
+        let req = sg.dlo0;
+        for (let moved = true; moved;) {
+          moved = false;
+          for (const t of res.nb.get(sg)) {
+            if (!x.has(t)) continue;
+            const xt = x.get(t);
+            if (t.movable ? xt + C.S > req : Math.abs(xt - req) < C.S - 0.5) { req = xt + C.S; moved = true; }
+          }
+        }
+        over = Math.max(over, req - sg.dhi0);
+        x.set(sg, req);
+      }
+      const alt = { ord: res.ord.slice().sort((p, q) => x.get(p) - x.get(q)), x, over, nb: res.nb };
+      const fits = alt.ord.every(sg => !sg.movable || x.get(sg) <= sg.hi + EPS), c2 = closePairs(alt);
+      if (fits && c2 < close) { res = alt; close = c2; }
     }
-    // 詰める：手前から、望む範囲の下端と、手前の重なる線分 + S のうち大きいほう
-    // 並びの順は通り道の範囲を見ないので、範囲の広い線分が、別の通り道の鎖に押されたまま、狭い線分や動かない線分の
-    // 手前に並ぶことがある（iss-00578）。押されて自分の上端（動かない線分は自分の位置）を超える線分があれば、それを
-    // 押している鎖を手前へたどり、それより奥へ逃げられる線分（範囲がそれより奥まであり、それの奥に入る余地がある）を、
-    // それのすぐ奥へ回して詰め直す（12回まで。押されの合計が減らなければ、その前の並びに戻してやめる）
-    let x = new Map(), over = 0, prev = null;
-    const by = new Map(), at = new Map();
-    for (let tries = 0; ; tries++) {
-      over = 0; let move = null, total = 0;
-      ord.forEach((sg, i) => at.set(sg, i));
-      ord.forEach((sg, i) => {
-        let req = sg.dlo0, push = null;
-        for (const t of nb.get(sg)) if (at.get(t) < i && x.get(t) + C.S > req) { req = x.get(t) + C.S; push = t; }
-        by.set(sg, push);
-        const cap = sg.movable ? (sg.wide ? sg.hi : sg.dhi0) : sg.pos, top = sg.movable ? sg.hi : sg.pos;
-        over = Math.max(over, req - cap);
-        if (req > cap + 0.5) total += req - cap;
-        x.set(sg, sg.movable ? req : sg.pos);
-        if (move || tries >= 12 || req <= cap + 0.5) return;
-        const base = sg.movable ? sg.dlo0 : sg.pos;
-        for (let p = push; p && !move; p = by.get(p)) if (p.movable && p.hi > top + EPS && base + C.S <= p.dhi0 + 0.5) move = { sg, p };
-      });
-      if (prev && total >= prev.total - 0.5) { ord.splice(0, ord.length, ...prev.ord); x = prev.x; over = prev.over; break; }
-      if (!move) break;
-      prev = { ord: ord.slice(), x: new Map(x), over, total };
-      const rest = ord.filter(t => t !== move.p), k = rest.indexOf(move.sg) + 1;
-      ord.splice(0, ord.length, ...rest.slice(0, k), move.p, ...rest.slice(k));
-    }
-    // 中央へ寄せる：余りの半分だけ奥へ動かし、奥から順に間隔と上端を守る
-    // 広い線分は寄せない（A* の位置にとどめる）ので、余りに数えない
-    let slack = Infinity; ord.forEach(sg => { if (sg.movable && !sg.wide) slack = Math.min(slack, sg.dhi0 - x.get(sg)); });
-    const sh = slack > 0 && isFinite(slack) ? slack / 2 : 0;
-    for (let i = ord.length - 1; i >= 0; i--) {
-      const sg = ord[i]; if (!sg.movable) continue;
-      // 目指す範囲からあふれた線分は、重ねずに本来の範囲（lo〜hi）へはみ出す（iss-00578）
-      const cap = sg.wide || x.get(sg) > sg.dhi0 + 0.5 ? sg.hi : sg.dhi0;
-      let v = x.get(sg) + (sg.wide ? 0 : sh); v = Math.min(v, Math.max(cap, sg.lo));
-      for (let t = i + 1; t < ord.length; t++) if (conf(ord[t], sg)) v = Math.min(v, x.get(ord[t]) - C.S);
-      v = Math.max(v, sg.lo); v = Math.min(v, sg.hi);
-      x.set(sg, v);
-    }
+    const { ord, x, over, nb } = res;
     ord.forEach(sg => { if (!sg.movable) return; const P = routes[sg.ri].pts, v = x.get(sg); P[sg.k][oc] = v; P[sg.k + 1][oc] = v; });
     widen.push(...lacking(ord, conf, V, over > 0.5, x, nb));
   });

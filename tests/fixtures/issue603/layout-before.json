@@ -76,7 +76,7 @@
   "spec-dock|all|nest|all|374|plain": "35aa8662c047613d2514cda6d4103a3d17ff68039d5f3cf19194c1a408cf2896",
   "spec-dock|all|nest|all|374|routed": "5bb3376c39979041a070d2a50e2af70396086d5fb8470c7763113a8b49a79a40",
   "spec-dock|all|nest|all|None|plain": "60c301c3fabf4ba10e7b31c1c5fb76384eeec9dad58478390b9cba94496a9481",
-  "spec-dock|all|nest|all|None|routed": "d671c534c6ee30f8e14385a02080940fe7d68e0bcd63b31789dea2b107292ab5",
+  "spec-dock|all|nest|all|None|routed": "f113a12f8c606f71a77fd61b0c378531abbecfaa11964974f8d1afdda177db1a",
   "spec-dock|all|nest|wait|374|plain": "99bc216911a90c70c8aa49189e0efca990d5c4b888161acb46dc6b52b9c67973",
   "spec-dock|all|nest|wait|374|routed": "99bc216911a90c70c8aa49189e0efca990d5c4b888161acb46dc6b52b9c67973",
   "spec-dock|all|nest|wait|None|plain": "31c9a701e505f9eeba6ba98609d8f4ac630e01ca27ba427f8866db686f82ccad",
@@ -97,5 +97,6 @@
   "spec-dock|now|tree|all|routed": "525cb1377996ecc6867dcb7413cfb7d752fde3b7413014f2ef13a419854973b1",
   "spec-dock|now|tree|wait|plain": "48971296884966aba86535edac3bad29667465c231ab020c7482c31565684d39",
   "spec-dock|now|tree|wait|routed": "429fe96745b9b065367e6a860d9d9ec14bdc01eab46790d697d213b4a2cf0e4a"
- }
+ },
+ "iss-00627": "spec-dock|all|nest|all|None|routed is the range all layout after the routing fixes of iss-00627 (router.js D-04, D-05: its lines moved and the world grew 6px wider); the other digests are those of 16f0cf122"
 }

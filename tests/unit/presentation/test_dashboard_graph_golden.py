@@ -4,6 +4,8 @@
 nest and tree ways, the three ranges, a focus, cleanup candidates, a selection with its path, the state chips and the
 agents' rows of marks) and what `views/graph.js` of the start commit 7f7dd2b1d drew for it in
 `tests/js/dashboard_graph_golden.mjs`. The current graph.js must draw exactly the same.
+iss-00627 wrote the copy again after its routing fixes (router.js D-04, D-05): only the stored structure's "all" run
+moved (its lines, and the world 6px wider); every other run is the same as 7f7dd2b1d drew.
 
 To write the copy again from another tree of assets (only when the drawing is meant to change):
     uv run python -m tests.unit.presentation.test_dashboard_graph_golden <dashboard assets dir>
