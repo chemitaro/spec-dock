@@ -48,7 +48,7 @@ requirements: {
 		acceptance: [
 			"開いた Initiative の子が、片付けの候補 a の Epic だけのとき（orca-web の init-00002 の形）、これからの layout の nodes にその Initiative も Epic もない（入れ子・木）",
 			"開いた Initiative → 開いた Epic（候補でない）→ 候補 a の Epic の3段で、これからの layout の nodes に3つのどれもない（下から消える）",
-			"開いた Issue の子が候補 a の Issue だけのとき、これからの layout の nodes にその親の Issue もない",
+			"開いた Issue → 開いた Issue → 閉じた Issue の3段（モデルは Issue を片付けの候補にしないので、中の Issue は候補でない開いたもの）で、これからの layout の nodes に2つの開いた Issue のどちらもない",
 		]
 	}
 	"R-02": {

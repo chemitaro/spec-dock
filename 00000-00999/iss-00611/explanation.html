@@ -9,51 +9,40 @@
 <!-- ▼ 説明資料の本文（Markdown）。編集するのはこのブロックだけです。 -->
 <script type="text/markdown" id="ds-source">
 ---
-title: この Scope の説明資料（題名を書き換えます）
-lead: この資料で理解できることを、初めて読む人にも分かるように1〜2文で書きます。
+title: 「これから」で中に進める仕事がない親を出さない
+lead: 構造の図の「これから」で、中に見えるものがない Initiative・Epic を出さなくする変更の、規則と確かめ方を説明します。
 category: 説明資料
 audience: 本日チームに加わった新メンバー
-status: 下書き
+status: 仕様
 ---
-
-<!-- spec-dock:explanation-skeleton -->
-<!-- 雛形から書き換えたら、上の印の行を消します。印が残っていると、検査は「雛形のまま」と判定します。 -->
 
 ## この資料で分かること
 
 :::summary
-- 読み終えたときに理解できていることを、1文ずつ書きます。
-- 背景、仕組み、失敗時の動き、確認方法のうち、特に伝えたい点を選びます。
-- 短い Scope なら、1〜2項目でかまいません。
+- 「これから」で、子を持つ Scope は、中に見える子孫があるときだけ出ること。
+- 子のない開いた Scope（まだ切り分けていない Initiative・Epic、Issue）は今どおり出ること。
+- 「全体」「いま」は何も変わらないこと。
 :::
 
 ## 背景と目的
 
-なぜこの Scope に取り組むのか、どの問題を解決するのかを具体的に説明します。
+iss-00603 で、構造の図の見せる範囲を「全体｜いま｜これから」にしました。「これから」は、終わったものと片付けの候補を出さず、それを持つ親は、中に候補でない開いたものがあるときだけ枠として出します。
 
-## 全体の構成
+ただ、親自身が開いていて候補でなければ、中が空でも出ていました。orca-web の init-00002 は、開いた子が片付けの候補の Epic 2つだけなので、「これから」では中のない枠として1つ残ります。本人（2026-11-16）は「中が片付けの候補だけなら、これから行う仕事はないので出さないべき」と指摘しました。
 
-構成要素の役割と関係を説明します。図は、理解を大きく助ける場合だけ入れます。
+## 規則
 
-```plantuml id=overview
-@startuml
-title 全体の構成
-top to bottom direction
-actor "利用者" as User
-component "説明対象の仕組み" as System
-database "データ" as Data
-User -> System : 操作する
-System -> Data : 読み書きする
-System --> User : 結果を返す
-@enduml
-```
+- 子を持つ Scope は、「これから」で見える子が1つ以上あるときだけ出します。自身の状態は見ません。
+- 子のない Scope は、終わっておらず片付けの候補でなければ出します（今のまま）。
+- 下の段から決めるので、Epic が消えれば、その Initiative も消えることがあります。
+- URL の focus で絞った Scope 自身は、中が空でも出します。
 
-## 確認方法
+## 確かめ方
 
-読者が手元で確かめられる手順を書きます。
+合成の構造で、init-00002 の形・3段の形・子のない Initiative・候補でない子を持つ Initiative・子を持つ Issue を並べ、入れ子と木の両方で、出るものと出ないものを確かめます。「全体」「いま」は、iss-00603 で記録した配置の digest と一致することで確かめます。最後に、orca-web・spec-dock・housing-lifecycle の実データで、直す前と後の「これから」を写します。
 
 ```sh
-spec-dock active show --json
+uv run pytest tests/unit/presentation/test_dashboard_graph_range.py
 ```
 </script>
 <script src="../../../design-system/ds.js"></script>
