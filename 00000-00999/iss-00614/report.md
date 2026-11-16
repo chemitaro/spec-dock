@@ -17,6 +17,8 @@ ID: "iss-00614"
 
 ## 実装の記録
 
+- 逸脱 codex-symlink-refusal：impl-sol（codex gpt-6.1-sol / medium、dispatch ctx_508f1a4c0a45、launch codex / gpt-6.1-sol / medium）は chat-scratch の writable root の symlink で手元のコマンドを起動できず、変更なしで止まった。plan の rationale と統括の了承どおり Claude Opus 5.5 / medium（dispatch ctx_3898535b8e3c、launch claude / opus / medium）に切り替え、impl-claude と同じ値なので S-01〜S-05 を1つのセッションにまとめた。
+
 ## Outcome
 
 ## Verification
