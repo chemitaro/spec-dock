@@ -413,7 +413,7 @@ class DashboardHttp:
 
     def _repositories(self, request: Request) -> dict[str, object]:
         items = []
-        for site in self.site.repositories():
+        for site, nesting in self.site.nested_repositories():
             repository = site.repository
             items.append({
                 "repository": site.key,
@@ -423,6 +423,8 @@ class DashboardHttp:
                 "path": f"/r/{site.key}/",
                 "api": f"/api/v1/r/{site.key}/",
                 "problem": site.problem,
+                "parent": nesting.parent,  # the nearest listed ancestor's key, never a path (iss-00613 D-03)
+                "tier": list(nesting.tier),
             })
         return {
             "schema": API_SCHEMA,
