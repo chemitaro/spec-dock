@@ -124,6 +124,7 @@ def _next() -> dict[str, Any]:
             closed(20, "epic", blocked_by=(61,)),  # b with a doing descendant: a frame only
             node(21, "issue", parent=20, in_progress=True),
             node(22, "issue", parent=20),  # c (blocked by its closed parent): not shown
+            node(23, "issue", parent=20, blocked_by=(61,)),  # c and yellow (blocked by an open one): not shown either
             closed(30, "epic"),  # b holding only a candidate: not shown
             node(31, "issue", parent=30),  # c
             node(40, "epic", blocked_by=(20,)),  # waits for the done frame 20: no line in next
@@ -198,8 +199,10 @@ def test_next_leaves_out_done_scopes_and_cleanup_candidates(nxt: dict[str, Any],
     for scope_id in shown:
         if scope_id not in kids:  # a box
             assert states[scope_id] != "done" and scope_id not in candidates, scope_id
+    # a c that is yellow (blocked by an open Scope) is a candidate too, and next leaves it out (CP-1 P3)
+    assert states["iss-00023"] == "blocked" and "iss-00023" in candidates
     # the same structure in all and now still shows them (the range is what leaves them out)
-    assert {"iss-00003", "epic-00010", "iss-00022"} <= set(_shown(nxt, f"{mode}|all|all"))
+    assert {"iss-00003", "epic-00010", "iss-00022", "iss-00023"} <= set(_shown(nxt, f"{mode}|all|all"))
     assert "iss-00003" in _shown(nxt, f"{mode}|all|now")
 
 
