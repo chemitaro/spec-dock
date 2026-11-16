@@ -92,7 +92,8 @@ def representative(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
 def test_every_way_of_showing_the_representative_structures_draws_clean_lines(representative: dict[str, Any]) -> None:
     runs = representative["audit"]
     assert {run["name"] for run in runs} == {"spec-dock", "generated", "generated-15", "generated-18", "many-lines"}
-    assert len(runs) >= 5 * 12  # 12 combinations each (iss-00603: 3 ranges), and the Epics and Initiatives as the focus
+    # 6 combinations each (iss-00603: 3 ranges; iss-00607: no line choice), and the Epics and Initiatives as the focus
+    assert len(runs) >= 5 * 6
     assert sum(run["edges"] for run in runs if run["name"] == "spec-dock") > 100
     # iss-00607 T-04: the lines are always every line, so no combination chooses them
     assert [run["opts"] for run in runs if "deps" in run["opts"]] == []
@@ -112,9 +113,9 @@ def test_every_way_of_showing_the_representative_structures_draws_clean_lines(re
 def test_the_250_scope_structure_routes_within_a_second(representative: dict[str, Any]) -> None:
     # iss-00572: "ms" is the node process's CPU time, the least of three runs, so a loaded PC does not stretch it.
     runs = [run for run in representative["audit"] if run["name"] == "generated" and not run["opts"].get("focus")]
-    assert (
-        len(runs) == 12 + 7 * 6
-    )  # and the nested ones at a PC's and a phone's width (iss-00560), with a height (iss-00575)
+    # 2 ways × 3 ranges (iss-00607: no line choice), and the nested ones at a PC's and a phone's width (iss-00560),
+    # with a height (iss-00575)
+    assert len(runs) == 6 + 7 * 3
     assert max(run["ms"] for run in runs) < 1000
 
 

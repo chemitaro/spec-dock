@@ -29,7 +29,8 @@ export const WRAP_WIDTH = 1240;
 
 // iss-00556: finished dependencies between what is shown are drawn by default (faint), the waiting ones stand out.
 // iss-00603: one range of what is shown replaces "done too" and "fold the cleanup candidates".
-export const DEFAULTS = { mode: "nest", range: "now", deps: "all", focus: null };
+// iss-00607: the lines are always every line; there is no choice of them.
+export const DEFAULTS = { mode: "nest", range: "now", focus: null };
 export const RANGES = ["all", "now", "next"];
 
 // iss-00603 D-01: the range as the inner choices. "all" is the old "done too" unfolded, "now" the old default (the
@@ -597,7 +598,7 @@ function flatten(block, ox, oy, path, out) {
  * Lay the Scopes out.
  * @param scopes  structure API `scopes`
  * @param cleanup structure API `cleanup` ([{id, code, text}])
- * @param options {mode: "nest"|"tree", range: "all"|"now"|"next", deps: "all"|"wait"|"none", focus, width, height} — width: the graph's
+ * @param options {mode: "nest"|"tree", range: "all"|"now"|"next", focus, width, height} — width: the graph's
  *                visible width at 100% (px), where the groups wrap (WRAP_WIDTH when absent); height is accepted
  *                but unused by placement (the page keeps it as a resize signal, iss-00583).
  * @param gaps    extra pixels per gap key (from earlier routing rounds)
@@ -658,8 +659,8 @@ function treeLines(nodes, ix) {
 
 // The dependency pairs to draw, between what is shown: a box, a frame or the folded group holding the Scope. Next
 // draws none with a done end (iss-00603 D-03: a done frame shown for what it holds included), whose other side is gone.
+// Every other finished dependency is drawn (faint), the waiting ones stand out (iss-00607: always every line).
 function pairs(scopes, ix, out, opts) {
-  if (opts.deps === "none") return [];
   const holder = new Map();
   for (const n of out.nodes) holder.set(n.id, `n:${n.id}`);
   for (const g of out.groups) {
@@ -686,7 +687,6 @@ function pairs(scopes, ix, out, opts) {
       if (!src || !a || a === z) continue;
       if (opts.next && (src.state === "done" || s.state === "done")) continue;
       const done = src.state === "done";
-      if (done && opts.deps === "wait") continue;
       const ra = rect.get(a), rz = rect.get(z);
       if (opts.mode !== "tree" && (contains(ra, rz) || contains(rz, ra))) continue; // parent and child: no line
       if (opts.mode === "tree" && (ix.ancestors(s.id).includes(b) || ix.ancestors(b).includes(s.id))) continue;
