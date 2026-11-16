@@ -1290,3 +1290,38 @@ def test_the_panel_foot_links_carry_the_memory_of_the_scope(tmp_path: Path) -> N
     assert out["gone"] == [f"{base}?agent=gone%3Aa&amp;tab=summary"] * 2
     assert out["map"] == [f"{base}?agent=b&amp;tab=summary"] * 2
     assert out["other"] == [f"{base}?tab=summary"] * 2
+
+
+@node
+def test_the_panel_foot_links_mark_the_map_choice_gone_on_another_tab(
+    tmp_path: Path,
+) -> None:  # iss-00602 T-03, FQG-00602-01
+    out = _run(
+        PANEL.replace("PANEL_URL", json.dumps((SHARED / "panel.js").as_uri()))
+        + """
+        const hrefs = () => [...part(".pn-foot").innerHTML.matchAll(/<a class="ds-btn[^"]*"( data-nav)? href="([^"]*)"/g)].map((m) => m[2]).slice(0, 2);
+        const press = (sel, dataset) => aside.click({target: {closest: (s) => (s === sel ? {dataset} : null)}, button: 0, preventDefault() {}});
+        reset();
+        world.trees[sid] = [tree("w1", "one", [raw("a"), raw("b")])];
+        showIt();
+        pn.preferTab("agents");
+        press("a[data-pn-param]", {pnParam: "agent", pnValue: "a"}); // the person picks a: the panel's Map has a
+        out.chosen = hrefs();
+        press("[data-pn-tab]", {pnTab: "summary"}); // the summary tab; the agents tab is not drawn
+        out.summary = hrefs();
+        world.trees[sid] = [tree("w1", "one", [raw("b")])]; // a goes away while the summary tab shows
+        showIt();
+        out.gone = hrefs();
+        world.trees[sid] = [tree("w1", "one", [raw("a"), raw("b")])]; // a comes back; nobody picked it again
+        showIt();
+        out.back = hrefs();
+        pn.hide();
+        world.trees[sid] = [tree("w1", "one", [raw("a")])];
+        """,
+        tmp_path,
+    )
+    base = "/r/github.com/o/r/scopes/iss-00001"
+    assert out["chosen"] == [f"{base}?agent=a&amp;tab=agents"] * 2
+    assert out["summary"] == [f"{base}?agent=a&amp;tab=summary"] * 2
+    assert out["gone"] == [f"{base}?agent=gone%3Aa&amp;tab=summary"] * 2
+    assert out["back"] == [f"{base}?agent=gone%3Aa&amp;tab=summary"] * 2

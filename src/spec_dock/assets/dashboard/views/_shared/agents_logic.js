@@ -147,3 +147,12 @@ export function lastChoice(mem, scopeId) {
   for (const id of mem.gone) return GONE + id;
   return null;
 }
+
+// The choice the panel's foot links carry (iss-00602 D-03, FQG-00602-01): the panel's Map comes first, but a raw id
+// this Scope's memory knows went away (noted while another tab showed) is carried as gone:<id>, so the new page does
+// not open it when it comes back. Without a Map choice, lastChoice.
+export function footChoice(mem, scopeId, mapped) {
+  if (mapped == null) return lastChoice(mem, scopeId);
+  if (mapped.startsWith(GONE)) return mapped;
+  return mem.scopeId === scopeId && mem.gone.has(mapped) ? GONE + mapped : mapped;
+}
