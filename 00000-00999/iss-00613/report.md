@@ -58,3 +58,23 @@ ID: "iss-00613"
 | yubisaki | input-devices | [プロダクト] |
 
 - 道が出ないこと：応答の JSON に `/Users/`、`/Volumes/`、`/private/`、`.canonical`、`workspace` の文字が0件。登録簿の9行の `catalog`・`main_checkout`・`git` の値（27個）も、応答に1つも現れなかった。
+
+## 最終品質ゲート
+
+- origin/main（iss-00611、PR #618、`d9bb6164d`）を取り込んだ `ee33f0679` を候補にした（取り込んだ変更は dashboard の layout.js と graph のテストだけで、この Issue の範囲と重ならない）。
+- 最終品質ゲート（quality-gate-reviewer opus / medium、second opinion なし、範囲 `2c7427a97..ee33f0679`、観点 functional-correctness・requirements-closure・test-adequacy・security-baseline。plan の `security` は security-baseline として扱った）：**合格**（attempt 1）。P0〜P3 すべて0、coverage complete。test lane：`make lint` exit 0、`uv run pytest` exit 0（3998 passed / 7 skipped、1718.57s）。closure は作業ツリーの `.workbench/final-quality-gate/iss-00613-fqg-1/closure.md`。
+
+## Outcome
+
+`GET /api/v1/repositories` の各リポジトリが、今の7つの項目の後ろに `parent`（いちばん近い出す祖先の鍵か null）と `tier`（段の札の配列）を返す。決め方は純粋な関数 `runtime/application/dashboard_nesting.py` の `repository_nesting` 1か所で、`DashboardSite` が一覧を読み直すときに1回だけ道を正規化して覚える。応答に道は出ない。配る側の `reference_cli.md` の契約、目録の sha256、dogfood の写しを合わせた。画面は変えていない（iss-00614）。
+
+## Verification
+
+- 単体・HTTP のテスト（`test_dashboard_nesting.py`、`test_dashboard_repositories_nesting.py`、`test_issue613_repository_nesting_docs.py`）、`make lint`、全体の `uv run pytest`（最終品質ゲートで 3998 passed）。
+- 実機：上の「実機の確かめ」。
+
+## Residual Risks / Follow-ups
+
+- 大文字と小文字を区別しないファイルシステムで、登録の道の大文字が違うと親子を見落としうる（平らに出るだけ。design.cue の risks）。
+- 絶対の道でない行の中のものは、さらに外の出す祖先から札を数えるので、その行のディレクトリの名前が札に出る（F-05 の仕様どおり。実際の登録では起こらない）。
+- 次：iss-00614（画面）が `parent`・`tier` を読む。
