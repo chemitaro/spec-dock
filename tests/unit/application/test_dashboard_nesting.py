@@ -133,8 +133,9 @@ def test_inside_a_hidden_repository_is_the_child_of_the_outer_shown_ancestor() -
 
 
 def test_inside_a_hidden_repository_without_a_shown_ancestor_is_at_the_top() -> None:
-    shown: list[tuple[str, str | None]] = [(TK, "/ws/company-os/businesses/housing-lifecycle/products/tk")]
-    nesting = repository_nesting(shown, ["/ws/company-os", "/ws/company-os/businesses/housing-lifecycle", shown[0][1]])
+    child = "/ws/company-os/businesses/housing-lifecycle/products/tk"
+    shown: list[tuple[str, str | None]] = [(TK, child)]
+    nesting = repository_nesting(shown, ["/ws/company-os", "/ws/company-os/businesses/housing-lifecycle", child])
     assert nesting[TK] == Nesting(None, ())
 
 
