@@ -555,6 +555,7 @@ def test_the_graph_saves_its_choices_under_the_new_key() -> None:
     assert '"specdock.graph.v1"' not in source and '"specdock.graph.v2"' not in source
     assert "specdock.graph.v" not in source  # the keys are written only in graph/prefs.js
     assert "restorePrefs" in source and "PREFS_KEY" in source and "LEGACY_KEYS" in source
+    assert "deps" not in source  # iss-00607 T-03: no line choice to draw, press or save
     prefs = (ASSETS / "views" / "graph" / "prefs.js").read_text(encoding="utf-8")
     assert 'PREFS_KEY = "specdock.graph.v3"' in prefs
     assert "deps" not in prefs  # iss-00607 T-03: the saved choices hold no line choice
