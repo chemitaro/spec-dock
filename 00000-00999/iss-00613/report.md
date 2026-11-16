@@ -38,3 +38,4 @@ ID: "iss-00613"
 - 逸脱と判断 dogfood-copy-sync `275a5f79c`：統括の決定（msg_22f5fbc7ac2b、(a)）により、この1ファイルに限り範囲を広げ、dogfood の写し `spec-dock/docs/reference_cli.md` を配る側と同じバイトにした。理由は、写しと配る側の一致を求める既存のテスト3件（上の失敗）。前例は `0bfa2424f`、`787a05147`（写しも同じ変更で合わせていた）。開始のコミットで2つは同じバイトだったことを確かめた。
   - 落ちた3件（と T-07、0.5.0・0.5.1 のテストの残り）18 passed。`make lint` 合格。
 - 判断（統括、2026-11-17、msg_22f5fbc7ac2b）：配る側の `reference_cli.md` を変えると、dogfood の写しと配る側の一致を求める既存のテスト3件が落ちるため、写し `spec-dock/docs/reference_cli.md` を配る側と同じバイトにコミットする（前例 0bfa2424f・787a05147）。requirement の excludes と依頼書の範囲から、この1ファイルに限って外れる逸脱として、統括が了承した。
+  - 写しを合わせた後の全体の `uv run pytest`（HEAD `275a5f79c`）：3984 passed、7 skipped（1952.8秒）。S-03 を done にした。
