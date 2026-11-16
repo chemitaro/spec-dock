@@ -67,6 +67,8 @@ design: {
 			export function compactNeeds(root, scale)
 			/** Whether a layout's compact frames would take other heights with these needs (or these rows of agents). */
 			export function headsDiffer(nodes, needs)
+			/** The needs above their frame's compactHeight: what heads keep. */
+			export function tallNeeds(nodes, needs)
 			```
 
 			`compactNeeds`：root が隠れている・幅0は null。各 `.gx-frame.is-compact` で、`.gx-fm` の computed style が flex でなければ null（graph.css が未適用）。
@@ -74,8 +76,8 @@ design: {
 			`headsDiffer`：縮めた frame の node ごとに `max(compactHeight(kind, rows), needs[id] ?? 0)` が `node.fit ?? compactHeight(kind, rows)` と 0.5px より違えば true。
 
 			graph.js：`V.heads` を足し、`buildWorld` の routeLayout に `heads: V.heads` を渡す。`checkRows` は `measureMarks` に続けて `compactNeeds(V.el.world, V.s)` を測り（null なら heads は今のまま）、
-			行の数の違い（今の判定）か `headsDiffer` のどちらかで違えば、今と同じ `rowsRedo`（2回まで、F-02）で render をやり直す。`V.heads` は測った値に置き換える。
-			allgraph.js：リポジトリごとの `r.heads`、`sigOf` に `JSON.stringify(r.heads)`、`layoutRepo` の routeLayout に `heads: r.heads`、`checkRows` は graph.js と同じ判定（リポジトリごとの `rowsRedo`）。
+			行の数の違い（今の判定）か `headsDiffer` のどちらかで違えば、今と同じ `rowsRedo`（2回まで、F-02）で render をやり直す。`V.heads` は `tallNeeds(nodes, needs)`（compactHeight より高い測りの値だけ）に置き換える（実装で足した：1行の枠だけのときは heads が空のままで、allgraph.js のリポジトリの印が測るたびに変わらない）。
+			allgraph.js：リポジトリごとの `r.heads`、`sigOf` に `JSON.stringify(r.heads)`、`layoutRepo` の routeLayout に `heads: r.heads`、`checkRows` は graph.js と同じ判定（リポジトリごとの `rowsRedo`）で、`r.heads` も `tallNeeds` の値。
 			"""
 		satisfies: ["R-02", "F-01", "F-02"]
 	}
