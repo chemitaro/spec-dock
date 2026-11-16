@@ -50,6 +50,7 @@ ID: "iss-00607"
 ## Verification
 
 - 仕様のレビュー合格（round-1）、最終品質ゲート合格（`3dab89a64`、make lint・全体の pytest 3956 passed）。
+- PR #608（head `3dab89a64`）：CI すべて成功（check ×2、route、spec-dock-check、provider-tests、Provider distribution parity ubuntu・macos）、mergeStateStatus CLEAN（2026-11-16）。
 - 実データの48通り（前後 × 24）で edgeAudit の違反0、構造の図のエラー0、線の数は前後で同じ（上の S-05）。
 
 ## Residual Risks / Follow-ups
