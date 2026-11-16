@@ -5,8 +5,8 @@ package spec
 goal: "構造の図から『後に続く』の数をなくし、稼働の印をすべて箱に収める（折り返して箱を伸ばす）"
 
 steps: {
-	"S-01": {title: "tests/js/dashboard_graph_check.mjs に layout の options の marks を通す口を足し、test_dashboard_graph_marks_rows.py に T-01〜T-05 を書いて、直す前のコードで markRows・rowsOf・高さのテストが落ち、印なしの一致（T-03）と既存の digest のテストが通ることを確かめる（Red）", realizes: ["R-04", "R-05"], status: "todo", session: "impl-sol"}
-	"S-02": {title: "layout.js に D-01（MARK_ROW・MARK_INSET・FRAME_TITLE_MIN・markRows・rowsOf）と D-02（box・tbox・frame の高さ、flatten の rows）を入れ、S-01 のテストと構造の図の既存のテスト（graph_js・graph_range・graph_toolbar・small_screens）を通す（Green）", realizes: ["R-04", "R-05", "F-01"], status: "todo", after: ["S-01"], session: "impl-sol"}
+	"S-01": {title: "tests/js/dashboard_graph_check.mjs に layout の options の marks を通す口を足し、test_dashboard_graph_marks_rows.py に T-01〜T-05 を書いて、直す前のコードで markRows・nodeMarkRows・高さのテストが落ち、印なしの一致（T-03）と既存の digest のテストが通ることを確かめる（Red）", realizes: ["R-04", "R-05"], status: "todo", session: "impl-sol"}
+	"S-02": {title: "layout.js に D-01（MARK_ROW・MARK_INSET・FRAME_TITLE_MIN・markRows・nodeMarkRows。既存の rowsOf は変えない）と D-02（box・tbox・frame の高さ、flatten の rows）を入れ、S-01 のテストと構造の図の既存のテスト（graph_js・graph_range・graph_toolbar・small_screens）を通す（Green）", realizes: ["R-04", "R-05", "F-01"], status: "todo", after: ["S-01"], session: "impl-sol"}
 	"S-03": {title: "画面の静的・偽の DOM のテスト（T-06・T-07）を先に直して落ちることを確かめ、D-05（dnMark・凡例・aria-label・置き場の all・is-wrap・CSS・marks の dump と golden・edgeAudit の markOverflow）と D-03・D-04（measureMarks・checkRows・ResizeObserver・歯止め）を入れて通す", realizes: ["R-01", "R-02", "R-03", "R-04", "R-06", "R-07", "F-01", "F-02", "F-03"], status: "todo", after: ["S-02"], session: "impl-claude"}
 	"S-04": {title: "static-inventory.json の sha256 を直し（変われば）、make lint と全体の uv run pytest を通す", realizes: ["R-05", "R-07"], status: "todo", after: ["S-03"], session: "impl-claude"}
 	"S-05": {title: "D-07 の実機の写し（エージェント1人・3人・6人の箱、iss-00613 の箱の前後、ボードの『後に続く』、1440・390 × 明暗）、edgeAudit の違反0・markOverflow 0・ブラウザーのエラー0を report.md に残し、試しの URL を立てる", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06"], status: "todo", after: ["S-04"], session: "owner"}
@@ -14,13 +14,13 @@ steps: {
 
 tests: {
 	"T-01": {title: "markRows：m なし・items 空で 1、ほかの印の残りに全部入れば 1、入らなければ 1 + 稼働の印の行（ちょうど入る境と1px越える境）、ほかの印なしで稼働の印の行だけ、avail より広い印は1つで1行、reserve（題名の最小）を足して判定する", verifies: ["R-04"]}
-	"T-02": {title: "options.marks を渡した layout：稼働の印が1人（1行）・3人（2行）・6人（3行）の箱の高さが 88・108・128（入れ子・木）、行が2つの入れ子の枠の見出しが MARK_ROW 高く中身が下がる、幅は変わらない、rows は 1 のとき鍵がない", verifies: ["R-05"]}
+	"T-02": {title: "options.marks を渡した layout：稼働の印が1人（1行）・3人（2行）・6人（3行）の箱の高さが 88・108・128（入れ子・木）、行が2つの入れ子の枠の見出しが MARK_ROW 高く中身が下がる、幅は変わらない、rows と agents は 1 のとき鍵がなく、ほかの印のある箱と枠は agents が below、ほかの印のない箱は wrap", verifies: ["R-05"]}
 	"T-03": {title: "marks なし・{}・全部1行の marks の layout が、marks なしの今の layout と同じ JSON。iss-00603 の digest の比較（test_all_and_now_lay_out_as_the_two_old_combinations）がそのまま通る", verifies: ["R-05", "F-01"]}
 	"T-04": {title: "稼働の印が1人・3人・6人の箱と2行の枠を含む小さな構造と context の構造で、入れ子・木 × 全体・いま・これから・focus の routeLayout の audit の違反0", verifies: ["R-05"]}
-	"T-05": {title: "layout の box・tframe・frame の node ごとに、rowsOf(node, marks[id]) が node.rows ?? 1 と一致する", verifies: ["R-04", "R-06"]}
-	"T-06": {title: "画面の静的な検査：boxHtml・frameHtml・renderLegend に dnMark と「後に続く」がなく、marks.js に dnMark がない。置き場が orcaSlot(s.id, \"all\")、rows > 1 で is-wrap。ボードの card は downMark と orcaSlot(scope.id, 4) のまま。paintOrca の後と ResizeObserver から checkRows を呼び、checkRows は rowsOf で比べて違うときだけ render する", verifies: ["R-01", "R-02", "R-03", "R-06"]}
+	"T-05": {title: "layout の box・tframe・frame の node ごとに、nodeMarkRows(node, marks[id]) が node.rows ?? 1 と一致する", verifies: ["R-04", "R-06"]}
+	"T-06": {title: "画面の静的な検査：boxHtml・frameHtml・renderLegend に dnMark と「後に続く」がなく、marks.js に dnMark がない。置き場が orcaSlot(s.id, \"all\")、agents が below で置き場が .gx-agents に、wrap で .gx-marks.is-wrap に入る。ボードの card は downMark と orcaSlot(scope.id, 4) のまま。paintOrca の後と ResizeObserver から checkRows を呼び、checkRows は nodeMarkRows で比べて違うときだけ render し、V.rowsRedo が2のときは render しない（checkRows からの render と ResizeObserver では0に戻さない）", verifies: ["R-01", "R-02", "R-03", "R-06"]}
 	"T-07": {title: "偽の DOM で paintOrcaMarks：data-orca-max=\"all\" の置き場はエージェント6人に max 6 を渡し、4 の置き場は max 4 のまま。agents が配列でない worktree は max 1。parts.orcaSlot(id, \"all\") の HTML", verifies: ["R-03", "F-01"]}
-	"T-08": {title: "実機：エージェント1人・3人・6人の箱と iss-00613 の箱（前後）の写し 1440・390 × 明暗、edgeAudit の違反0・markOverflow 0・ブラウザーのエラー0、『後に続く』が構造の図になくボードにある、経過の文字だけの要約で箱が作り直されない（要素の同一性）", verifies: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06", "R-07", "F-02", "F-03"]}
+	"T-08": {title: "実機：エージェント1人・3人・6人の箱と iss-00613 の箱（前後）の写し 1440・390 × 明暗、edgeAudit の違反0・markOverflow 0・ブラウザーのエラー0、『後に続く』が構造の図になくボードにある、経過の文字だけの要約で箱が作り直されない（要素の同一性）、木の枠の箱（進み具合・状態の数・人のタスク）に稼働の印が3人以上あるときもほかの印が1行目のまま", verifies: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06", "R-07", "F-02", "F-03"]}
 }
 
 verification: """

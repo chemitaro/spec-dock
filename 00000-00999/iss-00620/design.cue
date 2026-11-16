@@ -25,7 +25,7 @@ target: """
 
 design: {
 	"D-01": {
-		title: "行の数の規則（layout.js の markRows と rowsOf）"
+		title: "行の数の規則（layout.js の markRows と nodeMarkRows）"
 		text: """
 			layout.js に次を足して export する（DOM なし）。
 
@@ -34,7 +34,7 @@ design: {
 			export const MARK_INSET = { box: 26 }; // 箱の幅から下の段の幅を引く分：左の縁 4 + 左の余白 11 + 右の余白 10 + 右の縁 1（graph.css .gx-box）
 			export const FRAME_TITLE_MIN = 96; // 入れ子の枠の見出しで題名に残す最小の幅（px）
 			export function markRows(m, avail, reserve = 0)
-			export function rowsOf(node, m)
+			export function nodeMarkRows(node, m)
 			```
 
 			`m` は1つの箱・枠の印の測った幅 `{lead, items, gap}`：`lead` は同じ行のほかの印の幅とその行の flex の間（稼働の印の前の間を含む。題名は含まない）、
@@ -46,12 +46,15 @@ design: {
 			3. そうでなければ、`items` を順に `avail` の幅へ詰める（先頭から、次の印が `x + gap + w > avail` なら改行。`avail` より広い印は1つで1行）。その行の数を `k` とする。
 			4. `lead > 0 || reserve > 0` なら `1 + k`（R-04 の3：ほかの印・題名の行の次から）、そうでなければ `k`（R-04 の4）。
 
-			`rowsOf(node, m)`：layout の node（`type` が box・tframe・frame）について、
+			`nodeMarkRows(node, m)`：layout の node（`type` が box・tframe・frame）について、
 			- box・tframe：`markRows(m, (x2 − x1) − MARK_INSET.box)`。
 			- frame（入れ子の枠）：`padX` を `SIZE.pad[kind]` の横（Initiative 16、Epic・Issue 12）として `markRows(m, (x2 − x1) − 2 × padX − 2, FRAME_TITLE_MIN)`（2 は左右の縁）。
 			- ほかの type や `m` なし：1。
 
-			配置の中（D-02）も同じ `markRows` を同じ幅で呼ぶので、graph.js が今の layout の node に `rowsOf` を使った値は、その layout の行の数と必ず一致する（T-05）。
+			既存の `rowsOf(members, edges, stage)`（段・行の決定、313行）とは別の関数で、名前も中身も変えない（名前の衝突を避けて `nodeMarkRows` とする）。
+			`markRows` の4は、ほかの印の幅 `lead` が中の幅を越える箱でも同じに数える（ほかの印の行が1行目からはみ出すのは今の不具合で、この Issue では直さない。稼働の印の行は D-05 で別の行に置くので、ほかの印は折り返さない）。
+
+			配置の中（D-02）も同じ `markRows` を同じ幅で呼ぶので、graph.js が今の layout の node に `nodeMarkRows` を使った値は、その layout の行の数と必ず一致する（T-05）。
 			"""
 		satisfies: ["R-04", "R-05"]
 	}
@@ -63,7 +66,7 @@ design: {
 			- `boxBlock`：`rows = markRows(ctx.opts.marks?.[s.id], SIZE.boxW − MARK_INSET.box)`、`h = SIZE.boxH + grow + (rows − 1) × MARK_ROW`。
 			- `tree` の項目（tbox）：`w`（枠の箱は treeFrameW、箱は boxW）で同じく `rows` を求め、`h = SIZE.boxH + grow + (rows − 1) × MARK_ROW`。
 			- `frameBlock`：`w` を今のとおり求めた後、`rows = markRows(m, w − 2 × padX − 2, FRAME_TITLE_MIN)`、`head = SIZE.head + grow + (rows − 1) × MARK_ROW`。中身の `y` と枠の `h` は今の式のまま head から決まる。
-			- `flatten`：box・tframe・frame の node に、`rows > 1` のときだけ `rows` を足す（1 のときは鍵を足さない。印なしの nodes が今と同じ JSON になる）。
+			- `flatten`：box・tframe・frame の node に、`rows > 1` のときだけ `rows` と `agents` を足す（1 のときはどちらの鍵も足さない。印なしの nodes が今と同じ JSON になる）。`agents` は、稼働の印をほかの印・題名の行の次の行から置くとき（`lead > 0` か `reserve > 0`）`"below"`、ほかの印がない箱で下の段の中で折り返すとき `"wrap"`。
 
 			幅、`SIZE` の既存の値、段・行・包み（pack）の決め方は変えない。伸びた高さは今の包みと線の引き方にそのまま入り、routeLayout の検査と幅の広げ方は伸びた箱で回る（R-05）。
 			"""
@@ -82,8 +85,8 @@ design: {
 			`measureMarks(world)`（graph.js）：`[data-orca-scope]` の置き場ごとに、中に `.orca-mark` が1つ以上あれば、その箱・枠の id（置き場の `data-orca-scope`）に `{lead, items, gap}` を返す。
 			- 幅は `getBoundingClientRect().width / V.s`（拡大の分を戻す）を小数第1位で切り上げる（足し合わせて実際より小さくならないように）。
 			- `items`：置き場の中の `.orca-mark` ごとの幅（描いた順）。`gap`：部品の `.orca-marks` の `getComputedStyle().columnGap`。
-			- `lead`：置き場の親の行（`.gx-marks` か `.gx-fh`）の子のうち、置き場と題名（`.gx-fttl`）を除いたものの幅の和 + その行の `columnGap` ×（子の数 − 1）。
-			- 測れない（F-02）：図が隠れている、どれかの幅が0、部品の `.orca-marks` の `flexWrap` が `wrap` でない（部品の CSS がまだ効いていない）→ `null`（配置を変えない）。
+			- `lead`：その箱・枠のほかの印の行（箱は `.gx-marks`、入れ子の枠は `.gx-fh`。置き場がその行の中にあっても、D-05 の `.gx-agents` に移っていても同じ行を見る）の子のうち、置き場を除いた子が `c` 個（題名 `.gx-fttl` を数に含む）あるとき、題名と置き場を除いた子の幅の和 + その行の `columnGap` × `c`（稼働の印の前の間を含む）。`c` が0なら `lead = 0`。幅0の子（中身のない `.cnts` など）は幅0として足す。
+			- 測れない（F-02）：図が隠れている（`.gx-view` が hidden か幅0）、稼働の印 `.orca-mark` のどれかの幅が0、部品の `.orca-marks` の `flexWrap` が `wrap` でない（部品の CSS がまだ効いていない）→ `null`（配置を変えない）。ほかの印の子の幅が0なのは測れない理由にしない。
 			"""
 		satisfies: ["R-04", "R-06", "F-02"]
 	}
@@ -92,14 +95,14 @@ design: {
 		text: """
 			`V.marks`（最後に測った印、初めは `{}`）を `buildWorld` の routeLayout の options の `marks` に渡す。
 
-			`checkRows()`：`M = measureMarks(V.el.world)`。`null` なら何もしない。今の配置 `V.EG.layout.nodes` の box・tframe・frame ごとに `rowsOf(node, M[node.id])` を求め、
+			`checkRows()`：`M = measureMarks(V.el.world)`。`null` なら何もしない。今の配置 `V.EG.layout.nodes` の box・tframe・frame ごとに `nodeMarkRows(node, M[node.id])` を求め、
 			`node.rows ?? 1` と1つでも違えば、`V.marks = M` にして、`V.sig = null` で `render(V.root, V.ctx)` を呼ぶ（`V.fitted` を保つので拡大・位置は変わらない。選択と横の欄も render のまま保つ）。
 			どれも同じなら `V.marks = M` だけを更新し、配置はやり直さない（R-06：経過の文字だけの変化では箱を作り直さない）。
 
 			呼ぶところ：
 			- `paintOrca()` の `paintOrcaMarks` の後（要約のたび、描いた後のたび）。
 			- `ResizeObserver` で `.gx-world` の置き場（`.sd-orca`）を見て、大きさが変わったら `requestAnimationFrame` で1回にまとめて `checkRows`（部品の CSS や字体があとから効いたとき。R-06 の3つ目）。`buildWorld` のたびに見る要素を付け直し、`dispose` で外す。
-			- 揺れの歯止め（F-03）：`checkRows` からのやり直しを数え、要約（`orcaWatch` の知らせ）・大きさの変化・データの変化のたびに0に戻す。2回を越えたらやり直さない。
+			- 揺れの歯止め（F-03）：`checkRows` からのやり直しを `V.rowsRedo` で数える。0に戻すのは、`checkRows` 自身からでない `render` の呼び出し（データ・入れ子と木・範囲・focus の変化、窓の大きさの変化による relayout）と、orca の要約の知らせ（`orcaWatch` の `onNews`）のときだけ。`checkRows` が呼んだ `render` と、ResizeObserver の知らせ（やり直しで付け直した置き場の大きさの変化を含む）では0に戻さない。`V.rowsRedo` が2のときは、行の数が違ってもやり直さず `V.marks` だけを更新する（次の要約か、次の render で直る）。
 
 			やり直しで `render` → `paintOrca` → `checkRows` が再び呼ばれるが、そのときは今の layout の行の数と一致するので止まる（D-01 の一致）。
 			"""
@@ -108,14 +111,16 @@ design: {
 	"D-05": {
 		title: "画面：dnMark を消し、置き場を上限なしにし、折り返す（graph.js・marks.js・parts.js・orca_marks.js・graph.css）"
 		text: """
-			- `boxHtml`：`M.dnMark(s.downstream)` を2か所から消し、aria-label の「。後に続く n件」を消す。置き場は `orcaSlot(s.id, "all")`。`n.rows > 1` なら `.gx-marks` に `is-wrap` を足す。
-			- `frameHtml`：見出しの置き場を `orcaSlot(s.id, "all")` にし、`n.rows > 1` なら `.gx-fh` に `is-wrap` を足す。要約の行 `.gx-fm` から `M.dnMark` を消す。
+			- `boxHtml`：`M.dnMark(s.downstream)` を2か所から消し、aria-label の「。後に続く n件」を消す。置き場は `orcaSlot(s.id, "all")`。
+			  layout の node の `agents` が `"below"`（D-02）なら、置き場を `.gx-marks` から出し、その直後の `<div class="gx-agents">` に置く（`.gx-marks` はほかの印だけで、今のとおり折り返さない。R-04 の規則1）。`"wrap"` なら置き場は `.gx-marks` の中のまま、`.gx-marks` に `is-wrap` を足す（ほかの印がないので、折り返すのは稼働の印だけ）。
+			- `frameHtml`：見出しの置き場を `orcaSlot(s.id, "all")` にし、node の `agents` が `"below"` なら、置き場を `.gx-fh` から出して、`.gx-fh` と `.gx-fm` の間の `<div class="gx-agents">` に置く。要約の行 `.gx-fm` から `M.dnMark` を消す。
 			- `renderLegend`：「後に続く数」の `li` を消す（ほかの行と「矢印：…出る線＝後に続く」は残す）。
 			- `marks.js`：`dnMark` を消す。`tests/js/dashboard_marks_dump.mjs` と `tests/fixtures/issue544/marks-golden.json` から `dnMark` の項目を消す。
 			- `parts.js` の `orcaSlot(id, max)`：`max` は数か `"all"`（`data-orca-max="all"`）。ボード（4）と横の欄（4）は今のまま。
 			- `orca_marks.js` の `paintOrcaMarks`：`data-orca-max` が `"all"` のとき、`max = Math.max(1, worktree.agents の数)`（配列でなければ 1）。部品の `max` の意味は変えない（全員が max 以下なので『+N』は出ない）。
 			- `graph.css`：`.gx .dn` とそれに関わる規則（`.gx-marks .dn`、`.hm + .dn`、`:is(.hm, .dn) ~ .sd-orca`）を `dn` なしに直す。
-			  `.gx :is(.gx-marks, .gx-fh).is-wrap { flex-wrap: wrap; row-gap: 4px; }`、`.gx .is-wrap > .sd-orca { flex-basis: 100%; margin-left: 0; }`、`.gx .sd-orca .orca-marks { row-gap: 4px; }`。
+			  `.gx .gx-agents { display: flex; margin-top: 4px; }`、`.gx .gx-agents > .sd-orca { flex: 1 1 100%; margin-left: 0; min-width: 0; }`、`.gx .gx-marks.is-wrap { flex-wrap: wrap; }`、`.gx .gx-marks.is-wrap > .sd-orca { flex-basis: 100%; margin-left: 0; }`、`.gx .sd-orca .orca-marks { row-gap: 4px; }`。
+			  増える高さ：`.gx-agents` の1行目が 4 + 16 = 20、次の行から 4 + 16 = 20（`MARK_ROW`）。`is-wrap` の1行目は今の下の段の行に入り、次の行から 20。
 			  1行目の右寄せ（今の `margin-left: auto`）はそのまま。折り返した稼働の印の行は左寄せ（部品の既定）。新しい色を足さない（R-07）。
 			- `edgeAudit`：結果に `markOverflow`（稼働の印 `.orca-mark` のどれかが、その箱・枠の内側の右の縁か、箱の下の縁を 0.5px より越える箱・枠の数）を足す。実機の確かめ（T-08）に使う。
 			"""
@@ -125,7 +130,7 @@ design: {
 		title: "テストの置き場"
 		text: """
 			- layout（node、`tests/js/dashboard_graph_check.mjs` に `marks` を渡せるようにし、`tests/unit/presentation/test_dashboard_graph_marks_rows.py` を新しく作る）：
-			  `markRows` の場合分け（T-01）、`opts.marks` の高さ（T-02）、印なしの一致（T-03）、伸びた箱での audit（T-04）、`rowsOf` と node.rows の一致（T-05）。
+			  `markRows` の場合分け（T-01）、`opts.marks` の高さ（T-02）、印なしの一致（T-03）、伸びた箱での audit（T-04）、`nodeMarkRows` と node.rows の一致（T-05）。
 			  印の幅は、部品の sm の実寸に近い決まった値（例：ほかの印 60px、稼働の印 36px、間 2px）で作る。
 			- 画面（`tests/unit/infra/test_dashboard_orca_views_js.py`・`test_dashboard_orca_marks_js.py`、`tests/unit/presentation/test_dashboard_graph_js.py` などの静的な検査と node の偽の DOM）：dnMark・凡例・aria-label、置き場の `"all"`、`is-wrap`、`checkRows` の呼び方（T-06、T-07）。
 			- 既存の `test_the_box_size_does_not_change` は SIZE の値を見るので、そのまま通る（SIZE は変えない）。
