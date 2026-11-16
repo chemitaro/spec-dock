@@ -5,7 +5,7 @@ package spec
 goal: "`/graph` に、表示しているすべてのリポジトリの構造の図を会社の入れ子のリポジトリの枠で1枚に描く『横断の構造』を足す（既定は『これから』）。構造の図の見え方は変えない"
 
 steps: {
-	"S-01": {title: "compose.js（D-03）の node のテスト（T-01・T-02。この PC の登録の形の合成の9つ、名前だけの入力、next の出し入れ、帯、F-03）を先に書いて落ちることを確かめ、compose.js を書いて通す", realizes: ["R-03", "R-04", "R-05", "F-03"], status: "todo", session: "impl-sol"}
+	"S-01": {title: "compose.js（D-03）の node のテスト（T-01・T-02。この PC の登録の形の合成の9つ、名前だけの入力、next の出し入れ、帯、F-03）を先に書いて落ちることを確かめ、compose.js を書いて通す", realizes: ["R-03", "R-04", "R-05", "F-03"], status: "done", session: "impl-sol"}
 	"S-02": {title: "D-01（parseRoute・allGraphPath・ALL_TABS・VIEWS の口・title・interceptLinks・サーバーの _get・reference_cli.md）のテスト（T-03）を先に書いて落ちることを確かめ、実装して通す。VIEWS の allgraph は、S-04 まで最小の画面（空の render と dispose）でよい", realizes: ["R-01"], status: "todo", after: ["S-01"], session: "impl-sol"}
 	"S-03": {title: "開始のコミット 7f7dd2b1d の graph.js で偽の DOM の HTML の写し（T-04）を作ってテストの資料に残し、D-02 の draw.js を取り出し、写しとの一致と、調べる場所を移したソースの文字列のテストと、構造の図の既存のテストを通す", realizes: ["R-02"], status: "todo", after: ["S-02"], session: "impl-claude"}
 	"S-04": {title: "allgraph.js・allgraph.css（D-04〜D-07）を、偽の DOM のテスト（T-05〜T-07）を先に書いて落ちることを確かめてから書き、通す", realizes: ["R-03", "R-05", "R-06", "R-07", "R-08", "F-01", "F-02"], status: "todo", after: ["S-03"], session: "impl-claude"}
