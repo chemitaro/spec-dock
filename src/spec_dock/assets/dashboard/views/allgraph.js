@@ -43,7 +43,7 @@ const A = {
   s: 1,
   tx: 0,
   ty: 0,
-  fitted: false,
+  moved: false, // the reader has moved the graph (pan, zoom, fit, a selection brought into view): no first view again
   width: 0, // the graph area's width at 100% the frames were composed for
   height: 0,
   comp: null, // the last compose() result
@@ -239,7 +239,7 @@ function dispose() {
   A.root = null;
   A.el = null;
   A.ctx = null;
-  A.fitted = false;
+  A.moved = false;
   A.sel = null;
   A.path = null;
   A.hl = null;
@@ -526,11 +526,12 @@ function draw() {
   }
   renderBar();
   renderLegend();
-  if (!A.fitted && C.order.length) {
-    A.fitted = true;
+  if (!A.moved && C.order.length) {
     whenStyled(() => {
-      initialView();
-      applyT();
+      if (A.el && !A.moved) {
+        initialView();
+        applyT();
+      }
     });
   }
   applyT();
@@ -845,6 +846,9 @@ function barBottom() {
 
 const worldSize = () => ({ width: Math.max(1, A.comp?.width || 1), height: Math.max(1, A.comp?.height || 1) });
 
+// The first view (iss-00629 D-03): on a PC the world fits the graph area's width from its left (no part past it), read
+// down by panning; on a phone the structure graph's 74% from the left. Every draw places it again with the world of
+// that moment until the reader moves the graph (A.moved), so a world that grows after loading still fits.
 function initialView() {
   const v = A.el.view;
   const L = worldSize();
@@ -853,8 +857,8 @@ function initialView() {
     A.s = 0.74;
     A.tx = 4;
   } else {
-    A.s = Math.min(1, Math.max(0.88, (v.clientWidth - 16) / L.width));
-    A.tx = Math.max(0, (v.clientWidth - L.width * A.s) / 2);
+    A.s = Math.min(1, (v.clientWidth - 16) / L.width); // fit the width: no part of the world past the view
+    A.tx = 8;
   }
   A.ty = top;
 }
@@ -873,6 +877,7 @@ function fit() {
   const v = A.el.view;
   const L = worldSize();
   const top = barBottom() + 8;
+  A.moved = true;
   A.s = Math.max(minScale(), fitScale());
   A.tx = (v.clientWidth - L.width * A.s) / 2;
   A.ty = top + Math.max(0, (v.clientHeight - top - 8 - L.height * A.s) / 2);
@@ -881,6 +886,7 @@ function fit() {
 
 function zoomAt(f, cx, cy) {
   const ns = Math.min(2, Math.max(minScale(), A.s * f));
+  A.moved = true;
   A.tx = cx - (cx - A.tx) * (ns / A.s);
   A.ty = cy - (cy - A.ty) * (ns / A.s);
   A.s = ns;
@@ -902,6 +908,7 @@ function keepAbovePanel(repo, id) {
   const top = vb.top + barBottom() + 8;
   const bottom = vb.bottom - A.el.panel.offsetHeight - 12;
   if (b.top >= top && b.bottom <= bottom) return;
+  A.moved = true;
   A.ty += top + Math.max(0, (bottom - top - b.height) / 2) - b.top;
   applyT();
 }
@@ -912,6 +919,7 @@ function centerOn(repo, id) {
   const vb = A.el.view.getBoundingClientRect();
   const b = el.getBoundingClientRect();
   const off = isPhone() ? 0 : A.el.panel.classList.contains("is-open") ? (A.el.panel.offsetWidth + 10) / 2 : 0;
+  A.moved = true;
   A.tx += vb.left + vb.width / 2 - off - (b.left + b.width / 2);
   A.ty += vb.top + (isPhone() ? vb.height * 0.3 : vb.height / 2) - (b.top + b.height / 2);
   applyT();
@@ -954,12 +962,14 @@ function bindView() {
         }
       }
       if (tap.moved) {
+        A.moved = true;
         A.tx += dx;
         A.ty += dy;
         applyT();
       }
     } else if (pts.size === 2 && pinch) {
       const n = two();
+      A.moved = true;
       A.tx += n.cx - pinch.cx;
       A.ty += n.cy - pinch.cy;
       if (pinch.d > 0) zoomAt(n.d / pinch.d, n.cx, n.cy);
@@ -987,6 +997,7 @@ function bindView() {
       const b = v.getBoundingClientRect();
       if (e.ctrlKey || e.metaKey) zoomAt(Math.exp(-e.deltaY * 0.01), e.clientX - b.left, e.clientY - b.top);
       else {
+        A.moved = true;
         A.tx -= e.deltaX;
         A.ty -= e.deltaY;
         applyT();
