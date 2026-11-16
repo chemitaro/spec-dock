@@ -133,6 +133,18 @@ def test_pressing_a_mark_prefers_the_agents_tab() -> None:
     assert board.index("plainClick(event)") < board.index("preferTab")
 
 
+def test_a_mark_on_a_selected_box_opens_the_agents_tab_on_a_phone_too() -> None:  # iss-00602 T-01
+    tap = _function((VIEWS / "graph.js").read_text(), "onTap")
+    mark = tap.index('if (target.closest(".sd-orca")) {')
+    second = tap.index("if (isPhone() && V.sel === id) {")
+    assert mark < second  # the mark is read before a phone's second tap opens the detail screen
+    branch = tap[mark : tap.index("\n  }\n", mark)]
+    assert "if (V.sel !== id) select(id);" in branch
+    assert branch.index("select(id)") < branch.index('V.pn?.preferTab("agents");')
+    assert branch.rstrip().endswith("return;")
+    assert tap[second:].index("goDetail(id);") < tap[second:].index("return;")
+
+
 @needs_node
 def test_the_watch_follows_one_reader_at_a_time(tmp_path: Path) -> None:
     out = run_node(

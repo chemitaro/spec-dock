@@ -20,7 +20,12 @@ export function scopeAgents(worktrees) {
   let invalid = 0;
   const seen = new Set();
   for (const worktree of Array.isArray(worktrees) ? worktrees : []) {
-    if (!worktree || typeof worktree !== "object" || !Array.isArray(worktree.agents)) continue;
+    if (!worktree || typeof worktree !== "object") continue;
+    // The summary's contract always gives an array: anything else is one entry out of shape, never "no agents" (iss-00602 D-05).
+    if (!Array.isArray(worktree.agents)) {
+      invalid++;
+      continue;
+    }
     for (const raw of worktree.agents) {
       const id = raw && typeof raw === "object" && filled(raw.id) ? raw.id : null;
       if (id !== null) {
@@ -131,4 +136,14 @@ export function noteDrift(mem, id) {
 export function noteShown(mem, id) {
   mem.last = id;
   return mem;
+}
+
+// The choice a link out of the panel carries when the panel's Map has none (iss-00602 D-03): the agent placed last
+// in this Scope, or gone:<id> when it went away, or the first loss when only losses are remembered. Never another
+// Scope's memory.
+export function lastChoice(mem, scopeId) {
+  if (mem.scopeId !== scopeId) return null;
+  if (mem.last != null) return mem.gone.has(mem.last) ? GONE + mem.last : mem.last;
+  for (const id of mem.gone) return GONE + id;
+  return null;
 }

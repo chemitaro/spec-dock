@@ -696,12 +696,17 @@ function onTap(target) {
     return;
   }
   const id = hit.dataset.id;
+  // A pressed mark opens the agents' tab (iss-00592 D-03), also on a phone's second tap (iss-00602 D-01).
+  if (target.closest(".sd-orca")) {
+    if (V.sel !== id) select(id);
+    V.pn?.preferTab("agents");
+    return;
+  }
   if (isPhone() && V.sel === id) {
     goDetail(id);
     return;
   }
   if (V.sel !== id) select(id);
-  if (target.closest(".sd-orca")) V.pn?.preferTab("agents"); // a pressed mark opens the agents' tab (D-03)
 }
 
 // --- Zoom and pan ------------------------------------------------------------------------------------------

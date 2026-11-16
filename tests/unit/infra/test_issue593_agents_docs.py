@@ -67,3 +67,23 @@ def test_the_inventory_carries_the_new_reference() -> None:
     entry = entries["spec-dock/docs/reference_cli.md"]
     assert entry["sha256"] == hashlib.sha256(REFERENCE.read_bytes()).hexdigest()
     assert len(entry["known_old_sha256"]) == len(set(entry["known_old_sha256"]))
+
+
+def test_the_reference_explains_the_choice_fixes_of_issue_602() -> None:
+    """iss-00602 T-06 (D-06): the choice kept from the memory, the panel's foot links, modified presses, shape."""
+    section = _section()
+    agents = section[section.index("### エージェントのタブ") :]
+    assert "その Scope で最後に開いた相手を開いたときも、その相手を問い合わせ（横の欄では欄の中）に書く" in agents
+    assert "帯の今の相手を押しても枠は読み込み直されません" in agents
+    assert "横の欄の足の「詳しい画面」と「新しいタブで開く」は、欄の今の選びを、なければ同じ Scope の覚え" in agents
+    assert "いなくなっていれば`gone:<id>`" in agents and "欄がどのタブを見ていても" in agents
+    assert "修飾キー（Ctrl・Cmd・Shift・Alt）つきの押しで新しいタブに開くときは、元の画面の覚えを変えません" in agents
+    shape = next(line for line in agents.splitlines() if line.startswith("| `orca-shape` |"))
+    assert "worktree の`agents`が並びでないときも、形の違う1件に数える" in shape
+
+
+def test_the_inventory_accepts_the_reference_of_the_last_release() -> None:
+    entries = {e["path"]: e for e in json.loads((ASSETS / "static-inventory.json").read_text())["files"]}
+    entry = entries["spec-dock/docs/reference_cli.md"]
+    released = "6b8066f2ad598b16f243307be2073f424ace27167b718de770ba804d44c5c4a8"  # v0.9.3
+    assert released in entry["known_old_sha256"] and entry["sha256"] != released
