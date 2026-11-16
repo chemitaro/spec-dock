@@ -21,7 +21,7 @@ tests: {
 	"T-05": {title: "偽の DOM の allgraph：合成の9つのリポジトリ（stub の api）で、既定が next、範囲の切り替えが specdock.allgraph.v1 にだけ書く（specdock.graph.v3 は変わらない、壊れた値で next、保存した all を新しい描画で読み戻す）、ax-repo の並びと data-depth、見出しの owner/name と段の札（›）、next で見えないリポジトリの枠がなく入れ物の親があり、all・now ですべての枠、1つのリポジトリの枠の箱の ID の集まりが同じ構造の routeLayout と同じ、失敗したリポジトリの枠に overviewWarnings の文と次の1手、F-02 の2つの知らせ、allgraph.css に色の値と色の札がなく、`.ax-body > .gx-box` 等の絶対配置・`.main[data-view=\"allgraph\"]`・allgraph の `--pn-w` の規則がある", verifies: ["R-03", "R-05", "F-01", "F-02"]}
 	"T-06": {title: "偽の DOM の allgraph の選び：2つのリポジトリにある同じ ID の箱の一方を押すと、api.scope がそのリポジトリの鍵で呼ばれ、もう一方の箱は is-sel でなく、欄の『詳しい画面』の href が /r/<その鍵>/scopes/<ID>（embed で embed=1）、欄の current() がそのリポジトリと構造を返す。状態の札の数がすべての出している枠の合計。稼働の印（orca-web の要約の合成）が対応した worktree のあるリポジトリの箱にだけ描かれる", verifies: ["R-06"]}
 	"T-07": {title: "偽の DOM の allgraph の更新：版が変わらない更新を3回しても specdockAllGraphStats.layouts が増えず、1つのリポジトリの版を変えるとそのリポジトリの構造だけが読み直されて layouts が1つだけ増える。markSeen を呼ばない。エージェントの行の寸法が変わったリポジトリだけ配置し直す（リポジトリごとに2回まで）", verifies: ["R-06", "R-08"]}
-	"T-08": {title: "実機：この PC の9つの登録の写しで、company-os の下の事業・プロダクトの入れ子と外の spec-dock・orca-web が1枚に出る、全体・いま・これからで枠の出入りが正しい、箱を押すと横の欄が開き『詳しい画面』がそのリポジトリへ移る、稼働の印が出る、を 1440・1000・390 × 明・暗で写し、edgeAudit の total の違反0、ブラウザーのエラー0、横のスクロールなし、『収める』の後にすべての枠が図の領域に収まる、リポジトリごとの配置の ms", verifies: ["R-01", "R-03", "R-05", "R-06", "R-07"]}
+	"T-08": {title: "実機：この PC の9つの登録の写しで、company-os の下の事業・プロダクトの入れ子と外の spec-dock・orca-web が1枚に出る、全体・いま・これからで枠の出入りが正しい、箱を押すと横の欄が開き『詳しい画面』がそのリポジトリへ移る、稼働の印が出る、を 1440・1000・390 × 明・暗で写し、edgeAudit（倍率 100%）の違反が、リポジトリごと・範囲ごと・幅ごとに単体の構造の図と同じ数で新しい違反0（比べの表を report に残す）、ブラウザーのエラー0、横のスクロールなし、『収める』の後にすべての枠が図の領域に収まる、リポジトリごとの配置の ms", verifies: ["R-01", "R-03", "R-05", "R-06", "R-07"]}
 }
 
 verification: """

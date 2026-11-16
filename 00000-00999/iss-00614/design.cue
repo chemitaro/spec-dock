@@ -111,12 +111,13 @@ design: {
 	"D-07": {
 		title: "広さ、初めの見え方、線の検査"
 		text: """
-			- 初めの見え方、『収める』、拡大の下限、ズームと移動の操作、Safari の gesture の止め、窓の大きさの変化（200ms 落ち着いてから幅が変わったときだけ組み立て直す）は、graph.js と同じ式を compose の `width`・`height` に当てる。graph.js の関数をそのまま写してよい（共有のために graph.js を変えるなら、出す HTML と動きを変えない）。
+			- 拡大の下限だけは、graph.js の `max(0.02, min(0.12, fitScale))` の 0.02 を、全体を収めるのに要る倍率まで下げる（例 `max(0.002, min(0.12, fitScale))`）。実データの『全体』では世界が数万 px になり、0.02 では『収める』で収まらないため（R-07）。graph.js は変えない。
+			- 初めの見え方、『収める』、ズームと移動の操作、Safari の gesture の止め、窓の大きさの変化（200ms 落ち着いてから幅が変わったときだけ組み立て直す）は、graph.js と同じ式を compose の `width`・`height` に当てる。graph.js の関数をそのまま写してよい（共有のために graph.js を変えるなら、出す HTML と動きを変えない）。
 			- 390px 以下（PHONE 640 の判定は graph と同じ）では、横の欄は今の下からのシート、道具の帯は graph.css のスマホの形。
 			- `window.specdockEdgeAudit(options)`：リポジトリごとに、graph の edgeAudit と同じ計算を、そのリポジトリの `.ax-body` の四角を原点にして行い、`{repos: {鍵: 結果}, total: {各数の合計}}` を返す。dispose で消す。
 			- 共有の CSS が効く範囲：graph.css の部品の絶対配置などは `.gx .gx-world > .gx-box` のような子の結合子で書かれ、`.main[data-view="graph"]` と panel.css の `:is([data-view="graph"], [data-view="board"])`（`--pn-w`）は view の名前で当たる。allgraph の部品は `.gx-world > section.ax-repo > .ax-body` の中にあり、殻は `data-view="allgraph"` を付けるので、これらに当たる規則を allgraph.css に足す（`.ax-body > .gx-box` などの絶対配置と重なりの順、`.main[data-view="allgraph"]`、`[data-view="allgraph"]` の `--pn-w`）。共有の CSS のセレクターに `[data-view="allgraph"]` を足すやり方でもよいが、構造の図とボードの見え方は変えない。
 			- allgraph.css：`.ax-repo`（2px の線、角の丸みを Initiative の枠と変える、背景は今の面の色の札）、`.ax-head`（folder のアイコンと名前の帯）、`.ax-warn`、`.ax-body`、深さで背景を少し変えるなら今の札だけで。新しい色の値と色の札は書かない（R-03）。寸法は compose.js の REPO と揃える。
-			- 確かめ（R-07）：この PC の状態の置き場を写した一時の置き場と隔離した venv で `dashboard serve --offline --tailscale` を別のポートで立て、headless Chrome（`--disable-features=MacAppCodeSignClone`、CDP の `Browser.close` で閉じる）で 1440・1000・390 × 明・暗 × 3つの範囲を写し、edgeAudit とブラウザーのエラーと横のスクロールを数える。稼働の印は、常駐の orca-web の要約を読むだけで中継する試しの orca（iss-00620 と同じ作り）で確かめる。
+			- 確かめ（R-07）：この PC の状態の置き場を写した一時の置き場と隔離した venv で `dashboard serve --offline --tailscale` を別のポートで立て、headless Chrome（`--disable-features=MacAppCodeSignClone`、CDP の `Browser.close` で閉じる）で 1440・1000・390 × 明・暗 × 3つの範囲を写し、edgeAudit（倍率 100% で測る）とブラウザーのエラーと横のスクロールを数える。違反が出たリポジトリは、単体の構造の図（`/r/<鍵>/`、同じ範囲、中の幅と同じ見える幅）で同じ数かを比べ、表にする。稼働の印は、常駐の orca-web の要約を読むだけで中継する試しの orca（iss-00620 と同じ作り）で確かめる。
 			"""
 		satisfies: ["R-07"]
 	}
