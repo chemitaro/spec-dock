@@ -9,7 +9,7 @@ import * as api from "../core/api.js";
 import { DEFAULTS, index, routeLayout } from "./graph/layout.js";
 import { audit, svg as edgeSvg } from "./graph/router.js";
 import * as M from "./graph/marks.js";
-import { LEGACY_KEY, PREFS_KEY, restorePrefs } from "./graph/prefs.js";
+import { LEGACY_KEYS, PREFS_KEY, restorePrefs } from "./graph/prefs.js";
 import { createScopePanel } from "./_shared/panel.js";
 import { createOrcaWatch, paintOrcaMarks } from "./_shared/orca_marks.js";
 import { orcaSlot } from "./_shared/parts.js";
@@ -61,7 +61,7 @@ const V = {
   lastTap: null,
 };
 
-// The saved choices (iss-00556 D-05): version 2, with only some of version 1 carried over (graph/prefs.js).
+// The saved choices (iss-00603 D-04): version 3, with what carries over from versions 2 and 1 (graph/prefs.js).
 function loadPrefs() {
   const read = (key) => {
     try {
@@ -71,14 +71,14 @@ function loadPrefs() {
       return null; // private windows, blocked storage and broken values: the defaults
     }
   };
-  const { opts, legend } = restorePrefs(read(PREFS_KEY), read(LEGACY_KEY), DEFAULTS);
+  const { opts, legend } = restorePrefs(read(PREFS_KEY), LEGACY_KEYS.map(read), DEFAULTS);
   Object.assign(V.opts, opts);
   V.legend = legend;
 }
 function savePrefs() {
   try {
-    const { mode, showDone, deps, fold } = V.opts; // the focus lives in the URL, not in the preferences
-    localStorage.setItem(PREFS_KEY, JSON.stringify({ mode, showDone, deps, fold, legend: V.legend }));
+    const { mode, range, deps } = V.opts; // the focus lives in the URL, not in the preferences
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ mode, range, deps, legend: V.legend }));
   } catch {
     // ignore
   }
