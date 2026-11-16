@@ -222,7 +222,49 @@ def test_scope_agents(tmp_path: Path) -> None:  # T-02 scopeAgents
         const odd = logic.scopeAgents([null, 4, {id: "w4", branch: "b", agents: null}, {id: "w5", branch: 3, agents: [agent("d")]}]);
         assert.deepEqual(ids(odd.agents), ["d"]);
         assert.equal(odd.agents[0].branch, null);
-        assert.equal(odd.invalid, 0);
+        assert.equal(odd.invalid, 1); // a worktree whose agents is not an array counts as one out of shape (iss-00602 D-05)
+        """,
+        tmp_path,
+    )
+
+
+@node
+def test_a_worktree_whose_agents_is_not_an_array_is_out_of_shape(tmp_path: Path) -> None:  # iss-00602 T-05
+    run_node(
+        """
+        const shapes = {object: {agents: {id: "a"}}, null: {agents: null}, missing: {}, string: {agents: "a"}};
+        for (const [name, extra] of Object.entries(shapes)) {
+          const result = logic.scopeAgents([{id: "w1", branch: "one", ...extra}]);
+          assert.deepEqual(ids(result.agents), [], name);
+          assert.equal(result.invalid, 1, name);
+          assert.deepEqual([...result.invalidIds], [], name);
+        }
+        const mixed = logic.scopeAgents([tree("w1", "one", [agent("a"), agent("b")]), {id: "w2", branch: "two", agents: {id: "c"}}]);
+        assert.deepEqual(ids(mixed.agents), ["a", "b"]);
+        assert.equal(mixed.invalid, 1);
+        assert.deepEqual([...mixed.invalidIds], []);
+        """,
+        tmp_path,
+    )
+
+
+@node
+def test_last_choice_of_the_memory(tmp_path: Path) -> None:  # iss-00602 T-03
+    run_node(
+        """
+        const mem = logic.createAgentMemory();
+        assert.equal(logic.lastChoice(mem, "iss-00001"), null); // nothing remembered yet
+        logic.memoryFor(mem, "iss-00001");
+        assert.equal(logic.lastChoice(mem, "iss-00001"), null);
+        logic.noteShown(mem, "a");
+        assert.equal(logic.lastChoice(mem, "iss-00001"), "a");
+        assert.equal(logic.lastChoice(mem, "iss-00002"), null); // another Scope's memory is never used (F-02)
+        logic.noteGone(mem, "a");
+        assert.equal(logic.lastChoice(mem, "iss-00001"), "gone:a"); // F-01
+        mem.last = null;
+        mem.gone = new Set(["x", "y"]);
+        assert.equal(logic.lastChoice(mem, "iss-00001"), "gone:x"); // the first loss, in the order noted
+        assert.equal(logic.lastChoice(mem, "iss-00002"), null);
         """,
         tmp_path,
     )

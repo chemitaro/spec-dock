@@ -486,7 +486,7 @@ def test_the_strip_is_painted_once_and_follows_the_choice(tmp_path: Path) -> Non
         const capture = lone.root.box.listeners.filter((item) => item.type === "click");
         out.capture = capture.map((item) => item.capture);
         let prevented = false;
-        capture[0].fn({target: {closest: (sel) => (sel === "[data-agent-pick]" ? {dataset: {agentPick: "b"}} : null)}, preventDefault: () => { prevented = true; }});
+        capture[0].fn({target: {closest: (sel) => (sel === "[data-agent-pick]" ? {dataset: {agentPick: "b"}} : null)}, button: 0, preventDefault: () => { prevented = true; }});
         out.prevented = prevented; out.afterPress = {gone: [...at.mem.gone], picked: at.mem.picked};
         at.paintAgentList(lone.root, lone.env);
         out.captureCount = lone.root.box.listeners.filter((item) => item.type === "click").length;
@@ -1115,3 +1115,178 @@ def test_the_panel_foot_links_carry_the_panel_choice(tmp_path: Path) -> None:  #
     assert out["noChoice"] == [f"{base}?tab=agents"] * 2
     assert out["chosen"] == [f"{base}?agent=a&amp;tab=agents"] * 2
     assert out["gone"] == [f"{base}?agent=gone%3Aa&amp;tab=agents"] * 2
+
+
+# --- iss-00602: the choice from the memory, the foot links, the modified press and the out-of-shape worktree ------
+
+
+@node
+def test_an_agent_opened_from_the_memory_is_kept_as_the_choice(tmp_path: Path) -> None:  # iss-00602 T-02
+    out = _run(
+        """
+        const remembered = (id, extra = () => {}) => { reset(); logic.memoryFor(at.mem, sid); logic.noteShown(at.mem, id); extra(); };
+        world.trees[sid] = [tree("w1", "one", [raw("a"), raw("b")])];
+        // The panel without a choice (closed and opened again): a from the memory goes into the Map.
+        remembered("a");
+        const params = new Map();
+        const inPanel = counting(panel(params));
+        const panelHtml = at.agentsTab(inPanel);
+        out.panel = {kept: inPanel.kept, map: [...params], frames: frames(panelHtml)};
+        // The detail screen without agent=: a goes into the query in place, so pressing a in the strip is no move.
+        remembered("a");
+        const onPage = counting(page("tab=agents"));
+        const pageHtml = at.agentsTab(onPage);
+        const link = onPage.paramLink("agent", "a").match(/href="([^"]*)"/)[1].replaceAll("&amp;", "&");
+        out.page = {
+          kept: onPage.kept, replaced: onPage.ctx.replaced, frames: frames(pageHtml), param: onPage.param("agent"),
+          sameAgent: new URL(link, "http://x").searchParams.get("agent") === onPage.ctx.route.params.get("agent"),
+        };
+        // One agent: kept as before.
+        world.trees[sid] = [tree("w1", "one", [raw("a")])];
+        remembered("a");
+        const lone = counting(panel(new Map()));
+        at.agentsTab(lone);
+        out.lone = lone.kept;
+        // A choice in the Map or the query: nothing to keep.
+        world.trees[sid] = [tree("w1", "one", [raw("a"), raw("b")])];
+        remembered("a");
+        const chosen = counting(panel(new Map([["agent", "a"]])));
+        at.agentsTab(chosen);
+        const asked = counting(page("tab=agents&agent=a"));
+        at.agentsTab(asked);
+        out.asked = {panel: chosen.kept, page: asked.ctx.replaced};
+        // The remembered agent went away: gone:<id>, no frame (F-01).
+        remembered("a", () => logic.noteGone(at.mem, "a"));
+        const noted = counting(panel(new Map()));
+        out.noted = {kept: noted.kept, frames: frames(at.agentsTab(noted))};
+        world.trees[sid] = [tree("w1", "one", [raw("b"), raw("c")])];
+        remembered("a");
+        const missing = counting(panel(new Map()));
+        out.missing = {kept: missing.kept, frames: frames(at.agentsTab(missing))};
+        // A shape notice writes nothing (F-03).
+        world.trees[sid] = [tree("w1", "one", [{id: "a", detail: "x"}])];
+        remembered("a");
+        const shaped = counting(panel(new Map()));
+        out.shaped = {kept: shaped.kept, html: at.agentsTab(shaped)};
+        world.trees[sid] = [tree("w1", "one", [raw("a")])];
+        """,
+        tmp_path,
+    )
+    frame_a = (
+        '<iframe class="sd-agent" src="http://127.0.0.1:8791/embed/agent?id=a&amp;theme=light" '
+        f'sandbox="{SANDBOX}" referrerpolicy="no-referrer" title="エージェント：claude・one"></iframe>'
+    )
+    assert out["panel"] == {"kept": [["agent", "a"]], "map": [["agent", "a"]], "frames": [frame_a]}
+    assert out["page"] == {
+        "kept": [["agent", "a"]],
+        "replaced": [["agent", "a"]],
+        "frames": [frame_a],
+        "param": "a",
+        "sameAgent": True,
+    }
+    assert out["lone"] == [["agent", "a"]]
+    assert out["asked"] == {"panel": [], "page": []}
+    assert out["noted"] == {"kept": [["agent", "gone:a"]], "frames": []}
+    assert out["missing"] == {"kept": [["agent", "gone:a"]], "frames": []}
+    assert out["shaped"]["kept"] == [] and 'data-code="orca-shape"' in out["shaped"]["html"]
+
+
+@node
+def test_only_a_plain_press_in_the_strip_changes_the_memory(tmp_path: Path) -> None:  # iss-00602 T-04
+    out = _run(
+        """
+        reset();
+        world.trees[sid] = [tree("w1", "one", [raw("a"), raw("b")])];
+        const env = panel(new Map([["agent", "a"]]));
+        const root = fakeRoot(at.agentsTab(env));
+        at.paintAgentList(root, env);
+        const capture = root.box.listeners.find((item) => item.type === "click" && item.capture).fn;
+        const seed = () => { logic.memoryFor(at.mem, sid); at.mem.gone = new Set(["z"]); at.mem.picked = "a"; at.mem.last = "a"; at.mem.drift = "a"; };
+        const snapshot = () => ({gone: [...at.mem.gone], picked: at.mem.picked, last: at.mem.last, drift: at.mem.drift});
+        let prevented = 0;
+        const press = (extra) => capture({target: {closest: (sel) => (sel === "[data-agent-pick]" ? {dataset: {agentPick: "b"}} : null)}, preventDefault: () => { prevented++; }, ...extra});
+        out.modified = {};
+        for (const [name, extra] of Object.entries({meta: {button: 0, metaKey: true}, ctrl: {button: 0, ctrlKey: true}, shift: {button: 0, shiftKey: true}, alt: {button: 0, altKey: true}, middle: {button: 1}})) {
+          seed(); press(extra); out.modified[name] = snapshot();
+        }
+        seed(); press({button: 0});
+        out.plain = snapshot();
+        out.prevented = prevented;
+        world.trees[sid] = [tree("w1", "one", [raw("a")])];
+        """,
+        tmp_path,
+    )
+    seeded = {"gone": ["z"], "picked": "a", "last": "a", "drift": "a"}
+    assert out["modified"] == dict.fromkeys(("meta", "ctrl", "shift", "alt", "middle"), seeded)
+    assert out["plain"] == {"gone": [], "picked": "b", "last": "b", "drift": None}
+    assert out["prevented"] == 0
+
+
+@node
+def test_agents_that_are_not_an_array_show_the_shape_notice_not_a_loss(tmp_path: Path) -> None:  # iss-00602 T-05
+    out = _run(
+        """
+        reset();
+        world.trees[sid] = [{id: "w1", path: "/w/w1", branch: "one", agents: {id: "a"}}];
+        const params = new Map([["agent", "a"]]);
+        const asked = counting(panel(params));
+        const state = at.agentsState(asked);
+        out.asked = {reason: state.reason, gone: [...at.mem.gone], html: at.agentsTab(asked), kept: asked.kept, map: [...params]};
+        reset(); logic.memoryFor(at.mem, sid); logic.noteShown(at.mem, "a");
+        const fromLast = counting(panel(new Map()));
+        out.fromLast = {reason: at.agentsState(fromLast).reason, gone: [...at.mem.gone], kept: (at.agentsTab(fromLast), fromLast.kept)};
+        world.trees[sid] = [tree("w1", "one", [raw("a")])]; // orca-web is fixed: the same agent comes back
+        out.fixed = at.agentsTab(panel(params));
+        """,
+        tmp_path,
+    )
+    asked = out["asked"]
+    assert (
+        asked["reason"] == "shape" and asked["gone"] == [] and asked["kept"] == [] and asked["map"] == [["agent", "a"]]
+    )
+    assert 'data-code="orca-shape"' in asked["html"] and "（1件）" in asked["html"]
+    assert out["fromLast"] == {"reason": "shape", "gone": [], "kept": []}
+    assert "id=a&amp;theme=light" in out["fixed"]
+
+
+@node
+def test_the_panel_foot_links_carry_the_memory_of_the_scope(tmp_path: Path) -> None:  # iss-00602 T-03
+    out = _run(
+        PANEL.replace("PANEL_URL", json.dumps((SHARED / "panel.js").as_uri()))
+        + """
+        const hrefs = () => [...part(".pn-foot").innerHTML.matchAll(/<a class="ds-btn[^"]*"( data-nav)? href="([^"]*)"/g)].map((m) => m[2]).slice(0, 2);
+        const press = (sel, dataset) => aside.click({target: {closest: (s) => (s === sel ? {dataset} : null)}, button: 0, preventDefault() {}});
+        reset();
+        world.trees[sid] = [tree("w1", "one", [raw("a"), raw("b")])];
+        showIt();
+        pn.preferTab("agents");
+        press("a[data-pn-param]", {pnParam: "agent", pnValue: "a"}); // the person picks a
+        pn.hide();
+        showIt(); // opened again on the agents tab: a from the memory
+        out.reopened = hrefs();
+        press("[data-pn-tab]", {pnTab: "summary"});
+        pn.hide();
+        showIt(); // opened again on the summary tab: the Map is empty
+        out.summary = hrefs();
+        world.trees[sid] = [tree("w1", "one", [raw("b")])]; // a goes away while the summary tab shows; b is left alone
+        pn.hide();
+        showIt();
+        out.gone = hrefs();
+        press("a[data-pn-param]", {pnParam: "agent", pnValue: "b"}); // a choice in the Map comes first
+        out.map = hrefs();
+        // While the detail loads, a memory of another Scope is never used (F-02).
+        pn.hide();
+        logic.memoryFor(at.mem, "iss-00002"); logic.noteShown(at.mem, "z");
+        pn.show({ctx: panelCtx(), scope, doc: null, docState: "loading", byId});
+        out.other = hrefs();
+        pn.hide();
+        world.trees[sid] = [tree("w1", "one", [raw("a")])];
+        """,
+        tmp_path,
+    )
+    base = "/r/github.com/o/r/scopes/iss-00001"
+    assert out["reopened"] == [f"{base}?agent=a&amp;tab=agents"] * 2
+    assert out["summary"] == [f"{base}?agent=a&amp;tab=summary"] * 2
+    assert out["gone"] == [f"{base}?agent=gone%3Aa&amp;tab=summary"] * 2
+    assert out["map"] == [f"{base}?agent=b&amp;tab=summary"] * 2
+    assert out["other"] == [f"{base}?tab=summary"] * 2
