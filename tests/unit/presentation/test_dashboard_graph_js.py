@@ -92,7 +92,7 @@ def representative(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
 def test_every_way_of_showing_the_representative_structures_draws_clean_lines(representative: dict[str, Any]) -> None:
     runs = representative["audit"]
     assert {run["name"] for run in runs} == {"spec-dock", "generated", "generated-15", "generated-18", "many-lines"}
-    assert len(runs) >= 5 * 16  # 16 combinations each, and every open Epic or Initiative as the focus
+    assert len(runs) >= 5 * 12  # 12 combinations each (iss-00603: 3 ranges), and the Epics and Initiatives as the focus
     assert sum(run["edges"] for run in runs if run["name"] == "spec-dock" and run["opts"]["deps"] == "all") > 100
     dirty = [
         {
@@ -111,7 +111,7 @@ def test_the_250_scope_structure_routes_within_a_second(representative: dict[str
     # iss-00572: "ms" is the node process's CPU time, the least of three runs, so a loaded PC does not stretch it.
     runs = [run for run in representative["audit"] if run["name"] == "generated" and not run["opts"].get("focus")]
     assert (
-        len(runs) == 16 + 7 * 8
+        len(runs) == 12 + 7 * 6
     )  # and the nested ones at a PC's and a phone's width (iss-00560), with a height (iss-00575)
     assert max(run["ms"] for run in runs) < 1000
 
@@ -144,7 +144,7 @@ def _too_wide(runs: list[dict[str, Any]], axis: str) -> list[dict[str, Any]]:
 def test_the_passage_between_stage_columns_fits_the_lines_that_pass(many_lines: dict[str, Any]) -> None:
     """Before iss-00578 one passage of this structure was 954px wide for 9 vertical runs."""
     runs = many_lines["passages"]
-    assert len(runs) >= 16 + 2 * 8
+    assert len(runs) >= 12 + 2 * 6
     assert max(p["runs"] for run in runs for p in run["passages"] if p["axis"] == "x") >= 8  # many lines pass
     assert _too_wide(runs, "x") == []
 
@@ -161,13 +161,12 @@ def test_the_band_between_rows_fits_the_lines_that_pass(many_lines: dict[str, An
 def small(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
     layouts = {
         "home": {},
-        "unfolded": {"fold": False},
-        "done": {"showDone": True},
+        "done": {"range": "all"},
         "tree": {"mode": "tree"},
         "focus": {"focus": "epic-00001"},
-        "wait": {"showDone": True, "deps": "wait"},
-        "all": {"showDone": True, "deps": "all"},
-        "none": {"showDone": True, "deps": "none"},
+        "wait": {"range": "all", "deps": "wait"},
+        "all": {"range": "all", "deps": "all"},
+        "none": {"range": "all", "deps": "none"},
     }
     doc = _small()
     return {
@@ -222,10 +221,10 @@ def test_home_hides_done_keeps_closed_parents_and_folds_cleanup(small: dict[str,
     folded = {item_id for group in home["groups"] for item_id in group["ids"]}
     assert folded == {"iss-00007", "epic-00008"}
     assert "epic-00008" not in nodes
-    unfolded = _nodes(small, "unfolded")
-    assert {"iss-00007", "epic-00008"} <= unfolded.keys()
-    assert small["layout"]["small"]["unfolded"]["groups"] == []
-    assert "iss-00005" in _nodes(small, "done")
+    # iss-00603: "all" does not fold the candidates and shows every done Scope
+    unfolded = _nodes(small, "done")
+    assert {"iss-00007", "epic-00008", "iss-00005", "iss-00009"} <= unfolded.keys()
+    assert small["layout"]["small"]["done"]["groups"] == []
 
 
 def test_the_tree_shows_every_scope_as_a_box_with_parent_lines(small: dict[str, Any]) -> None:
@@ -377,9 +376,8 @@ def context(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
         "home": {},
         "tree": {"mode": "tree"},
         "wait": {"deps": "wait"},
-        "done": {"showDone": True},
+        "done": {"range": "all"},
         "focus8": {"focus": "epic-00008"},
-        "unfolded": {"fold": False},
         "focus80": {"focus": "epic-00080"},
     }
     return _run(
@@ -411,20 +409,36 @@ def context(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
             "gaps": {"inits": {"gapped": {"all.x": 12, "all.y": 12, "wcroot": 30}}},
             "checks": ["layout", "audit"],
             "prefs": [
-                {"current": None, "legacy": None},
+                # iss-00603 T-06: version 3 {mode, range, deps, legend}; legacies = [version 2, version 1]
+                {"current": None, "legacies": [None, None]},
+                {
+                    "current": {"mode": "tree", "range": "next", "deps": "wait", "legend": True},
+                    "legacies": [None, None],
+                },
+                {"current": {"mode": "box", "range": "later", "deps": "some", "legend": 1}, "legacies": [None, None]},
+                {"current": {"mode": "tree", "range": "x"}, "legacies": [{"mode": "nest", "showDone": True}, None]},
                 {
                     "current": None,
-                    "legacy": {"mode": "tree", "showDone": True, "deps": "wait", "fold": False, "legend": True},
+                    "legacies": [
+                        {"mode": "tree", "showDone": True, "deps": "wait", "fold": False, "legend": True},
+                        {"mode": "nest", "legend": False},
+                    ],
                 },
+                {"current": None, "legacies": [{"showDone": False, "deps": "none", "fold": False}, None]},
                 {
-                    "current": {"mode": "nest", "showDone": True, "deps": "wait", "fold": True, "legend": False},
-                    "legacy": {"mode": "tree"},
+                    "current": None,
+                    "legacies": [{"showDone": "yes", "mode": "box", "deps": "some", "legend": "no"}, None],
                 },
+                {"current": None, "legacies": [{"legend": True}, None]},
                 {
-                    "current": {"mode": "box", "showDone": "yes", "deps": "some", "fold": 1, "legend": None},
-                    "legacy": None,
+                    "current": None,
+                    "legacies": [
+                        None,
+                        {"mode": "tree", "showDone": True, "deps": "wait", "fold": False, "legend": True},
+                    ],
                 },
-                {"current": [1, 2], "legacy": "x"},
+                {"current": [1, 2], "legacies": ["x", 3]},
+                {"current": "broken", "legacies": None},
             ],
         },
     )
@@ -450,7 +464,8 @@ def test_the_default_view_keeps_done_scopes_under_open_parents(context: dict[str
     assert {"iss-00009", "epic-00010", "iss-00011"} <= _ids(context, "done").keys()
     assert "iss-00009" in _ids(context, "focus8")  # narrowed to a done Epic: its children show
     # the done children of an open Epic whose every child is done (a cleanup candidate) are not shown, folded or not
-    for key in ("tree", "unfolded"):
+    # (iss-00603: the tree is the unfolded "now")
+    for key in ("tree",):
         nodes = _ids(context, key)
         assert "epic-00080" in nodes and not {"iss-00081", "iss-00082"} & nodes.keys(), key
     assert {"iss-00081", "iss-00082"} <= _ids(context, "focus80").keys()
@@ -481,13 +496,12 @@ def test_frames_follow_activity_and_boxes_put_done_below(context: dict[str, Any]
     tree = _ids(context, "tree")
     assert _top_down(tree, roots) == ["init-00001", "epic-00020", "epic-00030", "init-00060"]  # the tree: unchanged
     # a closed parent with open children shows no done child: its dependencies are the open ones, so 92 (waiting
-    # only for the done 91) is a group of its own beside the group 95 -> 96 (its open children are cleanup
-    # candidates: unfolded)
-    unfolded = _ids(context, "unfolded")
-    assert "iss-00091" not in unfolded
-    assert unfolded["iss-00096"]["x1"] == unfolded["iss-00095"]["x2"] + 44
-    assert unfolded["iss-00092"]["x1"] == unfolded["iss-00096"]["x2"] + 14
-    assert unfolded["iss-00092"]["y1"] == unfolded["iss-00095"]["y1"] == unfolded["iss-00096"]["y1"]
+    # only for the done 91) is on the first stage with 95, before 96 that waits for 95. iss-00603: the unfolded way
+    # without the done Scopes is the tree ("all" shows 91; "now" folds the candidates 92, 95 and 96)
+    assert "iss-00091" not in tree and "iss-00091" not in home
+    assert _top_down(tree, ("iss-00092", "iss-00095", "iss-00096")) == ["iss-00095", "iss-00092", "iss-00096"]
+    folded = [group["ids"] for group in context["layout"]["context"]["home"]["groups"]]
+    assert sorted(["iss-00092", "iss-00095", "iss-00096"]) in [sorted(ids) for ids in folded]
 
 
 def test_scopes_without_times_are_the_oldest(context: dict[str, Any]) -> None:
@@ -500,20 +514,31 @@ def test_scopes_without_times_are_the_oldest(context: dict[str, Any]) -> None:
     assert done == ["iss-00106", "iss-00105"]
 
 
-def test_saved_choices_of_the_old_version_do_not_override_the_new_defaults(context: dict[str, Any]) -> None:
-    empty, legacy, current, broken, junk = context["prefs"]
-    defaults = {"mode": "nest", "showDone": False, "deps": "all", "fold": True}
+def test_saved_choices_carry_over_into_the_range(context: dict[str, Any]) -> None:
+    """iss-00603 T-06 (R-07, F-02): version 3 as saved, version 2's showDone as the range, version 1's mode and legend."""
+    empty, v3, v3_wrong, v3_partial, v2_all, v2_now, v2_wrong, v2_legend, v1, broken, junk = context["prefs"]
+    defaults = {"mode": "nest", "range": "now", "deps": "all"}
     assert empty == {"opts": defaults, "legend": False}
-    assert legacy == {"opts": {**defaults, "mode": "tree", "fold": False}, "legend": True}
-    assert current == {"opts": {**defaults, "showDone": True, "deps": "wait"}, "legend": False}
+    assert v3 == {"opts": {"mode": "tree", "range": "next", "deps": "wait"}, "legend": True}
+    assert v3_wrong == {"opts": defaults, "legend": False}
+    assert v3_partial == {"opts": {**defaults, "mode": "tree"}, "legend": False}  # version 2 is not read
+    assert v2_all == {"opts": {"mode": "tree", "range": "all", "deps": "wait"}, "legend": True}
+    assert v2_now == {"opts": {**defaults, "deps": "none"}, "legend": False}  # fold is not used
+    assert v2_wrong == {"opts": defaults, "legend": False}
+    assert v2_legend == {"opts": defaults, "legend": True}
+    assert v1 == {"opts": {**defaults, "mode": "tree"}, "legend": True}  # neither showDone, deps nor fold
     assert broken == {"opts": defaults, "legend": False}
     assert junk == {"opts": defaults, "legend": False}
 
 
 def test_the_graph_saves_its_choices_under_the_new_key() -> None:
     source = (ASSETS / "views" / "graph.js").read_text(encoding="utf-8")
-    assert '"specdock.graph.v1"' not in source
-    assert "restorePrefs" in source and "PREFS_KEY" in source and "LEGACY_KEY" in source
+    assert '"specdock.graph.v1"' not in source and '"specdock.graph.v2"' not in source
+    assert "specdock.graph.v" not in source  # the keys are written only in graph/prefs.js
+    assert "restorePrefs" in source and "PREFS_KEY" in source and "LEGACY_KEYS" in source
+    prefs = (ASSETS / "views" / "graph" / "prefs.js").read_text(encoding="utf-8")
+    assert 'PREFS_KEY = "specdock.graph.v3"' in prefs
+    assert 'LEGACY_KEYS = ["specdock.graph.v2", "specdock.graph.v1"]' in prefs
 
 
 def test_groups_without_dependencies_wrap_at_the_width_seen(context: dict[str, Any]) -> None:
@@ -587,7 +612,7 @@ def rows(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
         {
             "documents": {"chains": _chains(), "crossing": _crossing()},
             "layouts": {
-                "chains": {"home": {}, "w374": {"width": 374}, "done": {"showDone": True}},
+                "chains": {"home": {}, "w374": {"width": 374}, "done": {"range": "all"}},
                 "crossing": {"home": {}},
             },
             "checks": ["layout", "audit", "order"],

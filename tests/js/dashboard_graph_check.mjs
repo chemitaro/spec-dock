@@ -16,22 +16,29 @@ const out = { audit: [], layout: {}, series: {}, order: {} };
 if (request.prefs) {
   const { restorePrefs } = await load("views/graph/prefs.js");
   const { DEFAULTS } = await load("views/graph/layout.js");
-  out.prefs = request.prefs.map((p) => restorePrefs(p.current, p.legacy, DEFAULTS));
+  out.prefs = request.prefs.map((p) => restorePrefs(p.current, p.legacies, DEFAULTS));
 }
+
+// iss-00603: the range of what is shown (all, now, next) replaces the old showDone and fold.
+const RANGES = ["all", "now", "next"];
 
 function combos(doc) {
   const list = [];
   for (const mode of ["nest", "tree"])
-    for (const showDone of [false, true])
-      for (const deps of ["wait", "all"])
-        for (const fold of [true, false]) list.push({ mode, showDone, deps, fold });
+    for (const range of RANGES)
+      for (const deps of ["wait", "all"]) list.push({ mode, range, deps });
   // iss-00560: the groups wrap at the width seen at 100%: a PC (1400px) and a 390px phone (374px)
   // iss-00583: a height is still accepted, while every level wraps at the visible width
   for (const [width, height] of [[1400], [374], [1400, 760], [1900, 940], [1000, 800], [1440, 900], [1920, 1080]])
-    for (const showDone of [false, true])
-      for (const deps of ["wait", "all"])
-        for (const fold of [true, false]) list.push({ mode: "nest", showDone, deps, fold, width, height });
-  for (const s of doc.scopes) if (s.kind !== "issue" && s.state !== "done") list.push({ mode: "nest", showDone: false, deps: "all", fold: true, focus: s.id });
+    for (const range of RANGES)
+      for (const deps of ["wait", "all"]) list.push({ mode: "nest", range, deps, width, height });
+  // the focus: every open Epic or Initiative now, and every Epic or Initiative (done or a candidate too) next
+  for (const s of doc.scopes) {
+    if (s.kind === "issue") continue;
+    if (s.state !== "done") list.push({ mode: "nest", range: "now", deps: "all", focus: s.id });
+    list.push({ mode: "nest", range: "next", deps: "all", focus: s.id });
+    list.push({ mode: "tree", range: "next", deps: "all", focus: s.id });
+  }
   return list;
 }
 

@@ -28,7 +28,21 @@ const BASE = { world: 28, body: 12, wrapRow: 14, wrapCol: 14, cols: 44, col: 12,
 export const WRAP_WIDTH = 1240;
 
 // iss-00556: finished dependencies between what is shown are drawn by default (faint), the waiting ones stand out.
-export const DEFAULTS = { mode: "nest", showDone: false, deps: "all", fold: true, focus: null };
+// iss-00603: one range of what is shown replaces "done too" and "fold the cleanup candidates".
+export const DEFAULTS = { mode: "nest", range: "now", deps: "all", focus: null };
+export const RANGES = ["all", "now", "next"];
+
+// iss-00603 D-01: the range as the inner choices. "all" is the old "done too" unfolded, "now" the old default (the
+// tree never folds), "next" leaves out what is done and the cleanup candidates. A showDone or fold of the caller is
+// not used: the range is the only input.
+function rangeOpts(options) {
+  const opts = { ...DEFAULTS, ...options };
+  opts.range = RANGES.includes(opts.range) ? opts.range : "now";
+  opts.showDone = opts.range === "all";
+  opts.fold = opts.range === "now" && opts.mode !== "tree"; // the tree shows every Scope as a box
+  opts.next = opts.range === "next";
+  return opts;
+}
 
 // The axis a gap key spreads: x for widths (wrap items, columns, the tree's indent), y for heights.
 const axisOf = (key) => (key.startsWith("wc") || /^c/.test(key) || key === "tree.indent" ? "x" : "y");
@@ -79,7 +93,8 @@ export function index(scopes) {
 
 // iss-00556 D-01: a done Scope shows when its parent shows its done children (`showsDone`: open, or the focus);
 // a done Scope under a done parent, or without a parent, does not (unless it holds something shown: Epic R-12).
-function visibility(ix, opts, showsDone) {
+// iss-00603 D-02: next hides every done Scope and every cleanup candidate, except as the frame of what it holds.
+function visibility(ix, opts, showsDone, cleanup) {
   const memo = new Map();
   const seen = new Set();
   const context = (s) => {
@@ -90,7 +105,9 @@ function visibility(ix, opts, showsDone) {
     if (memo.has(s.id)) return memo.get(s.id);
     if (seen.has(s.id)) return false; // a broken parent cycle
     seen.add(s.id);
-    const v = opts.showDone || s.state !== "done" || ix.kids.get(s.id).some(visible) || context(s);
+    const v = opts.next
+      ? (s.state !== "done" && !cleanup.has(s.id)) || ix.kids.get(s.id).some(visible)
+      : opts.showDone || s.state !== "done" || ix.kids.get(s.id).some(visible) || context(s);
     memo.set(s.id, v);
     return v;
   };
@@ -580,27 +597,28 @@ function flatten(block, ox, oy, path, out) {
  * Lay the Scopes out.
  * @param scopes  structure API `scopes`
  * @param cleanup structure API `cleanup` ([{id, code, text}])
- * @param options {mode: "nest"|"tree", showDone, deps: "all"|"wait"|"none", fold, focus, width, height} — width: the graph's
+ * @param options {mode: "nest"|"tree", range: "all"|"now"|"next", deps: "all"|"wait"|"none", focus, width, height} — width: the graph's
  *                visible width at 100% (px), where the groups wrap (WRAP_WIDTH when absent); height is accepted
  *                but unused by placement (the page keeps it as a resize signal, iss-00583).
  * @param gaps    extra pixels per gap key (from earlier routing rounds)
  */
 export function layout(scopes, cleanup, options = {}, gaps = {}) {
-  const opts = { ...DEFAULTS, ...options };
-  if (opts.mode === "tree") opts.fold = false; // the tree shows every Scope as a box
+  const opts = rangeOpts(options);
   const ix = index(scopes);
   const focus = opts.focus && ix.byId.has(opts.focus) ? opts.focus : null;
   // A parent shows its done children with "done too", when it is the focus, or when it is open, except an open
   // parent whose every descendant is done (a cleanup candidate: what it holds is no longer the plan's progress).
+  // Next shows no done Scope at all, not even inside the focus.
   const finished = new Set((cleanup || []).filter((c) => c.code === "all_descendants_closed").map((c) => c.id));
-  const showsDone = (p) => opts.showDone || p.id === focus || (p.state !== "done" && !finished.has(p.id));
-  const visibleBase = visibility(ix, opts, showsDone);
+  const showsDone = (p) => !opts.next && (opts.showDone || p.id === focus || (p.state !== "done" && !finished.has(p.id)));
+  const candidates = new Set((cleanup || []).map((c) => c.id));
+  const visibleBase = visibility(ix, opts, showsDone, candidates);
   const inFocus = (s) => !focus || s.id === focus || ix.ancestors(s.id).includes(focus);
   const visible = (s) => inFocus(s) && (s.id === focus || visibleBase(s));
   const visibleKids = (s) => ix.kids.get(s.id).filter(visible);
   // the shelves of the layout without the routing's widening (computed first when there is any widening)
   const breaks = Object.keys(gaps).length && opts.mode !== "tree" ? layout(scopes, cleanup, options, {}).wraps : null;
-  const ctx = { opts, gaps, ix, focus, cleanup: new Set((cleanup || []).map((c) => c.id)), visibleKids, showsDone, breaks, wraps: new Map() };
+  const ctx = { opts, gaps, ix, focus, cleanup: candidates, visibleKids, showsDone, breaks, wraps: new Map() };
   ctx.node = (s, avail) => {
     const kids = visibleKids(s);
     return s.kind === "issue" && !kids.length ? boxBlock(s, ctx) : frameBlock(s, kids, ctx, avail);
@@ -638,7 +656,8 @@ function treeLines(nodes, ix) {
   return lines;
 }
 
-// The dependency pairs to draw, between what is shown: a box, a frame or the folded group holding the Scope.
+// The dependency pairs to draw, between what is shown: a box, a frame or the folded group holding the Scope. Next
+// draws none with a done end (iss-00603 D-03: a done frame shown for what it holds included), whose other side is gone.
 function pairs(scopes, ix, out, opts) {
   if (opts.deps === "none") return [];
   const holder = new Map();
@@ -665,6 +684,7 @@ function pairs(scopes, ix, out, opts) {
       const src = ix.byId.get(b);
       const a = holder.get(b);
       if (!src || !a || a === z) continue;
+      if (opts.next && (src.state === "done" || s.state === "done")) continue;
       const done = src.state === "done";
       if (done && opts.deps === "wait") continue;
       const ra = rect.get(a), rz = rect.get(z);
