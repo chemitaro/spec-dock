@@ -56,3 +56,4 @@ ID: "iss-00611"
 - 配布の手引き（`spec-dock/docs/migration.md` の「これから」の説明）は、この Issue の範囲外。次のリリースの Issue で「中に見えるもののない親も出さない」を足す。
 - 揺れるテスト `tests/integration/test_issue413_native_lock.py::test_terminated_owner_releases_native_start_lock_without_pid_recovery`（git の maintenance.lock との競合）。別の Issue で、走査で消えたファイルを許すよう直す提案。
 - 試しのサーバー 18612 は本人の確かめまで残す。
+- PR https://github.com/chemitaro/spec-dock/pull/618（head `a51e09159`）。CI（provider-ci ほか）は observable_ci PASS、merge_readiness READY。マージは統括が行う。
