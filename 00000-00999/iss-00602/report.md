@@ -54,6 +54,13 @@ iss-00601 が調べたエージェントのタブと構造の図の印の押し�
 - 写し：直す前と後の、欄のエージェントのタブと詳しい画面のエージェントのタブを、1440・1000・390 × 明暗で撮った（各12枚）。直した後の見た目は直す前と同じ（この Issue は見た目を変えない）。
 - 台本と記録（result.json、写し）は worktree の `.workbench/iss-00602/real/` に写した。
 
+## 最終品質ゲート
+
+- campaign `iss-00602-fqg`（worktree の `.workbench/final-quality-gate/iss-00602-fqg/`）、attempt 1、候補 `80d5aba3fd7e3af63c3bd35579e6c47d77742cd9`（範囲 `16f0cf122..80d5aba3f`）。
+- 主（quality-gate-reviewer Opus 5.5 / high）：pass、P3 1（FQG-001：欄の Map に人の選びか覚えの id があるまま、ほかのタブの間にその相手がいなくなると、足のリンクは `gone:<id>` でなく生の id を持つ。新しいタブは `orca-agent-gone` を出して残った相手を開かないので安全側。iss-00593 から同じ。実機の 2' で確かめた）、coverage complete。
+- 2人目：**逸脱（統括の指示 msg_16d92aef2143）**。ChatGPT は Chrome のリモートデバッグの許可が得られないため送らず（`attempts/01/second-opinion/fallback.md`）、GPT-6 Astra / high（codex exec、read-only。ログの model gpt-6-astra・reasoning effort high）で行った。pass、指摘0。1回目の起動は、`-o` の書き出し先がパケットの output_path と同じで「output_path がすでにある」の入力の誤り（REVIEW-INPUT-INVALID）になった機械の誤りで、書き出し先を分けて起動し直した。
+- テストの線：`make lint` pass（手元、`80d5aba3f`）。**逸脱（統括の了承 msg_4f680f6c33be、2026-11-16）**：全体の `uv run pytest` は、Mac の負荷（CPU 10個に load average 約450〜550）で手元では1時間で 8% しか進まず（10時間以上の見込み。pytest-xdist はない）、手元の走りを止め、同じ候補の SHA の PR #604 の CI（provider-ci の `make lint` と `uv run pytest` の全体）の合格をテストの線の証拠とした。止めた手元の走りのログは `attempts/01/tests/killed-run-1/`（1時間の上限で止まった1回目。make lint pass を含む）と `killed-run-2/`（切り離して起動し直し、統括の指示で止めた2回目）。
+
 ## Outcome
 
 ## Verification
