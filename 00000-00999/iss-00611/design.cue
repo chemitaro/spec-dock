@@ -51,7 +51,8 @@ design: {
 
 			番号の Scope の id は実際の document から取る（Initiative の接頭辞は support の `_PREFIX`）。モデルの片付けの候補がちょうど 71・73・82・96（どれも `all_descendants_closed`）で、70・80・81・95・110・111 が候補でないことも確かめる（前提の確認。2026-11-16 にタスク担当が今のモデルで確かめた。モデルは Issue を候補にしないので、111 は「自身は開いて候補でないが、子が終わったものだけ」の形になる）。
 			確かめ（入れ子・木）：これからの nodes の id の集合が期待どおり、95 の type が枠（入れ子 frame、木 tframe）、groups が空。
-			同じ構造の全体・いまでは 70・71・73・80・81・82・110・111 が出る（R-05 の2つ目）。
+			同じ構造の全体では 70・71・73・80・81・82・110・111 が nodes に出る。いまでは 70・80・81・110・111 が nodes に出て、71・73・82 は、入れ子では畳んだ塊（groups の ids）、木では nodes に出る（R-05 の2つ目。今の畳みのまま）。
+			循環（F-02）：別の小さな構造で、親が互いを指す2つの開いた Scope（parent の循環。support の `node(..., parent=...)` で作れなければ document の scopes の `parent_id` を直接書き換える）と、無い親を指す開いた Issue を入れ、これから（入れ子・木）の layout が例外なく返ることを確かめる（出るかどうかは問わない）。
 			focus：70 で nodes が {70}、95 で {95, 98}、80 で {80}（R-04）。
 			配線：同じ構造で next（入れ子・木、focus）を含む組み合わせの audit の違反0（R-06 の1つ目）。今の `nxt` の fixture と同じ `_run` の `checks: ["layout", "audit"]` を使う。
 			R-05 の1つ目は、今の `test_all_and_now_lay_out_as_the_two_old_combinations` がそのまま通ることで確かめる（期待の digest は変えない）。

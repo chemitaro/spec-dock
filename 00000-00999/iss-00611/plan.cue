@@ -5,7 +5,7 @@ package spec
 goal: "構造の図の「これから」で、見える子孫のない親を出さない（layout.js の visibility とテスト、実データの写し）"
 
 steps: {
-	"S-01": {title: "test_dashboard_graph_range.py に D-02 の合成の構造 `_parents()` と、これから・全体・いま・focus・audit のテストを足し、test_dashboard_graph_toolbar.py に D-03 の知らせのテストを足して、直す前のコードで R-01・R-04 のテスト（と D-03 の知らせ）が落ち、R-02・R-03・R-05 のテストが通ることを確かめる（Red）", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06", "F-01"], status: "todo", session: "impl-sol"}
+	"S-01": {title: "test_dashboard_graph_range.py に D-02 の合成の構造 `_parents()` と、これから・全体・いま・focus・audit のテストを足し、test_dashboard_graph_toolbar.py に D-03 の知らせのテストを足して、直す前のコードで R-01 のテスト、R-04 の focus 80、D-03 の知らせが落ち、R-02・R-03・R-05・F-02 と focus 70・95 のテストが通ることを確かめる（Red）", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06", "F-01"], status: "todo", session: "impl-sol"}
 	"S-02": {title: "layout.js の visibility の next の分岐を D-01 にし、構造の図のテスト（graph_js・graph_range・graph_toolbar）をすべて通す。iss-00603 の digest と `_next()` の期待は変えない（Green）", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06", "F-01", "F-02"], status: "todo", after: ["S-01"], session: "impl-sol"}
 	"S-03": {title: "make lint と全体の pytest を通す", realizes: ["R-05", "R-06"], status: "todo", after: ["S-02"], session: "impl-sol"}
 	"S-04": {title: "orca-web・spec-dock・housing-lifecycle の実データで、これからの直す前と後を 1440・390、明暗で写し、edgeAudit の違反0、ブラウザーのエラー0、orca-web の init-00002 が前は出て後は出ないことを report.md に残し、tailnet の試しの URL を立てる（D-04）", realizes: ["R-06"], status: "todo", after: ["S-03"], session: "owner"}
@@ -16,8 +16,9 @@ tests: {
 	"T-02": {title: "`_parents()` のこれから：子のない開いた Initiative 90 と Epic 91 が出る", verifies: ["R-02"]}
 	"T-03": {title: "`_parents()` のこれから：95 が枠（入れ子 frame、木 tframe）、98 が出て、96 が出ない。今の `_next()` の `SHOWN` のテストがそのまま通る", verifies: ["R-03"]}
 	"T-04": {title: "`_parents()` のこれからの focus：70 で {70}、80 で {80}、95 で {95, 98}（入れ子・木）", verifies: ["R-04"]}
-	"T-05": {title: "今の digest の比較（test_all_and_now_lay_out_as_the_two_old_combinations）がそのまま通り、`_parents()` の全体・いまで 70・71・73・80・81・82・110・111 が出る", verifies: ["R-05"]}
-	"T-06": {title: "`_parents()` の next（入れ子・木、focus）を含む組み合わせで edgeAudit の違反0。モデルの片付けの候補がちょうど 71・73・82・96 で、70・80・81・95・110・111 が候補でないこと（前提）", verifies: ["R-06", "F-02"]}
+	"T-05": {title: "今の digest の比較（test_all_and_now_lay_out_as_the_two_old_combinations）がそのまま通り、`_parents()` の全体で 70・71・73・80・81・82・110・111 が nodes に、いまで 70・80・81・110・111 が nodes に、71・73・82 が入れ子では groups、木では nodes に出る", verifies: ["R-05"]}
+	"T-06": {title: "`_parents()` の next（入れ子・木、focus）を含む組み合わせで edgeAudit の違反0。モデルの片付けの候補がちょうど 71・73・82・96 で、70・80・81・95・110・111 が候補でないこと（前提）", verifies: ["R-06"]}
+	"T-09": {title: "親の循環と無い親の参照を持つ小さな構造で、これから（入れ子・木）の layout が例外なく返る", verifies: ["F-02"]}
 	"T-07": {title: "開いた Initiative と候補 a の Epic だけの構造をこれからで描くと、知らせの文が出て、道具の帯と札の帯が残る（test_dashboard_graph_toolbar.py の仕組み）", verifies: ["F-01"]}
 	"T-08": {title: "実データ（orca-web、spec-dock、housing-lifecycle）のこれからの直す前と後 × 1440・390 × 明暗の写し、edgeAudit の違反0、ブラウザーのエラー0、orca-web の init-00002 の前後が report.md にある", verifies: ["R-06"]}
 }
