@@ -10,7 +10,7 @@ steps: {
 	"S-03": {title: "開始のコミット 7f7dd2b1d の graph.js で偽の DOM の HTML の写し（T-04）を作ってテストの資料に残し、D-02 の draw.js を取り出し、写しとの一致と、調べる場所を移したソースの文字列のテストと、構造の図の既存のテストを通す", realizes: ["R-02"], status: "done", after: ["S-02"], session: "impl-claude"}
 	"S-04": {title: "allgraph.js・allgraph.css（D-04〜D-07）を、偽の DOM のテスト（T-05〜T-07）を先に書いて落ちることを確かめてから書き、通す", realizes: ["R-03", "R-05", "R-06", "R-07", "R-08", "F-01", "F-02"], status: "done", after: ["S-03"], session: "impl-claude"}
 	"S-05": {title: "static-inventory.json の sha256 を直し（変われば）、make lint と全体の uv run pytest を通す", realizes: ["R-01", "R-02", "R-03"], status: "done", after: ["S-04"], session: "impl-claude"}
-	"S-06": {title: "D-07 の実機の写し（T-08）を取り、report.md に残し、本人が見る試しの URL を tailnet で立てる", realizes: ["R-03", "R-05", "R-06", "R-07"], status: "todo", after: ["S-05"], session: "owner"}
+	"S-06": {title: "D-07 の実機の写し（T-08）を取り、report.md に残し、本人が見る試しの URL を tailnet で立てる", realizes: ["R-03", "R-05", "R-06", "R-07"], status: "done", after: ["S-05"], session: "owner"}
 }
 
 tests: {
