@@ -105,7 +105,7 @@ design: {
 		title: "画面：置き場を上限なしにし、専用の行に置いて折り返す（graph.js・parts.js・orca_marks.js・graph.css）"
 		text: """
 			- `boxHtml`：`M.dnMark(s.downstream)` と aria-label の「後に続く n件」は今のまま（R-01）。置き場 `orcaSlot(s.id, "all")` を `.gx-marks` から出し、その直後の `<div class="gx-agents">` に置く（いつも出力する。中が空なら CSS で隠し、高さを取らない。R-04 の4）。`.gx-marks` はほかの印だけで、今のとおり折り返さない。
-			- `frameHtml`：見出しの置き場を `orcaSlot(s.id, "all")` にし、`.gx-fh` から出して、`.gx-fh` と `.gx-fm` の間の `<div class="gx-agents">` に置く。要約の行 `.gx-fm` の `M.dnMark` は今のまま。
+			- `frameHtml`：見出しの置き場を `orcaSlot(s.id, "all")` にし、`<div class="gx-agents">` に包んで `.gx-fh` の最後の子に置く（`.gx-fh` の中に残すので、`onTap` の `closest(".gx-box, .gx-fh")` と `.sd-orca` を押したときにエージェントのタブを開く契約（iss-00592 D-03）、ダブルクリック、`.gx-frame.is-dim > .gx-fh`・`.is-poff > .gx-fh` で淡くする規則がそのまま効く）。CSS で `.gx .gx-fh:has(> .gx-agents .orca-mark) { flex-wrap: wrap; row-gap: 0; }`（`.gx-fh` の `gap: 7px` が行の間にも効かないように。行の間は `.gx-agents` の上の 4px だけで `MARK_ROW` と合う）、`.gx .gx-fh > .gx-agents { flex: 1 1 100%; }` とし、エージェントの行を見出しの行（状態の印・Initiative の印・ID・題名）の下の行に送る（題名は今のとおり縮む）。要約の行 `.gx-fm` の `M.dnMark` は今のまま。
 			- `renderLegend`、`marks.js`、`tests/js/dashboard_marks_dump.mjs`、`tests/fixtures/issue544/marks-golden.json` は変えない（R-01）。
 			- `parts.js` の `orcaSlot(id, max)`：`max` は数か `"all"`（`data-orca-max="all"`）。ボード（4）と横の欄（4）は今のまま。
 			- `orca_marks.js` の `paintOrcaMarks`：`data-orca-max` が `"all"` のとき、`max = Math.max(1, worktree.agents の数)`（配列でなければ 1）。部品の `max` の意味は変えない（全員が max 以下なので『+N』は出ない）。

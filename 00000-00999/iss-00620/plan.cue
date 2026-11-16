@@ -18,9 +18,9 @@ tests: {
 	"T-03": {title: "marks なし・{}・全部1行の marks の layout が、marks なしの今の layout と同じ JSON。iss-00603 の digest の比較（test_all_and_now_lay_out_as_the_two_old_combinations）がそのまま通る", verifies: ["R-05", "F-01"]}
 	"T-04": {title: "稼働の印が1人・3人・6人の箱と2行の枠を含む小さな構造と context の構造で、入れ子・木 × 全体・いま・これから・focus の routeLayout の audit の違反0", verifies: ["R-05"]}
 	"T-05": {title: "layout の box・tframe・frame の node ごとに、nodeMarkRows(node, marks[id]) が node.rows ?? 1 と一致する", verifies: ["R-04", "R-06"]}
-	"T-06": {title: "画面の静的な検査：boxHtml・frameHtml の dnMark と aria-label の「後に続く」と renderLegend の「後に続く数」が今のまま。置き場が orcaSlot(s.id, \"all\") で、.gx-marks・.gx-fh の中になく、その下の .gx-agents にある。ボードの card は downMark と orcaSlot(scope.id, 4) のまま。paintOrca の後と ResizeObserver から checkRows を呼び、checkRows は nodeMarkRows で比べて違うときだけ render し、V.rowsRedo が2のときは render しない（checkRows からの render と ResizeObserver では0に戻さない）", verifies: ["R-01", "R-02", "R-03", "R-06"]}
+	"T-06": {title: "画面の静的な検査：boxHtml・frameHtml の dnMark と aria-label の「後に続く」と renderLegend の「後に続く数」が今のまま。置き場が orcaSlot(s.id, \"all\") で、箱では .gx-marks の中になくその後の .gx-agents に、入れ子の枠では .gx-fh の最後の子の .gx-agents にある（onTap の closest(\".gx-box, .gx-fh\") と淡くする規則が枠の印にも効く）。ボードの card は downMark と orcaSlot(scope.id, 4) のまま。paintOrca の後と ResizeObserver から checkRows を呼び、checkRows は nodeMarkRows で比べて違うときだけ render し、V.rowsRedo が2のときは render しない（checkRows からの render と ResizeObserver では0に戻さない）", verifies: ["R-01", "R-02", "R-03", "R-06"]}
 	"T-07": {title: "偽の DOM で paintOrcaMarks：data-orca-max=\"all\" の置き場はエージェント6人に max 6 を渡し、4 の置き場は max 4 のまま。agents が配列でない worktree は max 1。parts.orcaSlot(id, \"all\") の HTML", verifies: ["R-03", "F-01"]}
-	"T-08": {title: "実機：エージェント1人・3人・6人の箱と iss-00613 の箱（前後）の写し 1440・390 × 明暗、edgeAudit の違反0・markOverflow 0・ブラウザーのエラー0、『後に続く』が構造の図とボードに残る、経過の文字だけの要約で箱が作り直されない（要素の同一性）、エージェントが1人の箱でも稼働の印がエージェントの行にあり、ほかの印の行に混ざらない、エージェントのいない箱の高さが今のまま", verifies: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06", "R-07", "F-02", "F-03"]}
+	"T-08": {title: "実機：エージェント1人・3人・6人の箱と iss-00613 の箱（前後）の写し 1440・390 × 明暗、edgeAudit の違反0・markOverflow 0・ブラウザーのエラー0、『後に続く』が構造の図とボードに残る、経過の文字だけの要約で箱が作り直されない（要素の同一性）、エージェントが1人の箱でも稼働の印がエージェントの行にあり、ほかの印の行に混ざらない、エージェントのいない箱の高さが今のまま、入れ子の枠の稼働の印を押すとその枠が選ばれ横の欄でエージェントのタブが開き、枠が淡くなるとき枠の稼働の印も淡くなる", verifies: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06", "R-07", "F-02", "F-03"]}
 }
 
 verification: """
