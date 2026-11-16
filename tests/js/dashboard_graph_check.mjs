@@ -3,8 +3,8 @@
 // request.json = {documents: {name: structure API document}, checks: ["audit", "layout", "order", "series", "passages"]}
 // Prints one JSON object with the results; the Python test asserts on it.
 // iss-00620: request.marks = {document: {Scope id: {lead, items, gap}}} is passed to every audit combination as the
-// options' marks; request.markRows = [[m, avail, reserve], …] returns markRows of each; a layout's nodes carry rows and
-// agents only when the layout set them, and request.nodeRows = {document: [layout key, …]} returns, for those layouts,
+// options' marks; request.markRows = [[m, avail], …] returns markRows of each; a layout's nodes carry rows only when the
+// layout set it, and request.nodeRows = {document: [layout key, …]} returns, for those layouts,
 // nodeMarkRows(node, marks[id]) beside node.rows ?? 1 for every box, tframe and frame.
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
@@ -20,8 +20,8 @@ const request = JSON.parse(readFileSync(requestPath, "utf8"));
 const out = { audit: [], layout: {}, series: {}, order: {} };
 if (request.markRows) {
   const { markRows } = layoutModule;
-  out.markRows = typeof markRows === "function" ? request.markRows.map(([m, avail, reserve]) => markRows(m, avail, reserve)) : null;
-  out.markConsts = { MARK_ROW: layoutModule.MARK_ROW ?? null, MARK_INSET: layoutModule.MARK_INSET ?? null, FRAME_TITLE_MIN: layoutModule.FRAME_TITLE_MIN ?? null };
+  out.markRows = typeof markRows === "function" ? request.markRows.map(([m, avail]) => markRows(m, avail)) : null;
+  out.markConsts = { MARK_ROW: layoutModule.MARK_ROW ?? null, MARK_INSET: layoutModule.MARK_INSET ?? null };
 }
 if (request.prefs) {
   const { restorePrefs } = await load("views/graph/prefs.js");
@@ -88,7 +88,6 @@ if (request.checks.includes("layout")) {
         nodes: L.nodes.map((n) => ({
           id: n.id, type: n.type, x1: n.x1, y1: n.y1, x2: n.x2, y2: n.y2, path: n.path,
           ...("rows" in n ? { rows: n.rows } : {}),
-          ...("agents" in n ? { agents: n.agents } : {}),
         })),
         groups: L.groups.map((g) => ({ key: g.key, ids: g.ids, x1: g.x1, y1: g.y1, x2: g.x2, y2: g.y2 })),
         trunks: L.trunks.length,
