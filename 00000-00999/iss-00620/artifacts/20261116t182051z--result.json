@@ -1,0 +1,1064 @@
+[
+  {
+    "tag": "before-spec-dock-1440-light",
+    "audit": {
+      "segments": 61,
+      "boxHits": 5,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [
+        "box r9#1 n:epic-00573",
+        "box r9#2 n:epic-00573",
+        "box r9#2 n:epic-00612",
+        "box r9#2 n:epic-00615",
+        "box r9#3 n:epic-00615"
+      ],
+      "edges": 15,
+      "iters": 10,
+      "ms": 41,
+      "unmapped": 0,
+      "widenLeft": 4,
+      "missing": 0,
+      "drift": 0,
+      "mode": "nest"
+    },
+    "boxes": {
+      "iss-00620": {
+        "h": 88,
+        "w": 178,
+        "marks": 2,
+        "more": 0,
+        "dn": "4",
+        "inAgentsRow": null,
+        "inMarksRow": 2,
+        "overRight": 1,
+        "overBottom": 0,
+        "rect": {
+          "x": 45.7599983215332,
+          "y": 385.25,
+          "w": 156.63999938964844,
+          "h": 77.44000244140625
+        }
+      }
+    },
+    "legendDn": true,
+    "scale": "matrix(0.88, 0, 0, 0.88, 0, 52)",
+    "kept": null,
+    "board": {
+      "dn": 5,
+      "cards": 19
+    },
+    "errors": []
+  },
+  {
+    "tag": "before-spec-dock-1440-dark",
+    "audit": {
+      "segments": 61,
+      "boxHits": 5,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [
+        "box r9#1 n:epic-00573",
+        "box r9#2 n:epic-00573",
+        "box r9#2 n:epic-00612",
+        "box r9#2 n:epic-00615",
+        "box r9#3 n:epic-00615"
+      ],
+      "edges": 15,
+      "iters": 10,
+      "ms": 39,
+      "unmapped": 0,
+      "widenLeft": 4,
+      "missing": 0,
+      "drift": 0,
+      "mode": "nest"
+    },
+    "boxes": {
+      "iss-00620": {
+        "h": 88,
+        "w": 178,
+        "marks": 2,
+        "more": 0,
+        "dn": "4",
+        "inAgentsRow": null,
+        "inMarksRow": 2,
+        "overRight": 1,
+        "overBottom": 0,
+        "rect": {
+          "x": 45.7599983215332,
+          "y": 385.25,
+          "w": 156.63999938964844,
+          "h": 77.44000244140625
+        }
+      }
+    },
+    "legendDn": true,
+    "scale": "matrix(0.88, 0, 0, 0.88, 0, 52)",
+    "kept": null,
+    "board": null,
+    "errors": []
+  },
+  {
+    "tag": "before-spec-dock-390-light",
+    "audit": {
+      "segments": 55,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 15,
+      "iters": 10,
+      "ms": 27,
+      "unmapped": 0,
+      "widenLeft": 3,
+      "missing": 0,
+      "drift": 0,
+      "mode": "nest"
+    },
+    "boxes": {
+      "iss-00620": {
+        "h": 88,
+        "w": 178,
+        "marks": 2,
+        "more": 0,
+        "dn": "4",
+        "inAgentsRow": null,
+        "inMarksRow": 2,
+        "overRight": 1,
+        "overBottom": 0,
+        "rect": {
+          "x": 42.47999954223633,
+          "y": 440.3968811035156,
+          "w": 131.72000122070312,
+          "h": 65.1199951171875
+        }
+      }
+    },
+    "legendDn": true,
+    "scale": "matrix(0.74, 0, 0, 0.74, 4, 8)",
+    "kept": null,
+    "board": null,
+    "errors": []
+  },
+  {
+    "tag": "before-spec-dock-390-dark",
+    "audit": {
+      "segments": 55,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 15,
+      "iters": 10,
+      "ms": 25,
+      "unmapped": 0,
+      "widenLeft": 3,
+      "missing": 0,
+      "drift": 0,
+      "mode": "nest"
+    },
+    "boxes": {
+      "iss-00620": {
+        "h": 88,
+        "w": 178,
+        "marks": 2,
+        "more": 0,
+        "dn": "4",
+        "inAgentsRow": null,
+        "inMarksRow": 2,
+        "overRight": 1,
+        "overBottom": 0,
+        "rect": {
+          "x": 42.47999954223633,
+          "y": 440.3968811035156,
+          "w": 131.72000122070312,
+          "h": 65.1199951171875
+        }
+      }
+    },
+    "legendDn": true,
+    "scale": "matrix(0.74, 0, 0, 0.74, 4, 8)",
+    "kept": null,
+    "board": null,
+    "errors": []
+  },
+  {
+    "tag": "before-housing-lifecycle-1440-light",
+    "audit": {
+      "segments": 372,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 134,
+      "iters": 10,
+      "ms": 381,
+      "unmapped": 0,
+      "widenLeft": 3,
+      "missing": 0,
+      "drift": 0,
+      "mode": "nest"
+    },
+    "boxes": {
+      "iss-00407": {
+        "h": 88,
+        "w": 178,
+        "marks": 2,
+        "more": 1,
+        "dn": null,
+        "inAgentsRow": null,
+        "inMarksRow": 2,
+        "overRight": 0,
+        "overBottom": 0,
+        "rect": {
+          "x": 573.760009765625,
+          "y": 8728.5302734375,
+          "w": 156.6400146484375,
+          "h": 77.439453125
+        }
+      },
+      "iss-00417": {
+        "h": 88,
+        "w": 178,
+        "marks": 2,
+        "more": 1,
+        "dn": null,
+        "inAgentsRow": null,
+        "inMarksRow": 2,
+        "overRight": 0,
+        "overBottom": 0,
+        "rect": {
+          "x": 45.7599983215332,
+          "y": 1747.489990234375,
+          "w": 156.63999938964844,
+          "h": 77.43994140625
+        }
+      },
+      "iss-00412": {
+        "h": 88,
+        "w": 178,
+        "marks": 1,
+        "more": 0,
+        "dn": null,
+        "inAgentsRow": null,
+        "inMarksRow": 1,
+        "overRight": 0,
+        "overBottom": 0,
+        "rect": {
+          "x": 2640,
+          "y": 1180.77001953125,
+          "w": 156.639892578125,
+          "h": 77.43994140625
+        }
+      }
+    },
+    "legendDn": true,
+    "scale": "matrix(0.88, 0, 0, 0.88, 0, 52)",
+    "kept": null,
+    "board": {
+      "dn": 10,
+      "cards": 61
+    },
+    "errors": []
+  },
+  {
+    "tag": "before-housing-lifecycle-1440-dark",
+    "audit": {
+      "segments": 372,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 134,
+      "iters": 10,
+      "ms": 381,
+      "unmapped": 0,
+      "widenLeft": 3,
+      "missing": 0,
+      "drift": 0,
+      "mode": "nest"
+    },
+    "boxes": {
+      "iss-00407": {
+        "h": 88,
+        "w": 178,
+        "marks": 2,
+        "more": 1,
+        "dn": null,
+        "inAgentsRow": null,
+        "inMarksRow": 2,
+        "overRight": 0,
+        "overBottom": 0,
+        "rect": {
+          "x": 573.760009765625,
+          "y": 8728.5302734375,
+          "w": 156.6400146484375,
+          "h": 77.439453125
+        }
+      },
+      "iss-00417": {
+        "h": 88,
+        "w": 178,
+        "marks": 2,
+        "more": 1,
+        "dn": null,
+        "inAgentsRow": null,
+        "inMarksRow": 2,
+        "overRight": 0,
+        "overBottom": 0,
+        "rect": {
+          "x": 45.7599983215332,
+          "y": 1747.489990234375,
+          "w": 156.63999938964844,
+          "h": 77.43994140625
+        }
+      },
+      "iss-00412": {
+        "h": 88,
+        "w": 178,
+        "marks": 1,
+        "more": 0,
+        "dn": null,
+        "inAgentsRow": null,
+        "inMarksRow": 1,
+        "overRight": 0,
+        "overBottom": 0,
+        "rect": {
+          "x": 2640,
+          "y": 1180.77001953125,
+          "w": 156.639892578125,
+          "h": 77.43994140625
+        }
+      }
+    },
+    "legendDn": true,
+    "scale": "matrix(0.88, 0, 0, 0.88, 0, 52)",
+    "kept": null,
+    "board": null,
+    "errors": []
+  },
+  {
+    "tag": "before-housing-lifecycle-390-light",
+    "audit": {
+      "segments": 368,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 134,
+      "iters": 10,
+      "ms": 500,
+      "unmapped": 0,
+      "widenLeft": 6,
+      "missing": 0,
+      "drift": 0,
+      "mode": "nest"
+    },
+    "boxes": {
+      "iss-00407": {
+        "h": 88,
+        "w": 178,
+        "marks": 2,
+        "more": 1,
+        "dn": null,
+        "inAgentsRow": null,
+        "inMarksRow": 2,
+        "overRight": 0,
+        "overBottom": 0,
+        "rect": {
+          "x": 42.47999954223633,
+          "y": 14766.056640625,
+          "w": 131.72000122070312,
+          "h": 65.1201171875
+        }
+      },
+      "iss-00417": {
+        "h": 88,
+        "w": 178,
+        "marks": 2,
+        "more": 1,
+        "dn": null,
+        "inAgentsRow": null,
+        "inMarksRow": 2,
+        "overRight": 0,
+        "overBottom": 0,
+        "rect": {
+          "x": 42.47999954223633,
+          "y": 3825.89697265625,
+          "w": 131.72000122070312,
+          "h": 65.119873046875
+        }
+      },
+      "iss-00412": {
+        "h": 88,
+        "w": 178,
+        "marks": 1,
+        "more": 0,
+        "dn": null,
+        "inAgentsRow": null,
+        "inMarksRow": 1,
+        "overRight": 0,
+        "overBottom": 0,
+        "rect": {
+          "x": 575.280029296875,
+          "y": 2460.596923828125,
+          "w": 131.719970703125,
+          "h": 65.119873046875
+        }
+      }
+    },
+    "legendDn": true,
+    "scale": "matrix(0.74, 0, 0, 0.74, 4, 8)",
+    "kept": null,
+    "board": null,
+    "errors": []
+  },
+  {
+    "tag": "before-housing-lifecycle-390-dark",
+    "audit": {
+      "segments": 368,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 134,
+      "iters": 10,
+      "ms": 503,
+      "unmapped": 0,
+      "widenLeft": 6,
+      "missing": 0,
+      "drift": 0,
+      "mode": "nest"
+    },
+    "boxes": {
+      "iss-00407": {
+        "h": 88,
+        "w": 178,
+        "marks": 2,
+        "more": 1,
+        "dn": null,
+        "inAgentsRow": null,
+        "inMarksRow": 2,
+        "overRight": 0,
+        "overBottom": 0,
+        "rect": {
+          "x": 42.47999954223633,
+          "y": 14766.056640625,
+          "w": 131.72000122070312,
+          "h": 65.1201171875
+        }
+      },
+      "iss-00417": {
+        "h": 88,
+        "w": 178,
+        "marks": 2,
+        "more": 1,
+        "dn": null,
+        "inAgentsRow": null,
+        "inMarksRow": 2,
+        "overRight": 0,
+        "overBottom": 0,
+        "rect": {
+          "x": 42.47999954223633,
+          "y": 3825.89697265625,
+          "w": 131.72000122070312,
+          "h": 65.119873046875
+        }
+      },
+      "iss-00412": {
+        "h": 88,
+        "w": 178,
+        "marks": 1,
+        "more": 0,
+        "dn": null,
+        "inAgentsRow": null,
+        "inMarksRow": 1,
+        "overRight": 0,
+        "overBottom": 0,
+        "rect": {
+          "x": 575.280029296875,
+          "y": 2460.596923828125,
+          "w": 131.719970703125,
+          "h": 65.119873046875
+        }
+      }
+    },
+    "legendDn": true,
+    "scale": "matrix(0.74, 0, 0, 0.74, 4, 8)",
+    "kept": null,
+    "board": null,
+    "errors": []
+  },
+  {
+    "tag": "after-spec-dock-1440-light",
+    "audit": {
+      "segments": 61,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 15,
+      "iters": 10,
+      "ms": 37,
+      "unmapped": 0,
+      "widenLeft": 3,
+      "missing": 0,
+      "drift": 0,
+      "markOverflow": 0,
+      "mode": "nest"
+    },
+    "boxes": {
+      "iss-00620": {
+        "h": 108,
+        "w": 178,
+        "marks": 2,
+        "more": 0,
+        "dn": "4",
+        "inAgentsRow": 2,
+        "inMarksRow": 0,
+        "overRight": 0,
+        "overBottom": 0,
+        "rect": {
+          "x": 45.7599983215332,
+          "y": 365.8900146484375,
+          "w": 156.63999938964844,
+          "h": 95.03997802734375
+        }
+      }
+    },
+    "legendDn": true,
+    "scale": "matrix(0.88, 0, 0, 0.88, 0, 52)",
+    "kept": [
+      true
+    ],
+    "board": {
+      "dn": 5,
+      "cards": 19
+    },
+    "errors": []
+  },
+  {
+    "tag": "after-spec-dock-1440-dark",
+    "audit": {
+      "segments": 61,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 15,
+      "iters": 10,
+      "ms": 37,
+      "unmapped": 0,
+      "widenLeft": 3,
+      "missing": 0,
+      "drift": 0,
+      "markOverflow": 0,
+      "mode": "nest"
+    },
+    "boxes": {
+      "iss-00620": {
+        "h": 108,
+        "w": 178,
+        "marks": 2,
+        "more": 0,
+        "dn": "4",
+        "inAgentsRow": 2,
+        "inMarksRow": 0,
+        "overRight": 0,
+        "overBottom": 0,
+        "rect": {
+          "x": 45.7599983215332,
+          "y": 365.8900146484375,
+          "w": 156.63999938964844,
+          "h": 95.03997802734375
+        }
+      }
+    },
+    "legendDn": true,
+    "scale": "matrix(0.88, 0, 0, 0.88, 0, 52)",
+    "kept": null,
+    "board": null,
+    "errors": []
+  },
+  {
+    "tag": "after-spec-dock-390-light",
+    "audit": {
+      "segments": 55,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 15,
+      "iters": 10,
+      "ms": 22,
+      "unmapped": 0,
+      "widenLeft": 5,
+      "missing": 0,
+      "drift": 0,
+      "markOverflow": 0,
+      "mode": "nest"
+    },
+    "boxes": {
+      "iss-00620": {
+        "h": 108,
+        "w": 178,
+        "marks": 2,
+        "more": 0,
+        "dn": "4",
+        "inAgentsRow": 2,
+        "inMarksRow": 0,
+        "overRight": 0,
+        "overBottom": 0,
+        "rect": {
+          "x": 42.47999954223633,
+          "y": 440.3968811035156,
+          "w": 131.72000122070312,
+          "h": 79.92001342773438
+        }
+      }
+    },
+    "legendDn": true,
+    "scale": "matrix(0.74, 0, 0, 0.74, 4, 8)",
+    "kept": null,
+    "board": null,
+    "errors": []
+  },
+  {
+    "tag": "after-spec-dock-390-dark",
+    "audit": {
+      "segments": 55,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 15,
+      "iters": 10,
+      "ms": 22,
+      "unmapped": 0,
+      "widenLeft": 5,
+      "missing": 0,
+      "drift": 0,
+      "markOverflow": 0,
+      "mode": "nest"
+    },
+    "boxes": {
+      "iss-00620": {
+        "h": 108,
+        "w": 178,
+        "marks": 2,
+        "more": 0,
+        "dn": "4",
+        "inAgentsRow": 2,
+        "inMarksRow": 0,
+        "overRight": 0,
+        "overBottom": 0,
+        "rect": {
+          "x": 42.47999954223633,
+          "y": 440.3968811035156,
+          "w": 131.72000122070312,
+          "h": 79.92001342773438
+        }
+      }
+    },
+    "legendDn": true,
+    "scale": "matrix(0.74, 0, 0, 0.74, 4, 8)",
+    "kept": null,
+    "board": null,
+    "errors": []
+  },
+  {
+    "tag": "after-housing-lifecycle-1440-light",
+    "audit": {
+      "segments": 372,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 134,
+      "iters": 10,
+      "ms": 382,
+      "unmapped": 0,
+      "widenLeft": 3,
+      "missing": 0,
+      "drift": 0,
+      "markOverflow": 0,
+      "mode": "nest"
+    },
+    "boxes": {
+      "iss-00407": {
+        "h": 128,
+        "w": 178,
+        "marks": 6,
+        "more": 0,
+        "dn": null,
+        "inAgentsRow": 6,
+        "inMarksRow": 0,
+        "overRight": 0,
+        "overBottom": 0,
+        "rect": {
+          "x": 573.760009765625,
+          "y": 8769.009765625,
+          "w": 156.6400146484375,
+          "h": 112.640625
+        }
+      },
+      "iss-00417": {
+        "h": 108,
+        "w": 178,
+        "marks": 3,
+        "more": 0,
+        "dn": null,
+        "inAgentsRow": 3,
+        "inMarksRow": 0,
+        "overRight": 0,
+        "overBottom": 0,
+        "rect": {
+          "x": 45.7599983215332,
+          "y": 1747.489990234375,
+          "w": 156.63999938964844,
+          "h": 95.0400390625
+        }
+      },
+      "iss-00412": {
+        "h": 108,
+        "w": 178,
+        "marks": 1,
+        "more": 0,
+        "dn": null,
+        "inAgentsRow": 1,
+        "inMarksRow": 0,
+        "overRight": 0,
+        "overBottom": 0,
+        "rect": {
+          "x": 2640,
+          "y": 1180.77001953125,
+          "w": 156.639892578125,
+          "h": 95.0399169921875
+        }
+      }
+    },
+    "legendDn": true,
+    "scale": "matrix(0.88, 0, 0, 0.88, 0, 52)",
+    "kept": [
+      true,
+      true,
+      true
+    ],
+    "board": {
+      "dn": 10,
+      "cards": 61
+    },
+    "errors": []
+  },
+  {
+    "tag": "after-housing-lifecycle-1440-dark",
+    "audit": {
+      "segments": 372,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 134,
+      "iters": 10,
+      "ms": 392,
+      "unmapped": 0,
+      "widenLeft": 3,
+      "missing": 0,
+      "drift": 0,
+      "markOverflow": 0,
+      "mode": "nest"
+    },
+    "boxes": {
+      "iss-00407": {
+        "h": 128,
+        "w": 178,
+        "marks": 6,
+        "more": 0,
+        "dn": null,
+        "inAgentsRow": 6,
+        "inMarksRow": 0,
+        "overRight": 0,
+        "overBottom": 0,
+        "rect": {
+          "x": 573.760009765625,
+          "y": 8769.009765625,
+          "w": 156.6400146484375,
+          "h": 112.640625
+        }
+      },
+      "iss-00417": {
+        "h": 108,
+        "w": 178,
+        "marks": 3,
+        "more": 0,
+        "dn": null,
+        "inAgentsRow": 3,
+        "inMarksRow": 0,
+        "overRight": 0,
+        "overBottom": 0,
+        "rect": {
+          "x": 45.7599983215332,
+          "y": 1747.489990234375,
+          "w": 156.63999938964844,
+          "h": 95.0400390625
+        }
+      },
+      "iss-00412": {
+        "h": 108,
+        "w": 178,
+        "marks": 1,
+        "more": 0,
+        "dn": null,
+        "inAgentsRow": 1,
+        "inMarksRow": 0,
+        "overRight": 0,
+        "overBottom": 0,
+        "rect": {
+          "x": 2640,
+          "y": 1180.77001953125,
+          "w": 156.639892578125,
+          "h": 95.0399169921875
+        }
+      }
+    },
+    "legendDn": true,
+    "scale": "matrix(0.88, 0, 0, 0.88, 0, 52)",
+    "kept": null,
+    "board": null,
+    "errors": []
+  },
+  {
+    "tag": "after-housing-lifecycle-390-light",
+    "audit": {
+      "segments": 368,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 134,
+      "iters": 10,
+      "ms": 486,
+      "unmapped": 0,
+      "widenLeft": 5,
+      "missing": 0,
+      "drift": 0,
+      "markOverflow": 0,
+      "mode": "nest"
+    },
+    "boxes": {
+      "iss-00407": {
+        "h": 128,
+        "w": 178,
+        "marks": 6,
+        "more": 0,
+        "dn": null,
+        "inAgentsRow": 6,
+        "inMarksRow": 0,
+        "overRight": 0,
+        "overBottom": 0,
+        "rect": {
+          "x": 42.47999954223633,
+          "y": 14840.056640625,
+          "w": 131.72000122070312,
+          "h": 94.720703125
+        }
+      },
+      "iss-00417": {
+        "h": 108,
+        "w": 178,
+        "marks": 3,
+        "more": 0,
+        "dn": null,
+        "inAgentsRow": 3,
+        "inMarksRow": 0,
+        "overRight": 0,
+        "overBottom": 0,
+        "rect": {
+          "x": 42.47999954223633,
+          "y": 3825.89697265625,
+          "w": 131.72000122070312,
+          "h": 79.919921875
+        }
+      },
+      "iss-00412": {
+        "h": 108,
+        "w": 178,
+        "marks": 1,
+        "more": 0,
+        "dn": null,
+        "inAgentsRow": 1,
+        "inMarksRow": 0,
+        "overRight": 0,
+        "overBottom": 0,
+        "rect": {
+          "x": 575.280029296875,
+          "y": 2475.39697265625,
+          "w": 131.719970703125,
+          "h": 79.919921875
+        }
+      }
+    },
+    "legendDn": true,
+    "scale": "matrix(0.74, 0, 0, 0.74, 4, 8)",
+    "kept": null,
+    "board": null,
+    "errors": []
+  },
+  {
+    "tag": "after-housing-lifecycle-390-dark",
+    "audit": {
+      "segments": 368,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 134,
+      "iters": 10,
+      "ms": 486,
+      "unmapped": 0,
+      "widenLeft": 5,
+      "missing": 0,
+      "drift": 0,
+      "markOverflow": 0,
+      "mode": "nest"
+    },
+    "boxes": {
+      "iss-00407": {
+        "h": 128,
+        "w": 178,
+        "marks": 6,
+        "more": 0,
+        "dn": null,
+        "inAgentsRow": 6,
+        "inMarksRow": 0,
+        "overRight": 0,
+        "overBottom": 0,
+        "rect": {
+          "x": 42.47999954223633,
+          "y": 14840.056640625,
+          "w": 131.72000122070312,
+          "h": 94.720703125
+        }
+      },
+      "iss-00417": {
+        "h": 108,
+        "w": 178,
+        "marks": 3,
+        "more": 0,
+        "dn": null,
+        "inAgentsRow": 3,
+        "inMarksRow": 0,
+        "overRight": 0,
+        "overBottom": 0,
+        "rect": {
+          "x": 42.47999954223633,
+          "y": 3825.89697265625,
+          "w": 131.72000122070312,
+          "h": 79.919921875
+        }
+      },
+      "iss-00412": {
+        "h": 108,
+        "w": 178,
+        "marks": 1,
+        "more": 0,
+        "dn": null,
+        "inAgentsRow": 1,
+        "inMarksRow": 0,
+        "overRight": 0,
+        "overBottom": 0,
+        "rect": {
+          "x": 575.280029296875,
+          "y": 2475.39697265625,
+          "w": 131.719970703125,
+          "h": 79.919921875
+        }
+      }
+    },
+    "legendDn": true,
+    "scale": "matrix(0.74, 0, 0, 0.74, 4, 8)",
+    "kept": null,
+    "board": null,
+    "errors": []
+  }
+]
