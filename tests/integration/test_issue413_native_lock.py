@@ -31,6 +31,11 @@ def _environment(tmp_path: Path) -> dict[str, str]:
         "GIT_CONFIG_NOSYSTEM": "1",
         "GIT_CONFIG_GLOBAL": os.devnull,
         "GIT_TERMINAL_PROMPT": "0",
+        "GIT_CONFIG_COUNT": "2",
+        "GIT_CONFIG_KEY_0": "maintenance.auto",
+        "GIT_CONFIG_VALUE_0": "false",
+        "GIT_CONFIG_KEY_1": "gc.auto",
+        "GIT_CONFIG_VALUE_1": "0",
     })
     return environment
 
@@ -125,6 +130,36 @@ def _probe(tmp_path: Path, common_dir: Path, environment: dict[str, str]) -> sub
         check=False,
         timeout=20,
     )
+
+
+def test_isolated_git_environment_disables_automatic_maintenance_and_gc(tmp_path: Path) -> None:
+    environment = _environment(tmp_path)
+    assert _git(tmp_path, environment, "config", "--get", "maintenance.auto") == "false"
+    assert _git(tmp_path, environment, "config", "--get", "gc.auto") == "0"
+    root = tmp_path / "traced"
+    root.mkdir()
+    _git(root, environment, "init", "--initial-branch=main", "-q")
+    result = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(root),
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "--allow-empty",
+            "-qm",
+            "fixture",
+        ],
+        env={**environment, "GIT_TRACE": "1"},
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=20,
+    )
+    assert "maintenance run" not in result.stderr, result.stderr
 
 
 def test_main_and_linked_worktree_processes_share_one_physical_lock_without_git_writes(tmp_path: Path) -> None:
