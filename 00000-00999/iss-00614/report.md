@@ -93,3 +93,4 @@ ID: "iss-00614"
 - 線の違反（housing-lifecycle・taikyohiyou_project の『全体』『いま』の一部の幅）は、単体の構造の図と同じく残る。iss-00627 で直す（『次の提案』）。
 - Epic epic-00612 の文書を、この Issue の仕様の変更に合わせる（『次の提案』）。
 - 試しのサーバー 18614・18799 は本人の確かめまで残す。
+- PR https://github.com/chemitaro/spec-dock/pull/628（head `908da8b53`）。CI（Actions と Commit Status）は observable_ci PASS、merge_readiness READY（`.workbench/iss-00614/pr-checks.json`）。マージは統括が行う。
