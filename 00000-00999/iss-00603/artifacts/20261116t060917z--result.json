@@ -1,0 +1,962 @@
+[
+  {
+    "name": "spec-dock",
+    "w": 1440,
+    "theme": "light",
+    "range": "all",
+    "file": "spec-dock-1440-light-all.png",
+    "audit": {
+      "segments": 665,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 211,
+      "iters": 10,
+      "ms": 661,
+      "unmapped": 0,
+      "widenLeft": 13,
+      "missing": 0,
+      "drift": 0,
+      "mode": "nest"
+    },
+    "ui": {
+      "pressed": [
+        "all"
+      ],
+      "boxes": 300,
+      "frames": 36,
+      "chips": 0,
+      "done": 680,
+      "cln": 2,
+      "toolsW": 825.078125,
+      "docW": 1440
+    },
+    "errors": []
+  },
+  {
+    "name": "spec-dock",
+    "w": 1440,
+    "theme": "light",
+    "range": "now",
+    "file": "spec-dock-1440-light-now.png",
+    "audit": {
+      "segments": 17,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 5,
+      "iters": 5,
+      "ms": 7,
+      "unmapped": 0,
+      "widenLeft": 0,
+      "missing": 0,
+      "drift": 0,
+      "mode": "nest"
+    },
+    "ui": {
+      "pressed": [
+        "now"
+      ],
+      "boxes": 33,
+      "frames": 28,
+      "chips": 2,
+      "done": 126,
+      "cln": 0,
+      "toolsW": 825.078125,
+      "docW": 1440
+    },
+    "errors": []
+  },
+  {
+    "name": "spec-dock",
+    "w": 1440,
+    "theme": "light",
+    "range": "next",
+    "file": "spec-dock-1440-light-next.png",
+    "audit": {
+      "segments": 0,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 0,
+      "iters": 0,
+      "ms": 1,
+      "unmapped": 0,
+      "widenLeft": 0,
+      "missing": 0,
+      "drift": 0,
+      "mode": "nest"
+    },
+    "ui": {
+      "pressed": [
+        "next"
+      ],
+      "boxes": 6,
+      "frames": 6,
+      "chips": 0,
+      "done": 6,
+      "cln": 0,
+      "toolsW": 833.265625,
+      "docW": 1440
+    },
+    "errors": []
+  },
+  {
+    "name": "spec-dock",
+    "w": 1440,
+    "theme": "dark",
+    "range": "all",
+    "file": "spec-dock-1440-dark-all.png",
+    "audit": {
+      "segments": 665,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 211,
+      "iters": 10,
+      "ms": 660,
+      "unmapped": 0,
+      "widenLeft": 13,
+      "missing": 0,
+      "drift": 0,
+      "mode": "nest"
+    },
+    "ui": {
+      "pressed": [
+        "all"
+      ],
+      "boxes": 300,
+      "frames": 36,
+      "chips": 0,
+      "done": 680,
+      "cln": 2,
+      "toolsW": 825.078125,
+      "docW": 1440
+    },
+    "errors": []
+  },
+  {
+    "name": "spec-dock",
+    "w": 1440,
+    "theme": "dark",
+    "range": "now",
+    "file": "spec-dock-1440-dark-now.png",
+    "audit": {
+      "segments": 17,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 5,
+      "iters": 5,
+      "ms": 7,
+      "unmapped": 0,
+      "widenLeft": 0,
+      "missing": 0,
+      "drift": 0,
+      "mode": "nest"
+    },
+    "ui": {
+      "pressed": [
+        "now"
+      ],
+      "boxes": 33,
+      "frames": 28,
+      "chips": 2,
+      "done": 126,
+      "cln": 0,
+      "toolsW": 825.078125,
+      "docW": 1440
+    },
+    "errors": []
+  },
+  {
+    "name": "spec-dock",
+    "w": 1440,
+    "theme": "dark",
+    "range": "next",
+    "file": "spec-dock-1440-dark-next.png",
+    "audit": {
+      "segments": 0,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 0,
+      "iters": 0,
+      "ms": 1,
+      "unmapped": 0,
+      "widenLeft": 0,
+      "missing": 0,
+      "drift": 0,
+      "mode": "nest"
+    },
+    "ui": {
+      "pressed": [
+        "next"
+      ],
+      "boxes": 6,
+      "frames": 6,
+      "chips": 0,
+      "done": 6,
+      "cln": 0,
+      "toolsW": 833.265625,
+      "docW": 1440
+    },
+    "errors": []
+  },
+  {
+    "name": "spec-dock",
+    "w": 390,
+    "theme": "light",
+    "range": "all",
+    "file": "spec-dock-390-light-all.png",
+    "audit": {
+      "segments": 663,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 211,
+      "iters": 4,
+      "ms": 194,
+      "unmapped": 0,
+      "widenLeft": 0,
+      "missing": 0,
+      "drift": 0,
+      "mode": "nest"
+    },
+    "ui": {
+      "pressed": [
+        "all"
+      ],
+      "boxes": 300,
+      "frames": 36,
+      "chips": 0,
+      "done": 680,
+      "cln": 2,
+      "toolsW": 32,
+      "docW": 390
+    },
+    "errors": []
+  },
+  {
+    "name": "spec-dock",
+    "w": 390,
+    "theme": "light",
+    "range": "now",
+    "file": "spec-dock-390-light-now.png",
+    "audit": {
+      "segments": 15,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 5,
+      "iters": 1,
+      "ms": 3,
+      "unmapped": 0,
+      "widenLeft": 0,
+      "missing": 0,
+      "drift": 0,
+      "mode": "nest"
+    },
+    "ui": {
+      "pressed": [
+        "now"
+      ],
+      "boxes": 33,
+      "frames": 28,
+      "chips": 2,
+      "done": 126,
+      "cln": 0,
+      "toolsW": 32,
+      "docW": 390
+    },
+    "errors": []
+  },
+  {
+    "name": "spec-dock",
+    "w": 390,
+    "theme": "light",
+    "range": "next",
+    "file": "spec-dock-390-light-next.png",
+    "audit": {
+      "segments": 0,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 0,
+      "iters": 0,
+      "ms": 1,
+      "unmapped": 0,
+      "widenLeft": 0,
+      "missing": 0,
+      "drift": 0,
+      "mode": "nest"
+    },
+    "ui": {
+      "pressed": [
+        "next"
+      ],
+      "boxes": 6,
+      "frames": 6,
+      "chips": 0,
+      "done": 6,
+      "cln": 0,
+      "toolsW": 32,
+      "docW": 390
+    },
+    "errors": []
+  },
+  {
+    "name": "spec-dock",
+    "w": 390,
+    "theme": "dark",
+    "range": "all",
+    "file": "spec-dock-390-dark-all.png",
+    "audit": {
+      "segments": 663,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 211,
+      "iters": 4,
+      "ms": 190,
+      "unmapped": 0,
+      "widenLeft": 0,
+      "missing": 0,
+      "drift": 0,
+      "mode": "nest"
+    },
+    "ui": {
+      "pressed": [
+        "all"
+      ],
+      "boxes": 300,
+      "frames": 36,
+      "chips": 0,
+      "done": 680,
+      "cln": 2,
+      "toolsW": 32,
+      "docW": 390
+    },
+    "errors": []
+  },
+  {
+    "name": "spec-dock",
+    "w": 390,
+    "theme": "dark",
+    "range": "now",
+    "file": "spec-dock-390-dark-now.png",
+    "audit": {
+      "segments": 15,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 5,
+      "iters": 1,
+      "ms": 3,
+      "unmapped": 0,
+      "widenLeft": 0,
+      "missing": 0,
+      "drift": 0,
+      "mode": "nest"
+    },
+    "ui": {
+      "pressed": [
+        "now"
+      ],
+      "boxes": 33,
+      "frames": 28,
+      "chips": 2,
+      "done": 126,
+      "cln": 0,
+      "toolsW": 32,
+      "docW": 390
+    },
+    "errors": []
+  },
+  {
+    "name": "spec-dock",
+    "w": 390,
+    "theme": "dark",
+    "range": "next",
+    "file": "spec-dock-390-dark-next.png",
+    "audit": {
+      "segments": 0,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 0,
+      "iters": 0,
+      "ms": 0,
+      "unmapped": 0,
+      "widenLeft": 0,
+      "missing": 0,
+      "drift": 0,
+      "mode": "nest"
+    },
+    "ui": {
+      "pressed": [
+        "next"
+      ],
+      "boxes": 6,
+      "frames": 6,
+      "chips": 0,
+      "done": 6,
+      "cln": 0,
+      "toolsW": 32,
+      "docW": 390
+    },
+    "errors": []
+  },
+  {
+    "name": "housing-lifecycle",
+    "w": 1440,
+    "theme": "light",
+    "range": "all",
+    "file": "housing-lifecycle-1440-light-all.png",
+    "audit": {
+      "segments": 372,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 134,
+      "iters": 10,
+      "ms": 410,
+      "unmapped": 0,
+      "widenLeft": 3,
+      "missing": 0,
+      "drift": 0,
+      "mode": "nest"
+    },
+    "ui": {
+      "pressed": [
+        "all"
+      ],
+      "boxes": 342,
+      "frames": 67,
+      "chips": 0,
+      "done": 752,
+      "cln": 12,
+      "toolsW": 825.078125,
+      "docW": 1440
+    },
+    "errors": []
+  },
+  {
+    "name": "housing-lifecycle",
+    "w": 1440,
+    "theme": "light",
+    "range": "now",
+    "file": "housing-lifecycle-1440-light-now.png",
+    "audit": {
+      "segments": 102,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 36,
+      "iters": 10,
+      "ms": 64,
+      "unmapped": 0,
+      "widenLeft": 2,
+      "missing": 0,
+      "drift": 0,
+      "mode": "nest"
+    },
+    "ui": {
+      "pressed": [
+        "now"
+      ],
+      "boxes": 119,
+      "frames": 34,
+      "chips": 6,
+      "done": 231,
+      "cln": 0,
+      "toolsW": 825.078125,
+      "docW": 1440
+    },
+    "errors": []
+  },
+  {
+    "name": "housing-lifecycle",
+    "w": 1440,
+    "theme": "light",
+    "range": "next",
+    "file": "housing-lifecycle-1440-light-next.png",
+    "audit": {
+      "segments": 25,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 11,
+      "iters": 9,
+      "ms": 9,
+      "unmapped": 0,
+      "widenLeft": 0,
+      "missing": 0,
+      "drift": 0,
+      "mode": "nest"
+    },
+    "ui": {
+      "pressed": [
+        "next"
+      ],
+      "boxes": 23,
+      "frames": 26,
+      "chips": 0,
+      "done": 15,
+      "cln": 0,
+      "toolsW": 825.078125,
+      "docW": 1440
+    },
+    "errors": []
+  },
+  {
+    "name": "housing-lifecycle",
+    "w": 1440,
+    "theme": "dark",
+    "range": "all",
+    "file": "housing-lifecycle-1440-dark-all.png",
+    "audit": {
+      "segments": 372,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 134,
+      "iters": 10,
+      "ms": 381,
+      "unmapped": 0,
+      "widenLeft": 3,
+      "missing": 0,
+      "drift": 0,
+      "mode": "nest"
+    },
+    "ui": {
+      "pressed": [
+        "all"
+      ],
+      "boxes": 342,
+      "frames": 67,
+      "chips": 0,
+      "done": 752,
+      "cln": 12,
+      "toolsW": 825.078125,
+      "docW": 1440
+    },
+    "errors": []
+  },
+  {
+    "name": "housing-lifecycle",
+    "w": 1440,
+    "theme": "dark",
+    "range": "now",
+    "file": "housing-lifecycle-1440-dark-now.png",
+    "audit": {
+      "segments": 102,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 36,
+      "iters": 10,
+      "ms": 66,
+      "unmapped": 0,
+      "widenLeft": 2,
+      "missing": 0,
+      "drift": 0,
+      "mode": "nest"
+    },
+    "ui": {
+      "pressed": [
+        "now"
+      ],
+      "boxes": 119,
+      "frames": 34,
+      "chips": 6,
+      "done": 231,
+      "cln": 0,
+      "toolsW": 825.078125,
+      "docW": 1440
+    },
+    "errors": []
+  },
+  {
+    "name": "housing-lifecycle",
+    "w": 1440,
+    "theme": "dark",
+    "range": "next",
+    "file": "housing-lifecycle-1440-dark-next.png",
+    "audit": {
+      "segments": 25,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 11,
+      "iters": 9,
+      "ms": 9,
+      "unmapped": 0,
+      "widenLeft": 0,
+      "missing": 0,
+      "drift": 0,
+      "mode": "nest"
+    },
+    "ui": {
+      "pressed": [
+        "next"
+      ],
+      "boxes": 23,
+      "frames": 26,
+      "chips": 0,
+      "done": 15,
+      "cln": 0,
+      "toolsW": 825.078125,
+      "docW": 1440
+    },
+    "errors": []
+  },
+  {
+    "name": "housing-lifecycle",
+    "w": 390,
+    "theme": "light",
+    "range": "all",
+    "file": "housing-lifecycle-390-light-all.png",
+    "audit": {
+      "segments": 368,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 134,
+      "iters": 10,
+      "ms": 483,
+      "unmapped": 0,
+      "widenLeft": 6,
+      "missing": 0,
+      "drift": 0,
+      "mode": "nest"
+    },
+    "ui": {
+      "pressed": [
+        "all"
+      ],
+      "boxes": 342,
+      "frames": 67,
+      "chips": 0,
+      "done": 752,
+      "cln": 12,
+      "toolsW": 32,
+      "docW": 390
+    },
+    "errors": []
+  },
+  {
+    "name": "housing-lifecycle",
+    "w": 390,
+    "theme": "light",
+    "range": "now",
+    "file": "housing-lifecycle-390-light-now.png",
+    "audit": {
+      "segments": 100,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 36,
+      "iters": 10,
+      "ms": 45,
+      "unmapped": 0,
+      "widenLeft": 1,
+      "missing": 0,
+      "drift": 0,
+      "mode": "nest"
+    },
+    "ui": {
+      "pressed": [
+        "now"
+      ],
+      "boxes": 119,
+      "frames": 34,
+      "chips": 6,
+      "done": 231,
+      "cln": 0,
+      "toolsW": 32,
+      "docW": 390
+    },
+    "errors": []
+  },
+  {
+    "name": "housing-lifecycle",
+    "w": 390,
+    "theme": "light",
+    "range": "next",
+    "file": "housing-lifecycle-390-light-next.png",
+    "audit": {
+      "segments": 25,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 11,
+      "iters": 9,
+      "ms": 9,
+      "unmapped": 0,
+      "widenLeft": 0,
+      "missing": 0,
+      "drift": 0,
+      "mode": "nest"
+    },
+    "ui": {
+      "pressed": [
+        "next"
+      ],
+      "boxes": 23,
+      "frames": 26,
+      "chips": 0,
+      "done": 15,
+      "cln": 0,
+      "toolsW": 32,
+      "docW": 390
+    },
+    "errors": []
+  },
+  {
+    "name": "housing-lifecycle",
+    "w": 390,
+    "theme": "dark",
+    "range": "all",
+    "file": "housing-lifecycle-390-dark-all.png",
+    "audit": {
+      "segments": 368,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 134,
+      "iters": 10,
+      "ms": 479,
+      "unmapped": 0,
+      "widenLeft": 6,
+      "missing": 0,
+      "drift": 0,
+      "mode": "nest"
+    },
+    "ui": {
+      "pressed": [
+        "all"
+      ],
+      "boxes": 342,
+      "frames": 67,
+      "chips": 0,
+      "done": 752,
+      "cln": 12,
+      "toolsW": 32,
+      "docW": 390
+    },
+    "errors": []
+  },
+  {
+    "name": "housing-lifecycle",
+    "w": 390,
+    "theme": "dark",
+    "range": "now",
+    "file": "housing-lifecycle-390-dark-now.png",
+    "audit": {
+      "segments": 100,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 36,
+      "iters": 10,
+      "ms": 46,
+      "unmapped": 0,
+      "widenLeft": 1,
+      "missing": 0,
+      "drift": 0,
+      "mode": "nest"
+    },
+    "ui": {
+      "pressed": [
+        "now"
+      ],
+      "boxes": 119,
+      "frames": 34,
+      "chips": 6,
+      "done": 231,
+      "cln": 0,
+      "toolsW": 32,
+      "docW": 390
+    },
+    "errors": []
+  },
+  {
+    "name": "housing-lifecycle",
+    "w": 390,
+    "theme": "dark",
+    "range": "next",
+    "file": "housing-lifecycle-390-dark-next.png",
+    "audit": {
+      "segments": 25,
+      "boxHits": 0,
+      "ownHits": 0,
+      "overlaps": 0,
+      "diagonal": 0,
+      "portShare": 0,
+      "trunkOverlaps": 0,
+      "frameExits": 0,
+      "failed": 0,
+      "list": [],
+      "edges": 11,
+      "iters": 9,
+      "ms": 9,
+      "unmapped": 0,
+      "widenLeft": 0,
+      "missing": 0,
+      "drift": 0,
+      "mode": "nest"
+    },
+    "ui": {
+      "pressed": [
+        "next"
+      ],
+      "boxes": 23,
+      "frames": 26,
+      "chips": 0,
+      "done": 15,
+      "cln": 0,
+      "toolsW": 32,
+      "docW": 390
+    },
+    "errors": []
+  }
+]
