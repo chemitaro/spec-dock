@@ -24,6 +24,46 @@ export const SIZE = {
   indent: 40,
 };
 const BASE = { world: 28, body: 12, wrapRow: 14, wrapCol: 14, cols: 44, col: 12, treeRow: 14, treeIndent: 0 };
+// iss-00620: the agents' marks (orca-web) sit on rows of their own below a box's other marks (a frame's heading).
+// Copies of graph.css: change them together.
+export const MARK_ROW = 20; // one row of agents: the 4px above it and the component's sm height 16px (.gx-agents, .orca-marks row-gap)
+export const MARK_INSET = { box: 26 }; // a box's width less its inner width: left edge 4 + left padding 11 + right padding 10 + right edge 1 (.gx-box)
+
+/**
+ * The rows of a box's or frame's marks: 1 without an agent (no row of agents), else 1 + the rows the agents' marks take
+ * packed left to right into avail (a mark wider than avail takes a row of its own).
+ * @param m     {items: [width of each agent's mark], gap: px between them} as the page measured them, or none
+ * @param avail the inner width (px)
+ */
+export function markRows(m, avail) {
+  const items = m?.items;
+  if (!Array.isArray(items) || !items.length) return 1;
+  const gap = Number(m.gap) || 0;
+  let k = 1;
+  let x = null;
+  for (const w of items) {
+    if (x === null) x = w;
+    else if (x + gap + w > avail) {
+      k++;
+      x = w;
+    } else x += gap + w;
+  }
+  return 1 + k;
+}
+
+/** markRows of a laid out node (box, tframe, frame) at its own width: what the layout used for it. */
+export function nodeMarkRows(node, m) {
+  if (!m || !node) return 1;
+  const w = node.x2 - node.x1;
+  if (node.type === "box" || node.type === "tframe") return markRows(m, w - MARK_INSET.box);
+  if (node.type === "frame") {
+    const padX = (SIZE.pad[node.kind] || SIZE.pad.epic)[1];
+    return markRows(m, w - 2 * padX - 2);
+  }
+  return 1;
+}
+const markOf = (ctx, s) => ctx.opts.marks?.[s.id];
+
 // The width seen at 100% when the page does not say (the node check): the wrap before iss-00556 (iss-00560 F-01).
 export const WRAP_WIDTH = 1240;
 
@@ -153,7 +193,8 @@ const byStageActivity = (all, ix) => {
 const grow = (ctx, s) => ctx.gaps[`grow:n:${s.id}`] || 0;
 
 function boxBlock(s, ctx) {
-  return { t: "box", s, w: SIZE.boxW, h: SIZE.boxH + grow(ctx, s) };
+  const rows = markRows(markOf(ctx, s), SIZE.boxW - MARK_INSET.box);
+  return { t: "box", s, w: SIZE.boxW, h: SIZE.boxH + grow(ctx, s) + (rows - 1) * MARK_ROW, rows };
 }
 
 function chipBlock(key, list, ctx) {
@@ -537,14 +578,15 @@ function frameBlock(s, kids, ctx, avail) {
   const body = kids.length ? childrenBlock(s, kids, ctx, avail - 2 * padX) : null;
   const bodyGap = gap(ctx.gaps, `b${s.id}`, BASE.body);
   const compact = !body;
-  const head = SIZE.head + grow(ctx, s);
   const w = compact ? SIZE.compactW : Math.max(SIZE.minFrameW[s.kind] || 300, body.w + 2 * padX);
+  const rows = markRows(markOf(ctx, s), w - 2 * padX - 2);
+  const head = SIZE.head + grow(ctx, s) + (rows - 1) * MARK_ROW;
   const h = padT + head + (body ? bodyGap + body.h : 0) + padB;
   if (body) {
     body.x = padX;
     body.y = padT + head + bodyGap;
   }
-  return { t: "frame", s, w, h, compact, head: padT + head, padT, body, key: `f${s.id}` };
+  return { t: "frame", s, w, h, compact, head: padT + head, padT, body, key: `f${s.id}`, rows };
 }
 
 // --- The nested and the tree layout ---------------------------------------------------------------------------
@@ -566,7 +608,8 @@ function tree(roots, ctx) {
   let y = 0;
   const items = rows.map((r, i) => {
     const w = r.frame ? SIZE.treeFrameW : SIZE.boxW;
-    const it = { t: "tbox", s: r.s, depth: r.depth, frame: r.frame, x: r.depth * indent, y, w, h: SIZE.boxH + grow(ctx, r.s) };
+    const marked = markRows(markOf(ctx, r.s), w - MARK_INSET.box);
+    const it = { t: "tbox", s: r.s, depth: r.depth, frame: r.frame, x: r.depth * indent, y, w, h: SIZE.boxH + grow(ctx, r.s) + (marked - 1) * MARK_ROW, rows: marked };
     y += it.h + (i < rows.length - 1 ? gap(ctx.gaps, `tree.row.${i}`, BASE.treeRow) : 0);
     return it;
   });
@@ -580,8 +623,9 @@ function flatten(block, ox, oy, path, out) {
   const x = ox + (block.x || 0);
   const y = oy + (block.y || 0);
   const rect = { x1: x, y1: y, x2: x + block.w, y2: y + block.h };
+  const marked = block.rows > 1 ? { rows: block.rows } : {}; // only a grown node carries rows (iss-00620)
   if (block.t === "box" || block.t === "tbox") {
-    out.nodes.push({ type: block.t === "box" || !block.frame ? "box" : "tframe", id: block.s.id, depth: block.depth ?? null, ...rect, path });
+    out.nodes.push({ type: block.t === "box" || !block.frame ? "box" : "tframe", id: block.s.id, depth: block.depth ?? null, ...rect, path, ...marked });
     return;
   }
   if (block.t === "chip") {
@@ -589,7 +633,7 @@ function flatten(block, ox, oy, path, out) {
     return;
   }
   if (block.t === "frame") {
-    out.nodes.push({ type: "frame", id: block.s.id, kind: block.s.kind, state: block.s.state, compact: block.compact, headY2: y + block.head, ...rect, path: [...path, { c: block.key, axis: "y", i: 0 }] });
+    out.nodes.push({ type: "frame", id: block.s.id, kind: block.s.kind, state: block.s.state, compact: block.compact, headY2: y + block.head, ...rect, path: [...path, { c: block.key, axis: "y", i: 0 }], ...marked });
     if (block.body) flatten(block.body, x, y, [...path, { c: block.key, axis: "y", i: 1, gapKey: `b${block.s.id}` }], out);
     return;
   }
@@ -600,9 +644,10 @@ function flatten(block, ox, oy, path, out) {
  * Lay the Scopes out.
  * @param scopes  structure API `scopes`
  * @param cleanup structure API `cleanup` ([{id, code, text}])
- * @param options {mode: "nest"|"tree", range: "all"|"now"|"next", focus, width, height} — width: the graph's
+ * @param options {mode: "nest"|"tree", range: "all"|"now"|"next", focus, width, height, marks} — width: the graph's
  *                visible width at 100% (px), where the groups wrap (WRAP_WIDTH when absent); height is accepted
- *                but unused by placement (the page keeps it as a resize signal, iss-00583).
+ *                but unused by placement (the page keeps it as a resize signal, iss-00583); marks: {Scope id:
+ *                {items, gap}} of the agents' marks the page measured (iss-00620, markRows).
  * @param gaps    extra pixels per gap key (from earlier routing rounds)
  */
 export function layout(scopes, cleanup, options = {}, gaps = {}) {
