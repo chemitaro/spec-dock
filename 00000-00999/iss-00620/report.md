@@ -39,7 +39,7 @@ ID: "iss-00620"
 
 - キャンペーン `.workbench/final-quality-gate/iss-00620-fqg-1/`（quality-gate-reviewer opus / medium、second opinion なし、範囲 `d9bb6164d..5b170ecb7`、観点 functional-correctness・requirements-closure・test-adequacy。plan の `ui-behavior` は契約の観点にないので functional-correctness の中で見て、実機は S-05 で取った）。
 - attempt 01（`5b170ecb7`）：review lane 合格（P0〜P3 0、coverage complete）。test lane は `make lint` exit 0、`uv run pytest` 1 failed / 4009 passed / 7 skipped。落ちたのは iss-00611 と同じ揺れるテスト `tests/integration/test_issue413_native_lock.py::test_terminated_owner_releases_native_start_lock_without_pid_recovery`（`.git` の走査と git の自動 maintenance の `maintenance.lock` の競合）。この変更は触れていない。単独で3回とも通った（`review-response.md`）。コードを変えずに同じコミットで test lane をやり直した（attempt 02）。
-- ATTEMPT02_RESULT
+- attempt 02（同じ `5b170ecb7`）：`make lint` exit 0、`uv run pytest` exit 0（4010 passed / 7 skipped）。**合格**。closure `.workbench/final-quality-gate/iss-00620-fqg-1/closure.md`（worktree `/Volumes/990p2t/workspace/worktrees/orca/spec-dock/iss-00620`）。P2・P3 なし。
 
 ## 実機の写し（S-05、タスク担当）
 
@@ -67,7 +67,7 @@ ID: "iss-00620"
 ## Verification
 
 - 仕様のレビュー合格（round-5、指摘0。本人の決定2つを含む）。
-- 最終品質ゲート：review lane 合格（`5b170ecb7`、指摘0）、test lane は下の attempt 02。
+- 最終品質ゲート合格（`5b170ecb7`、review 指摘0、make lint・全体の pytest 4010 passed）。
 - 実機：前後 × 1440・390 × 明暗で、後の edgeAudit の違反0・markOverflow 0・ブラウザーのエラー0。エージェント1人・3人・6人と2人（本人の写しと同じ形）の箱がすべて収まる。
 
 ## Residual Risks / Follow-ups
@@ -77,3 +77,4 @@ ID: "iss-00620"
 - 印の並び順は orca-web の部品の順（orca-web の iss-00043 で『指揮の上流が左』に改まる予定。SpecDock は並べ替えない）。
 - 配布の手引き（リリースノート）は 0.9.5 のリリースの Issue で「エージェントの行」を書く。
 - 試しのサーバー 18622・18799 は本人の確かめまで残す。
+- PR https://github.com/chemitaro/spec-dock/pull/622（head `5b170ecb7`）。CI は観測中。マージは統括が行う。
