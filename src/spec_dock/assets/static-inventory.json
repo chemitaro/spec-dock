@@ -386,7 +386,7 @@
     {
       "path": "spec-dock/docs/migration.md",
       "source": "spec_dock/docs/migration.md",
-      "sha256": "47902bb99e158855f26c2c7733704bfaecb5864b497a26e94271792817c79e59",
+      "sha256": "9ea0ec4a4017d6b6c258b596a22f4947bb6e0c42b85053cac4f25c6fa163ec2b",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
@@ -405,7 +405,8 @@
         "454b06730e5fe9cc17f2645a1a2c9ae8928845e969dc089d3f752b56e0a406af",
         "14e4b13324100dc52e6588e46cf33d466215e06fc71a52ec497457ca9c7e6b2e",
         "fd7a00bc9a2aa884f8a9bb4ee98c61b670c5b2f9b15ab2f886ca7417cb3d68c3",
-        "8c598cf091965278e15a194e8caec73fad0d5fb433b025a04656d3ddb0194049"
+        "8c598cf091965278e15a194e8caec73fad0d5fb433b025a04656d3ddb0194049",
+        "47902bb99e158855f26c2c7733704bfaecb5864b497a26e94271792817c79e59"
       ]
     },
     {
@@ -769,7 +770,7 @@
     {
       "path": "spec-dock/system/spec-dock-version",
       "source": "spec_dock/system/spec-dock-version",
-      "sha256": "a61cc7a990558a2b76c4a814eb233267e219158dcf184b6b30ce458d27027674",
+      "sha256": "8780409dbc52c96276102c5a079a7d3e325510d7bf87af5257508ecc088a3730",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
@@ -786,7 +787,8 @@
         "9d8c94f1ad3ea96b1e2ac4914fda4cb93c76b4a3e0d8cc6dd8976d6c0b227d15",
         "179a5390966e85c2071a87c1b31de13df67460665196f6529f8c4986842f81e5",
         "f34248c2449a022d41c918d1e995ad85859a1e9f0e6f89d0af23ae4a55519f71",
-        "38ecaa1e4c36c6691944c83df7671fca8b86f5cbf2d4e22c0012aa52df14b149"
+        "38ecaa1e4c36c6691944c83df7671fca8b86f5cbf2d4e22c0012aa52df14b149",
+        "a61cc7a990558a2b76c4a814eb233267e219158dcf184b6b30ce458d27027674"
       ]
     },
     {
