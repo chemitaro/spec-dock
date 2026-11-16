@@ -6,8 +6,8 @@ goal: "構造の図の線が箱・枠の見出しや別の線に重ならない�
 
 steps: {
 	"S-01": {title: "D-06 の回帰の入力を tests/fixtures/issue627/ に作る（題名を伏せる）。直す前の router で、その入力の違反が0でないことを node で確かめる", realizes: ["R-03"], status: "done", session: "owner"}
-	"S-02": {title: "T-01・T-02 を先に書いて落ちることを確かめ、router.js に D-04・D-05 を入れて通す。既存の構造の図のテストを通す", realizes: ["R-03", "R-05"], status: "todo", after: ["S-01"], session: "impl-sol"}
-	"S-03": {title: "T-03〜T-05 を先に書いて落ちることを確かめ、D-01（graph.css）・D-02（layout.js の heads と compactHeight）・D-03（measure.js、graph.js と allgraph.js の測り直し）を入れて通す", realizes: ["R-01", "R-02", "F-01", "F-02"], status: "todo", after: ["S-02"], session: "impl-claude"}
+	"S-02": {title: "T-01・T-02 を tests/unit/presentation/test_dashboard_graph_route_fix.py（と tests/js の検査の口）に先に書いて落ちることを確かめ、router.js に D-04・D-05 を入れて通す。既存の構造の図のテストを通す", realizes: ["R-03", "R-05"], status: "todo", after: ["S-01"], session: "impl-sol"}
+	"S-03": {title: "T-03〜T-05 を tests/unit/presentation/test_dashboard_graph_fit.py（と tests/js の検査の口）に先に書いて落ちることを確かめ、D-01（graph.css）・D-02（layout.js の heads と compactHeight）・D-03（measure.js、graph.js と allgraph.js の測り直し）を入れて通す", realizes: ["R-01", "R-02", "F-01", "F-02"], status: "todo", after: ["S-02"], session: "impl-claude"}
 	"S-04": {title: "make lint と全体の uv run pytest を通す（static-inventory.json に dashboard の資産はないので、変われば直す）", realizes: ["R-01", "R-02", "R-03"], status: "todo", after: ["S-03"], session: "impl-claude"}
 	"S-05": {title: "D-07 の実機の確かめ（R-04 の表、R-01 の見出しの差、R-02 のはみ出し、直す前と後の写し）と R-05 の 240 組の比べを report.md に残し、試しの URL を立てる", realizes: ["R-01", "R-02", "R-04", "R-05"], status: "todo", after: ["S-04"], session: "owner"}
 }
@@ -23,7 +23,7 @@ tests: {
 }
 
 verification: """
-	節目：`uv run pytest tests/unit/presentation/test_dashboard_graph_js.py tests/unit/presentation/test_dashboard_graph_fit.py tests/unit/infra/test_dashboard_orca_views_js.py tests/unit/presentation/test_dashboard_allgraph_screen.py`。
+	節目：S-02 の後は `uv run pytest tests/unit/presentation/test_dashboard_graph_route_fix.py tests/unit/presentation/test_dashboard_graph_js.py`、S-03 の後は `uv run pytest tests/unit/presentation/test_dashboard_graph_route_fix.py tests/unit/presentation/test_dashboard_graph_js.py tests/unit/presentation/test_dashboard_graph_fit.py tests/unit/infra/test_dashboard_orca_views_js.py tests/unit/presentation/test_dashboard_allgraph_screen.py`。
 	最後に `make lint`、`uv run pytest`（全体）。実機は D-07、比べは `.workbench/iss-00627/tools/sweep.mjs`。
 	"""
 

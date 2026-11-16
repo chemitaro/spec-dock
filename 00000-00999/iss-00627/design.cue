@@ -70,7 +70,7 @@ design: {
 			```
 
 			`compactNeeds`：root が隠れている・幅0は null。各 `.gx-frame.is-compact` で、`.gx-fm` の computed style が flex でなければ null（graph.css が未適用）。
-			高さ = ceil（（`.gx-fm` の下端 − 枠の上端）/ scale + 下の余白 + 下の縁）。
+			高さ = ceil（（`.gx-fm` の下端 − 枠の上端）/ scale + 下の余白 + 下の縁 − 0.25）（測りの小数の誤差で、ちょうど収まる1行の枠が 1px 高く測られないよう、0.25px までの超えは切り捨てる）。
 			`headsDiffer`：縮めた frame の node ごとに `max(compactHeight(kind, rows), needs[id] ?? 0)` が `node.fit ?? compactHeight(kind, rows)` と 0.5px より違えば true。
 
 			graph.js：`V.heads` を足し、`buildWorld` の routeLayout に `heads: V.heads` を渡す。`checkRows` は `measureMarks` に続けて `compactNeeds(V.el.world, V.s)` を測り（null なら heads は今のまま）、
@@ -98,15 +98,15 @@ design: {
 		title: "入口の高さそろえ（router.js の assignPorts）"
 		text: """
 			「まっすぐ届く線」（入口の辺にその線だけで、出口の高さが入口の範囲の内）の規則は、`facing(G, Z, e.y1)`（入口の辺のすぐ左でその高さに向かい合う障害物）が線の出る箱 `e.a` でなく、
-			その出口（`exits`）が e.y1 から S − 0.5 未満にあるときは使わず、入口の格子の位置のままにする。
+			その出口（`exits`）が e.y1 から S − 0.5px 未満にあるときは使わず、入口の格子の位置のままにする。
 			"""
 		satisfies: ["R-03", "R-04", "R-05"]
 	}
 	"D-06": {
 		title: "回帰の入力（tests/fixtures/issue627/）"
 		text: """
-			この PC の状態の置き場の写しから、受入の組の routeLayout の入力（構造の API の scopes と cleanup、稼働の印の測った幅、見える幅、範囲）を取り、題名・本文・日時の文字（title、text など文字の項目）を Scope の ID に置き換えて固定する。
-			依存、親、状態、段、推奨の順、番号は残す（配置と経路はそれだけで決まる）。node のテスト（tests/js の検査の口）で routeLayout と audit を走らせ、違反0を確かめる。
+			この PC の状態の置き場の写しから、受入の組の routeLayout の入力（構造の API の scopes と cleanup、稼働の印の測った幅、見える幅、範囲）を取り、題名と本文の文字（scopes の title、cleanup の text）を伏せ（title は Scope の ID、text は code）、配置に使わない項目（url、path、reason、pr、branch、worktrees、todos など）を落として固定する。
+			依存、親、子、状態、段、推奨の順、番号、日時（active_at・closed_at：活動の順に使う）、keep_visible、merge は残す（配置と経路はこれで決まる。伏せる前と同じ違反の数になることを S-01 で確かめた）。node のテスト（tests/js の検査の口）で routeLayout と audit を走らせ、違反0を確かめる。
 			"""
 		satisfies: ["R-03"]
 	}
