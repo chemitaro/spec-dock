@@ -6,9 +6,9 @@ package spec
 goal: "native lock のテストの揺れを、テストの隔離で直す"
 
 steps: {
-	"S-01": {title: "D-02 の回帰テストを足し、直す前のコードで落ちることを確かめる（Red）", realizes: ["R-01"], status: "todo", session: "impl-sol"}
-	"S-02": {title: "D-01 の環境の設定を足し、`tests/integration/test_issue413_native_lock.py` をすべて通す（Green）", realizes: ["R-01", "R-02", "F-01"], status: "todo", after: ["S-01"], session: "impl-sol"}
-	"S-03": {title: "そのファイルを単独で50回、`make lint`、全体の `uv run pytest` を2回走らせ、結果を返す", realizes: ["R-02"], status: "todo", after: ["S-02"], session: "impl-sol"}
+	"S-01": {title: "D-02 の回帰テストを足し、直す前のコードで落ちることを確かめる（Red）", realizes: ["R-01"], status: "done", session: "impl-sol"}
+	"S-02": {title: "D-01 の環境の設定を足し、`tests/integration/test_issue413_native_lock.py` をすべて通す（Green）", realizes: ["R-01", "R-02", "F-01"], status: "done", after: ["S-01"], session: "impl-sol"}
+	"S-03": {title: "そのファイルを単独で50回、`make lint`、全体の `uv run pytest` を2回走らせ、結果を返す", realizes: ["R-02"], status: "done", after: ["S-02"], session: "impl-sol"}
 }
 
 tests: {
