@@ -23,3 +23,16 @@ ID: "iss-00613"
   - P2（同じ道の2つの出すリポジトリの中の子で、親の候補が同じ長さになりうる）と P3（T-07 が文書の決め方と道を返さないことを確かめる対象に含まない）は記録だけ。P2 は実装の裁量として、同じ長さなら `shown` の並びの先のものを採る（決まった結果にする）よう実装担当に伝える。
 - 開始のコミット `2c7427a97ff97bd3b7ffc463401f3cffffab36e1`。
 - 逸脱 codex-symlink-refusal（タスク担当の記録）：impl-sol（codex gpt-6.1-sol / medium、dispatch ctx_153998eba943、launch.effective codex / gpt-6.1-sol / medium）は、手元のコマンドの実行の前に chat-scratch の writable root の symlink による UnsupportedOperation で止まり、変更なしで escalation を返した。plan の rationale と統括の了承どおり、待たずに worker-stop し、Claude Opus 5.5 / medium（dispatch ctx_2ba710432d6b、launch.effective claude / claude-opus-5-5 / medium）に切り替えた。
+
+## 実装の記録
+
+実装担当：Claude Opus 5.5 / medium（impl-sol の代わり、dispatch ctx_2ba710432d6b）。開始のコミット `2c7427a97ff97bd3b7ffc463401f3cffffab36e1`（clean、仕様の sha256 は合格の値と一致）。
+
+- 基準（開始時）：`make lint` 合格。`uv run pytest tests/unit/application` 275 passed（25.6秒）。
+- S-01（Red）`8030dc000`：`tests/unit/application/test_dashboard_nesting.py`（T-01〜T-05、12件）と `tests/unit/application/test_dashboard_repositories_nesting.py`（T-06、7件＋ realpath が読み直しの1回だけであることの確かめ）。開始のコミットでは `dashboard_nesting` がなく、集めの段で落ちることを確かめた。
+- S-02（Green）`034f2c51c`：`runtime/application/dashboard_nesting.py`（D-01）、`DashboardSite` の `_Listing.nesting` と `nested_repositories()`（D-02）、`_repositories` の `parent`・`tier`（D-03）。新しいテスト 20 passed、`tests/unit/application` 295 passed（27.7秒）、`make lint` 合格。
+  - 判断（仕様レビューの P2）：同じ道の2つの出すリポジトリの中の子は、`shown` の並びの先のものを親にする（長さが真に長いときだけ親を替える）。テスト `test_a_child_of_two_repositories_at_the_same_path_takes_the_first_shown` を足した。
+  - 判断：絶対の道かは `Path(...).is_absolute()` で見る（ruff の PTH 規則）。正規化は設計どおり `os.path.realpath`。
+- S-03 `6252dbef8`：配る側の `reference_cli.md` の API の項目に `parent`・`tier`・決め方・道を返さないことを足し、`static-inventory.json` の sha256 を `249f76e9…37cf33` に、前の `4c4bbf4a…69e1` を `known_old_sha256` に足した。T-07 は `tests/unit/infra/test_issue613_repository_nesting_docs.py`（仕様レビューの P3 の決め方と道を返さないことの文も確かめる）。`make lint` 合格。
+  - 全体の `uv run pytest`：3 failed、3981 passed、7 skipped（3149秒）。失敗の3つ（`test_issue550_todo_aggregate.py::test_the_shipped_reference_and_the_help_name_the_new_contract`、`test_issue440_release_0_5_0.py` と `test_issue513_release_0_5_1.py` の `…dogfood_copy_matches`）は、dogfood の写し `spec-dock/docs/reference_cli.md` が配る側と同じバイトであることを求める既存のテスト。仕様は写しの更新を範囲外にしているため、タスク担当に相談中（S-03 は doing のまま）。
+- 判断（統括、2026-11-17、msg_22f5fbc7ac2b）：配る側の `reference_cli.md` を変えると、dogfood の写しと配る側の一致を求める既存のテスト3件が落ちるため、写し `spec-dock/docs/reference_cli.md` を配る側と同じバイトにコミットする（前例 0bfa2424f・787a05147）。requirement の excludes と依頼書の範囲から、この1ファイルに限って外れる逸脱として、統括が了承した。
