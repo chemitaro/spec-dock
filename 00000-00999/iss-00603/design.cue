@@ -97,7 +97,7 @@ design: {
 	"D-07": {
 		title: "これからで何も出ないときの知らせ（graph.js）"
 		text: """
-			buildWorld の後、range が next で layout の nodes が0なら、図の場所に「これから進める Scope はありません。全体やいまで、終わったものを見られます。」を出す（道具の帯と札の帯は残す）。
+			buildWorld の後、range が next で layout の nodes が0なら、図の場所に「これから進める Scope はありません。全体で、終わったものを見られます。」を出す（道具の帯と札の帯は残す）。
 			`showEmpty` は帯を隠すので使わず、図の中の別の要素（既存の部品の文字の色 `--ds-muted`）にする。範囲を変えると消える。
 			選択とパネルは今のまま（選んだ Scope が見えなくなっても、今の showDone を外したときと同じ）。
 			"""

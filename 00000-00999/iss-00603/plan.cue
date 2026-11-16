@@ -23,6 +23,7 @@ tests: {
 	"T-07": {title: "dashboard_graph_check.mjs の組み合わせに range next（入れ子・木、幅 1400・374 ほか、focus）を足し、すべてで edgeAudit の違反0", verifies: ["R-04", "R-05", "R-09"]}
 	"T-08": {title: "graph.js の描画（node の DOM なしの確かめか文字の検査）で、帯に done・fold のボタンがなく、role=group aria-label『見せる範囲』の3つのボタンと title、fit の『収める』『画面に収める』、凡例の新しい文、全体の箱の .cln、next の知らせの文がある", verifies: ["R-01", "R-08", "F-01"]}
 	"T-09": {title: "graph.css の差分に新しい色の値がない（レビューで確かめる）", verifies: ["R-09"]}
+	"T-11": {title: "graph.js の切り替えの動き（node で DOM の最小の代わりを使うか、ブラウザーで確かめる）：range のボタンを押すと押したものだけが aria-pressed=true になり、layout がその range で呼ばれ、`specdock.graph.v3` に `{mode, range, deps, legend}` の4つの鍵だけが書かれる", verifies: ["R-01", "R-07"]}
 	"T-10": {title: "実データ（spec-dock、housing-lifecycle）の3つの範囲 × 1440・390 × 明暗の写しと edgeAudit の違反0、ブラウザーのエラー0が report.md にある。これからで選んだ箱が消えてもエラーが出ない", verifies: ["R-09", "F-03"]}
 }
 
