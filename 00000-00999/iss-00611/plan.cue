@@ -5,9 +5,9 @@ package spec
 goal: "構造の図の「これから」で、見える子孫のない親を出さない（layout.js の visibility とテスト、実データの写し）"
 
 steps: {
-	"S-01": {title: "test_dashboard_graph_range.py に D-02 の合成の構造 `_parents()` と、これから・全体・いま・focus・audit のテストを足し、test_dashboard_graph_toolbar.py に D-03 の知らせのテストを足して、直す前のコードで R-01 のテスト、R-04 の focus 80、D-03 の知らせが落ち、R-02・R-03・R-05・F-02 と focus 70・95 のテストが通ることを確かめる（Red）", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06", "F-01"], status: "todo", session: "impl-sol"}
-	"S-02": {title: "layout.js の visibility の next の分岐を D-01 にし、構造の図のテスト（graph_js・graph_range・graph_toolbar）をすべて通す。iss-00603 の digest と `_next()` の期待は変えない（Green）", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06", "F-01", "F-02"], status: "todo", after: ["S-01"], session: "impl-sol"}
-	"S-03": {title: "make lint と全体の pytest を通す", realizes: ["R-05", "R-06"], status: "todo", after: ["S-02"], session: "impl-sol"}
+	"S-01": {title: "test_dashboard_graph_range.py に D-02 の合成の構造 `_parents()` と、これから・全体・いま・focus・audit のテストを足し、test_dashboard_graph_toolbar.py に D-03 の知らせのテストを足して、直す前のコードで R-01 のテスト、R-04 の focus 80、D-03 の知らせが落ち、R-02・R-03・R-05・F-02 と focus 70・95 のテストが通ることを確かめる（Red）", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06", "F-01"], status: "done", session: "impl-sol"}
+	"S-02": {title: "layout.js の visibility の next の分岐を D-01 にし、構造の図のテスト（graph_js・graph_range・graph_toolbar）をすべて通す。iss-00603 の digest と `_next()` の期待は変えない（Green）", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06", "F-01", "F-02"], status: "done", after: ["S-01"], session: "impl-sol"}
+	"S-03": {title: "make lint と全体の pytest を通す", realizes: ["R-05", "R-06"], status: "doing", after: ["S-02"], session: "impl-sol"}
 	"S-04": {title: "orca-web・spec-dock・housing-lifecycle の実データで、これからの直す前と後を 1440・390、明暗で写し、edgeAudit の違反0、ブラウザーのエラー0、orca-web の init-00002 が前は出て後は出ないことを report.md に残し、tailnet の試しの URL を立てる（D-04）", realizes: ["R-06"], status: "todo", after: ["S-03"], session: "owner"}
 }
 
