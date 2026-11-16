@@ -89,3 +89,11 @@ def test_the_inventory_accepts_the_reference_of_the_last_release() -> None:
     entry = entries["spec-dock/docs/reference_cli.md"]
     released = "6b8066f2ad598b16f243307be2073f424ace27167b718de770ba804d44c5c4a8"  # v0.9.3
     assert released in entry["known_old_sha256"] and entry["sha256"] != released
+
+
+def test_the_inventory_accepts_the_reference_merged_to_main_by_pr_604() -> None:
+    """iss-00602 FQG-2 FQG-001: the main state after PR #604 (094772a9f) stays a known old reference."""
+    entries = {e["path"]: e for e in json.loads((ASSETS / "static-inventory.json").read_text())["files"]}
+    entry = entries["spec-dock/docs/reference_cli.md"]
+    merged = "256c60a89c415df09fc72f82a4cfa6fc4756c05bbff9b836d1f1dffd99762f52"
+    assert merged in entry["known_old_sha256"] and entry["sha256"] != merged
