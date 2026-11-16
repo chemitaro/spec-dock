@@ -43,7 +43,7 @@ design: {
 			`dc = {data, ix, desc, cleanup, range, path, sel}`（`data` は構造の JSON、`ix` は `index(data.scopes)`、`desc` は graph.js の `descendants(ix)` と同じ関数、`cleanup` は `Map`（id → 片付けの候補）、`range` は layout の `opts.range`、`path` と `sel` は線の class のための選びの状態）。
 
 			draw.js の公開：`descendants(ix)`、`cleanupMap(data)`、`tally(dc, id)`、`boxHtml(dc, s, n)`、`frameHtml(dc, s, n)`、`chipHtml(dc, g)`、`edgeClass(dc, e)`、`pos(r)`、`treeSvgPaths(trunks)`（今の `buildWorld` の trunks の path の文字列）。文字列の組み立ては1文字も変えない。
-			graph.js は `V` から `dc` を作って呼ぶだけにする（`V.desc` は `descendants(V.ix)`）。`buildWorld`・`paint`・`renderBar`・`renderLegend`・`edgeAudit` などのほかの部分は graph.js に残す。
+			graph.js は `V` から `dc` を作って呼ぶだけにする（`V.desc` は `descendants(V.ix)`）。draw.js の関数の中で描く文脈を受ける引数の名前は `V` にし（例 `boxHtml(V, s, n)`）、`V.ix.byId` などのソースの文字列がそのまま残るようにする（ソースの文字列のテストの文字列を変えないため）。`buildWorld`・`paint`・`renderBar`・`renderLegend`・`edgeAudit` などのほかの部分は graph.js に残す。
 
 			確かめ（R-02）：取り出す前（開始のコミット）の graph.js を、`tests/js/dashboard_graph_toolbar.mjs` と同じ偽の DOM で、複数の構造（入れ子・木 × 全体・いま・これから、focus、片付けの候補、稼働の印の行の寸法、選びと状態の札）に描き、世界・道具の帯・状態の札・凡例の HTML を、テストの資料（`tests/fixtures/dashboard/graph_dom_golden.json` などの、合成の構造だけを持つ固定の写し）に残す。取り出した後の graph.js が同じ HTML を出すことをテストで確かめる。
 			graph.js のソースの文字列を調べる今のテスト（`test_dashboard_orca_views_js.py`、`test_dashboard_shell_polish.py`、`test_dashboard_state_marks.py`、`test_dashboard_scope_tabs_js.py` のうち、移した関数の中を調べるもの）は、調べるファイルを draw.js に移し、確かめる文字列と数を変えない。
@@ -55,19 +55,19 @@ design: {
 		text: """
 			DOM なし。`layout.js` と同じ px の単位。公開：
 
-			- `REPO`（寸法の定数）：`head: 40`（見出しの行）、`warn: 24`（警告1件の行）、`line: 28`（文1行の中身：読み込み中、Scope がない）、`pad: 16`（枠の内側の左右と下の余白、見出しと中身の間も同じ）、`gap: 16`（兄弟の枠の間、縦と横）、`minW: 360`（中身の使える幅の下限）、`headW: 280`（見出しの最小の幅）、`margin: 8`（世界の外側）。値は CSS（allgraph.css）と一緒に変える（コメントで互いを指す）。
+			- `REPO`（寸法の定数）：`head: 40`（見出しの行）、`warn: 24`（警告1件の行）、`line: 28`（文1行の中身：読み込み中、Scope がない）、`pad: 16`（枠の内側の左右と下の余白、中身と子の棚の間の余白。見出しと中身の間には置かない）、`gap: 16`（兄弟の枠の間、縦と横）、`minW: 360`（中身の使える幅の下限）、`headW: 280`（見出しの最小の幅）、`margin: 8`（世界の外側）。値は CSS（allgraph.css）と一緒に変える（コメントで互いを指す）。
 			- `bodyWidth(width, depth)`：深さ `depth`（最上位が0）の枠の中身が使える幅 `max(REPO.minW, width − 2·REPO.margin − 2·REPO.pad·(depth + 1))`。最上位の枠の外の幅の上限が `width − 2·REPO.margin`、子の枠の外の幅の上限が親の中身の使える幅、という決まりから出る式。画面はこの値を、そのリポジトリの `routeLayout` の `width` に渡す。
 			- `compose(repos, sizes, options)`：
 			  - `repos`：一覧の API の並びの `[{repository, parent, tier, owner, name}]`。
-			  - `sizes`：鍵 → `{status: "loading"|"failed"|"ok", w, h, shown, scopes, warns}`。`ok` のとき `w`・`h` はそのリポジトリの routeLayout の `layout.width`・`layout.height`（Scope がないときは 0・0）、`shown` は `layout.nodes.length + layout.groups.length`、`scopes` はそのリポジトリの Scope の数。`warns` は警告の行の数（info を含めて出す数）。鍵がなければ `loading`。
+			  - `sizes`：鍵 → `{status: "loading"|"failed"|"ok", w, h, shown, scopes, warns, alerts}`。`ok` のとき `w`・`h` はそのリポジトリの routeLayout の `layout.width`・`layout.height`（Scope がないときは 0・0）、`shown` は `layout.nodes.length + layout.groups.length`、`scopes` はそのリポジトリの Scope の数。`warns` は警告の行の数（枠を出すときに並べる数で、info を含む）、`alerts` はそのうち info でない警告の数（Epic D-04 の `warn` に当たり、出すかの判定だけに使う）。鍵がなければ `loading`。
 			  - `options`：`{range, width, bands}`。`width` は図の領域の 100% での幅、`bands` は鍵 → 帯の高さ（px、既定は {}、ない鍵は 0）。
 			- 木：`parent` が同じ `repos` にあればその子、なければ最上位。親をたどって自分に戻るものは最上位（F-03）。兄弟は `repos` の並び。
-			- 出すか：`all`・`now` ではすべて。`next` では、`status` が ok、`shown` が0、`warns` が0のリポジトリは、出す子が1つもなければ出さない（子から先に決める）。`loading`・`failed`・`warns` が1以上は出す。
-			- 中身の種類 `body.kind`：`graph`（ok で shown が1以上：`w × h`）、`empty`（ok で Scope が0：`REPO.line` の高さ、「Scope はまだありません」）、`container`（next で shown が0で出す子がある：高さ0）、`none`（next で shown が0だが warns があって出す：高さ0）、`loading`（`REPO.line`）、`failed`（高さ0。理由は警告の行）。
-			- 枠の縦の並び：見出し `REPO.head`、警告 `warns × REPO.warn`、帯 `bands[key]`、中身、（子があれば）`REPO.pad` を空けて子の棚、下の余白 `REPO.pad`。中身と棚の高さが0のときは間の余白を入れない。
-			- 子の棚：子の枠を、その親の body の幅で左から右へ `REPO.gap` を空けて詰め、入らなければ次の行。行の高さはその行のいちばん高い枠。
+			- 出すか：`all`・`now` ではすべて。`next` では、`status` が ok、`shown` が0、`alerts` が0のリポジトリは、出す子が1つもなければ出さない（子から先に決める）。`loading`・`failed`・`alerts` が1以上は出す。info だけの警告（例：PR の状態が分からない）は、出すかを変えない。
+			- 中身の種類 `body.kind`（上から順に最初に当たるもの）：`loading`（読み込み中：`REPO.line` の高さ、「読み込んでいます…」）、`failed`（高さ0。理由は警告の行）、`graph`（ok で shown が1以上：`w × h`）、`empty`（ok で Scope が0：all・now では `REPO.line` の高さで「Scope はまだありません」、next で出すとき（子か alerts のため）は高さ0）、`quiet`（ok で Scope が1以上で shown が0：all・now では `REPO.line` の高さで「この範囲で見せる Scope はありません」、next で出すとき（子か alerts のため）は高さ0）。next で高さ0の枠は、見える子があれば入れ物、なければ alerts のための枠である。`kind` と `h` はこの表だけで決まり、どの（範囲、status、shown、scopes）の組にも1つ当たる。
+			- 枠の縦の並び：見出し `REPO.head`、警告 `warns × REPO.warn`、帯 `bands[key]`、中身（ここまで余白なしで積む。中身の図は自分の余白 `SIZE.margin` を持つ）、（出す子があれば）`REPO.pad` を空けて子の棚、下の余白 `REPO.pad`。中身の高さが0のときは中身と棚の間の余白を入れない。帯の四角は、見出しと警告の行のすぐ下から `bands[key]` の高さ。
+			- 子の棚：子の枠を、その親の中身が使える幅 `bodyWidth(width, 親の深さ)`（中身の実際の幅ではない）で左から右へ `REPO.gap` を空けて詰め、入らなければ次の行。行の高さはその行のいちばん高い枠。
 			- 枠の幅：`max(REPO.headW, 中身の幅, 棚の幅) + 2·REPO.pad`。最上位も同じ詰め方で `options.width − 2·REPO.margin` で折り返す。
-			- 出力：`{frames: Map(鍵 → {key, depth, x1, y1, x2, y2, head: {x1,y1,x2,y2}, warn: {x1,y1,x2,y2}, band: {x1,y1,x2,y2}, body: {kind, x, y, w, h}}), order: [出す鍵（深さ優先、親が子の前）], width, height}`。座標は世界の左上が原点。`band` の高さは `bands[key]`（0 なら高さ0の四角）。
+			- 出力：`{frames: Map(鍵 → {key, depth, x1, y1, x2, y2, head: {x1,y1,x2,y2}, warn: {x1,y1,x2,y2}, band: {x1,y1,x2,y2}, body: {kind, x, y, w, h}（w は graph では layout の幅、ほかは 0）}), order: [出す鍵（深さ優先、親が子の前）], width, height}`。座標は世界の左上が原点。`band` の高さは `bands[key]`（0 なら高さ0の四角）。
 			- 帯の高さを渡さないときと全部 0 のときの出力は同じ（R-04）。
 			"""
 		satisfies: ["R-03", "R-04", "R-05", "F-03"]
@@ -114,6 +114,7 @@ design: {
 			- 初めの見え方、『収める』、拡大の下限、ズームと移動の操作、Safari の gesture の止め、窓の大きさの変化（200ms 落ち着いてから幅が変わったときだけ組み立て直す）は、graph.js と同じ式を compose の `width`・`height` に当てる。graph.js の関数をそのまま写してよい（共有のために graph.js を変えるなら、出す HTML と動きを変えない）。
 			- 390px 以下（PHONE 640 の判定は graph と同じ）では、横の欄は今の下からのシート、道具の帯は graph.css のスマホの形。
 			- `window.specdockEdgeAudit(options)`：リポジトリごとに、graph の edgeAudit と同じ計算を、そのリポジトリの `.ax-body` の四角を原点にして行い、`{repos: {鍵: 結果}, total: {各数の合計}}` を返す。dispose で消す。
+			- 共有の CSS が効く範囲：graph.css の部品の絶対配置などは `.gx .gx-world > .gx-box` のような子の結合子で書かれ、`.main[data-view="graph"]` と panel.css の `:is([data-view="graph"], [data-view="board"])`（`--pn-w`）は view の名前で当たる。allgraph の部品は `.gx-world > section.ax-repo > .ax-body` の中にあり、殻は `data-view="allgraph"` を付けるので、これらに当たる規則を allgraph.css に足す（`.ax-body > .gx-box` などの絶対配置と重なりの順、`.main[data-view="allgraph"]`、`[data-view="allgraph"]` の `--pn-w`）。共有の CSS のセレクターに `[data-view="allgraph"]` を足すやり方でもよいが、構造の図とボードの見え方は変えない。
 			- allgraph.css：`.ax-repo`（2px の線、角の丸みを Initiative の枠と変える、背景は今の面の色の札）、`.ax-head`（folder のアイコンと名前の帯）、`.ax-warn`、`.ax-body`、深さで背景を少し変えるなら今の札だけで。新しい色の値と色の札は書かない（R-03）。寸法は compose.js の REPO と揃える。
 			- 確かめ（R-07）：この PC の状態の置き場を写した一時の置き場と隔離した venv で `dashboard serve --offline --tailscale` を別のポートで立て、headless Chrome（`--disable-features=MacAppCodeSignClone`、CDP の `Browser.close` で閉じる）で 1440・1000・390 × 明・暗 × 3つの範囲を写し、edgeAudit とブラウザーのエラーと横のスクロールを数える。稼働の印は、常駐の orca-web の要約を読むだけで中継する試しの orca（iss-00620 と同じ作り）で確かめる。
 			"""
