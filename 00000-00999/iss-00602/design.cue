@@ -46,7 +46,8 @@ design: {
 		text: """
 			- `agents_logic.js` に純粋な `lastChoice(mem, scopeId)`：`mem.scopeId !== scopeId` なら null（F-02）。`mem.last` があれば、`mem.gone.has(mem.last)` なら `"gone:" + mem.last`、なければ `mem.last`。`mem.last` がなく `mem.gone` が空でなければ、`mem.gone` の最初の id の `"gone:" + id`（Set の入れた順）。ほかは null。
 			- `panel.js` の `draw` の足：`withParam(withParam(withoutEmbed(scope.path), "agent", params.get("agent") ?? lastChoice(mem, scope.id)), "tab", tab ?? "summary")`。`mem` は `agents_tab.js` の export を import する。足は中身を描いた後に作るので、同じ描きで覚えた last（noteShown）が入る。
-			- 欄の Map が gone:<id> を持つとき（agentsTab の keep）は、Map が先（今のまま）。
+			- `agents_logic.js` に純粋な `footChoice(mem, scopeId, mapped)`：`mapped`（欄の Map の agent）が null なら `lastChoice(mem, scopeId)`。`mapped` が `gone:` で始まればそのまま。生の id で、`mem.scopeId === scopeId` かつ `mem.gone.has(mapped)` なら `"gone:" + mapped`、ほかは `mapped`。足は `footChoice(mem, scope.id, params.get("agent") ?? null)` を使う（ほかのタブを見ている間に `agentsState` の `noteGone` が覚えに足した id を、Map の生の id より先に gone として扱う）。
+			- 欄の Map そのものは書き換えない（帯と中身の選びは今のまま。エージェントのタブを描くとき pickAgent が gone:<id> を keep する）。
 			"""
 		satisfies: ["R-02", "F-01", "F-02"]
 	}
@@ -67,7 +68,7 @@ design: {
 	"D-06": {
 		title: "配る文書（reference_cli.md）"
 		text: """
-			- エージェントのタブの節の「選び」に：横の欄の足の「詳しい画面」と「新しいタブで開く」は、欄の今の選び（なければ同じ Scope の最後に開いた相手、いなくなっていれば `gone:<id>`）を持つ。問い合わせに `agent` がない詳しい画面で、最後に開いた相手を開いたときも、その相手を問い合わせに書く（履歴は増えない）。
+			- エージェントのタブの節の「選び」に：横の欄の足の「詳しい画面」と「新しいタブで開く」は、欄の今の選び（なければ同じ Scope の最後に開いた相手。どちらも、いなくなっていれば `gone:<id>`）を持つ。問い合わせに `agent` がない詳しい画面で、最後に開いた相手を開いたときも、その相手を問い合わせに書く（履歴は増えない）。
 			- 「いなくなったとき」の「人がその Scope で選ぶと覚えを捨てます」に：修飾キーつきの押しで新しいタブに開くときは、元の画面の覚えを変えない。
 			- 知らせの表の `orca-shape` の意味に：対応した worktree の `agents` が並びでないときも形の違いに数える。
 			- static-inventory.json の reference_cli.md の sha256 を合わせる。
