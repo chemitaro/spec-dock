@@ -75,7 +75,7 @@ NO_AGENT = {
         *(f"epic-{n:05d}" for n in (1, 6, 8, 10, 20, 30)),
     ]
 }
-WAYS = {
+WAYS: dict[str, dict[str, Any]] = {
     "nest|all": {"mode": "nest", "range": "all"},
     "nest|now": {"mode": "nest", "range": "now"},
     "nest|next": {"mode": "nest", "range": "next"},
@@ -87,7 +87,7 @@ VARIANTS: dict[str, Any] = {"none": None, "empty": {}, "noagent": NO_AGENT, "mar
 
 
 def _layouts() -> dict[str, dict[str, Any]]:
-    out = {}
+    out: dict[str, dict[str, Any]] = {}
     for way, opts in WAYS.items():
         for variant, marks in VARIANTS.items():
             for how in ("plain", "routed"):
