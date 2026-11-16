@@ -9,8 +9,8 @@
 <!-- ▼ 説明資料の本文（Markdown）。編集するのはこのブロックだけです。 -->
 <script type="text/markdown" id="ds-source">
 ---
-title: 稼働しているエージェントをすべて印で出し、エージェントのタブの小さな点を直す
-lead: 構造の図・ボード・横の欄で、worktree にいるエージェントを1人1つの印ですべて出し、エージェントのタブで見つかった5つの小さな点を直します。
+title: エージェントのタブの5つの小さな点を直す
+lead: iss-00601 が調べた、エージェントのタブと構造の図の印の押しの5つの小さな点を、それぞれテストで再現してから直します。
 category: 説明資料
 audience: 本日チームに加わった新メンバー
 status: 下書き
@@ -19,46 +19,49 @@ status: 下書き
 ## この資料で分かること
 
 :::summary
-- 印は「+N」にまとめず、全員分を出します。入りきらなければ折り返し、構造の図の箱はその分だけ高くなります（幅は変わりません）。
-- 箱の高さは、画面が描いた印の行の数を測り、配置の計算（layout.js）に渡して決めます。行の数が変わったときだけ配置し直します。
-- エージェントのタブの5点（今の相手の押しで書きかけが消える、欄の足のリンクに選びが付かない、スマホの印の2回目の押し、修飾キーの押しで覚えが変わる、形の違う要約をいなくなったと読む）を直します。
+- 5点はどれも別の相手に送る道ではありませんが、書きかけの本文が消える、スマホで違う画面に飛ぶなど、人が普通にする操作で起きるものがあります。
+- 直しはそれぞれ数行で、選びの規則（ほかの相手に自動で移らない、いなくなった相手を開かない）は変えません。
+- 依頼にあった「すべての印を出す」は、本人の判断で行いません（印の上限と箱の高さは今のまま）。
 :::
 
 ## 背景と目的
 
-本人から「3台稼働していれば3つ表示してほしい」と要望がありました。今は構造の図の箱が2つ、枠の見出しが3つ、ボードの札と横の欄が4つまでで、超えた分は「+N」になります。
+エージェントのタブ（iss-00593）は、横の欄と詳しい画面で、その Scope の worktree のエージェントを選び、orca-web のチャットを開きます。iss-00593 の最終品質ゲートで記録だけにした5点を、iss-00601 が読み直し、直し方を決めました。
 
-エージェントのタブは iss-00593 で作り、iss-00601 で残りの5点を調べました。どれも別の相手に送る道ではありませんが、人が普通にする操作で起きるものがあります。
+## 5点と直し方
 
-## 全体の構成
+| 点 | 起きること | 直し |
+|---|---|---|
+| 1 | 覚えから開いた今の相手を帯で押すと、枠が置き直され書きかけが消える | 覚えから開いた相手も `agent` として書く |
+| 2 | 欄を開き直すと、足のリンクに選びが付かず、新しいタブで残った1人が開きうる | 足のリンクが同じ Scope の覚え（いなくなっていれば `gone:<id>`）を持つ |
+| 3 | スマホで、選んだ箱の印の2回目の押しで詳しい画面に飛ぶ | 印の押しを2回目の押しより先に見る |
+| 4 | Cmd などの押しで新しいタブに開いても、元の画面の覚えが変わる | 修飾キーのない主ボタンの押しだけが覚えを変える |
+| 5 | `agents` が並びでない要約を「いなくなった」と読む | 形の違いに数え、知らせ orca-shape を出す |
 
 ```plantuml id=overview
 @startuml
-title 印の行と箱の高さ
+title 選びの流れ（直した後）
 top to bottom direction
-component "orca-web の部品\n（印を描く）" as Marks
-component "graph.js\n（描いた印の行を測る）" as Graph
-component "layout.js\n（行の数で箱の高さを決める）" as Layout
-component "router.js\n（線を引く）" as Router
-Graph -> Marks : 全員の数を max に渡す
-Marks --> Graph : 折り返した印
-Graph -> Layout : orcaRows（Scope ごとの行の数）
-Layout -> Router : 伸びた箱の座標
+component "問い合わせか欄の Map の agent" as Asked
+component "覚え（同じ Scope の last と gone）" as Mem
+component "pickAgent" as Pick
+component "keep（agent を書く）" as Keep
+component "欄の足のリンク" as Foot
+Asked --> Pick : あれば先
+Mem --> Pick : なければ last
+Pick --> Keep : 覚えから開いた相手も書く
+Mem --> Foot : Map になければ lastChoice
 @enduml
 ```
-
-- 置き場（`.sd-orca`）は行の残りの幅まで縮み、部品の印が置き場の中で折り返します。
-- 1行増えるごとに、箱（と枠の見出し）は 18px 高くなります（orca-web の小さい印 16px と行の間 2px）。
-- 経過の表記だけが変わる要約では、行の数が同じなので配置し直しません。続けての配置し直しは2回までです。
 
 ## 確認方法
 
 ```sh
 spec-dock scope show iss-602 --json
-uv run pytest tests/unit/presentation/test_dashboard_graph_js.py tests/unit/infra/test_dashboard_agents_tab_js.py
+uv run pytest tests/unit/infra/test_dashboard_agents_tab_js.py tests/unit/infra/test_dashboard_agents_logic_js.py tests/unit/infra/test_dashboard_orca_views_js.py
 ```
 
-実機の確かめ（写しと edgeAudit）は report.md に残します。
+実機の確かめ（直す前と後の比べ、写し）は report.md に残します。
 </script>
 <script src="../../../design-system/ds.js"></script>
 </head>
