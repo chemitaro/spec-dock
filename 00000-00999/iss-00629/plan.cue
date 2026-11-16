@@ -11,9 +11,9 @@ steps: {
 }
 
 tests: {
-	"T-01": {title: "compose の並び（node）：合成で、親の図（graph、幅 a）と狭い子（幅 b、c）で a + gap + b ≤ bodyWidth なら子 b は図と同じ y で x = 図の右 + gap、入らない子は次の行（y = 行の下 + gap）。2つ以上が並ぶ行は bodyWidth の中。図が bodyWidth より広い親では子はすべて図の下の行（F-01）。graph でない親（all の empty・quiet・loading は1行の下に pad、next の高さ0は見出しの直後）。この PC の登録の形の9つで入れ子と外の2つと order が iss-00614 と同じ、子は親の中で親の図・兄弟と重ならない", verifies: ["R-01", "F-01"]}
+	"T-01": {title: "compose の並び（node）：合成で、親の図（graph、幅 a）と狭い子（幅 b、c）で a + gap + b ≤ bodyWidth なら子 b は図と同じ y で x = 図の右 + gap、入らない子は次の行（y = 行の下 + gap）。2つ以上が並ぶ行は bodyWidth の中。図が bodyWidth より広い親では子はすべて図の下の行（F-01）。graph でない親（all の empty・quiet・loading は1行の下に pad、next の高さ0は見出し・警告・帯のすぐ下）。この PC の登録の形の9つで入れ子と外の2つと order が iss-00614 と同じ、子は親の中で親の図・兄弟と重ならない", verifies: ["R-01", "F-01"]}
 	"T-02": {title: "compose の帯（node）：帯を渡さないときと全部0の出力が同じ。図の右に子が並ぶ親に h を渡すと、band の四角、body の y、子と孫のすべての y1・y2 が h 増え、枠の高さが h 増え、重なりがない", verifies: ["R-02"]}
-	"T-03": {title: "allgraph の最初の表示（偽の DOM）：図の領域 1440 幅・世界がそれより広い構造で、最初の transform が scale = (1440 − 16) ÷ 世界の幅、translate x = 8、y = 道具の帯の下 + 8、世界の右端が図の領域の中。狭い世界で scale 1・x 8。画面が 640 以下で scale 0.74・x 4。拡大してから範囲を変えても scale が最初の値に戻らない。『収める』のテスト（test_fit_holds_…）が変えずに通る", verifies: ["R-03"]}
+	"T-03": {title: "allgraph の最初の表示（偽の DOM）：図の領域 1440 幅・世界がそれより広い構造で、最初の transform が scale = (1440 − 16) ÷ 世界の幅、translate x = 8、y = 道具の帯の下 + 8、世界の右端が図の領域の中。狭い世界で scale 1・x 8。画面が 640 以下で scale 0.74・x 4。構造の答えを最初の描画より後に届けると、動かしていなければ scale が届いた後の世界の幅に合う。動かす前に範囲を変えると合わせ直し、拡大してから範囲を変えると scale と translate が保たれる。『収める』のテスト（test_fit_holds_…）が変えずに通る", verifies: ["R-03"]}
 	"T-04": {title: "実機（この PC の9つの登録の写し）：node で開始と候補の世界の寸法と『収める』の倍率（1440・1000・390 × 3範囲）、Chrome で 1440・1000・390 × 明・暗 × 3範囲の写し、最初の表示の倍率と横のはみ出しなし（1440・1000）、ブラウザーのエラー0、横のスクロールなし、帯と見出しの重なり0、倍率 100% の edgeAudit をリポジトリごとに単体の構造の図と比べて新しい違反0", verifies: ["R-01", "R-03", "R-04"]}
 }
 
@@ -51,7 +51,7 @@ execution: {
 		owner:         {task: "実機の確かめと試しの URL（S-03）", model: "opus", effort: "medium", rationale: "タスク担当（このセッション）。受け入れの証拠の取得で、実装ではない"}
 	}
 	reviews: {
-		spec: {role: "仕様のレビュー", after: "S-01", model: "opus", effort: "high"}
+		// 仕様のレビュー（spec-reviewer opus / high）は S-01 の前に行う。after は手順の後しか指せないので、ここには書かず report.md に記録する
 		gate: {role: "最終品質ゲート", after: "S-02", model: "opus", effort: "medium"}
 	}
 }
