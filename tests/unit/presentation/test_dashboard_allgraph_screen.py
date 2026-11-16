@@ -100,7 +100,7 @@ def scope_docs() -> dict[str, dict[str, Any]]:
     out: dict[str, dict[str, Any]] = {}
     for name, nodes in (("spec-dock", (*_open(), node(6, "issue", blocked_by=(5,)))), ("taikyohiyou_project", _open())):
         structure = replace(snapshot(*nodes), repository=key(name))
-        out[key(name)] = {s.id: scope_of(structure, s.id) for s in structure.issues.values()}
+        out[key(name)] = {s.id: scope_of(structure, s.id) for s in structure.issues.values() if s.id}
     return out
 
 
