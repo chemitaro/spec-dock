@@ -46,6 +46,7 @@ SpecDock 0.9.4 のリリースの変更を作った。機能のコードは変�
 - 最終品質ゲート（quality-gate-reviewer opus / medium、second opinion なし、範囲 `3d5ff4961..112bbff13`）：**合格**（attempt 1）。P0〜P3 0、coverage complete。test lane：`make lint` exit 0、`uv run pytest` exit 0（3962 passed / 7 skipped、28分）。closure `.workbench/final-quality-gate/iss-00609-fqg-1/closure.md`（worktree `/Volumes/990p2t/workspace/worktrees/orca/spec-dock/iss-00609`）。区切りのレビューは計画どおりなし。
 - 実装担当の報告：対象の統合テスト5ファイル 16 passed、`make lint`、`uv lock --check` 合格、全体 3962 passed / 7 skipped。
 - wheel：隔離した venv で `spec-dock --version` が `spec-dock 0.9.4`（Outcome の S-04）。
+- PR #610（https://github.com/chemitaro/spec-dock/pull/610、head 112bbff13 = 合格のコミット、記録のコミットなし）：CI 合格（observer の結果 OBSERVED_CI_PASS、merge_readiness READY、2026-11-16T11:18Z UTC、`.workbench/coding-task/iss-00609/ci.json`）。
 
 ## 逸脱と判断
 
