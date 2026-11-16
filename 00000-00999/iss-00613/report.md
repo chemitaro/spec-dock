@@ -39,3 +39,22 @@ ID: "iss-00613"
   - 落ちた3件（と T-07、0.5.0・0.5.1 のテストの残り）18 passed。`make lint` 合格。
 - 判断（統括、2026-11-17、msg_22f5fbc7ac2b）：配る側の `reference_cli.md` を変えると、dogfood の写しと配る側の一致を求める既存のテスト3件が落ちるため、写し `spec-dock/docs/reference_cli.md` を配る側と同じバイトにコミットする（前例 0bfa2424f・787a05147）。requirement の excludes と依頼書の範囲から、この1ファイルに限って外れる逸脱として、統括が了承した。
   - 写しを合わせた後の全体の `uv run pytest`（HEAD `275a5f79c`）：3984 passed、7 skipped（1952.8秒）。S-03 を done にした。
+
+## 実機の確かめ（S-04、タスク担当）
+
+- 候補 `ee33f0679`（origin/main の iss-00611 を取り込んだ後）を `git archive` で書き出して wheel にし、隔離した venv（作業ツリーの `.workbench/iss-00613/real/venv`、spec-dock 0.9.4 の版の表示のまま）に入れた。この PC の状態の置き場から登録簿（9行）と `catalogs/` を一時の置き場 `.workbench/iss-00613/real/state` に写し（隠す印のファイルはこの PC にない）、`spec-dock dashboard serve --port 18613 --offline --state-root <一時の置き場>` で立てた。常駐のダッシュボード（47800）と道具の環境には触れていない（確かめの後も 47800 は同じ PID で待ち受けていた）。確かめの後に 18613 のサーバーを止めた。
+- `GET /api/v1/repositories` の結果（`unknown_count` 0、9つ、並びは鍵の順で今と同じ）：
+
+| リポジトリ（github.com/chemitaro/…） | parent | tier |
+|---|---|---|
+| company-os | null | [] |
+| generic-mona | input-devices | [プロダクト] |
+| housing-lifecycle | company-os | [事業] |
+| input-devices | company-os | [事業] |
+| orca-web | null | [] |
+| spec-dock | null | [] |
+| taikyohiyou_project | housing-lifecycle | [プロダクト] |
+| tenting-cradle | input-devices | [プロダクト] |
+| yubisaki | input-devices | [プロダクト] |
+
+- 道が出ないこと：応答の JSON に `/Users/`、`/Volumes/`、`/private/`、`.canonical`、`workspace` の文字が0件。登録簿の9行の `catalog`・`main_checkout`・`git` の値（27個）も、応答に1つも現れなかった。
