@@ -91,6 +91,27 @@ def test_paint_preserves_children_for_equal_views_and_paints_new_slots(tmp_path:
     )
 
 
+def test_paint_without_a_limit_draws_every_agent(tmp_path: Path) -> None:  # iss-00620 T-07
+    run_node(
+        """
+        const all = new Slot("iss-00001", "all"), four = new Slot("iss-00001", "4");
+        const bare = new Slot("iss-00002", "all");
+        const six = {id: "w6", agents: [1, 2, 3, 4, 5, 6].map((n) => ({id: `a${n}`}))};
+        const odd = {id: "wx", agents: null};
+        const builds = [], renders = [];
+        const module = {
+          buildMarks(w, options) {builds.push([w.id, options.max]); return {marks: [{elapsed: "1m"}], overflow: null};},
+          renderAgentMarks(slot, w, options) {renders.push([w.id, options.max]); slot.replaceChildren({});},
+        };
+        const orca = {status: () => "ok", marks: () => module, forScope: (data, id) => [id === "iss-00001" ? six : odd]};
+        ui.paintOrcaMarks(rootOf(all, four, bare), {orca}, {});
+        assert.deepEqual(builds, [["w6", 6], ["w6", 4], ["wx", 1]]);
+        assert.deepEqual(renders, [["w6", 6], ["w6", 4], ["wx", 1]]);
+        """,
+        tmp_path,
+    )
+
+
 def test_paint_clears_unavailable_slots_and_recovers(tmp_path: Path) -> None:
     run_node(
         """

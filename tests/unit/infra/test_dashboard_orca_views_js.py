@@ -83,15 +83,98 @@ def test_the_card_holds_a_slot_only_when_asked(tmp_path: Path) -> None:
     assert "sd-orca" not in out["marks"]
 
 
-def test_graph_boxes_and_frames_end_their_rows_with_a_slot() -> None:
+@needs_node
+def test_the_graph_slot_has_no_limit(tmp_path: Path) -> None:  # iss-00620 T-07
+    out = run_node('out.slot = parts.orcaSlot("iss-00005", "all");', tmp_path)
+    assert out["slot"] == '<span class="sd-orca" data-orca-scope="iss-00005" data-orca-max="all"></span>'
+
+
+AGENTS_ROW = '<div class="gx-agents">${orcaSlot(s.id, "all")}</div>'
+
+
+def test_graph_boxes_and_frames_put_the_agents_on_a_row_of_their_own() -> None:  # iss-00620 T-06
     source = (VIEWS / "graph.js").read_text()
     box = _function(source, "boxHtml")
+    # the other marks stay on their row, the downstream count with them (R-01); the agents' slot is not among them
     assert box.count('<div class="gx-marks">') == 2
-    assert box.count("${orcaSlot(s.id, 2)}</div>`") == 2
+    assert box.count("${M.dnMark(s.downstream)}</div>`") == 2
+    assert "。後に続く ${s.downstream}件" in box
+    assert "orcaSlot(s.id, 2)" not in box and "orcaSlot(s.id, 3)" not in box
+    # the row of agents follows the other marks, in every box
+    assert box.count(AGENTS_ROW) == 1
+    assert box.index("marks +") < box.index(AGENTS_ROW) < box.index("`</div>`")
     frame = _function(source, "frameHtml")
-    assert "${orcaSlot(s.id, 3)}</div>`" in frame
     head = frame[frame.index("const head") : frame.index("const meta")]
-    assert head.rstrip().endswith("${orcaSlot(s.id, 3)}</div>`;")
+    # the frame's row of agents is the heading's last child, so that taps, the double click and dimming keep working
+    assert head.rstrip().endswith(AGENTS_ROW + "</div>`;")
+    assert "orcaSlot(s.id, 3)" not in frame
+    meta = frame[frame.index("const meta") :]
+    assert "${M.hmMark(s)}${M.dnMark(s.downstream)}</div>`" in meta and "gx-agents" not in meta
+    tap = _function(source, "onTap")
+    assert 'target.closest(".gx-box, .gx-fh")' in tap
+    legend = _function(source, "renderLegend")
+    assert '"後に続く数"' in legend
+    marks = (VIEWS / "graph/marks.js").read_text()
+    assert "export const dnMark" in marks or "export function dnMark" in marks
+
+
+def test_the_graph_measures_the_marks_and_lays_out_again_only_when_the_rows_change() -> None:  # iss-00620 T-06
+    graph = (VIEWS / "graph.js").read_text()
+    assert 'import { DEFAULTS, index, nodeMarkRows, routeLayout } from "./graph/layout.js";' in graph
+    paint = _function(graph, "paintOrca")
+    assert paint.index("paintOrcaMarks(V.el.world, V.ctx, V.data)") < paint.index("checkRows()")
+    build = _function(graph, "buildWorld")
+    assert "marks: V.marks" in build
+    assert 'querySelectorAll(".sd-orca")' in build and "V.ro.observe(" in build
+    assert "V.ro?.disconnect()" in _function(graph, "dispose")
+    assert "new ResizeObserver(" in graph
+    resized = _function(graph, "onMarksResize")
+    assert "requestAnimationFrame(" in resized and "checkRows()" in resized and "rowsRedo" not in resized
+    check = _function(graph, "checkRows")
+    assert "measureMarks(V.el.world)" in check
+    assert "if (!M) return;" in check
+    assert "nodeMarkRows(n, M[n.id])" in check and "(n.rows ?? 1)" in check
+    assert "V.marks = M;" in check
+    # a different count lays out again (twice at most per news or render), keeping the zoom and the position
+    assert check.index("V.rowsRedo >= 2") < check.index("render(V.root, V.ctx)")
+    assert "V.sig = null;" in check and "V.fitted" not in check
+    assert "V.rowsRedo++" in check
+    # only a render that checkRows did not call and the reader's news start the count again
+    render = _function(graph, "render")
+    assert "if (!V.fromRows) V.rowsRedo = 0;" in render
+    assert "createOrcaWatch(onOrcaNews)" in graph
+    news = _function(graph, "onOrcaNews")
+    assert "V.rowsRedo = 0;" in news and "paintOrca()" in news
+    measure = _function(graph, "measureMarks")
+    for marker in (
+        'querySelectorAll("[data-orca-scope]")',
+        '.querySelectorAll(".orca-mark")',
+        "getBoundingClientRect().width / V.s",
+        "Math.ceil(",
+        "columnGap",
+        'flexWrap !== "wrap"',
+        "return null;",
+    ):
+        assert marker in measure, marker
+    audit = _function(graph, "edgeAudit")
+    assert "markOverflow" in audit
+
+
+def test_the_graph_css_wraps_the_row_of_agents() -> None:  # iss-00620 T-06, R-07
+    css = (VIEWS / "graph.css").read_text()
+    for rule in (
+        ".gx .gx-agents { display: flex; margin-top: 4px; }",
+        ".gx .gx-agents:not(:has(.orca-mark)) { display: none; }",
+        ".gx .gx-agents > .sd-orca { flex: 1 1 100%; margin-left: 0; min-width: 0; }",
+        ".gx .sd-orca .orca-marks { row-gap: 4px; }",
+        ".gx .gx-fh:has(> .gx-agents .orca-mark) { flex-wrap: wrap; row-gap: 0; }",
+        ".gx .gx-fh > .gx-agents { flex: 1 1 100%; }",
+    ):
+        assert rule in css, rule
+    added = [line for line in css.splitlines() if "gx-agents" in line or ".orca-marks" in line]
+    assert added and not [line for line in added if re.search(r"#[0-9a-fA-F]{3}|rgb|hsl|var\(", line)]
+    layout = (VIEWS / "graph/layout.js").read_text()
+    assert "export const MARK_ROW = 20;" in layout and "export const MARK_INSET = { box: 26 };" in layout
 
 
 def test_the_box_size_does_not_change() -> None:
@@ -165,8 +248,19 @@ def test_the_watch_follows_one_reader_at_a_time(tmp_path: Path) -> None:
 def test_slot_styles_stay_shared_and_leave_the_marks_to_orca_web() -> None:
     parts = (SHARED / "parts.css").read_text()
     assert "& .sd-card__meta:not(:has(> :not(.sd-orca:empty))) { display: none; }" in parts
+    # iss-00620: the graph only hides an empty row of agents and sets the gap between the rows of marks (R-07)
+    allowed = {
+        VIEWS / "graph.css": (
+            ".gx .gx-agents:not(:has(.orca-mark)) { display: none; }",
+            ".gx .sd-orca .orca-marks { row-gap: 4px; }",
+            ".gx .gx-fh:has(> .gx-agents .orca-mark) { flex-wrap: wrap; row-gap: 0; }",
+        )
+    }
     for path in [*DASHBOARD.glob("*.css"), *VIEWS.glob("*.css"), *SHARED.glob("*.css")]:
         text = path.read_text()
+        for rule in allowed.get(path, ()):
+            assert rule in text, rule
+            text = text.replace(rule, "")
         assert ".orca-mark" not in text, path
         assert not re.search(r"\.orca-[a-z-]+\s*[{,]", text), path
     panel = (SHARED / "panel.js").read_text()

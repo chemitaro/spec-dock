@@ -94,6 +94,7 @@ export function stateCountList(counts, { done = true } = {}) {
 }
 
 // The empty place an orca-web mark is drawn into (iss-00592 D-02): its HTML depends on the Scope's ID and max only.
+// max is a number, or "all" for every agent of the worktree (the structure graph, iss-00620).
 export const orcaSlot = (id, max) => `<span class="sd-orca" data-orca-scope="${esc(id)}" data-orca-max="${max}"></span>`;
 
 // A card on the board and on the detail tabs: an ordinary link to the detail screen (opens in a new tab too).

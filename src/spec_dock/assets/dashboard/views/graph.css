@@ -138,6 +138,14 @@
 .gx .gx-r1 .stg { margin-left: auto; }
 .gx .gx-ttl { margin-top: 3px; font-size: 12.5px; font-weight: 650; line-height: 1.45; color: var(--ds-text); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: auto-phrase; }
 .gx .gx-marks { display: flex; align-items: center; gap: 9px; margin-top: 6px; min-height: 13px; }
+/* エージェントの行（iss-00620）。ほかの印の下（枠では見出しの行の下）に左寄せで置き、箱の中の幅で折り返す。
+   行1つの高さ 4 + 16 = 20 は layout.js の MARK_ROW、箱の左右の縁と余白 26 は MARK_INSET の写し。一緒に直す */
+.gx .gx-agents { display: flex; margin-top: 4px; }
+.gx .gx-agents:not(:has(.orca-mark)) { display: none; }
+.gx .gx-agents > .sd-orca { flex: 1 1 100%; margin-left: 0; min-width: 0; }
+.gx .sd-orca .orca-marks { row-gap: 4px; }
+.gx .gx-fh:has(> .gx-agents .orca-mark) { flex-wrap: wrap; row-gap: 0; }
+.gx .gx-fh > .gx-agents { flex: 1 1 100%; }
 
 .gx .gx-bar { position: absolute; top: 12px; left: 12px; right: 12px; z-index: 10; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 8px 16px; pointer-events: none; }
 .gx .gx-bar > * { pointer-events: auto; }
