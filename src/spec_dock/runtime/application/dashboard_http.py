@@ -239,6 +239,8 @@ class DashboardHttp:
             return self._api(request, rest[1:])
         if head == "todos" and not rest:
             return self._shell(request, embed)  # every repository's human tasks (iss-00554 D-04)
+        if head == "graph" and not rest:
+            return self._shell(request, embed)  # the cross-repository structure (iss-00614 D-01)
         if head == "r" and len(rest) >= 3:
             if rest[2] == "design-system" and len(rest) > 3:
                 asset = design_system_asset(rest[3:])

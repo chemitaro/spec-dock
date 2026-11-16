@@ -2,6 +2,7 @@
 // `/r/<host>/<owner>/<name>/` (home = graph), `…/graph`, `…/board`, `…/timeline`, `…/scopes/<ID>`.
 // `/r/…/scopes/<ID>` and `?embed=1` are a stable contract. The human tasks (iss-00554): `/todos` (every repository),
 // `/r/<repo>/todos` and `/r/<repo>/todos/<ID>`, all with view "todos" (`todo` is the task ID on the one-task screen).
+// The cross-repository structure (iss-00614): `/graph`, view "allgraph".
 
 export function parseRoute(url) {
   const parsed = new URL(url, location.href);
@@ -9,7 +10,8 @@ export function parseRoute(url) {
   const params = parsed.searchParams;
   const embed = params.get("embed") === "1";
   if (parts[0] !== "r" || parts.length < 4) {
-    const view = parts.length === 1 && parts[0] === "todos" ? "todos" : "overview";
+    const one = parts.length === 1 ? parts[0] : null;
+    const view = one === "todos" ? "todos" : one === "graph" ? "allgraph" : "overview";
     return { view, repository: null, scope: null, todo: null, params, embed, path: parsed.pathname + parsed.search };
   }
   const repository = parts.slice(1, 4).join("/");
@@ -39,5 +41,6 @@ export function withEmbed(path, embed) {
 
 export const repositoryPath = (repository, view = "graph") => (view === "graph" ? `/r/${repository}/` : `/r/${repository}/${view}`);
 export const scopePath = (repository, scopeId) => `/r/${repository}/scopes/${scopeId}`;
+export const allGraphPath = "/graph";
 export const todosPath = (repository) => (repository ? `/r/${repository}/todos` : "/todos");
 export const todoPath = (repository, todoId) => `/r/${repository}/todos/${encodeURIComponent(todoId)}`;

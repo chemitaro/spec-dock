@@ -11,8 +11,11 @@
 //   };
 //   ctx = {repository, route: {view, repository, scope, params, embed, path}, data (structure JSON),
 //          scope (scope JSON on the detail screen), repositories, embed, navigate(path), href(path)}
+//   The screens without a repository (overview, todos, allgraph) have repository and data null and read
+//   `repositories` (the list API's repositories, with parent and tier) themselves.
 //
 // #531 (board, scope, overview) and #532 (graph, timeline) replace their own file (and add CSS) only.
+import allgraph from "./allgraph.js"; // iss-00614
 import board from "./board.js";
 import graph from "./graph.js";
 import overview from "./overview.js";
@@ -20,4 +23,4 @@ import scope from "./scope.js";
 import timeline from "./timeline.js";
 import todos from "./todos.js"; // iss-00554
 
-export const VIEWS = { graph, board, timeline, scope, overview, todos };
+export const VIEWS = { graph, board, timeline, scope, overview, todos, allgraph };
