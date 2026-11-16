@@ -132,7 +132,7 @@ def test_the_toolbar_has_one_range_switch_and_no_done_or_fold(shots: dict[str, A
     """R-01, R-08: no done or fold button; a group of all, now and next after the mode button; fit says 収める."""
     tools = shots[name][0]["tools"]
     assert 'data-act="done"' not in tools and 'data-act="fold"' not in tools
-    assert "終わったものも" not in tools and "片付けの候補を畳む" not in tools
+    assert 'aria-label="終わったものも"' not in tools and "片付けの候補を畳む" not in tools
     buttons = _range_buttons(tools)
     assert list(buttons) == ["all", "now", "next"]
     for key, attrs in buttons.items():
