@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from tests.support.dashboard import closed, snapshot
+from tests.support.dashboard import closed, node, snapshot
 from tests.support.dashboard_graph import document
 from tests.unit.presentation.test_dashboard_graph_js import ASSETS, ROOT, _node
 from tests.unit.presentation.test_dashboard_graph_range import _next
@@ -52,6 +52,13 @@ def _saved(mode: str) -> dict[str, str]:
 
 def _all_done() -> dict[str, Any]:
     return document(snapshot(closed(1, "epic"), closed(2, "issue", parent=1), closed(3, "issue")))
+
+
+def _only_candidates() -> dict[str, Any]:
+    """iss-00611 T-07: an open Initiative holding only a candidate a; everything else is done."""
+    return document(
+        snapshot(node(1, "initiative"), node(2, "epic", parent=1), closed(3, "issue", parent=2), closed(4, "issue"))
+    )
 
 
 @pytest.fixture(scope="module")
@@ -92,6 +99,13 @@ def shots(tmp_path_factory: pytest.TempPathFactory) -> dict[str, list[dict[str, 
                 "doc": _all_done(),
                 "saved": {V3: json.dumps({"mode": "nest", "range": "next", "deps": "all", "legend": False})},
                 "clicks": [{"act": "range", "range": "all"}, {"act": "range", "range": "next"}],
+            },
+            # iss-00611: the open parent holding only a candidate goes too, so next is empty
+            {
+                "name": "parents",
+                "doc": _only_candidates(),
+                "saved": {V3: json.dumps({"mode": "nest", "range": "next", "legend": False})},
+                "clicks": [{"act": "range", "range": "all"}],
             },
         ],
     )
@@ -290,3 +304,13 @@ def test_next_with_nothing_to_show_keeps_the_bar_and_says_so(shots: dict[str, An
 def test_the_notice_is_hidden_when_something_is_shown(shots: dict[str, Any], name: str) -> None:
     for shot in shots[name]:
         assert shot["none"] is not None and shot["none"]["hidden"] is True
+
+
+def test_next_with_only_an_empty_parent_left_says_so(shots: dict[str, Any]) -> None:
+    """iss-00611 T-07 (F-01): when the parents go, next is empty, the bars stay and the notice shows."""
+    empty, every = shots["parents"]
+    assert empty["range"] == "next"
+    assert _ids(empty["world"]) == set()
+    assert empty["bar"] and empty["view"] and empty["tools"]
+    assert empty["none"] == {"hidden": False, "text": NOTICE}
+    assert every["none"]["hidden"] is True and {"init-00001", "epic-00002"} <= _ids(every["world"])

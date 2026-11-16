@@ -259,6 +259,144 @@ def test_next_routes_cleanly(nxt: dict[str, Any]) -> None:
     assert [run for run in runs if any(run[key] for key in AUDIT_KEYS)] == []
 
 
+# --- iss-00611: next shows a parent only when something inside it shows -------------------------------------
+
+
+def _parents() -> dict[str, Any]:
+    return document(
+        snapshot(
+            node(70, "initiative"),  # init-00002 of orca-web: open, holding only candidates a
+            node(71, "epic", parent=70),
+            closed(72, "issue", parent=71),
+            node(73, "epic", parent=70),
+            closed(74, "issue", parent=73),
+            node(80, "initiative"),  # three levels: 82 is a, so 81 and 80 go too (from below)
+            node(81, "epic", parent=80),
+            node(82, "epic", parent=81),
+            closed(83, "issue", parent=82),
+            node(90, "initiative"),  # not sliced yet: still shown
+            node(91, "epic"),
+            node(95, "initiative"),  # an open child that is not a candidate: a frame
+            node(96, "epic", parent=95),
+            closed(97, "issue", parent=96),
+            node(98, "issue", parent=95),
+            node(110, "issue"),  # Issues are never candidates: 111 is open, its only child done
+            node(111, "issue", parent=110),
+            closed(112, "issue", parent=111),
+        )
+    )
+
+
+PARENTS_HIDDEN = {"init-00070", "epic-00071", "epic-00073", "init-00080", "epic-00081", "epic-00082"}
+PARENTS_HIDDEN |= {"iss-00110", "iss-00111"}
+PARENTS_SHOWN = {"init-00090", "epic-00091", "init-00095", "iss-00098"}
+PARENTS_FOCUS = {
+    "init-00070": {"init-00070"},
+    "init-00080": {"init-00080"},
+    "init-00095": {"init-00095", "iss-00098"},
+}
+
+
+def _cycle() -> dict[str, Any]:
+    """Two open Epics whose parents point at each other, and an open Issue whose parent is not there (F-02)."""
+    doc = document(snapshot(node(1, "epic"), node(2, "epic"), node(3, "issue"), node(4, "issue")))
+    parents = {"epic-00001": "epic-00002", "epic-00002": "epic-00001", "iss-00003": "epic-09999"}
+    parents["iss-00004"] = "epic-00001"
+    for scope in doc["scopes"]:
+        if scope["id"] in parents:
+            scope["parent_id"] = parents[scope["id"]]
+    return doc
+
+
+@pytest.fixture(scope="module")
+def parents(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
+    doc = _parents()
+    layouts: dict[str, dict[str, Any]] = {}
+    for mode in ("nest", "tree"):
+        for rng in ("all", "now", "next"):
+            layouts[f"{mode}|{rng}"] = {"mode": mode, "range": rng}
+        for focus in PARENTS_FOCUS:
+            layouts[f"{mode}|focus|{focus}"] = {"mode": mode, "range": "next", "focus": focus}
+    cycle = {f"{mode}|next": {"mode": mode, "range": "next"} for mode in ("nest", "tree")}
+    return {
+        "doc": doc,
+        **_run(
+            tmp_path_factory.mktemp("range-parents"),
+            {
+                "documents": {"next": doc},
+                "layouts": {"next": layouts},
+                "checks": ["layout", "audit"],
+            },
+        ),
+        "cycle": _run(
+            tmp_path_factory.mktemp("range-cycle"),
+            {"documents": {"cycle": _cycle()}, "layouts": {"cycle": cycle}, "checks": ["layout"]},
+        )["layout"]["cycle"],
+    }
+
+
+def test_parents_premise_the_model_marks_exactly_the_epics_holding_only_done_ones(parents: dict[str, Any]) -> None:
+    """T-06 (premise): the candidates are 71, 73, 82 and 96 (all_descendants_closed); the open parents are not."""
+    cleanup = {c["id"]: c["code"] for c in parents["doc"]["cleanup"]}
+    assert cleanup == dict.fromkeys({"epic-00071", "epic-00073", "epic-00082", "epic-00096"}, "all_descendants_closed")
+    states = {s["id"]: s["state"] for s in parents["doc"]["scopes"]}
+    for scope_id in ("init-00070", "init-00080", "epic-00081", "init-00095", "iss-00110", "iss-00111"):
+        assert states[scope_id] != "done", scope_id
+
+
+@pytest.mark.parametrize("mode", ["nest", "tree"])
+def test_next_leaves_out_a_parent_with_nothing_shown_inside(parents: dict[str, Any], mode: str) -> None:
+    """T-01, T-02, T-03 (R-01, R-02, R-03): a parent shows only as the frame of what shows inside; an open Scope
+    without children shows as it did."""
+    shown = _shown(parents, f"{mode}|next")
+    assert set(shown) == PARENTS_SHOWN
+    assert not set(shown) & PARENTS_HIDDEN
+    assert shown["init-00095"]["type"] == ("frame" if mode == "nest" else "tframe")
+    assert "epic-00096" not in shown
+    assert parents["layout"]["next"][f"{mode}|next"]["groups"] == []
+
+
+@pytest.mark.parametrize("mode", ["nest", "tree"])
+def test_all_and_now_still_show_the_parents(parents: dict[str, Any], mode: str) -> None:
+    """T-05 (R-05): all shows every one of them; now shows the open parents and folds the candidates in nest."""
+    assert set(_shown(parents, f"{mode}|all")) >= PARENTS_HIDDEN
+    now = parents["layout"]["next"][f"{mode}|now"]
+    open_parents = {"init-00070", "init-00080", "epic-00081", "iss-00110", "iss-00111"}
+    assert open_parents <= set(_shown(parents, f"{mode}|now"))
+    candidates = {"epic-00071", "epic-00073", "epic-00082"}
+    if mode == "nest":
+        folded = {scope_id for g in now["groups"] for scope_id in g["ids"]}
+        assert candidates <= folded
+    else:
+        assert candidates <= set(_shown(parents, f"{mode}|now"))
+
+
+@pytest.mark.parametrize("mode", ["nest", "tree"])
+@pytest.mark.parametrize("focus", sorted(PARENTS_FOCUS))
+def test_next_shows_a_parent_in_focus_with_only_what_shows_inside(
+    parents: dict[str, Any], mode: str, focus: str
+) -> None:
+    """T-04 (R-04): the focus shows even with nothing inside; under it the rule of next holds."""
+    key = f"{mode}|focus|{focus}"
+    assert set(_shown(parents, key)) == PARENTS_FOCUS[focus]
+    assert parents["layout"]["next"][key]["focus"] == focus
+    assert parents["layout"]["next"][key]["groups"] == []
+
+
+def test_next_of_the_parents_routes_cleanly(parents: dict[str, Any]) -> None:
+    """T-06 (R-06): every combination of the node check, next and its focus among them, has no audit problem."""
+    runs = parents["audit"]
+    assert any(run["opts"].get("range") == "next" and run["opts"].get("focus") for run in runs)
+    assert [run for run in runs if any(run[key] for key in AUDIT_KEYS)] == []
+
+
+def test_next_with_a_parent_cycle_or_a_missing_parent_returns(parents: dict[str, Any]) -> None:
+    """T-09 (F-02): a cycle of parents and a parent that is not there lay out without an exception."""
+    assert set(parents["cycle"]) == {"nest|next", "tree|next"}
+    for entry in parents["cycle"].values():
+        assert isinstance(entry["nodes"], list)
+
+
 def record(out: Path) -> None:
     """Record the digests at the start commit (run there once: `python -c 'from ... import record; record(...)'`)."""
     import tempfile
