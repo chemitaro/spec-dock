@@ -71,7 +71,7 @@ SpecDock 0.9.5 のリリースの変更を作った。機能のコードは変�
   - 区切りのレビューは、計画どおりなし。
 - 実装担当の報告：対象の統合テスト6ファイルで 19 passed。`make lint`、`uv lock --check` が合格。全体で 4013 passed / 7 skipped。
 - wheel：隔離した venv で `spec-dock --version` が `spec-dock 0.9.5` を返した（Outcome の S-04）。
-- PR #625（https://github.com/chemitaro/spec-dock/pull/625）：head は 1a3352430（合格のコミット）。記録のコミットはない。
+- PR #625（https://github.com/chemitaro/spec-dock/pull/625）：head は 1a3352430（合格のコミット）。記録のコミットはない。CI は合格した。observer の結果は OBSERVED_CI_PASS、merge_readiness は READY（2026-11-16T21:05Z UTC、`.workbench/coding-task/iss-00623/ci-2.json`）。1回目の observer は、長いテストのジョブの間に idle の時間切れ（exit 4）で止まり、`resume_argv` で1回やり直した。
 
 ## 逸脱と判断
 
