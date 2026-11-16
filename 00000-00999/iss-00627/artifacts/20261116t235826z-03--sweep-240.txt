@@ -1,0 +1,2 @@
+BAD taikyohiyou_project tree all 1240 9 -> 9
+{"cases":240,"same":199,"changed":41,"better":7,"worse":0,"oldBad":8,"newBad":1}
