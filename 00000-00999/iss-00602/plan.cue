@@ -5,8 +5,8 @@ package spec
 goal: "iss-00601 が調べたエージェントのタブと構造の図の印の押しの5つの小さな点を、それぞれ再現するテストを先に書いてから直す。"
 
 steps: {
-	"S-01": {title: "テスト（T-01〜T-05）を先に書いて、直す前の main で落ちる（各点を再現する）ことを確かめ、D-01（onTap の順）、D-02（fromLast と keep）、D-03（lastChoice と欄の足）、D-04（捕捉の聞き手の修飾キー）、D-05（scopeAgents）を作る。今のテストの、直した動きを前提にしない目印（iss-00593 の D-04 の修飾キーによらない forgetGone など）を新しい約束に合わせる。関わるテストと make lint を通す", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "F-01", "F-02", "F-03"], status: "doing", session: "impl"}
-	"S-02": {title: "配る文書（D-06）の reference_cli.md と static-inventory.json の sha256 を直し、テスト（T-06）を足す。make lint と uv run pytest（全体）を通す", realizes: ["R-06"], status: "todo", after: ["S-01"], session: "owner"}
+	"S-01": {title: "テスト（T-01〜T-05）を先に書いて、直す前の main で落ちる（各点を再現する）ことを確かめ、D-01（onTap の順）、D-02（fromLast と keep）、D-03（lastChoice と欄の足）、D-04（捕捉の聞き手の修飾キー）、D-05（scopeAgents）を作る。今のテストの、直した動きを前提にしない目印（iss-00593 の D-04 の修飾キーによらない forgetGone など）を新しい約束に合わせる。関わるテストと make lint を通す", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "F-01", "F-02", "F-03"], status: "done", session: "impl"}
+	"S-02": {title: "配る文書（D-06）の reference_cli.md と static-inventory.json の sha256 を直し、テスト（T-06）を足す。make lint と uv run pytest（全体）を通す", realizes: ["R-06"], status: "doing", after: ["S-01"], session: "owner"}
 	"S-03": {title: "試しの orca-web と試しの SpecDock の組で、5点の直しの動き（T-07）を、直す前（main）と後で、1440・1000・390 の幅と明暗の写しとともに確かめ、report.md に残す。本人が見る URL を報告し、本人の確かめまで残す", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "F-01"], status: "todo", after: ["S-02"], session: "owner"}
 }
 
