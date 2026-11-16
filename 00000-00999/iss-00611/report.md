@@ -15,6 +15,8 @@ ID: "iss-00611"
 - 仕様のレビュー round-1（spec-reviewer opus / high）：合格（P0・P1 なし、P2 3・P3 2）。`.workbench/spec-review/iss-00611/round-1.json`（worktree `/Volumes/990p2t/workspace/worktrees/orca/spec-dock/iss-00611`）。P2・P3 はすべて実装の前に反映した（`review-response.md`）。
 - round-2（同じレビュアー）：**合格**。P0〜P3 すべて0。結果 `round-2.json`、検査 `round-2.check.json`（valid、status pass、reviewed_sha `2c7427a97`）。
 - 合格した文書の sha256：requirement.cue `2988a3ee2b3b33082da4b35fbf1971c7357b55fcb3c10f2fea763c4869aa3db1`、design.cue `8418b5b54c288103497db305c6950c4a67a79d550d301d9435427052d673a29b`、plan.cue `ff2b8a187a89585f3033bd376920f0fb7ca27476b0fcaef08f589eb476763e84`。
+- 最終品質ゲート（quality-gate-reviewer opus / medium、second opinion なし、範囲 `2c7427a97..a51e09159`）：**合格**。review lane は P0〜P3 0、coverage complete。test lane は attempt 01 で `uv run pytest` が1件落ちた（`tests/integration/test_issue413_native_lock.py`。テストの `.git` の走査と git の自動 maintenance の `maintenance.lock` の競合による揺れ。この変更は触れていない。単独で3回中1回落ちる）。コードを変えずに同じコミットでやり直し（attempt 02）、`make lint` exit 0、`uv run pytest` 3976 passed / 7 skipped。closure `.workbench/final-quality-gate/iss-00611-fqg-1/closure.md`（worktree `/Volumes/990p2t/workspace/worktrees/orca/spec-dock/iss-00611`）。
+- 逸脱 codex-symlink-refusal：impl-sol（codex gpt-6.1-sol / medium、dispatch ctx_a97b766183dc、launch codex / gpt-6.1-sol / medium）は chat-scratch の writable root の symlink で手元のコマンドを起動できず、変更なしで failed を返した。plan の rationale と統括の了承どおり、Claude Opus 5.5 / medium（dispatch ctx_9ad5620e37b9、launch claude / opus / medium）に切り替えた。
 
 ## 実装の記録
 
@@ -41,6 +43,16 @@ ID: "iss-00611"
 
 ## Outcome
 
+構造の図の「これから」で、子を持つ Scope は、これからで見える子孫があるときだけ出るようにした（layout.js の visibility の next の分岐だけ）。orca-web の init-00002 と spec-dock の init-00468 のような、中が片付けの候補だけの開いた親は出なくなる。子のない開いた Scope、候補でない子孫を持つ親、focus の Scope は今どおり。全体・いまは変わらない。
+
 ## Verification
 
+- 仕様のレビュー合格（round-2、指摘0）。最終品質ゲート合格（`a51e09159`、make lint・全体の pytest 3976 passed）。
+- 実データの24枚（3つのリポジトリ × 前後 × 1440・390 × 明暗）で edgeAudit の違反0、グラフ由来のブラウザーのエラー0。orca-web の init-00002 は前は出て、後は出ない。
+
 ## Residual Risks / Follow-ups
+
+- これからで、作業中（in_progress）でも子が候補・終わったものだけの親は出ない（統括の決定1どおり）。
+- 配布の手引き（`spec-dock/docs/migration.md` の「これから」の説明）は、この Issue の範囲外。次のリリースの Issue で「中に見えるもののない親も出さない」を足す。
+- 揺れるテスト `tests/integration/test_issue413_native_lock.py::test_terminated_owner_releases_native_start_lock_without_pid_recovery`（git の maintenance.lock との競合）。別の Issue で、走査で消えたファイルを許すよう直す提案。
+- 試しのサーバー 18612 は本人の確かめまで残す。
