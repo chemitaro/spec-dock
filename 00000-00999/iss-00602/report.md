@@ -22,9 +22,12 @@ iss-00601 が調べたエージェントのタブと構造の図の印の押し�
 - round-1（範囲を絞る前の仕様、すべての印を出す部分を含む）：spec-reviewer が fail（P1 1、P2 2。どれもすべての印を出す部分の測りと CSS）。本人の判断でその部分を範囲から外したので、指摘は仕様から消えた（`.workbench/spec-review/iss-00602/review-response.md`）。
 - **逸脱（本人の了承、統括の伝え msg_16d92aef2143、2026-11-16）**：仕様レビューの2人目（ChatGPT GPT-6 / Extra High、chatgpt-spec-review-strict）は、Oracle が Chrome（127.0.0.1:9223）のリモートデバッグの許可（Allow）を得られず止まったため取れなかった（1回目は node v16 で起動前に落ち、2回目と3回目はそれぞれ許可待ちのまま止めた。どれも ChatGPT への送信はしていない）。spec-reviewer の合格で進める。
 
+- 仕様の直しと再合格（round-3、2026-11-16）：最終品質ゲート attempt 1 の ChatGPT の P1 FQG-00602-01（主の P3 FQG-001 と同じ根）を本物と判断し、R-02・F-01・D-03 に footChoice、計画に S-04（直し）と S-05（文書と実機）を足した。spec-reviewer Opus 5.5 / high：pass（P3 3）。2人目 ChatGPT GPT-6 / Extra High（chatgpt-spec-review-strict、canonical `f205b7f`、モデルの選択 verified）：pass（P2 1・P3 1。どれも D-03 の2つ目の箇条書きに古い式が残る件と R-01 の受け入れの3つ目の件で、記録だけ。実装担当への依頼書に読み方の注として渡した）。合格の sha256：requirement.cue `914b44b462b38fd868f5200c5e93c65aaa48e614159f72faa72b78135fc54610`、design.cue `e951b0ecdf7fbc59688bbfd0b48d7ff0d8327269bfef93b2e46dca8b2ad74b48`、plan.cue `e4c4e946e6fa8e61900a13467483401deaa14e02b0894bb836bbd53b9a616102`。結果は `.workbench/spec-review/iss-00602/round-3.json` と `chatgpt-round-3.out`。
+
 ## 実装担当の起動
 
 - S-01：初めに Codex GPT-6.1 Sol / medium（dispatch ctx_b03d41a3750e、launch.effective：codex・gpt-6.1-sol・medium）を起動した。Codex は Orca の chat-scratch の書き込み先がシンボリックリンクの下にある環境の拒否（symlinked writable root）でふつうのコマンドを実行できず、仕様の確かめの読みだけで止まった。**逸脱（計画の取り決め、統括の了承済み）**：待たずに worker-stop し、HEAD が開始のコミット `16f0cf122` のままで未コミットがないことを確かめ、Claude Opus 5.5 / high（dispatch ctx_9613ad2614c4、launch.effective：claude・claude-opus-5-5・high）に切り替えた。
+- S-04（最終品質ゲートの P1 の直し）：Claude Opus 5.5 / high（dispatch ctx_b3fe8119ca03、launch.effective：claude・claude-opus-5-5・high）。impl の Codex が動かなかったのと同じ扱い。
 
 ## 実装の記録
 
