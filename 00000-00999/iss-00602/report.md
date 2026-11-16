@@ -64,8 +64,35 @@ iss-00601 が調べたエージェントのタブと構造の図の印の押し�
 - 2人目：**逸脱（統括の指示 msg_16d92aef2143）**。ChatGPT は Chrome のリモートデバッグの許可が得られないため送らず（`attempts/01/second-opinion/fallback.md`）、GPT-6 Astra / high（codex exec、read-only。ログの model gpt-6-astra・reasoning effort high）で行った。pass、指摘0。1回目の起動は、`-o` の書き出し先がパケットの output_path と同じで「output_path がすでにある」の入力の誤り（REVIEW-INPUT-INVALID）になった機械の誤りで、書き出し先を分けて起動し直した。
 - テストの線：`make lint` pass（手元、`80d5aba3f`）。**逸脱（統括の了承 msg_4f680f6c33be、2026-11-16）**：全体の `uv run pytest` は、Mac の負荷（CPU 10個に load average 約450〜550）で手元では1時間で 8% しか進まず（10時間以上の見込み。pytest-xdist はない）、手元の走りを止め、同じ候補の SHA の PR #604 の CI（provider-ci の `make lint` と `uv run pytest` の全体）の合格をテストの線の証拠とした。止めた手元の走りのログは `attempts/01/tests/killed-run-1/`（1時間の上限で止まった1回目。make lint pass を含む）と `killed-run-2/`（切り離して起動し直し、統括の指示で止めた2回目）。
 
+- fqg-1 のその後（本人の指示：2人目は ChatGPT の skill を先に使う）：PR #604 の head `80d5aba3f` で chatgpt-final-quality-gate-strict（GPT-6 / Extra High、会話 6afa8f48…。1回目は Chrome の許可待ちのまま Orca の再起動で切れ、送信なし。wrapper の空の staging を残して新しいキャンペーンの置き場 `iss-00602-r2` で送り直した）が **P1 FQG-00602-01**（主の P3 FQG-001 と同じ根）と P2 FQG-00602-02 を返した。回答の JSON は Markdown のエスケープで壊れていた（wrapper exit 20）が、中身は読めた。PR #604 は、その前（14:11 JST）に統括がマージ済みだった。P1 は本物と判断し、仕様に footChoice を足して（round-3）、S-04・S-05 を PR #605 にした。
+- **合格：campaign `iss-00602-fqg-2`、attempt 3、`e76974faa811ee1913cde97a737419cc062df8e9`**（PR #605 の head。origin/main の #606・#608 を取り込んだ後の最終のコミット）。closure は worktree の `.workbench/final-quality-gate/iss-00602-fqg-2/closure.md`。
+  - 主（quality-gate-reviewer Opus 5.5 / high）：pass、指摘0、coverage complete（attempt 01 の P2 FQG-001〈main の reference_cli.md の sha256 が known_old_sha256 にない〉は統括の決定で 4457ab16f で直した）。
+  - 2人目：ChatGPT は r3（038b487f9、回答が空）・r4（4457ab16f、1時間40分回答なし）とも送信の後に取れず、送り直していない。**本人の補足（msg_44f231305455）で GPT-6 Astra / high**（codex exec、read-only）：pass、指摘0、coverage complete。
+  - テスト（統括の決定で PR #605 の CI）：Provider CI run 43840609087、make lint pass、uv run pytest 3941 passed / 25 skipped。
+- 記録だけの P2/P3：ChatGPT の P2 FQG-00602-02（同じ Scope に対応する worktree の一部だけ agents が並びでないと、その worktree にいた選びの相手をいなくなったとみなしうる。別の相手が自動で開く道ではない）。仕様レビューの P3（D-03 の2つ目の箇条書きの古い式、R-01 の受け入れの3つ目、S-05 の版の書き方）。
+
+## 実機の確かめ（S-05）
+
+- 試しの SpecDock の直した後の版を `038b487f9` の wheel に入れ替え、試しの orca-web（8902）と直す前の版（18602）を、Orca の再起動に巻き込まれないよう新しいセッションに切り離して起動し直した（Orca の再起動で SIGTERM で止まっていた）。
+- Orca の再起動の後、iss-00602 の worktree のエージェントは1人（A）になった（orca-web の二重の数えの片方が消えた）。2人の場面には、CDP の Fetch で要約の iss-00602 の worktree に、ほかの worktree の本物のエージェントの項目を B として写して足した。
+- 結果（直す前 `16f0cf122` → 直した後 `038b487f9`）：
+  - 2'（欄の Map に人の選び A、概要のタブの間に A がいなくなる → A が戻る → 足の「新しいタブで開く」をエージェントのタブで開く）：直す前は足が `agent=A` のままで、**新しいタブで A が開いた**。直した後は足が A のいる間も戻った後も `agent=gone:A` で、新しいタブは iframe なし・`orca-agent-gone`。
+  - 1・2・4・5 は前と同じ結果（直す前は欠陥が出て、直した後は直る）。3（390px）は、構造が古いという知らせの帯が2つ出て選んだ箱が欄のシートの下に隠れたので、390×1200 で確かめた：直した後は印の2回目の押しで道が変わらずタブが agents、印の外の押しで詳しい画面。直す前は印の押しで詳しい画面に移った。
+- 記録：`.workbench/iss-00602/real/`（out-final、out-before2、out-r03-after、out-r03-before、checks.mjs）。
+
 ## Outcome
+
+- PR #604（https://github.com/chemitaro/spec-dock/pull/604）：5点の直しと文書（`80d5aba3f`）。統括が 2026-11-16 にマージ（`094772a9f`）。
+- PR #605（https://github.com/chemitaro/spec-dock/pull/605）：最終品質ゲートの P1 の直し（footChoice）、文書、known_old_sha256、origin/main の取り込み。head `e76974faa` = 最終品質ゲートの合格のコミット（記録のコミットなし）。CI：observable_ci PASS、merge_readiness READY（2026-11-16T09:44Z）。マージは統括。
 
 ## Verification
 
+- `spec-dock scope check iss-00602`：誤りなし、警告なし（S-01〜S-06 は done）。
+- `make lint` pass（手元、e76974faa）。全体の `uv run pytest` は PR #605 の CI で 3941 passed / 25 skipped（e76974faa）。手元の関わるテスト 95 passed。
+- 実機の確かめ（S-03・S-05）は上の節。
+
 ## Residual Risks / Follow-ups
+
+- ChatGPT の P2 FQG-00602-02（一部の worktree だけ形が違うときの誤った gone）。後の Issue の候補。
+- 本人が見る試しの URL（tailnet）：直した後 `http://<tailnet の IP>:18603/r/github.com/chemitaro/spec-dock/`、直す前 `:18602`、試しの orca-web `:8902`（送信は止めてある）。止め方：3つのプロセス（pid は scratchpad の `serve-038b487f9.pid`、`serve-16f0cf122.pid`、`orca-web/pid`）に SIGTERM。
+- 最終品質ゲートと仕様レビューの ChatGPT は、Chrome の許可待ちと、送信の後に回答が出ない（または空）ことで、たびたび取れなかった（Oracle の側の課題）。
