@@ -9,7 +9,7 @@ steps: {
 	"S-02": {title: "layout.js に D-01〜D-03 を実装し、全体・いまが今の組と同じ結果、これからが規則どおり、すべての組み合わせ（next を含む）で edgeAudit の違反0を通す（Green）", realizes: ["R-02", "R-03", "R-04", "R-05", "R-06"], status: "done", after: ["S-01"], session: "impl-sol"}
 	"S-03": {title: "prefs.js を版3にし（D-04）、版3・版2・版1・壊れた値の移し替えのテストを先に書いてから実装する。graph.js の loadPrefs・savePrefs を新しい形に合わせる（保存の鍵の文字は prefs.js だけ）", realizes: ["R-07", "F-02"], status: "done", after: ["S-02"], session: "impl-sol"}
 	"S-04": {title: "graph.js の道具の帯（D-05）、片付けの候補の印と凡例（D-06）、これからの知らせ（D-07）を実装し、graph.css を要るときだけ直す。帯・印・凡例・知らせの HTML を確かめるテストを足す", realizes: ["R-01", "R-02", "R-08", "R-09", "F-01", "F-03"], status: "done", after: ["S-03"], session: "impl-ui"}
-	"S-05": {title: "make lint と全体の pytest を通す（重い Mac では統括と相談のうえ CI の provider-ci を test lane の証拠にする）", realizes: ["R-01", "R-09"], status: "todo", after: ["S-04"], session: "impl-ui"}
+	"S-05": {title: "make lint と全体の pytest を通す（重い Mac では統括と相談のうえ CI の provider-ci を test lane の証拠にする）", realizes: ["R-01", "R-09"], status: "done", after: ["S-04"], session: "impl-ui"}
 	"S-06": {title: "spec-dock と housing-lifecycle の実データで、3つの範囲を 1440・390、明暗で写し、edgeAudit の違反0を report.md に残し、tailnet の試しの URL を立てる", realizes: ["R-09"], status: "todo", after: ["S-05"], session: "owner"}
 }
 
