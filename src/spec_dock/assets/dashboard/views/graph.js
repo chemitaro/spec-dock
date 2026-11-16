@@ -9,7 +9,7 @@ import * as api from "../core/api.js";
 import { DEFAULTS, index, routeLayout } from "./graph/layout.js";
 import { audit, svg as edgeSvg } from "./graph/router.js";
 import * as M from "./graph/marks.js";
-import { LEGACY_KEY, PREFS_KEY, restorePrefs } from "./graph/prefs.js";
+import { LEGACY_KEYS, PREFS_KEY, restorePrefs } from "./graph/prefs.js";
 import { createScopePanel } from "./_shared/panel.js";
 import { createOrcaWatch, paintOrcaMarks } from "./_shared/orca_marks.js";
 import { orcaSlot } from "./_shared/parts.js";
@@ -23,6 +23,13 @@ export function emptyText(data) {
   if (data.snapshot?.status !== "ok") return "構造のスナップショットがないか読めないため、図を描けません。上の知らせを見てください。";
   return "このリポジトリには、まだ Scope がありません。";
 }
+
+// The ranges of what is shown (iss-00603 D-05): value, label, icon and the short meaning in the title.
+const RANGES = [
+  ["all", "全体", "layers", "終わったものも、片付けの候補も出す"],
+  ["now", "いま", "clock", "開いている親の中の終わったものを灰色で出し、片付けの候補は畳む"],
+  ["next", "これから", "sparkle", "着手できる・作業中・止められている・不明だけを出す"],
+];
 
 // The board's lane order (Epic R-13): blocked, ready, doing, awaiting merge (needs fix, mergeable), unknown.
 const HL = [
@@ -61,7 +68,7 @@ const V = {
   lastTap: null,
 };
 
-// The saved choices (iss-00556 D-05): version 2, with only some of version 1 carried over (graph/prefs.js).
+// The saved choices (iss-00603 D-04): version 3, with what carries over from versions 2 and 1 (graph/prefs.js).
 function loadPrefs() {
   const read = (key) => {
     try {
@@ -71,14 +78,14 @@ function loadPrefs() {
       return null; // private windows, blocked storage and broken values: the defaults
     }
   };
-  const { opts, legend } = restorePrefs(read(PREFS_KEY), read(LEGACY_KEY), DEFAULTS);
+  const { opts, legend } = restorePrefs(read(PREFS_KEY), LEGACY_KEYS.map(read), DEFAULTS);
   Object.assign(V.opts, opts);
   V.legend = legend;
 }
 function savePrefs() {
   try {
-    const { mode, showDone, deps, fold } = V.opts; // the focus lives in the URL, not in the preferences
-    localStorage.setItem(PREFS_KEY, JSON.stringify({ mode, showDone, deps, fold, legend: V.legend }));
+    const { mode, range } = V.opts; // the focus lives in the URL, not in the preferences
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ mode, range, legend: V.legend }));
   } catch {
     // ignore
   }
@@ -107,7 +114,7 @@ function mount(root) {
   loadPrefs();
   root.innerHTML =
     `<section class="gx" aria-label="構造の図">` +
-    `<div class="gx-view" tabindex="0" aria-label="構造の図。ドラッグで移動、Ctrl とホイールか2本指で拡大・縮小"><div class="gx-world"></div></div>` +
+    `<div class="gx-view" tabindex="0" aria-label="構造の図。ドラッグで移動、Ctrl とホイールか2本指で拡大・縮小"><div class="gx-world"></div><p class="gx-none" hidden></p></div>` +
     `<div class="gx-bar"><div class="gx-left"><div class="gx-crumbs" hidden></div><div class="gx-next" role="group" aria-label="状態で目立たせる"></div></div><div class="gx-tools"></div></div>` +
     `<div class="legend"></div>` +
     `<aside class="panel" aria-hidden="true" aria-label="Scope の欄"></aside>` +
@@ -126,6 +133,7 @@ function mount(root) {
     legend: q(".legend"),
     panel: q(".panel"),
     empty: q(".gx-empty"),
+    none: q(".gx-none"),
   };
   V.pn = createScopePanel(V.el.panel, {
     onSelect: (id) => {
@@ -261,18 +269,23 @@ function maxOpenStage(parentId) {
 
 // --- The world: frames, boxes, folded groups, tree lines and dependency lines ---------------------------------
 
-function boxHtml(s, n) {
+// The cleanup candidate's mark (iss-00603 D-06): on frames in all and now, on boxes in all only, never in next.
+const clnMark = (s, cleanup) =>
+  cleanup.has(s.id) ? `<span class="cln" title="片付けの候補：${esc(cleanup.get(s.id).text)}" role="img" aria-label="片付けの候補">${ic("box")}</span>` : "";
+
+function boxHtml(s, n, cleanup, range) {
   const of = s.state !== "done" ? maxOpenStage(s.parent_id) : 1;
   const stg = of >= 2 ? M.stageMark(s.stage?.open, of) : "";
   const human = M.humanCount(s);
   const label = `${s.id} ${s.title}。${STATES[s.state]?.label ?? s.state}（${s.reason?.text ?? ""}）${s.downstream ? `。後に続く ${s.downstream}件` : ""}${human.count ? `。人のタスク ${human.count}件が止めている${human.descendants ? "（配下を含む）" : ""}` : ""}`;
   const frame = n.type === "tframe";
+  const cln = range === "all" ? clnMark(s, cleanup) : "";
   let marks;
   if (frame) {
     const { cnt, total } = tally(s.id);
-    marks = `<div class="gx-marks">${M.sbar(cnt, total, 64)}${M.frac(cnt, total)}${M.counts(cnt)}${M.asMark(s.assurance)}${M.hmMark(s)}${M.dnMark(s.downstream)}${orcaSlot(s.id, 2)}</div>`;
+    marks = `<div class="gx-marks">${M.sbar(cnt, total, 64)}${M.frac(cnt, total)}${M.counts(cnt)}${M.asMark(s.assurance)}${cln}${M.hmMark(s)}${M.dnMark(s.downstream)}${orcaSlot(s.id, 2)}</div>`;
   } else {
-    marks = `<div class="gx-marks">${M.asMark(s.assurance)}${M.prMark(s.pr)}${M.wtMark(s.state === "doing" ? s.branch : null)}${M.hmMark(s)}${M.dnMark(s.downstream)}${orcaSlot(s.id, 2)}</div>`;
+    marks = `<div class="gx-marks">${M.asMark(s.assurance)}${cln}${M.prMark(s.pr)}${M.wtMark(s.state === "doing" ? s.branch : null)}${M.hmMark(s)}${M.dnMark(s.downstream)}${orcaSlot(s.id, 2)}</div>`;
   }
   return (
     `<div class="gx-box${frame ? " is-frame" : ""}" data-id="${esc(s.id)}" data-st="${s.state}" role="button" tabindex="0" aria-label="${esc(label)}" style="${pos(n)}">` +
@@ -285,7 +298,7 @@ function boxHtml(s, n) {
   );
 }
 
-function frameHtml(s, n, cleanup) {
+function frameHtml(s, n, cleanup, range) {
   const { cnt, total } = tally(s.id);
   const ini = s.kind === "initiative";
   const head =
@@ -294,7 +307,7 @@ function frameHtml(s, n, cleanup) {
     `<span class="ds-docid">${esc(s.id)}</span><span class="gx-fttl" title="${esc(s.title)}">${esc(s.title)}</span>${orcaSlot(s.id, 3)}</div>`;
   const meta =
     `<div class="gx-fm">${M.sbar(cnt, total, ini ? 150 : 84)}${M.frac(cnt, total)}${M.counts(cnt)}${M.asMark(s.assurance)}` +
-    (cleanup.has(s.id) ? `<span class="cln" title="片付けの候補：${esc(cleanup.get(s.id).text)}" role="img" aria-label="片付けの候補">${ic("box")}</span>` : "") +
+    (range === "next" ? "" : clnMark(s, cleanup)) +
     `${M.hmMark(s)}${M.dnMark(s.downstream)}</div>`;
   return (
     `<section class="gx-frame ${ini ? "gx-ini" : "gx-epic"}${n.compact ? " is-compact" : ""}" data-id="${esc(s.id)}" data-st="${s.state}" style="${pos(n)}">` +
@@ -324,8 +337,9 @@ function buildWorld(focus) {
   V.EG = { ...r, ms: Math.round(performance.now() - t0) };
   const L = r.layout;
   const cleanup = cleanupOf();
-  const frames = L.nodes.filter((n) => n.type === "frame").map((n) => frameHtml(byId(n.id), n, cleanup));
-  const boxes = L.nodes.filter((n) => n.type !== "frame").map((n) => boxHtml(byId(n.id), n));
+  const range = L.opts.range;
+  const frames = L.nodes.filter((n) => n.type === "frame").map((n) => frameHtml(byId(n.id), n, cleanup, range));
+  const boxes = L.nodes.filter((n) => n.type !== "frame").map((n) => boxHtml(byId(n.id), n, cleanup, range));
   const chips = L.groups.map(chipHtml);
   const trunks = L.trunks
     .map((t) =>
@@ -338,6 +352,11 @@ function buildWorld(focus) {
   w.style.width = `${L.width}px`;
   w.style.height = `${L.height}px`;
   w.dataset.mode = L.opts.mode;
+  w.dataset.range = range;
+  // D-07: next with nothing to show says so inside the graph area; the toolbar stays to change the range
+  const none = range === "next" && !L.nodes.length;
+  V.el.none.hidden = !none;
+  V.el.none.textContent = none ? "これから進める Scope はありません。全体で、終わったものを見られます。" : "";
   w.innerHTML =
     (trunks ? `<svg class="gx-tree" width="${L.width}" height="${L.height}" aria-hidden="true">${trunks}</svg>` : "") +
     frames.join("") +
@@ -468,23 +487,15 @@ function renderBar(focus) {
     `<span class="nx-grp" role="group" aria-label="マージ待ち"><span class="nx-grp__lab">${ic("branch")}<span class="lab">マージ待ち</span></span>${chipBtn(HL[3], ic("zap"))}${chipBtn(HL[4], ic("check"))}</span>` +
     (n.unknown ? chipBtn(HL[5]) : "");
   const o = V.opts;
-  const tool = (act, label, icon, pressed, extra = "") =>
-    `<button type="button" class="tool" data-act="${act}"${pressed == null ? "" : ` aria-pressed="${pressed}"`} aria-label="${label}" title="${label}"${extra}>${ic(icon)}<span class="lab">${label}</span></button>`;
+  const tool = (act, label, icon, pressed, extra = "", name = label) =>
+    `<button type="button" class="tool" data-act="${act}"${pressed == null ? "" : ` aria-pressed="${pressed}"`} aria-label="${name}" title="${name}"${extra}>${ic(icon)}<span class="lab">${label}</span></button>`;
   V.el.tools.innerHTML =
     `<span class="tool-group"><button type="button" class="tool is-icon" data-act="zout" aria-label="縮小">${ic("minus")}</button><button type="button" class="tool zoomval" data-act="z100" title="100% に戻す">${Math.round(V.s * 100)}%</button><button type="button" class="tool is-icon" data-act="zin" aria-label="拡大">${ic("plus")}</button></span>` +
-    tool("fit", "全体", "fit") +
+    tool("fit", "収める", "fit", null, "", "画面に収める") +
     tool("mode", o.mode === "tree" ? "木" : "入れ子", o.mode === "tree" ? "tree" : "nest", null, ` data-mode="${o.mode}"`) +
-    tool("done", "終わったものも", "checkCircle", o.showDone) +
-    `<span class="tool-group" role="group" aria-label="依存の線">` +
-    [
-      ["wait", "待っている線"],
-      ["all", "すべての線"],
-      ["none", "線なし"],
-    ]
-      .map(([v, label]) => `<button type="button" class="tool" data-act="deps" data-deps="${v}" aria-pressed="${o.deps === v}" title="依存の線：${label}">${v === "none" ? ic("x") : ic("arrowRight")}<span class="lab">${label}</span></button>`)
-      .join("") +
-    `</span>` +
-    (o.mode === "nest" ? tool("fold", "片付けの候補を畳む", "box", o.fold) : "");
+    `<span class="tool-group" role="group" aria-label="見せる範囲">` +
+    RANGES.map(([v, label, icon, title]) => `<button type="button" class="tool" data-act="range" data-range="${v}" aria-pressed="${o.range === v}" title="見せる範囲：${label}（${title}）">${ic(icon)}<span class="lab">${label}</span></button>`).join("") +
+    `</span>`;
   if (focus && byId(focus)) {
     const chain = V.ix.ancestors(focus).slice().reverse();
     V.el.crumbs.hidden = false;
@@ -506,7 +517,7 @@ function renderLegend() {
     `<div class="lg-grp"><h4>PR と CI</h4><ul>${li(`<span class="pr" data-pr="open">${ic("branch")}</span>`, "開いている")}${li(`<span class="pr" data-pr="draft">${ic("branch")}</span>`, "下書き")}${li(`<span class="pr" data-pr="merged">${ic("merge")}</span>`, "マージ済み")}${li(`<span class="pr" data-pr="closed">${ic("prClosed")}</span>`, "閉じた")}` +
     `${li('<span class="ci" data-ci="success"></span>', "CI 成功")}${li('<span class="ci" data-ci="failure"></span>', "CI 失敗")}${li('<span class="ci" data-ci="running"></span>', "CI 実行中")}${li(`<span class="mg" data-mg="ok">${ic("check")}</span>`, "マージできる")}${li(`<span class="mg" data-mg="conflict">${ic("zap")}</span>`, "衝突")}</ul></div>` +
     `<div class="lg-grp"><h4>保証</h4><ul>${M.AS_LEVELS.map((l) => li(M.asMark(l), l)).join("")}</ul></div>` +
-    `<div class="lg-grp"><h4>そのほか</h4><ul>${li('<span class="lg-chg"></span>', "前回から変化")}${li(`<span class="wt">${ic("folder")}</span>`, "worktree あり")}${li('<span class="stg">2</span>', "進める段")}${li(`<span class="dn">${ic("down")}3</span>`, "後に続く数")}${li(`<span class="hm">${ic("person")}人 2</span>`, "人のタスクが止めている数（枠は配下も）")}${li(`<span class="cln">${ic("box")}</span>`, "片付けの候補")}${li('<span class="lg-line"></span>', "待っている依存", 1)}${li('<span class="lg-line is-done"></span>', "終わった依存", 1)}${li('<span class="lg-tree"></span>', "親子（木）", 1)}</ul></div>` +
+    `<div class="lg-grp"><h4>そのほか</h4><ul>${li('<span class="lg-chg"></span>', "前回から変化")}${li(`<span class="wt">${ic("folder")}</span>`, "worktree あり")}${li('<span class="stg">2</span>', "進める段")}${li(`<span class="dn">${ic("down")}3</span>`, "後に続く数")}${li(`<span class="hm">${ic("person")}人 2</span>`, "人のタスクが止めている数（枠は配下も）")}${li(`<span class="cln">${ic("box")}</span>`, "片付けの候補（全体では箱と枠に印、いまでは畳んで1つに、これからでは出さない）", 1)}${li('<span class="lg-line"></span>', "待っている依存", 1)}${li('<span class="lg-line is-done"></span>', "終わった依存", 1)}${li('<span class="lg-tree"></span>', "親子（木）", 1)}</ul></div>` +
     `<div class="lg-grp"><h4>箱を選んだとき</h4><ul>${li('<span class="lg-box is-sel"></span>', "選んだ箱（1つだけ）")}${li('<span class="lg-line is-p1"></span>', "直接の依存", 1)}${li('<span class="lg-line is-p2"></span>', "間接（2段目より先）", 1)}${li('<span class="lg-line is-off"></span><span class="lg-box is-off"></span>', "関係ない")}${li(`<span class="rt lg-rt">${ic("target")}大もと</span>`, "大もとの待ち先")}${li(ic("arrowRight"), "矢印：選んだ箱へ入る線＝待ち先、出る線＝後に続く", 1)}</ul></div>` +
     `</div>`;
 }
@@ -583,9 +594,7 @@ function onClick(event) {
     else if (a === "unfocus") setFocus(null);
     else {
       if (a === "mode") o.mode = o.mode === "tree" ? "nest" : "tree";
-      else if (a === "done") o.showDone = !o.showDone;
-      else if (a === "deps") o.deps = act.dataset.deps;
-      else if (a === "fold") o.fold = !o.fold;
+      else if (a === "range") o.range = act.dataset.range;
       else return;
       savePrefs();
       render(V.root, V.ctx);
