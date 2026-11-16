@@ -37,6 +37,8 @@ ID: "iss-00624"
 - S-03（実装担当、`b3135a3a6`）：`tests/integration/test_issue413_native_lock.py` を単独で50回続けて走らせ、**50/50 通過**。`make lint` 合格。全体の `uv run pytest` を2回、**どちらも 4011 passed / 7 skipped、失敗0**。
 - 最終品質ゲート（quality-gate-reviewer opus / medium、second opinion なし、範囲 `7f7dd2b1d..0c1b66182`、観点 functional-correctness・requirements-closure・test-adequacy）：attempt 01（`0c1b66182`、origin/main の #625 を取り込んだ後）で**合格**。review lane は P0〜P2 0、P3 1（この記録の欠け。ここで反映した）、coverage complete。test lane は `make lint` exit 0、`uv run pytest` exit 0（4014 passed / 7 skipped）。closure `.workbench/final-quality-gate/iss-00624-fqg-1/closure.md`（worktree `/Volumes/990p2t/workspace/worktrees/orca/spec-dock/iss-00624`）。
 
+- PR https://github.com/chemitaro/spec-dock/pull/626（head `0c1b66182`）。CI は observable_ci PASS、merge_readiness READY。マージは統括が行う。
+
 ## Residual Risks / Follow-ups
 
 - 同じ形（fixture の commit の後に `.git` を走査する）で、maintenance を止めていないテストは、`rg` で見た範囲では `tests/unit/application/test_dashboard_scope_details.py` が候補（走査の対象が `.git` かは確かめていない）。この Issue の範囲外。
