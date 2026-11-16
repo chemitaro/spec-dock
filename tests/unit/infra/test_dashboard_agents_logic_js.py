@@ -271,6 +271,27 @@ def test_last_choice_of_the_memory(tmp_path: Path) -> None:  # iss-00602 T-03
 
 
 @node
+def test_foot_choice_of_the_panel_map_and_the_memory(tmp_path: Path) -> None:  # iss-00602 T-03 footChoice
+    run_node(
+        """
+        const mem = logic.createAgentMemory();
+        logic.memoryFor(mem, "iss-00001");
+        logic.noteShown(mem, "a");
+        assert.equal(logic.footChoice(mem, "iss-00001", null), "a"); // no Map: the same as lastChoice
+        assert.equal(logic.footChoice(mem, "iss-00002", null), null);
+        logic.noteGone(mem, "a");
+        assert.equal(logic.footChoice(mem, "iss-00001", null), logic.lastChoice(mem, "iss-00001"));
+        assert.equal(logic.footChoice(mem, "iss-00001", null), "gone:a");
+        assert.equal(logic.footChoice(mem, "iss-00001", "gone:x"), "gone:x"); // a gone:<id> in the Map stays
+        assert.equal(logic.footChoice(mem, "iss-00001", "a"), "gone:a"); // the memory knows a went away (F-01)
+        assert.equal(logic.footChoice(mem, "iss-00002", "a"), "a"); // another Scope's memory is never used (F-02)
+        assert.equal(logic.footChoice(mem, "iss-00001", "b"), "b"); // b has not gone away
+        """,
+        tmp_path,
+    )
+
+
+@node
 def test_agent_frame_and_sandbox(tmp_path: Path) -> None:  # T-03
     run_node(
         f"""

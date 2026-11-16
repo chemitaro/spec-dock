@@ -11,7 +11,7 @@ import { createOpenButton, paintOrcaMarks } from "./orca_marks.js";
 import { nextOnTap, pickTab, settleSheet, sheetHeights } from "./panel_logic.js";
 import { panelEnv, SCOPE_TABS, TAB_KEYS, visibleTabs } from "./scope_tabs.js";
 import { mem, paintAgentList } from "./agents_tab.js";
-import { lastChoice } from "./agents_logic.js";
+import { footChoice } from "./agents_logic.js";
 
 const plainClick = (event) => event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
 const PHONE = 640;
@@ -165,8 +165,9 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
     if (env && tab === "agents") paintAgentList(parts.body, env, { redraw });
     // The detail screen and the new tab carry the panel's agent choice (an id or gone:<id>) like the tabs' links do,
     // so a lost agent does not open the one left by itself on the new page (iss-00593 R-05, FQG attempt 2). Without
-    // one, they carry this Scope's memory, whichever tab shows (iss-00602 D-03).
-    const agent = params.get("agent") ?? lastChoice(mem, scope.id);
+    // one, they carry this Scope's memory, whichever tab shows; a Map id the memory knows went away is gone:<id>
+    // (iss-00602 D-03).
+    const agent = footChoice(mem, scope.id, params.get("agent") ?? null);
     const detail = withParam(withParam(withoutEmbed(scope.path), "agent", agent), "tab", tab ?? "summary");
     parts.foot.innerHTML =
       `<a class="ds-btn is-primary" data-nav href="${esc(ctx.href(detail))}" aria-label="詳しい画面" title="詳しい画面">${icon("arrowRight")}詳しい画面</a>` +

@@ -76,7 +76,9 @@ def test_the_reference_explains_the_choice_fixes_of_issue_602() -> None:
     assert "その Scope で最後に開いた相手を開いたときも、その相手を問い合わせ（横の欄では欄の中）に書く" in agents
     assert "帯の今の相手を押しても枠は読み込み直されません" in agents
     assert "横の欄の足の「詳しい画面」と「新しいタブで開く」は、欄の今の選びを、なければ同じ Scope の覚え" in agents
-    assert "いなくなっていれば`gone:<id>`" in agents and "欄がどのタブを見ていても" in agents
+    assert "欄がどのタブを見ていても" in agents
+    assert "どちらも、その相手がいなくなったと画面が知っていれば`gone:<id>`として持つ" in agents
+    assert "その相手が戻った後に新しいタブで開いても開きません" in agents
     assert "修飾キー（Ctrl・Cmd・Shift・Alt）つきの押しで新しいタブに開くときは、元の画面の覚えを変えません" in agents
     shape = next(line for line in agents.splitlines() if line.startswith("| `orca-shape` |"))
     assert "worktree の`agents`が並びでないときも、形の違う1件に数える" in shape
@@ -87,3 +89,11 @@ def test_the_inventory_accepts_the_reference_of_the_last_release() -> None:
     entry = entries["spec-dock/docs/reference_cli.md"]
     released = "6b8066f2ad598b16f243307be2073f424ace27167b718de770ba804d44c5c4a8"  # v0.9.3
     assert released in entry["known_old_sha256"] and entry["sha256"] != released
+
+
+def test_the_inventory_accepts_the_reference_merged_to_main_by_pr_604() -> None:
+    """iss-00602 FQG-2 FQG-001: the main state after PR #604 (094772a9f) stays a known old reference."""
+    entries = {e["path"]: e for e in json.loads((ASSETS / "static-inventory.json").read_text())["files"]}
+    entry = entries["spec-dock/docs/reference_cli.md"]
+    merged = "256c60a89c415df09fc72f82a4cfa6fc4756c05bbff9b836d1f1dffd99762f52"
+    assert merged in entry["known_old_sha256"] and entry["sha256"] != merged
