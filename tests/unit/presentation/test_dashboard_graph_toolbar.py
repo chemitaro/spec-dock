@@ -242,7 +242,16 @@ def test_the_toolbar_has_no_line_choice_and_ends_with_the_range_group(shots: dic
         assert 'data-act="deps"' not in tools and 'aria-label="依存の線"' not in tools
         for word in ("待っている線", "すべての線", "線なし"):
             assert word not in tools
-        assert re.findall(r'data-act="([^"]+)"', tools) == ["zout", "z100", "zin", "fit", "mode", "range", "range", "range"]
+        assert re.findall(r'data-act="([^"]+)"', tools) == [
+            "zout",
+            "z100",
+            "zin",
+            "fit",
+            "mode",
+            "range",
+            "range",
+            "range",
+        ]
         assert tools.count('class="tool-group"') == 2
         legend = shot["legend"]
         for line in ("待っている依存", "終わった依存", "親子（木）", "直接の依存", "間接（2段目より先）", "関係ない"):
