@@ -31,6 +31,11 @@ def _environment(tmp_path: Path) -> dict[str, str]:
         "GIT_CONFIG_NOSYSTEM": "1",
         "GIT_CONFIG_GLOBAL": os.devnull,
         "GIT_TERMINAL_PROMPT": "0",
+        "GIT_CONFIG_COUNT": "2",
+        "GIT_CONFIG_KEY_0": "maintenance.auto",
+        "GIT_CONFIG_VALUE_0": "false",
+        "GIT_CONFIG_KEY_1": "gc.auto",
+        "GIT_CONFIG_VALUE_1": "0",
     })
     return environment
 
