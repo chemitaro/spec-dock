@@ -15,6 +15,8 @@ ID: "iss-00603"
 - 仕様のレビュー round-1（spec-reviewer opus / high）：合格（P0・P1 なし、P2 2・P3 2）。`.workbench/spec-review/iss-00603/round-1.json`（worktree `/Volumes/990p2t/workspace/worktrees/orca/spec-dock/iss-00603`）。P2 1件（テストの抜け）と P3 2件を反映（`review-response.md`）。
 - round-2（同じレビュアー）：**合格**。P0・P1 なし、P2 1（凡例の文と木のいま・入れ子の b の枠の食い違い。凡例の文は統括の決定 msg_237502e135aa どおりなので記録だけ。次の提案に回す）。結果 `round-2.json`、検査 `round-2.check.json`（valid、status pass）。
 - 合格した文書の sha256：requirement.cue `01b97b1821ba14484808a3e220a48ed6e84567a13b990ec4c1dea31038c3bcc4`、design.cue `76171726cd81868d2be1ead5a7d8b01b2248683a4eab72ddd053dceae67f650b`、plan.cue `887fcbfb7689731dd7abf92fcd0de3f32c54bcf272fe5b2a815f6bceda9b2fe1`。
+- 逸脱 codex-symlink-refusal（タスク担当の記録）：impl-sol（codex gpt-6.1-sol / medium、dispatch ctx_f14e1d68e729）は、手元のコマンドの実行の前に chat-scratch の writable root の symlink による UnsupportedOperation で止まり、変更なしで failed を返した。plan の rationale と統括の了承どおり、待たずに Claude Opus 5.5 / medium（dispatch ctx_bdbc48a1d80d、launch.effective claude / claude-opus-5-5 / medium）に切り替えた。
+- CP-1（code-reviewer opus / medium、範囲 `16f0cf122..63bda08e3`、S-01〜S-03、axis both）：**合格**。P0〜P2 なし、P3 1（T-03 の合成の構造に止められている c がない）。結果 `.workbench/code-review/iss-00603/cp1-round-1.json`、検査 `cp1-round-1.check.json`（valid、status pass）。P3 は S-04 の担当にあわせて足してもらう。タスク担当が手元で構造の図のテスト 56 passed を確かめた。
 
 ## 実装の記録（impl-sol の代わり：Claude Opus 5.5 / medium）
 
