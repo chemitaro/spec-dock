@@ -15,6 +15,9 @@ ID: "iss-00614"
 - 仕様のレビュー（spec-reviewer opus / high、standard、同じレビュアー）：round-1 不合格（P1 1、P2 5、P3 1）→ 直した（`review-response.md`）。round-2 合格（P2 1、P3 1）→ 実装担当が迷わないよう直した。round-3 **合格**（P0〜P3 すべて0）。結果 `.workbench/spec-review/iss-00614/round-{1,2,3}.json` と `.check.json`（worktree `/Volumes/990p2t/workspace/worktrees/orca/spec-dock/iss-00614`、reviewed_sha `7f7dd2b1d`）。
 - **合格した文書の sha256**：requirement.cue `dcc616ab1dab8dd63ccba859040a815b6c183afe69efda784e9a61f40325e686`、design.cue `92f81b4fe6a2d90107880f1b831d4b68a9f4cd3917aa4b6dc1bf1e60fbb7723b`、plan.cue `a97e7572f502e6cdfe8689e632ddc5decac2b14f08fd1ded19558f724717b168`。
 
+- 仕様の変更1（実装の後、統括の決定 msg_df4ba7148ea7、2026-11-17）：R-07 の線の検査の受入を「各リポジトリ単体の構造の図と同じ違反の数、新しい違反0」に改め（違反そのものは iss-00627）、D-07 で allgraph の拡大の下限だけを 0.02 から下げた。round-4（同じレビュアー、reviewed_sha `23e32e182`）：**合格**（P0・P1 なし、P2 1：Epic の R-08 の受入と D-07 の下限の式が変更前のまま、iss-00627 が Epic の slice にない、Issue の R-07 の本文の「同じ式」と下限の変更の記録が decisions にない。Epic の文書は統括の持ち場なので報告に回した）。
+- **改めて合格した文書の sha256**：requirement.cue `8da8ae0cf746ddee356eefcf87ce0b8e2eac9061ddd05802b625be0713094312`、design.cue `1c6d1f97854a790277c46a0c5f539a0b3c618dc847ddd5c15d41ed3431ec28e3`、plan.cue `39467c2f0aa38e0aa37ed3095195dceb01c6f619fe13d6b5a0662cb0712bff17`。
+
 ## 実装の記録
 
 - 逸脱 codex-symlink-refusal：impl-sol（codex gpt-6.1-sol / medium、dispatch ctx_508f1a4c0a45、launch codex / gpt-6.1-sol / medium）は chat-scratch の writable root の symlink で手元のコマンドを起動できず、変更なしで止まった。plan の rationale と統括の了承どおり Claude Opus 5.5 / medium（dispatch ctx_3898535b8e3c、launch claude / opus / medium）に切り替え、impl-claude と同じ値なので S-01〜S-05 を1つのセッションにまとめた。
