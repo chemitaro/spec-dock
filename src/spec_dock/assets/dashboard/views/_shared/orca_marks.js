@@ -8,8 +8,9 @@ export function paintOrcaMarks(root, ctx, structure) {
   const module = ctx.orca?.marks();
   for (const slot of root.querySelectorAll("[data-orca-scope]")) {
     try {
-      const max = Number(slot.dataset.orcaMax);
       const worktree = slotWorktree(ctx.orca, structure, slot.dataset.orcaScope);
+      // iss-00620: "all" (the structure graph) draws every agent, so the component never folds them into "+N"
+      const max = slot.dataset.orcaMax === "all" ? Math.max(1, Array.isArray(worktree?.agents) ? worktree.agents.length : 0) : Number(slot.dataset.orcaMax);
       const built = worktree && module ? module.buildMarks(worktree, { now, max }) : null;
       const key = marksKey(built);
       if (painted.get(slot) === key) continue;

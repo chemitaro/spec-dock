@@ -6,7 +6,7 @@
 // The model decides every state, order, stage and path (#528, through the structure and scope APIs). This module
 // only places (graph/layout.js), routes (graph/router.js) and draws.
 import * as api from "../core/api.js";
-import { DEFAULTS, index, routeLayout } from "./graph/layout.js";
+import { DEFAULTS, index, nodeMarkRows, routeLayout } from "./graph/layout.js";
 import { audit, svg as edgeSvg } from "./graph/router.js";
 import * as M from "./graph/marks.js";
 import { LEGACY_KEYS, PREFS_KEY, restorePrefs } from "./graph/prefs.js";
@@ -66,6 +66,11 @@ const V = {
   ix: null,
   desc: null,
   lastTap: null,
+  marks: {}, // iss-00620: the agents' marks last measured, {Scope id: {items, gap}}, passed to the layout
+  rowsRedo: 0, // the lay-outs checkRows asked for since the last news or render of another cause (F-03)
+  fromRows: false, // the render running was called by checkRows
+  ro: null, // the ResizeObserver of the world's mark slots
+  rowsRaf: 0,
 };
 
 // The saved choices (iss-00603 D-04): version 3, with what carries over from versions 2 and 1 (graph/prefs.js).
@@ -105,8 +110,64 @@ function paintOrca() {
   if (!V.el || !V.ctx || !V.data) return;
   paintOrcaMarks(V.el.world, V.ctx, V.data);
   V.pn?.refreshOrca();
+  checkRows();
 }
-const orcaWatch = createOrcaWatch(paintOrca);
+// The reader's news (every summary) starts the count of the lay-outs again that the rows of agents asked for.
+function onOrcaNews() {
+  V.rowsRedo = 0;
+  paintOrca();
+}
+const orcaWatch = createOrcaWatch(onOrcaNews);
+
+// --- The rows of agents (iss-00620) ----------------------------------------------------------------------------
+
+// The widths of the agents' marks drawn in each box and frame, {Scope id: {items, gap}} at 100% zoom, or null when they
+// cannot be measured (the graph is hidden, a mark has no width, the component's CSS does not apply yet: F-02).
+function measureMarks(world) {
+  const view = V.el?.view;
+  if (!world || !view || view.hidden || !view.clientWidth) return null;
+  const px = (el) => Math.ceil((el.getBoundingClientRect().width / V.s) * 10) / 10;
+  const out = {};
+  for (const slot of world.querySelectorAll("[data-orca-scope]")) {
+    const marks = [...slot.querySelectorAll(".orca-mark")];
+    if (!marks.length) continue;
+    const list = slot.querySelector(".orca-marks");
+    const style = list ? getComputedStyle(list) : null;
+    if (!style || style.flexWrap !== "wrap") return null;
+    const items = marks.map(px);
+    if (items.some((w) => !(w > 0))) return null;
+    out[slot.dataset.orcaScope] = { items, gap: parseFloat(style.columnGap) || 0 };
+  }
+  return out;
+}
+
+// After the marks are drawn: lay out again only when a box's or frame's rows of agents differ from the layout's (R-06),
+// keeping the zoom, the position and the selection; at most twice per news or render (F-03).
+function checkRows() {
+  if (!V.el || !V.EG || !V.data || !V.ctx) return;
+  const M = measureMarks(V.el.world);
+  if (!M) return;
+  const differ = V.EG.layout.nodes.some((n) => ["box", "tframe", "frame"].includes(n.type) && nodeMarkRows(n, M[n.id]) !== (n.rows ?? 1));
+  V.marks = M;
+  if (!differ || V.rowsRedo >= 2) return;
+  V.rowsRedo++;
+  V.sig = null;
+  V.fromRows = true;
+  try {
+    render(V.root, V.ctx);
+  } finally {
+    V.fromRows = false;
+  }
+}
+
+// The component's CSS or font can apply after the marks are drawn: a slot that changes size checks the rows once a frame.
+function onMarksResize() {
+  if (V.rowsRaf) return;
+  V.rowsRaf = requestAnimationFrame(() => {
+    V.rowsRaf = 0;
+    checkRows();
+  });
+}
 
 // --- Shell DOM ---------------------------------------------------------------------------------------------
 
@@ -154,6 +215,10 @@ function dispose() {
   document.removeEventListener("keydown", onKey);
   for (const type of ["gesturestart", "gesturechange", "gestureend"]) document.removeEventListener(type, stopGesture, { passive: false });
   window.removeEventListener("resize", onResize);
+  V.ro?.disconnect();
+  V.ro = null;
+  if (V.rowsRaf) cancelAnimationFrame(V.rowsRaf);
+  V.rowsRaf = 0;
   if (window.specdockEdgeAudit === edgeAudit) delete window.specdockEdgeAudit;
   V.token++; // an answer of the scope API that arrives after leaving the screen is dropped
   V.root = null;
@@ -179,6 +244,7 @@ function stopGesture(event) {
 function render(root, ctx) {
   if (V.root !== root || !root.querySelector(".gx")) mount(root);
   V.ctx = ctx;
+  if (!V.fromRows) V.rowsRedo = 0;
   orcaWatch.follow(ctx.orca);
   window.specdockEdgeAudit = edgeAudit;
   const data = ctx.data;
@@ -283,9 +349,9 @@ function boxHtml(s, n, cleanup, range) {
   let marks;
   if (frame) {
     const { cnt, total } = tally(s.id);
-    marks = `<div class="gx-marks">${M.sbar(cnt, total, 64)}${M.frac(cnt, total)}${M.counts(cnt)}${M.asMark(s.assurance)}${cln}${M.hmMark(s)}${M.dnMark(s.downstream)}${orcaSlot(s.id, 2)}</div>`;
+    marks = `<div class="gx-marks">${M.sbar(cnt, total, 64)}${M.frac(cnt, total)}${M.counts(cnt)}${M.asMark(s.assurance)}${cln}${M.hmMark(s)}${M.dnMark(s.downstream)}</div>`;
   } else {
-    marks = `<div class="gx-marks">${M.asMark(s.assurance)}${cln}${M.prMark(s.pr)}${M.wtMark(s.state === "doing" ? s.branch : null)}${M.hmMark(s)}${M.dnMark(s.downstream)}${orcaSlot(s.id, 2)}</div>`;
+    marks = `<div class="gx-marks">${M.asMark(s.assurance)}${cln}${M.prMark(s.pr)}${M.wtMark(s.state === "doing" ? s.branch : null)}${M.hmMark(s)}${M.dnMark(s.downstream)}</div>`;
   }
   return (
     `<div class="gx-box${frame ? " is-frame" : ""}" data-id="${esc(s.id)}" data-st="${s.state}" role="button" tabindex="0" aria-label="${esc(label)}" style="${pos(n)}">` +
@@ -294,6 +360,7 @@ function boxHtml(s, n, cleanup, range) {
     `<div class="gx-r1">${M.stateMark(s, V.ix.byId, { motion: true })}<span class="gx-id">${esc(s.id)}</span><span class="gx-no">#${s.number}</span>${stg}</div>` +
     `<div class="gx-ttl${frame ? " is-one" : ""}" title="${esc(s.title)}">${esc(s.title)}</div>` +
     marks +
+    `<div class="gx-agents">${orcaSlot(s.id, "all")}</div>` +
     `</div>`
   );
 }
@@ -304,7 +371,7 @@ function frameHtml(s, n, cleanup, range) {
   const head =
     `<div class="gx-fh" data-id="${esc(s.id)}" role="button" tabindex="0" aria-label="${esc(`${s.id} ${s.title}。${STATES[s.state]?.label ?? s.state}`)}">${M.stateMark(s, V.ix.byId, { motion: true })}` +
     (ini ? `<span class="gx-kicker">Initiative</span>` : "") +
-    `<span class="ds-docid">${esc(s.id)}</span><span class="gx-fttl" title="${esc(s.title)}">${esc(s.title)}</span>${orcaSlot(s.id, 3)}</div>`;
+    `<span class="ds-docid">${esc(s.id)}</span><span class="gx-fttl" title="${esc(s.title)}">${esc(s.title)}</span><div class="gx-agents">${orcaSlot(s.id, "all")}</div></div>`;
   const meta =
     `<div class="gx-fm">${M.sbar(cnt, total, ini ? 150 : 84)}${M.frac(cnt, total)}${M.counts(cnt)}${M.asMark(s.assurance)}` +
     (range === "next" ? "" : clnMark(s, cleanup)) +
@@ -333,7 +400,7 @@ function buildWorld(focus) {
   const t0 = performance.now();
   V.width = seenWidth();
   V.height = seenHeight();
-  const r = routeLayout(V.data.scopes, V.data.cleanup, { ...V.opts, focus, width: V.width, height: V.height });
+  const r = routeLayout(V.data.scopes, V.data.cleanup, { ...V.opts, focus, width: V.width, height: V.height, marks: V.marks });
   V.EG = { ...r, ms: Math.round(performance.now() - t0) };
   const L = r.layout;
   const cleanup = cleanupOf();
@@ -363,6 +430,12 @@ function buildWorld(focus) {
     boxes.join("") +
     chips.join("") +
     `<svg class="gx-edges" width="${L.width}" height="${L.height}" aria-hidden="true"></svg>`;
+  // the slots of this world are the ones whose size changes check the rows of agents
+  if (!V.ro && typeof ResizeObserver === "function") V.ro = new ResizeObserver(onMarksResize);
+  if (V.ro) {
+    V.ro.disconnect();
+    for (const slot of w.querySelectorAll(".sd-orca")) V.ro.observe(slot);
+  }
 }
 
 // --- Highlights: state chips and the selected path ---------------------------------------------------------
@@ -908,6 +981,16 @@ export function edgeAudit(options = {}) {
     options,
   );
   const drift = Math.max(0, ...G.obs.map((o, i) => (o.lane ? 0 : Math.max(Math.abs(o.x1 - obs[i].x1), Math.abs(o.y1 - obs[i].y1), Math.abs(o.x2 - obs[i].x2)))));
+  // iss-00620: the boxes and frames with an agent's mark past their inner right edge or their bottom edge (0.5px allowed)
+  let markOverflow = 0;
+  for (const el of V.el.world.querySelectorAll(".gx-box, .gx-frame")) {
+    const marks = el.querySelectorAll(".orca-mark");
+    if (!marks.length) continue;
+    const r = rect(el);
+    const cs = getComputedStyle(el);
+    const right = r.x2 - (parseFloat(cs.borderRightWidth) || 0) - (parseFloat(cs.paddingRight) || 0);
+    if ([...marks].some((m) => rect(m).x2 > right + 0.5 || rect(m).y2 > r.y2 + 0.5)) markOverflow++;
+  }
   return {
     ...res,
     edges: routes.length,
@@ -917,6 +1000,7 @@ export function edgeAudit(options = {}) {
     widenLeft: V.EG.widen.length,
     missing: obs.filter((o) => o.missing).length,
     drift: Math.round(drift * 10) / 10,
+    markOverflow,
     mode: V.opts.mode,
   };
 }

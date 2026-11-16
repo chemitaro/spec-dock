@@ -2,17 +2,27 @@
 //   node dashboard_graph_check.mjs <assets/dashboard directory> <request.json>
 // request.json = {documents: {name: structure API document}, checks: ["audit", "layout", "order", "series", "passages"]}
 // Prints one JSON object with the results; the Python test asserts on it.
+// iss-00620: request.marks = {document: {Scope id: {lead, items, gap}}} is passed to every audit combination as the
+// options' marks; request.markRows = [[m, avail], …] returns markRows of each; a layout's nodes carry rows only when the
+// layout set it, and request.nodeRows = {document: [layout key, …]} returns, for those layouts,
+// nodeMarkRows(node, marks[id]) beside node.rows ?? 1 for every box, tframe and frame.
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import path from "node:path";
 
 const [assets, requestPath] = process.argv.slice(2);
 const load = (rel) => import(pathToFileURL(path.join(assets, rel)).href);
-const { layout, routeLayout, graphInput, index, byActivity } = await load("views/graph/layout.js");
+const layoutModule = await load("views/graph/layout.js");
+const { layout, routeLayout, graphInput, index, byActivity } = layoutModule;
 const { audit } = await load("views/graph/router.js");
 const series = await load("views/timeline/series.js");
 const request = JSON.parse(readFileSync(requestPath, "utf8"));
 const out = { audit: [], layout: {}, series: {}, order: {} };
+if (request.markRows) {
+  const { markRows } = layoutModule;
+  out.markRows = typeof markRows === "function" ? request.markRows.map(([m, avail]) => markRows(m, avail)) : null;
+  out.markConsts = { MARK_ROW: layoutModule.MARK_ROW ?? null, MARK_INSET: layoutModule.MARK_INSET ?? null };
+}
 if (request.prefs) {
   const { restorePrefs } = await load("views/graph/prefs.js");
   const { DEFAULTS } = await load("views/graph/layout.js");
@@ -63,7 +73,8 @@ function check(name, doc, opts) {
 }
 
 if (request.checks.includes("audit")) {
-  for (const [name, doc] of Object.entries(request.documents)) for (const opts of combos(doc)) out.audit.push(check(name, doc, opts));
+  for (const [name, doc] of Object.entries(request.documents))
+    for (const opts of combos(doc)) out.audit.push(check(name, doc, request.marks?.[name] ? { ...opts, marks: request.marks[name] } : opts));
 }
 
 if (request.checks.includes("layout")) {
@@ -74,7 +85,10 @@ if (request.checks.includes("layout")) {
         ? routeLayout(doc.scopes, doc.cleanup, opts).layout
         : layout(doc.scopes, doc.cleanup, opts, request.gaps?.[name]?.[key] || {});
       result[key] = {
-        nodes: L.nodes.map((n) => ({ id: n.id, type: n.type, x1: n.x1, y1: n.y1, x2: n.x2, y2: n.y2, path: n.path })),
+        nodes: L.nodes.map((n) => ({
+          id: n.id, type: n.type, x1: n.x1, y1: n.y1, x2: n.x2, y2: n.y2, path: n.path,
+          ...("rows" in n ? { rows: n.rows } : {}),
+        })),
         groups: L.groups.map((g) => ({ key: g.key, ids: g.ids, x1: g.x1, y1: g.y1, x2: g.x2, y2: g.y2 })),
         trunks: L.trunks.length,
         edges: L.edges.map((e) => ({ a: e.a, z: e.z, done: e.done, pairs: e.pairs })),
@@ -83,6 +97,14 @@ if (request.checks.includes("layout")) {
         ancestors: L.ancestors,
         obs: graphInput(L).obs.length,
       };
+      if (request.nodeRows?.[name]?.includes(key)) result[key].heads = Object.fromEntries(L.nodes.filter((n) => n.type === "frame").map((n) => [n.id, n.headY2]));
+      if (request.nodeRows?.[name]?.includes(key)) {
+        const { nodeMarkRows } = layoutModule;
+        const marks = opts.marks || {};
+        result[key].nodeRows = L.nodes
+          .filter((n) => ["box", "tframe", "frame"].includes(n.type))
+          .map((n) => ({ id: n.id, want: typeof nodeMarkRows === "function" ? nodeMarkRows(n, marks[n.id]) : null, got: n.rows ?? 1 }));
+      }
     }
     out.layout[name] = result;
   }
