@@ -95,6 +95,7 @@ export function index(scopes) {
 // iss-00556 D-01: a done Scope shows when its parent shows its done children (`showsDone`: open, or the focus);
 // a done Scope under a done parent, or without a parent, does not (unless it holds something shown: Epic R-12).
 // iss-00603 D-02: next hides every done Scope and every cleanup candidate, except as the frame of what it holds.
+// iss-00611 D-01: in next a Scope with children shows only when one of them shows; one without, when open and no candidate.
 function visibility(ix, opts, showsDone, cleanup) {
   const memo = new Map();
   const seen = new Set();
@@ -106,8 +107,9 @@ function visibility(ix, opts, showsDone, cleanup) {
     if (memo.has(s.id)) return memo.get(s.id);
     if (seen.has(s.id)) return false; // a broken parent cycle
     seen.add(s.id);
+    const kids = ix.kids.get(s.id);
     const v = opts.next
-      ? (s.state !== "done" && !cleanup.has(s.id)) || ix.kids.get(s.id).some(visible)
+      ? (kids.length ? kids.some(visible) : s.state !== "done" && !cleanup.has(s.id))
       : opts.showDone || s.state !== "done" || ix.kids.get(s.id).some(visible) || context(s);
     memo.set(s.id, v);
     return v;
