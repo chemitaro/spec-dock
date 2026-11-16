@@ -18,7 +18,7 @@ current: """
 	"""
 
 target: """
-	- 構造の図から dnMark が消え、置き場は上限なし（`data-orca-max="all"`）。
+	- 『後に続く』は今のまま。置き場は上限なし（`data-orca-max="all"`）で、ほかの印の下の専用の行 `.gx-agents` にある。
 	- layout.js が箱・枠ごとの印の測った幅（`opts.marks`）から行の数を決め、箱・見出しを伸ばす。
 	- graph.js が印を描いた後に測り、今の配置と行の数が違うときだけ配置をやり直す。
 	"""
@@ -30,30 +30,24 @@ design: {
 			layout.js に次を足して export する（DOM なし）。
 
 			```js
-			export const MARK_ROW = 20; // 稼働の印の行1つ分：部品の sm の高さ 16px と行の間 4px（graph.css）
-			export const MARK_INSET = { box: 26 }; // 箱の幅から下の段の幅を引く分：左の縁 4 + 左の余白 11 + 右の余白 10 + 右の縁 1（graph.css .gx-box）
-			export const FRAME_TITLE_MIN = 96; // 入れ子の枠の見出しで題名に残す最小の幅（px）
-			export function markRows(m, avail, reserve = 0)
+			export const MARK_ROW = 20; // エージェントの行1つ分：上の間 4px と部品の sm の高さ 16px（graph.css の .gx-agents と .orca-marks の row-gap）
+			export const MARK_INSET = { box: 26 }; // 箱の幅から中の幅を引く分：左の縁 4 + 左の余白 11 + 右の余白 10 + 右の縁 1（graph.css .gx-box）
+			export function markRows(m, avail)
 			export function nodeMarkRows(node, m)
 			```
 
-			`m` は1つの箱・枠の印の測った幅 `{lead, items, gap}`：`lead` は同じ行のほかの印の幅とその行の flex の間（稼働の印の前の間を含む。題名は含まない）、
-			`items` は稼働の印1つずつの幅（部品の並び順）、`gap` は稼働の印どうしの横の間（部品の 2px を測った値）。
+			`m` は1つの箱・枠の稼働の印の測った幅 `{items, gap}`：`items` は稼働の印1つずつの幅（部品の並び順）、`gap` は稼働の印どうしの横の間（部品の 2px を測った値）。
 
-			`markRows(m, avail, reserve)`：
-			1. `m` がない、または `items` が空 → 1。
-			2. `one = Σitems + gap × (items.length − 1)`。`lead + reserve + one ≤ avail` → 1（R-04 の2：1行目の右寄せ）。
-			3. そうでなければ、`items` を順に `avail` の幅へ詰める（先頭から、次の印が `x + gap + w > avail` なら改行。`avail` より広い印は1つで1行）。その行の数を `k` とする。
-			4. `lead > 0 || reserve > 0` なら `1 + k`（R-04 の3：ほかの印・題名の行の次から）、そうでなければ `k`（R-04 の4）。
+			`markRows(m, avail)`：
+			1. `m` がない、または `items` が空 → 1（エージェントの行を作らない。R-04 の4）。
+			2. そうでなければ、`items` を順に `avail` の幅へ左から詰める（次の印が `x + gap + w > avail` なら改行。`avail` より広い印は1つで1行）。その行の数を `k` として `1 + k`（下の段・見出しの行と、k 行のエージェントの行。R-04 の2・3）。
 
 			`nodeMarkRows(node, m)`：layout の node（`type` が box・tframe・frame）について、
 			- box・tframe：`markRows(m, (x2 − x1) − MARK_INSET.box)`。
-			- frame（入れ子の枠）：`padX` を `SIZE.pad[kind]` の横（Initiative 16、Epic・Issue 12）として `markRows(m, (x2 − x1) − 2 × padX − 2, FRAME_TITLE_MIN)`（2 は左右の縁）。
+			- frame（入れ子の枠）：`padX` を `SIZE.pad[kind]` の横（Initiative 16、Epic・Issue 12）として `markRows(m, (x2 − x1) − 2 × padX − 2)`（2 は左右の縁）。
 			- ほかの type や `m` なし：1。
 
 			既存の `rowsOf(members, edges, stage)`（段・行の決定、313行）とは別の関数で、名前も中身も変えない（名前の衝突を避けて `nodeMarkRows` とする）。
-			`markRows` の4は、ほかの印の幅 `lead` が中の幅を越える箱でも同じに数える（ほかの印の行が1行目からはみ出すのは今の不具合で、この Issue では直さない。稼働の印の行は D-05 で別の行に置くので、ほかの印は折り返さない）。
-
 			配置の中（D-02）も同じ `markRows` を同じ幅で呼ぶので、graph.js が今の layout の node に `nodeMarkRows` を使った値は、その layout の行の数と必ず一致する（T-05）。
 			"""
 		satisfies: ["R-04", "R-05"]
@@ -65,8 +59,8 @@ design: {
 
 			- `boxBlock`：`rows = markRows(ctx.opts.marks?.[s.id], SIZE.boxW − MARK_INSET.box)`、`h = SIZE.boxH + grow + (rows − 1) × MARK_ROW`。
 			- `tree` の項目（tbox）：`w`（枠の箱は treeFrameW、箱は boxW）で同じく `rows` を求め、`h = SIZE.boxH + grow + (rows − 1) × MARK_ROW`。
-			- `frameBlock`：`w` を今のとおり求めた後、`rows = markRows(m, w − 2 × padX − 2, FRAME_TITLE_MIN)`、`head = SIZE.head + grow + (rows − 1) × MARK_ROW`。中身の `y` と枠の `h` は今の式のまま head から決まる。
-			- `flatten`：box・tframe・frame の node に、`rows > 1` のときだけ `rows` と `agents` を足す（1 のときはどちらの鍵も足さない。印なしの nodes が今と同じ JSON になる）。`agents` は、稼働の印をほかの印・題名の行の次の行から置くとき（`lead > 0` か `reserve > 0`）`"below"`、ほかの印がない箱で下の段の中で折り返すとき `"wrap"`。
+			- `frameBlock`：`w` を今のとおり求めた後、`rows = markRows(m, w − 2 × padX − 2)`、`head = SIZE.head + grow + (rows − 1) × MARK_ROW`。中身の `y` と枠の `h` は今の式のまま head から決まる。
+			- `flatten`：box・tframe・frame の node に、`rows > 1` のときだけ `rows` を足す（1 のときは鍵を足さない。印なしの nodes が今と同じ JSON になる）。
 
 			幅、`SIZE` の既存の値、段・行・包み（pack）の決め方は変えない。伸びた高さは今の包みと線の引き方にそのまま入り、routeLayout の検査と幅の広げ方は伸びた箱で回る（R-05）。
 			"""
@@ -77,16 +71,15 @@ design: {
 		text: """
 			**決めたこと：決まった幅ではなく、描いた部品の実寸を測る。** 理由：
 
-			- 印の幅は、エージェントの種類のロゴ、monitoring の印、スリープの月、経過の文字（now、7m、39m、12h…）で変わり、ほかの印（PR の印、人のタスクの数、進み具合）も箱ごとに違う。
-			  決まった幅を最大に取ると、収まる箱も早く折り返して高さが無駄に伸び、平均に取るとはみ出す（本人の写しの不具合そのもの）。
+			- 印の幅は、エージェントの種類のロゴ、monitoring の印、スリープの月、経過の文字（now、7m、39m、12h…）で変わる。
+			  決まった幅を最大に取ると、収まる行も早く折り返して高さが無駄に伸び、平均に取るとはみ出す（本人の写しの不具合そのもの）。
 			- 印の大きさは orca-web の部品が決める（R-07 で変えない）。SpecDock に幅の表を写すと、部品が変わったときに黙ってずれる。測れば部品の今の大きさに従う。
 			- 測るのは描いた後なので、行の数の規則は D-01 の純粋な関数に分け、そこを node で確かめる。測る部分は小さく保ち、実機で確かめる（T-08）。
 
-			`measureMarks(world)`（graph.js）：`[data-orca-scope]` の置き場ごとに、中に `.orca-mark` が1つ以上あれば、その箱・枠の id（置き場の `data-orca-scope`）に `{lead, items, gap}` を返す。
+			`measureMarks(world)`（graph.js）：`[data-orca-scope]` の置き場ごとに、中に `.orca-mark` が1つ以上あれば、その箱・枠の id（置き場の `data-orca-scope`）に `{items, gap}` を返す。
 			- 幅は `getBoundingClientRect().width / V.s`（拡大の分を戻す）を小数第1位で切り上げる（足し合わせて実際より小さくならないように）。
 			- `items`：置き場の中の `.orca-mark` ごとの幅（描いた順）。`gap`：部品の `.orca-marks` の `getComputedStyle().columnGap`。
-			- `lead`：その箱・枠のほかの印の行（箱は `.gx-marks`、入れ子の枠は `.gx-fh`。置き場がその行の中にあっても、D-05 の `.gx-agents` に移っていても同じ行を見る）の子のうち、置き場を除いた子が `c` 個（題名 `.gx-fttl` を数に含む）あるとき、題名と置き場を除いた子の幅の和 + その行の `columnGap` × `c`（稼働の印の前の間を含む）。`c` が0なら `lead = 0`。幅0の子（中身のない `.cnts` など）は幅0として足す。
-			- 測れない（F-02）：図が隠れている（`.gx-view` が hidden か幅0）、稼働の印 `.orca-mark` のどれかの幅が0、部品の `.orca-marks` の `flexWrap` が `wrap` でない（部品の CSS がまだ効いていない）→ `null`（配置を変えない）。ほかの印の子の幅が0なのは測れない理由にしない。
+			- 測れない（F-02）：図が隠れている（`.gx-view` が hidden か幅0）、稼働の印 `.orca-mark` のどれかの幅が0、部品の `.orca-marks` の `flexWrap` が `wrap` でない（部品の CSS がまだ効いていない）→ `null`（配置を変えない）。
 			"""
 		satisfies: ["R-04", "R-06", "F-02"]
 	}
@@ -109,19 +102,16 @@ design: {
 		satisfies: ["R-06", "F-02", "F-03"]
 	}
 	"D-05": {
-		title: "画面：dnMark を消し、置き場を上限なしにし、折り返す（graph.js・marks.js・parts.js・orca_marks.js・graph.css）"
+		title: "画面：置き場を上限なしにし、専用の行に置いて折り返す（graph.js・parts.js・orca_marks.js・graph.css）"
 		text: """
-			- `boxHtml`：`M.dnMark(s.downstream)` を2か所から消し、aria-label の「。後に続く n件」を消す。置き場は `orcaSlot(s.id, "all")`。
-			  layout の node の `agents` が `"below"`（D-02）なら、置き場を `.gx-marks` から出し、その直後の `<div class="gx-agents">` に置く（`.gx-marks` はほかの印だけで、今のとおり折り返さない。R-04 の規則1）。`"wrap"` なら置き場は `.gx-marks` の中のまま、`.gx-marks` に `is-wrap` を足す（ほかの印がないので、折り返すのは稼働の印だけ）。
-			- `frameHtml`：見出しの置き場を `orcaSlot(s.id, "all")` にし、node の `agents` が `"below"` なら、置き場を `.gx-fh` から出して、`.gx-fh` と `.gx-fm` の間の `<div class="gx-agents">` に置く。要約の行 `.gx-fm` から `M.dnMark` を消す。
-			- `renderLegend`：「後に続く数」の `li` を消す（ほかの行と「矢印：…出る線＝後に続く」は残す）。
-			- `marks.js`：`dnMark` を消す。`tests/js/dashboard_marks_dump.mjs` と `tests/fixtures/issue544/marks-golden.json` から `dnMark` の項目を消す。
+			- `boxHtml`：`M.dnMark(s.downstream)` と aria-label の「後に続く n件」は今のまま（R-01）。置き場 `orcaSlot(s.id, "all")` を `.gx-marks` から出し、その直後の `<div class="gx-agents">` に置く（いつも出力する。中が空なら CSS で隠し、高さを取らない。R-04 の4）。`.gx-marks` はほかの印だけで、今のとおり折り返さない。
+			- `frameHtml`：見出しの置き場を `orcaSlot(s.id, "all")` にし、`.gx-fh` から出して、`.gx-fh` と `.gx-fm` の間の `<div class="gx-agents">` に置く。要約の行 `.gx-fm` の `M.dnMark` は今のまま。
+			- `renderLegend`、`marks.js`、`tests/js/dashboard_marks_dump.mjs`、`tests/fixtures/issue544/marks-golden.json` は変えない（R-01）。
 			- `parts.js` の `orcaSlot(id, max)`：`max` は数か `"all"`（`data-orca-max="all"`）。ボード（4）と横の欄（4）は今のまま。
 			- `orca_marks.js` の `paintOrcaMarks`：`data-orca-max` が `"all"` のとき、`max = Math.max(1, worktree.agents の数)`（配列でなければ 1）。部品の `max` の意味は変えない（全員が max 以下なので『+N』は出ない）。
-			- `graph.css`：`.gx .dn` とそれに関わる規則（`.gx-marks .dn`、`.hm + .dn`、`:is(.hm, .dn) ~ .sd-orca`）を `dn` なしに直す。
-			  `.gx .gx-agents { display: flex; margin-top: 4px; }`、`.gx .gx-agents > .sd-orca { flex: 1 1 100%; margin-left: 0; min-width: 0; }`、`.gx .gx-marks.is-wrap { flex-wrap: wrap; }`、`.gx .gx-marks.is-wrap > .sd-orca { flex-basis: 100%; margin-left: 0; }`、`.gx .sd-orca .orca-marks { row-gap: 4px; }`。
-			  増える高さ：`.gx-agents` の1行目が 4 + 16 = 20、次の行から 4 + 16 = 20（`MARK_ROW`）。`is-wrap` の1行目は今の下の段の行に入り、次の行から 20。
-			  1行目の右寄せ（今の `margin-left: auto`）はそのまま。折り返した稼働の印の行は左寄せ（部品の既定）。新しい色を足さない（R-07）。
+			- `graph.css`：`.gx .dn` の規則は変えない（置き場が `.gx-marks` から出るので `:is(.hm, .dn) ~ .sd-orca` は効かなくなるが、害はなく残してよい）。
+			  `.gx .gx-agents { display: flex; margin-top: 4px; }`、`.gx .gx-agents:not(:has(.orca-mark)) { display: none; }`、`.gx .gx-agents > .sd-orca { flex: 1 1 100%; margin-left: 0; min-width: 0; }`、`.gx .sd-orca .orca-marks { row-gap: 4px; }`。
+			  エージェントの行は左寄せ（部品の既定）。増える高さはエージェントの行1つにつき 4 + 16 = 20（`MARK_ROW`）。新しい色を足さない（R-07）。
 			- `edgeAudit`：結果に `markOverflow`（稼働の印 `.orca-mark` のどれかが、その箱・枠の内側の右の縁か、箱の下の縁を 0.5px より越える箱・枠の数）を足す。実機の確かめ（T-08）に使う。
 			"""
 		satisfies: ["R-01", "R-02", "R-03", "R-04", "R-07", "F-01"]
@@ -131,8 +121,8 @@ design: {
 		text: """
 			- layout（node、`tests/js/dashboard_graph_check.mjs` に `marks` を渡せるようにし、`tests/unit/presentation/test_dashboard_graph_marks_rows.py` を新しく作る）：
 			  `markRows` の場合分け（T-01）、`opts.marks` の高さ（T-02）、印なしの一致（T-03）、伸びた箱での audit（T-04）、`nodeMarkRows` と node.rows の一致（T-05）。
-			  印の幅は、部品の sm の実寸に近い決まった値（例：ほかの印 60px、稼働の印 36px、間 2px）で作る。
-			- 画面（`tests/unit/infra/test_dashboard_orca_views_js.py`・`test_dashboard_orca_marks_js.py`、`tests/unit/presentation/test_dashboard_graph_js.py` などの静的な検査と node の偽の DOM）：dnMark・凡例・aria-label、置き場の `"all"`、`is-wrap`、`checkRows` の呼び方（T-06、T-07）。
+			  印の幅は、部品の sm の実寸に近い決まった値（例：稼働の印 36px、間 2px）で作る。
+			- 画面（`tests/unit/infra/test_dashboard_orca_views_js.py`・`test_dashboard_orca_marks_js.py`、`tests/unit/presentation/test_dashboard_graph_js.py` などの静的な検査と node の偽の DOM）：dnMark・凡例・aria-label が今のまま、置き場の `"all"`、`.gx-agents`、`checkRows` の呼び方（T-06、T-07）。
 			- 既存の `test_the_box_size_does_not_change` は SIZE の値を見るので、そのまま通る（SIZE は変えない）。
 			"""
 		satisfies: ["R-01", "R-02", "R-03", "R-05", "R-06"]
@@ -143,7 +133,7 @@ design: {
 			開始のコミットと直した後のコミットを `git archive` から wheel にし、別々の隔離した venv と `.workbench/iss-00620/state-*`（この PC の状態の置き場の写し）で、`spec-dock dashboard serve --tailscale` を別のポートで立てる（常駐の 47800・8791 と道具の環境には触れない）。
 			エージェントが1人・3人・6人の箱は、実データにいなければ、試しの orca-web の要約を返す小さなサーバー（`/embed/agent-marks.{js,css}` は orca-web のチェックアウトの部品をそのまま配り、`/api/worktrees/summary` は作った要約）を別のポートで立て、試しのダッシュボードの Orca の設定をそこに向ける。
 			headless Chrome（`--disable-features=MacAppCodeSignClone`、CDP `Browser.close`）で 1440・390 × 明暗に写し、`specdockEdgeAudit()` の違反0と `markOverflow` 0、ブラウザーのエラー0を report.md に残す。
-			iss-00613 の箱（またはエージェントが2人以上の箱）の前後、構造の図で『後に続く』が消え、ボードには残ることも写す。
+			iss-00613 の箱（またはエージェントが2人以上の箱）の前後、構造の図とボードに『後に続く』が残ることも写す。
 			"""
 		satisfies: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06"]
 	}
@@ -151,7 +141,7 @@ design: {
 
 compatibility: """
 	構造の API・保存・設定は変えない。構造の図の部品を使う『横断の構造』（iss-00614）にも同じ変更が入る。
-	印の入力がない配置は今と同じなので、orca-web をつないでいない利用者の構造の図は、dnMark が消えること以外は変わらない。
+	印の入力がない配置は今と同じなので、orca-web をつないでいない利用者の構造の図は変わらない。エージェントのいる箱は、1人でもエージェントの行の分（20px）高くなる（本人の決定）。
 	"""
 
 risks: [
