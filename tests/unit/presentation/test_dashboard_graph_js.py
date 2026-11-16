@@ -92,8 +92,11 @@ def representative(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
 def test_every_way_of_showing_the_representative_structures_draws_clean_lines(representative: dict[str, Any]) -> None:
     runs = representative["audit"]
     assert {run["name"] for run in runs} == {"spec-dock", "generated", "generated-15", "generated-18", "many-lines"}
-    assert len(runs) >= 5 * 12  # 12 combinations each (iss-00603: 3 ranges), and the Epics and Initiatives as the focus
-    assert sum(run["edges"] for run in runs if run["name"] == "spec-dock" and run["opts"]["deps"] == "all") > 100
+    # 6 combinations each (iss-00603: 3 ranges; iss-00607: no line choice), and the Epics and Initiatives as the focus
+    assert len(runs) >= 5 * 6
+    assert sum(run["edges"] for run in runs if run["name"] == "spec-dock") > 100
+    # iss-00607 T-04: the lines are always every line, so no combination chooses them
+    assert [run["opts"] for run in runs if "deps" in run["opts"]] == []
     dirty = [
         {
             "name": run["name"],
@@ -110,9 +113,9 @@ def test_every_way_of_showing_the_representative_structures_draws_clean_lines(re
 def test_the_250_scope_structure_routes_within_a_second(representative: dict[str, Any]) -> None:
     # iss-00572: "ms" is the node process's CPU time, the least of three runs, so a loaded PC does not stretch it.
     runs = [run for run in representative["audit"] if run["name"] == "generated" and not run["opts"].get("focus")]
-    assert (
-        len(runs) == 12 + 7 * 6
-    )  # and the nested ones at a PC's and a phone's width (iss-00560), with a height (iss-00575)
+    # 2 ways × 3 ranges (iss-00607: no line choice), and the nested ones at a PC's and a phone's width (iss-00560),
+    # with a height (iss-00575)
+    assert len(runs) == 6 + 7 * 3
     assert max(run["ms"] for run in runs) < 1000
 
 
@@ -164,9 +167,11 @@ def small(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
         "done": {"range": "all"},
         "tree": {"mode": "tree"},
         "focus": {"focus": "epic-00001"},
-        "wait": {"range": "all", "deps": "wait"},
-        "all": {"range": "all", "deps": "all"},
-        "none": {"range": "all", "deps": "none"},
+        # iss-00607: a stale line choice of a caller changes nothing (all and now)
+        "done|wait": {"range": "all", "deps": "wait"},
+        "done|none": {"range": "all", "deps": "none"},
+        "home|wait": {"deps": "wait"},
+        "home|none": {"deps": "none"},
     }
     doc = _small()
     return {
@@ -243,16 +248,22 @@ def test_focus_shows_only_the_scope_and_its_descendants(small: dict[str, Any]) -
     assert set(_nodes(small, "focus")) == {"epic-00001", "iss-00002", "iss-00003", "iss-00005"}
 
 
-def test_the_three_dependency_line_choices(small: dict[str, Any]) -> None:
-    def pairs(key: str) -> dict[tuple[str, str], bool]:
-        return {(p[0], p[1]): e["done"] for e in small["layout"]["small"][key]["edges"] for p in e["pairs"]}
+def test_every_line_is_drawn_whatever_line_choice_is_passed(small: dict[str, Any]) -> None:
+    """iss-00607 T-02 (R-02, F-01): a finished dependency is drawn faint and a waiting one stands out, always; a stale
+    deps of wait or none lays out the same nodes, groups and edges as none passed."""
+    result = small["layout"]["small"]
 
-    wait, every, none = pairs("wait"), pairs("all"), pairs("none")
-    assert ("iss-00031", "iss-00032") not in wait
+    def pairs(key: str) -> dict[tuple[str, str], bool]:
+        return {(p[0], p[1]): e["done"] for e in result[key]["edges"] for p in e["pairs"]}
+
+    every = pairs("done")
     assert every["iss-00031", "iss-00032"] is True  # a finished dependency: drawn dashed
     assert every["iss-00033", "iss-00034"] is False
-    assert set(wait) < set(every)
-    assert none == {}
+    for base in ("home", "done"):
+        assert any(e["done"] for e in result[base]["edges"]), base
+        for stale in ("wait", "none"):
+            for key in ("nodes", "groups", "edges", "trunks", "wraps"):
+                assert result[f"{base}|{stale}"][key] == result[base][key], (base, stale, key)
 
 
 def test_weeks_of_the_chosen_kinds_add_up(small: dict[str, Any]) -> None:
@@ -376,6 +387,7 @@ def context(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
         "home": {},
         "tree": {"mode": "tree"},
         "wait": {"deps": "wait"},
+        "none": {"deps": "none"},
         "done": {"range": "all"},
         "focus8": {"focus": "epic-00008"},
         "focus80": {"focus": "epic-00080"},
@@ -409,7 +421,8 @@ def context(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
             "gaps": {"inits": {"gapped": {"all.x": 12, "all.y": 12, "wcroot": 30}}},
             "checks": ["layout", "audit"],
             "prefs": [
-                # iss-00603 T-06: version 3 {mode, range, deps, legend}; legacies = [version 2, version 1]
+                # iss-00603 T-06: version 3 {mode, range, legend}; legacies = [version 2, version 1]
+                # iss-00607 T-03: a deps saved by the old line choice is in versions 3 and 2 and is never read
                 {"current": None, "legacies": [None, None]},
                 {
                     "current": {"mode": "tree", "range": "next", "deps": "wait", "legend": True},
@@ -476,7 +489,11 @@ def test_the_default_view_draws_finished_dependencies_between_shown_boxes(contex
         return {(p[0], p[1]): e["done"] for e in context["layout"]["context"][key]["edges"] for p in e["pairs"]}
 
     assert pairs("home")["iss-00003", "iss-00005"] is True
-    assert ("iss-00003", "iss-00005") not in pairs("wait")
+    # iss-00607: a stale line choice draws every line too
+    layouts = context["layout"]["context"]
+    for stale in ("wait", "none"):
+        for key in ("nodes", "groups", "edges"):
+            assert layouts[stale][key] == layouts["home"][key], (stale, key)
     dirty = [run for run in context["audit"] if any(run[key] for key in AUDIT_KEYS)]
     assert dirty == []
 
@@ -515,15 +532,17 @@ def test_scopes_without_times_are_the_oldest(context: dict[str, Any]) -> None:
 
 
 def test_saved_choices_carry_over_into_the_range(context: dict[str, Any]) -> None:
-    """iss-00603 T-06 (R-07, F-02): version 3 as saved, version 2's showDone as the range, version 1's mode and legend."""
+    """iss-00603 T-06 (R-07, F-02): version 3 as saved, version 2's showDone as the range, version 1's mode and legend.
+    iss-00607 T-03 (R-04, F-01): the opts are only {mode, range}; a saved deps is dropped from every version."""
+    assert all(set(p["opts"]) == {"mode", "range"} for p in context["prefs"])
     empty, v3, v3_wrong, v3_partial, v2_all, v2_now, v2_wrong, v2_legend, v1, broken, junk = context["prefs"]
-    defaults = {"mode": "nest", "range": "now", "deps": "all"}
+    defaults = {"mode": "nest", "range": "now"}
     assert empty == {"opts": defaults, "legend": False}
-    assert v3 == {"opts": {"mode": "tree", "range": "next", "deps": "wait"}, "legend": True}
+    assert v3 == {"opts": {"mode": "tree", "range": "next"}, "legend": True}
     assert v3_wrong == {"opts": defaults, "legend": False}
     assert v3_partial == {"opts": {**defaults, "mode": "tree"}, "legend": False}  # version 2 is not read
-    assert v2_all == {"opts": {"mode": "tree", "range": "all", "deps": "wait"}, "legend": True}
-    assert v2_now == {"opts": {**defaults, "deps": "none"}, "legend": False}  # fold is not used
+    assert v2_all == {"opts": {"mode": "tree", "range": "all"}, "legend": True}
+    assert v2_now == {"opts": defaults, "legend": False}  # neither fold nor deps is used
     assert v2_wrong == {"opts": defaults, "legend": False}
     assert v2_legend == {"opts": defaults, "legend": True}
     assert v1 == {"opts": {**defaults, "mode": "tree"}, "legend": True}  # neither showDone, deps nor fold
@@ -536,8 +555,10 @@ def test_the_graph_saves_its_choices_under_the_new_key() -> None:
     assert '"specdock.graph.v1"' not in source and '"specdock.graph.v2"' not in source
     assert "specdock.graph.v" not in source  # the keys are written only in graph/prefs.js
     assert "restorePrefs" in source and "PREFS_KEY" in source and "LEGACY_KEYS" in source
+    assert "deps" not in source  # iss-00607 T-03: no line choice to draw, press or save
     prefs = (ASSETS / "views" / "graph" / "prefs.js").read_text(encoding="utf-8")
     assert 'PREFS_KEY = "specdock.graph.v3"' in prefs
+    assert "deps" not in prefs  # iss-00607 T-03: the saved choices hold no line choice
     assert 'LEGACY_KEYS = ["specdock.graph.v2", "specdock.graph.v1"]' in prefs
 
 

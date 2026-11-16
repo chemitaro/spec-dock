@@ -1,7 +1,7 @@
 // The structure graph's toolbar, marks, legend and "next" notice, drawn by views/graph.js in node (iss-00603 T-08, T-11).
 //
 // usage: node dashboard_graph_toolbar.mjs <dashboard assets dir> <request.json>
-// request: {runs: [{name, doc, saved: {key: raw string} | null, clicks: [{act, range?, deps?}]}]}
+// request: {runs: [{name, doc, saved: {key: raw string} | null, clicks: [{act, range?}]}]}
 // Prints {runs: {name: [snapshot after the first render, snapshot after each click]}}.
 //
 // graph.js draws by writing HTML strings, so a minimal stand-in for the DOM is enough: each element keeps the HTML
@@ -43,7 +43,13 @@ class El {
     this.parts = new Map();
   }
   querySelector(sel) {
-    // only the shell (mount) asks for its parts; the parts' own drawings are read as strings
+    // the shell (mount) hands out its parts; the world hands out the layer its drawing holds for the dependency
+    // lines (iss-00607 T-06); the other drawings are read as strings
+    if (this.name === ".gx-world" && sel === ".gx-edges") {
+      if (!this.html.includes('<svg class="gx-edges"')) return null;
+      if (!this.parts.has(sel)) this.parts.set(sel, new El(sel));
+      return this.parts.get(sel);
+    }
     if (this.name !== "root") return null;
     if (!this.parts.has(sel)) this.parts.set(sel, new El(sel));
     return this.parts.get(sel);
@@ -99,6 +105,7 @@ function snap(root) {
     tools: part(".gx-tools").innerHTML,
     legend: part(".legend").innerHTML,
     world: part(".gx-world").innerHTML,
+    edges: part(".gx-world").parts.get(".gx-edges")?.innerHTML ?? null,
     range: part(".gx-world").dataset.range ?? null,
     mode: part(".gx-world").dataset.mode ?? null,
     none: none ? { hidden: none.hidden, text: none.textContent } : null,

@@ -3,6 +3,7 @@
 "all" and "now" are the two combinations before iss-00603 ({showDone: true, fold: false} and the default
 {showDone: false, fold: true}); their layouts are compared with digests recorded at the start commit 16f0cf122
 (`tests/fixtures/issue603/layout-before.json`). "next" leaves out what is done and the cleanup candidates.
+iss-00607: the lines are always every line, so the layouts are compared only with the recorded digests of deps all.
 """
 
 from __future__ import annotations
@@ -33,7 +34,16 @@ def documents() -> dict[str, dict[str, Any]]:
 
 
 def cases() -> dict[str, dict[str, Any]]:
-    """The ways of showing compared with the start commit, without the range."""
+    """The ways of showing compared with the start commit, without the range. Each key is the recorded one of deps all
+    (iss-00607: no line choice is passed; the recorded wait digests are not used)."""
+    out: dict[str, dict[str, Any]] = {"tree|all": {"mode": "tree"}}
+    for width in (None, 374):
+        out[f"nest|all|{width}"] = {"mode": "nest", **({"width": width} if width else {})}
+    return out
+
+
+def recorded_cases() -> dict[str, dict[str, Any]]:
+    """The ways of showing recorded at the start commit 16f0cf122, when the lines were still chosen."""
     out: dict[str, dict[str, Any]] = {}
     for deps in ("all", "wait"):
         out[f"tree|{deps}"] = {"mode": "tree", "deps": deps}
@@ -52,7 +62,7 @@ def request_before() -> dict[str, Any]:
     layouts = {
         f"{rng}|{key}|{how}": {**opts, **OLD[rng]}
         for rng in OLD
-        for key, opts in cases().items()
+        for key, opts in recorded_cases().items()
         for how in ("plain", "routed")
     }
     docs = documents()
@@ -65,9 +75,22 @@ def request_before() -> dict[str, Any]:
 
 
 # What the range alone, a missing range and a range with stale showDone and fold of the old callers must equal.
+# iss-00607 T-01, T-02: a stale deps of wait or none of the old line choice equals deps all too.
 VARIANTS: dict[str, list[dict[str, Any]]] = {
-    "all": [{"range": "all"}, {"range": "all", "showDone": False, "fold": True}],
-    "now": [{"range": "now"}, {}, {"range": "now", "showDone": True, "fold": False}, {"range": "later"}],
+    "all": [
+        {"range": "all"},
+        {"range": "all", "showDone": False, "fold": True},
+        {"range": "all", "deps": "wait"},
+        {"range": "all", "deps": "none"},
+    ],
+    "now": [
+        {"range": "now"},
+        {},
+        {"range": "now", "showDone": True, "fold": False},
+        {"range": "later"},
+        {"deps": "wait"},
+        {"range": "now", "deps": "none"},
+    ],
 }
 
 
@@ -103,7 +126,8 @@ def test_all_and_now_lay_out_as_the_two_old_combinations(same: dict[str, Any]) -
             want = before[f"{name}|{rng}|{case}|{how}"]
             if digest(entry) != want:
                 differ.append(f"{name}|{key}")
-    assert len(same) == 4 and all(len(r) == len(cases()) * 2 * 6 for r in same.values())
+    variants = sum(len(v) for v in VARIANTS.values())
+    assert len(same) == 4 and all(len(r) == len(cases()) * 2 * variants for r in same.values())
     assert differ == []
 
 
@@ -164,9 +188,8 @@ def nxt(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
     doc = _next()
     layouts: dict[str, dict[str, Any]] = {}
     for mode in ("nest", "tree"):
-        for deps in ("all", "wait", "none"):
-            for rng in ("all", "now", "next"):
-                layouts[f"{mode}|{deps}|{rng}"] = {"mode": mode, "deps": deps, "range": rng}
+        for rng in ("all", "now", "next"):
+            layouts[f"{mode}|{rng}"] = {"mode": mode, "range": rng}
         for focus in FOCUS:
             layouts[f"{mode}|focus|{focus}"] = {"mode": mode, "range": "next", "focus": focus}
     return {
@@ -189,10 +212,10 @@ def _pairs(nxt: dict[str, Any], key: str) -> set[tuple[str, str]]:
 @pytest.mark.parametrize("mode", ["nest", "tree"])
 def test_next_leaves_out_done_scopes_and_cleanup_candidates(nxt: dict[str, Any], mode: str) -> None:
     """T-03: no done box, no candidate box; a and b holding only candidates are gone, b with a doing child a frame."""
-    shown = _shown(nxt, f"{mode}|all|next")
+    shown = _shown(nxt, f"{mode}|next")
     assert set(shown) == SHOWN
     assert shown["epic-00020"]["type"] == ("frame" if mode == "nest" else "tframe")
-    assert nxt["layout"]["next"][f"{mode}|all|next"]["groups"] == []
+    assert nxt["layout"]["next"][f"{mode}|next"]["groups"] == []
     states = {s["id"]: s["state"] for s in nxt["doc"]["scopes"]}
     candidates = {c["id"] for c in nxt["doc"]["cleanup"]}
     kids = {s["parent_id"] for s in nxt["doc"]["scopes"] if s.get("parent_id")}
@@ -202,21 +225,21 @@ def test_next_leaves_out_done_scopes_and_cleanup_candidates(nxt: dict[str, Any],
     # a c that is yellow (blocked by an open Scope) is a candidate too, and next leaves it out (CP-1 P3)
     assert states["iss-00023"] == "blocked" and "iss-00023" in candidates
     # the same structure in all and now still shows them (the range is what leaves them out)
-    assert {"iss-00003", "epic-00010", "iss-00022", "iss-00023"} <= set(_shown(nxt, f"{mode}|all|all"))
-    assert "iss-00003" in _shown(nxt, f"{mode}|all|now")
+    assert {"iss-00003", "epic-00010", "iss-00022", "iss-00023"} <= set(_shown(nxt, f"{mode}|all"))
+    assert "iss-00003" in _shown(nxt, f"{mode}|now")
 
 
 @pytest.mark.parametrize("mode", ["nest", "tree"])
 def test_next_draws_no_line_from_or_to_a_done_scope(nxt: dict[str, Any], mode: str) -> None:
-    """T-04: whatever the line choice, a pair with a done end is not drawn; none draws nothing."""
+    """T-04: a pair with a done end is not drawn (iss-00607: every line is drawn, so next draws no finished one)."""
     done = {s["id"] for s in nxt["doc"]["scopes"] if s["state"] == "done"}
-    for deps in ("all", "wait"):
-        pairs = _pairs(nxt, f"{mode}|{deps}|next")
-        assert ("iss-00002", "iss-00005") in pairs, deps
-        assert not {item for pair in pairs for item in pair} & done, deps
+    pairs = _pairs(nxt, f"{mode}|next")
+    assert ("iss-00002", "iss-00005") in pairs
+    assert not {item for pair in pairs for item in pair} & done
     # the frame 20 is shown and its dependencies are open ones: drawn in all, left out in next
-    assert {("iss-00061", "epic-00020"), ("epic-00020", "epic-00040")} <= _pairs(nxt, f"{mode}|all|all")
-    assert nxt["layout"]["next"][f"{mode}|none|next"]["edges"] == []
+    assert {("iss-00061", "epic-00020"), ("epic-00020", "epic-00040")} <= _pairs(nxt, f"{mode}|all")
+    assert not any(e["done"] for e in nxt["layout"]["next"][f"{mode}|next"]["edges"])
+    assert any(e["done"] for e in nxt["layout"]["next"][f"{mode}|all"]["edges"])  # every line elsewhere
 
 
 @pytest.mark.parametrize("mode", ["nest", "tree"])

@@ -84,8 +84,8 @@ function loadPrefs() {
 }
 function savePrefs() {
   try {
-    const { mode, range, deps } = V.opts; // the focus lives in the URL, not in the preferences
-    localStorage.setItem(PREFS_KEY, JSON.stringify({ mode, range, deps, legend: V.legend }));
+    const { mode, range } = V.opts; // the focus lives in the URL, not in the preferences
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ mode, range, legend: V.legend }));
   } catch {
     // ignore
   }
@@ -495,15 +495,6 @@ function renderBar(focus) {
     tool("mode", o.mode === "tree" ? "木" : "入れ子", o.mode === "tree" ? "tree" : "nest", null, ` data-mode="${o.mode}"`) +
     `<span class="tool-group" role="group" aria-label="見せる範囲">` +
     RANGES.map(([v, label, icon, title]) => `<button type="button" class="tool" data-act="range" data-range="${v}" aria-pressed="${o.range === v}" title="見せる範囲：${label}（${title}）">${ic(icon)}<span class="lab">${label}</span></button>`).join("") +
-    `</span>` +
-    `<span class="tool-group" role="group" aria-label="依存の線">` +
-    [
-      ["wait", "待っている線"],
-      ["all", "すべての線"],
-      ["none", "線なし"],
-    ]
-      .map(([v, label]) => `<button type="button" class="tool" data-act="deps" data-deps="${v}" aria-pressed="${o.deps === v}" title="依存の線：${label}">${v === "none" ? ic("x") : ic("arrowRight")}<span class="lab">${label}</span></button>`)
-      .join("") +
     `</span>`;
   if (focus && byId(focus)) {
     const chain = V.ix.ancestors(focus).slice().reverse();
@@ -604,7 +595,6 @@ function onClick(event) {
     else {
       if (a === "mode") o.mode = o.mode === "tree" ? "nest" : "tree";
       else if (a === "range") o.range = act.dataset.range;
-      else if (a === "deps") o.deps = act.dataset.deps;
       else return;
       savePrefs();
       render(V.root, V.ctx);

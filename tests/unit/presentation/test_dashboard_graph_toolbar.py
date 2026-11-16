@@ -2,7 +2,7 @@
 
 `tests/js/dashboard_graph_toolbar.mjs` runs the screen in node with a minimal stand-in for the DOM: it renders,
 presses the toolbar's buttons through the screen's own click listener, and returns what each part drew and what the
-browser storage holds (T-08, T-11).
+browser storage holds (T-08, T-11). iss-00607: the toolbar has no line choice and every line is drawn (T-05, T-06).
 """
 
 from __future__ import annotations
@@ -71,7 +71,20 @@ def shots(tmp_path_factory: pytest.TempPathFactory) -> dict[str, list[dict[str, 
                 "saved": {
                     V2: json.dumps({"mode": "nest", "showDone": True, "deps": "wait", "fold": False, "legend": True})
                 },
-                "clicks": [{"act": "range", "range": "next"}, {"act": "deps", "deps": "none"}, {"act": "legend"}],
+                "clicks": [{"act": "range", "range": "next"}, {"act": "legend"}],
+            },
+            # iss-00607 T-06: a version 3 saved with the old line choice of none draws every line all the same
+            {
+                "name": "nolines",
+                "doc": doc,
+                "saved": {V3: json.dumps({"mode": "nest", "range": "all", "deps": "none", "legend": False})},
+                "clicks": [],
+            },
+            {
+                "name": "lines",
+                "doc": doc,
+                "saved": {V3: json.dumps({"mode": "nest", "range": "all", "legend": False})},
+                "clicks": [],
             },
             # everything is done: next has nothing to show
             {
@@ -178,10 +191,11 @@ def test_all_marks_the_cleanup_issue_boxes_and_next_marks_nothing(shots: dict[st
 
 
 @pytest.mark.parametrize("name", ["nest", "tree"])
-def test_pressing_a_range_presses_only_it_lays_out_with_it_and_saves_four_keys(
+def test_pressing_a_range_presses_only_it_lays_out_with_it_and_saves_three_keys(
     shots: dict[str, Any], name: str
 ) -> None:
-    """R-01, R-07: only the pressed button is aria-pressed, the layout takes that range, v3 holds four keys."""
+    """R-01, R-07: only the pressed button is aria-pressed, the layout takes that range; v3 holds three keys
+    (iss-00607 T-06: the old saved deps is dropped by the first press)."""
     first, *after = shots[name]
     assert first["range"] == "now"
     assert first["mode"] == name
@@ -195,8 +209,8 @@ def test_pressing_a_range_presses_only_it_lays_out_with_it_and_saves_four_keys(
         assert states == {k: str(k == pressed).lower() for k in LABELS}, pressed
         assert shot["range"] == pressed
         saved = json.loads(shot["saved"][V3])
-        assert list(saved) == ["mode", "range", "deps", "legend"]
-        assert saved == {"mode": name, "range": pressed, "deps": "all", "legend": False}
+        assert list(saved) == ["mode", "range", "legend"]
+        assert saved == {"mode": name, "range": pressed, "legend": False}
     nxt, every, now = after
     assert "iss-00003" not in _ids(nxt["world"]) and "iss-00022" not in _ids(nxt["world"])
     assert {"iss-00003", "iss-00022"} <= _ids(every["world"])
@@ -205,15 +219,56 @@ def test_pressing_a_range_presses_only_it_lays_out_with_it_and_saves_four_keys(
 
 def test_the_first_press_moves_a_saved_version_2_to_version_3(shots: dict[str, Any]) -> None:
     """R-07: version 2 (showDone) starts in all; presses write version 3 only, version 2 stays."""
-    first, nxt, deps, legend = shots["legacy"]
+    first, nxt, legend = shots["legacy"]
     assert first["range"] == "all"
     assert V3 not in first["saved"]
     v2 = first["saved"][V2]
-    assert json.loads(nxt["saved"][V3]) == {"mode": "nest", "range": "next", "deps": "wait", "legend": True}
-    assert json.loads(deps["saved"][V3]) == {"mode": "nest", "range": "next", "deps": "none", "legend": True}
-    assert json.loads(legend["saved"][V3]) == {"mode": "nest", "range": "next", "deps": "none", "legend": False}
+    # iss-00607 T-06: the deps of version 2 is not carried over
+    assert json.loads(nxt["saved"][V3]) == {"mode": "nest", "range": "next", "legend": True}
+    assert json.loads(legend["saved"][V3]) == {"mode": "nest", "range": "next", "legend": False}
     assert legend["saved"][V2] == v2
     assert set(legend["saved"]) == {V2, V3}
+
+
+# --- iss-00607 T-05, T-06: no line choice; every line is drawn ------------------------------------------------
+
+
+@pytest.mark.parametrize("name", ["nest", "tree"])
+def test_the_toolbar_has_no_line_choice_and_ends_with_the_range_group(shots: dict[str, Any], name: str) -> None:
+    """iss-00607 R-01, R-03: in all, now and next the bar has no deps group nor its three words; zoom, fit, mode
+    and the range group stay in their order; the legend still explains the lines."""
+    for shot in shots[name]:
+        tools = shot["tools"]
+        assert 'data-act="deps"' not in tools and 'aria-label="依存の線"' not in tools
+        for word in ("待っている線", "すべての線", "線なし"):
+            assert word not in tools
+        assert re.findall(r'data-act="([^"]+)"', tools) == [
+            "zout",
+            "z100",
+            "zin",
+            "fit",
+            "mode",
+            "range",
+            "range",
+            "range",
+        ]
+        assert tools.count('class="tool-group"') == 2
+        legend = shot["legend"]
+        for line in ("待っている依存", "終わった依存", "親子（木）", "直接の依存", "間接（2段目より先）", "関係ない"):
+            assert f"{line}</li>" in legend, line
+    assert {shot["range"] for shot in shots[name]} == {"all", "now", "next"}
+
+
+def test_a_saved_deps_of_none_still_draws_every_line(shots: dict[str, Any]) -> None:
+    """iss-00607 R-04, F-01: a version 3 holding deps none draws the same lines as one without it, the done
+    dependencies (is-done) among them."""
+    (saved_none,) = shots["nolines"]
+    (plain,) = shots["lines"]
+    assert saved_none["range"] == plain["range"] == "all"
+    edges = saved_none["edges"]
+    assert edges and edges == plain["edges"]
+    assert "is-done" in edges and "is-wait" in edges
+    assert saved_none["world"] == plain["world"]
 
 
 # --- T-08, F-01: next with nothing to show ---------------------------------------------------------------------
@@ -231,7 +286,7 @@ def test_next_with_nothing_to_show_keeps_the_bar_and_says_so(shots: dict[str, An
     assert again["none"] == {"hidden": False, "text": NOTICE}
 
 
-@pytest.mark.parametrize("name", ["nest", "tree", "legacy"])
+@pytest.mark.parametrize("name", ["nest", "tree", "legacy", "nolines", "lines"])
 def test_the_notice_is_hidden_when_something_is_shown(shots: dict[str, Any], name: str) -> None:
     for shot in shots[name]:
         assert shot["none"] is not None and shot["none"]["hidden"] is True
