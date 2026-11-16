@@ -33,14 +33,16 @@ export function agentsState(env) {
   memoryFor(mem, scope.id);
   // Without a choice in the query or the Map (a panel opened again, a path without agent=), the agent placed last
   // in this Scope stands in, so another one left alone never opens by itself (FQG attempt 1).
-  const wanted = env.param("agent") ?? mem.last;
+  const asked = env.param("agent");
+  const wanted = asked ?? mem.last;
+  const fromLast = asked == null && mem.last != null;
   const goneIds = mem.gone;
   const visibility = agentsVisibility({ status, problem, records, agents, invalid, invalidIds, wanted, goneIds, embed });
   // A loss only when the match is known: ok, readable records and no shape notice (FQG attempt 1, F-04).
   if (visibility.reason === null && visibility.show && wanted && !wanted.startsWith("gone:") && !agents.some((item) => item.id === wanted) && !invalidIds.has(wanted)) {
     noteGone(mem, wanted, { stale: false });
   }
-  const state = { ...visibility, agents, invalid, invalidIds, wanted, goneIds };
+  const state = { ...visibility, agents, invalid, invalidIds, wanted, fromLast, goneIds };
   states.set(env, state);
   return state;
 }
@@ -98,7 +100,10 @@ export function agentsTab(env) {
   if (state.reason !== null) return notice(env, state);
   const pick = pickAgent(state.agents, state.wanted, state.goneIds);
   if (pick.addGone) noteGone(mem, pick.addGone, { stale: pick.addGoneStale });
-  if (pick.remember) env.keep("agent", pick.remember);
+  // The agent opened from the memory is written as the choice too, so pressing it in the strip is no move and its
+  // frame stays (iss-00602 D-02). A loss (gone:<id>) from pickAgent comes first (F-01).
+  const remember = pick.remember ?? (state.fromLast && pick.selected ? pick.selected.id : null);
+  if (remember) env.keep("agent", remember);
   picks.set(env, pick);
   const { ctx, scope } = env;
   const selected = pick.selected;
@@ -225,7 +230,8 @@ export function paintAgentList(root, env, { redraw } = {}) {
   }
   if (watch.follow) revealChosen(strip, watch);
 
-  // The person's pick forgets the losses of this Scope before the click's own handling redraws (R-05).
+  // The person's pick forgets the losses of this Scope before the click's own handling redraws (R-05). A modified or
+  // non-primary press opens a new tab and leaves this page's memory alone (iss-00602 D-04).
   const box = root.querySelector('.sd-framebox[data-frame="agents"]');
   if (box && !box.dataset.pickWatch) {
     box.dataset.pickWatch = "1";
@@ -233,7 +239,8 @@ export function paintAgentList(root, env, { redraw } = {}) {
       "click",
       (event) => {
         const item = event.target?.closest?.("[data-agent-pick]");
-        if (item) forgetGone(mem, item.dataset.agentPick);
+        const plain = event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
+        if (item && plain) forgetGone(mem, item.dataset.agentPick);
       },
       true,
     );
