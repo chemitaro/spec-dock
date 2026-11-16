@@ -1,41 +1,63 @@
 package spec
 
 // 計画（Issue）。型 specdock/v1。
-// 作業しながら、手順の追加、変更、status の更新を、このファイルに直接書く。
 
-// 目標（任意）。
-// goal: "..."
+goal: "構造の図から『後に続く』の数をなくし、稼働の印をすべて箱に収める（折り返して箱を伸ばす）"
 
-// 実装の手順。番号（S-01、…）をキーにし、番号の順に並べる。
-// title と realizes（満たす要件・失敗の条件の番号）が必須。
-// status は todo（既定）、doing、done、dropped。after は先に済ませる手順の番号。
-// 1手順を1行に書き、status は title と realizes のすぐ後に置く。status の位置がそろうので一括で書き換えやすく、
-// 同じ手順に status を2つ書く誤りも防げる（同じ値の2つは CUE が黙ってまとめ、違う値なら誤りになる）。
-// すべての要件に、それを満たす手順が要る（dropped の手順は数えない）。
-// strict 以上では、dropped でない手順のすべてが、いずれかの番号に結び付く。
 steps: {
-	// "S-01": {title: "〜を作る", realizes: ["R-01"], status: "todo", after: ["..."], session: "impl"}
+	"S-01": {title: "tests/js/dashboard_graph_check.mjs に layout の options の marks を通す口を足し、test_dashboard_graph_marks_rows.py に T-01〜T-05 を書いて、直す前のコードで markRows・rowsOf・高さのテストが落ち、印なしの一致（T-03）と既存の digest のテストが通ることを確かめる（Red）", realizes: ["R-04", "R-05"], status: "todo", session: "impl-sol"}
+	"S-02": {title: "layout.js に D-01（MARK_ROW・MARK_INSET・FRAME_TITLE_MIN・markRows・rowsOf）と D-02（box・tbox・frame の高さ、flatten の rows）を入れ、S-01 のテストと構造の図の既存のテスト（graph_js・graph_range・graph_toolbar・small_screens）を通す（Green）", realizes: ["R-04", "R-05", "F-01"], status: "todo", after: ["S-01"], session: "impl-sol"}
+	"S-03": {title: "画面の静的・偽の DOM のテスト（T-06・T-07）を先に直して落ちることを確かめ、D-05（dnMark・凡例・aria-label・置き場の all・is-wrap・CSS・marks の dump と golden・edgeAudit の markOverflow）と D-03・D-04（measureMarks・checkRows・ResizeObserver・歯止め）を入れて通す", realizes: ["R-01", "R-02", "R-03", "R-04", "R-06", "R-07", "F-01", "F-02", "F-03"], status: "todo", after: ["S-02"], session: "impl-claude"}
+	"S-04": {title: "static-inventory.json の sha256 を直し（変われば）、make lint と全体の uv run pytest を通す", realizes: ["R-05", "R-07"], status: "todo", after: ["S-03"], session: "impl-claude"}
+	"S-05": {title: "D-07 の実機の写し（エージェント1人・3人・6人の箱、iss-00613 の箱の前後、ボードの『後に続く』、1440・390 × 明暗）、edgeAudit の違反0・markOverflow 0・ブラウザーのエラー0を report.md に残し、試しの URL を立てる", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06"], status: "todo", after: ["S-04"], session: "owner"}
 }
 
-// テスト。番号（T-01、…）をキーにする。title と verifies（確かめる要件・失敗の条件の番号）が必須。
-// standard 以上では、すべての要件に、strict 以上では、すべての失敗の条件に、確かめるテストが要る。
 tests: {
-	// "T-01": {title: "〜を確かめる", verifies: ["R-01"]}
+	"T-01": {title: "markRows：m なし・items 空で 1、ほかの印の残りに全部入れば 1、入らなければ 1 + 稼働の印の行（ちょうど入る境と1px越える境）、ほかの印なしで稼働の印の行だけ、avail より広い印は1つで1行、reserve（題名の最小）を足して判定する", verifies: ["R-04"]}
+	"T-02": {title: "options.marks を渡した layout：稼働の印が1人（1行）・3人（2行）・6人（3行）の箱の高さが 88・108・128（入れ子・木）、行が2つの入れ子の枠の見出しが MARK_ROW 高く中身が下がる、幅は変わらない、rows は 1 のとき鍵がない", verifies: ["R-05"]}
+	"T-03": {title: "marks なし・{}・全部1行の marks の layout が、marks なしの今の layout と同じ JSON。iss-00603 の digest の比較（test_all_and_now_lay_out_as_the_two_old_combinations）がそのまま通る", verifies: ["R-05", "F-01"]}
+	"T-04": {title: "稼働の印が1人・3人・6人の箱と2行の枠を含む小さな構造と context の構造で、入れ子・木 × 全体・いま・これから・focus の routeLayout の audit の違反0", verifies: ["R-05"]}
+	"T-05": {title: "layout の box・tframe・frame の node ごとに、rowsOf(node, marks[id]) が node.rows ?? 1 と一致する", verifies: ["R-04", "R-06"]}
+	"T-06": {title: "画面の静的な検査：boxHtml・frameHtml・renderLegend に dnMark と「後に続く」がなく、marks.js に dnMark がない。置き場が orcaSlot(s.id, \"all\")、rows > 1 で is-wrap。ボードの card は downMark と orcaSlot(scope.id, 4) のまま。paintOrca の後と ResizeObserver から checkRows を呼び、checkRows は rowsOf で比べて違うときだけ render する", verifies: ["R-01", "R-02", "R-03", "R-06"]}
+	"T-07": {title: "偽の DOM で paintOrcaMarks：data-orca-max=\"all\" の置き場はエージェント6人に max 6 を渡し、4 の置き場は max 4 のまま。agents が配列でない worktree は max 1。parts.orcaSlot(id, \"all\") の HTML", verifies: ["R-03", "F-01"]}
+	"T-08": {title: "実機：エージェント1人・3人・6人の箱と iss-00613 の箱（前後）の写し 1440・390 × 明暗、edgeAudit の違反0・markOverflow 0・ブラウザーのエラー0、『後に続く』が構造の図になくボードにある、経過の文字だけの要約で箱が作り直されない（要素の同一性）", verifies: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06", "R-07", "F-02", "F-03"]}
 }
 
-// 検証のしかた、戻し方、終わりの条件（任意）。critical では、手順があれば rollback が要る。
-// verification: "..."
-// rollback:     "..."
-// exit:         "..."
+verification: """
+	節目：`uv run pytest tests/unit/presentation/test_dashboard_graph_marks_rows.py tests/unit/presentation/test_dashboard_graph_js.py tests/unit/presentation/test_dashboard_graph_range.py tests/unit/presentation/test_dashboard_graph_toolbar.py tests/unit/infra/test_dashboard_orca_views_js.py tests/unit/infra/test_dashboard_orca_marks_js.py`。
+	最後に `make lint`、`uv run pytest`（全体）。実機は D-07。
+	"""
 
-// 実行の割り当て（任意）。手順の session は、実装のセッション（impl）を指す。
-// セッションのモデルと推論は起動のときに決まるので、計画で選べるのは、計画の後に起動するセッション（実装担当）の値。
-// 計画を書いたセッション（spec）の値は、事実として記録する。
-// レビューの after は、どの手順の後かを指す。モデルと推論の名前は、どんな文字列でもよい。
-// execution: {
-// 	sessions: {
-// 		spec: {task: "仕様化（起動した側が選んだ値の記録）", model: "...", effort: "...", rationale: "<起動した側と根拠>"}
-// 		impl: {task: "実装", model: "...", effort: "...", rationale: "..."}
-// 	}
-// 	reviews: code: {role: "コードのレビュー", after: "S-01", model: "...", effort: "..."}
-// }
+rollback: "PR を戻す（dashboard の静的な資産とテストだけ）。API・保存・モデルは変わらない。"
+
+exit: "PR がマージできる状態で CI が通り、最終品質ゲートの closure.md があり、report.md に実機の写しと試しの URL がある。マージは統括が行う。"
+
+// 関門（coding-task / specify の ## 関門）
+gates: {
+	checkpoints: {
+		"CP-1": "なし（S-02 の後は、タスク担当がテストの合格を確かめてから S-03 の担当を起動する。レビューは最終品質ゲートでまとめる）"
+	}
+	final_quality_gate: {
+		scope:          "開始のコミット d9bb6164d から S-04 の終わりまで（S-05 は記録だけ）。PR の直前に origin/main を取り込んだら、その最後のコミットでやり直す"
+		perspectives:   ["functional-correctness", "requirements-closure", "test-adequacy", "ui-behavior"]
+		test_commands:  ["make lint", "uv run pytest"]
+		record_paths:   ["spec-dock/initiatives/00000-00999/iss-00620/"]
+		second_opinion: "none"
+		reviewer:       "quality-gate-reviewer opus / medium"
+	}
+	merge:      "owner"
+	merge_note: "統括がマージする（依頼書）。タスク担当はマージしない"
+}
+
+execution: {
+	sessions: {
+		spec:          {task: "仕様化（起動した側が選んだ値の記録）", model: "opus", effort: "medium", rationale: "統括が方針の「タスク担当 × standard」から選んだ（依頼書）"}
+		"impl-sol":    {task: "実装（S-01〜S-02、layout.js とその node のテスト）", model: "gpt-6.1-sol", effort: "medium", rationale: "codex。行の数と高さは DOM のない純粋な計算で node のテストで確かめられる（方針の「テストで確かめられる実装」× standard）。本人の指示で Sol を使う。chat-scratch の symlink の拒否や確認の画面で止まったら、待たずに止め、Claude Opus 5.5 / medium に切り替える（統括が了承済み、逸脱として report.md に書く）"}
+		"impl-claude": {task: "実装（S-03〜S-04、画面・CSS・測ってやり直す仕組み）", model: "opus", effort: "medium", rationale: "claude。画面は実機の DOM と見た目の判断を含む（依頼書の指定：画面は Claude Opus 5.5 / medium）"}
+		owner:         {task: "実機の写しと試しの URL（S-05）", model: "opus", effort: "medium", rationale: "タスク担当（このセッション）。受け入れの証拠の取得で、実装ではない"}
+	}
+	reviews: {
+		spec: {role: "仕様のレビュー", after: "S-01", model: "opus", effort: "high"}
+		gate: {role: "最終品質ゲート", after: "S-04", model: "opus", effort: "medium"}
+	}
+}
