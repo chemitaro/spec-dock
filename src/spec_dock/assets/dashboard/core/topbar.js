@@ -9,9 +9,11 @@ export const TABS = [
   ["timeline", "時間の軸", "history"],
   ["todos", "人のタスク", "person"], // iss-00554
 ];
-// Without a repository: the overview and every repository's human tasks (iss-00554 D-05).
+// Without a repository: the overview, the cross-repository structure (iss-00614) and every repository's human tasks
+// (iss-00554 D-05).
 export const ALL_TABS = [
   ["overview", "/", "横断の概況", "globe"],
+  ["allgraph", "/graph", "横断の構造", "layers"],
   ["todos", "/todos", "人のタスク", "person"],
 ];
 

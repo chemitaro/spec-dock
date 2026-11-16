@@ -80,6 +80,7 @@ function title() {
   const repo = state.route.repository?.split("/").slice(1).join("/");
   const scope = state.route.scope ? `${state.route.scope} · ` : "";
   if (!repo && state.route.view === "todos") return "人のタスク · すべてのリポジトリ · SpecDock"; // iss-00554
+  if (!repo && state.route.view === "allgraph") return "横断の構造 · すべてのリポジトリ · SpecDock"; // iss-00614
   return repo ? `${scope}${module?.title ?? ""} · ${repo} · SpecDock` : "すべてのリポジトリ · SpecDock";
 }
 
@@ -217,7 +218,7 @@ function interceptLinks(event) {
     window.open(url.href, "_blank", "noopener");
     return;
   }
-  const screen = url.pathname === "/" || url.pathname === "/todos" || (url.pathname.startsWith("/r/") && !url.pathname.includes("/files/"));
+  const screen = url.pathname === "/" || url.pathname === "/todos" || url.pathname === "/graph" || (url.pathname.startsWith("/r/") && !url.pathname.includes("/files/"));
   if (!screen) return; // materials and other files open as ordinary pages
   const target = parseRoute(url.href);
   if (!target.repository || target.repository !== state.route.repository) {

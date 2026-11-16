@@ -1,6 +1,6 @@
 /* Scope の欄（iss-00587 D-05）。構造の図とボードで同じ部品（_shared/panel.js）。PC は右、スマートフォンは下から。
    タブの中身の見た目は _shared/scope_tabs.css、札や知らせは _shared/parts.css（どちらも .sd-pn を範囲に含む）。 */
-:is([data-view="graph"], [data-view="board"]) { --pn-w: clamp(380px, 44cqw, 720px); }
+:is([data-view="graph"], [data-view="board"], [data-view="allgraph"]) { --pn-w: clamp(380px, 44cqw, 720px); }
 .sd-pn { position: absolute; z-index: 25; top: 10px; right: 10px; bottom: 10px; width: var(--pn-w); display: flex; flex-direction: column; min-height: 0; border: 1px solid var(--ds-border); border-top: 4px solid var(--st, var(--ds-accent)); border-radius: var(--ds-radius-l); background: var(--ds-surface); box-shadow: var(--ds-shadow-l); transform: translateX(calc(100% + 24px)); transition: transform .26s var(--ds-ease); }
 .sd-pn.is-open { transform: none; }
 .sd-pn .pn-grab { display: none; }

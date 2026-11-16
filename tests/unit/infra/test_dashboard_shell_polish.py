@@ -62,7 +62,7 @@ def test_the_marks_values_live_only_in_core_ui() -> None:
 
 
 def test_the_graph_box_shows_the_worktree_only_while_doing() -> None:
-    graph = (ASSETS / "views" / "graph.js").read_text()
+    graph = (ASSETS / "views" / "graph" / "draw.js").read_text()  # iss-00614: the graph's boxes are drawn there
     assert 'M.wtMark(s.state === "doing" ? s.branch : null)' in graph
 
 

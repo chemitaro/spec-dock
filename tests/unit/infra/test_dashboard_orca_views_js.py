@@ -94,7 +94,8 @@ AGENTS_ROW = '<div class="gx-agents">${orcaSlot(s.id, "all")}</div>'
 
 def test_graph_boxes_and_frames_put_the_agents_on_a_row_of_their_own() -> None:  # iss-00620 T-06
     source = (VIEWS / "graph.js").read_text()
-    box = _function(source, "boxHtml")
+    draw = (VIEWS / "graph/draw.js").read_text()  # iss-00614: the boxes, frames and legend are drawn there
+    box = _function(draw, "boxHtml")
     # the other marks stay on their row, the downstream count with them (R-01); the agents' slot is not among them
     assert box.count('<div class="gx-marks">') == 2
     assert box.count("${M.dnMark(s.downstream)}</div>`") == 2
@@ -103,7 +104,7 @@ def test_graph_boxes_and_frames_put_the_agents_on_a_row_of_their_own() -> None: 
     # the row of agents follows the other marks, in every box
     assert box.count(AGENTS_ROW) == 1
     assert box.index("marks +") < box.index(AGENTS_ROW) < box.index("`</div>`")
-    frame = _function(source, "frameHtml")
+    frame = _function(draw, "frameHtml")
     head = frame[frame.index("const head") : frame.index("const meta")]
     # the frame's row of agents is the heading's last child, so that taps, the double click and dimming keep working
     assert head.rstrip().endswith(AGENTS_ROW + "</div>`;")
@@ -112,7 +113,7 @@ def test_graph_boxes_and_frames_put_the_agents_on_a_row_of_their_own() -> None: 
     assert "${M.hmMark(s)}${M.dnMark(s.downstream)}</div>`" in meta and "gx-agents" not in meta
     tap = _function(source, "onTap")
     assert 'target.closest(".gx-box, .gx-fh")' in tap
-    legend = _function(source, "renderLegend")
+    legend = _function(draw, "renderLegend")
     assert '"後に続く数"' in legend
     marks = (VIEWS / "graph/marks.js").read_text()
     assert "export const dnMark" in marks or "export function dnMark" in marks
