@@ -9,52 +9,56 @@
 <!-- ▼ 説明資料の本文（Markdown）。編集するのはこのブロックだけです。 -->
 <script type="text/markdown" id="ds-source">
 ---
-title: この Scope の説明資料（題名を書き換えます）
-lead: この資料で理解できることを、初めて読む人にも分かるように1〜2文で書きます。
+title: 稼働しているエージェントをすべて印で出し、エージェントのタブの小さな点を直す
+lead: 構造の図・ボード・横の欄で、worktree にいるエージェントを1人1つの印ですべて出し、エージェントのタブで見つかった5つの小さな点を直します。
 category: 説明資料
 audience: 本日チームに加わった新メンバー
 status: 下書き
 ---
 
-<!-- spec-dock:explanation-skeleton -->
-<!-- 雛形から書き換えたら、上の印の行を消します。印が残っていると、検査は「雛形のまま」と判定します。 -->
-
 ## この資料で分かること
 
 :::summary
-- 読み終えたときに理解できていることを、1文ずつ書きます。
-- 背景、仕組み、失敗時の動き、確認方法のうち、特に伝えたい点を選びます。
-- 短い Scope なら、1〜2項目でかまいません。
+- 印は「+N」にまとめず、全員分を出します。入りきらなければ折り返し、構造の図の箱はその分だけ高くなります（幅は変わりません）。
+- 箱の高さは、画面が描いた印の行の数を測り、配置の計算（layout.js）に渡して決めます。行の数が変わったときだけ配置し直します。
+- エージェントのタブの5点（今の相手の押しで書きかけが消える、欄の足のリンクに選びが付かない、スマホの印の2回目の押し、修飾キーの押しで覚えが変わる、形の違う要約をいなくなったと読む）を直します。
 :::
 
 ## 背景と目的
 
-なぜこの Scope に取り組むのか、どの問題を解決するのかを具体的に説明します。
+本人から「3台稼働していれば3つ表示してほしい」と要望がありました。今は構造の図の箱が2つ、枠の見出しが3つ、ボードの札と横の欄が4つまでで、超えた分は「+N」になります。
+
+エージェントのタブは iss-00593 で作り、iss-00601 で残りの5点を調べました。どれも別の相手に送る道ではありませんが、人が普通にする操作で起きるものがあります。
 
 ## 全体の構成
 
-構成要素の役割と関係を説明します。図は、理解を大きく助ける場合だけ入れます。
-
 ```plantuml id=overview
 @startuml
-title 全体の構成
+title 印の行と箱の高さ
 top to bottom direction
-actor "利用者" as User
-component "説明対象の仕組み" as System
-database "データ" as Data
-User -> System : 操作する
-System -> Data : 読み書きする
-System --> User : 結果を返す
+component "orca-web の部品\n（印を描く）" as Marks
+component "graph.js\n（描いた印の行を測る）" as Graph
+component "layout.js\n（行の数で箱の高さを決める）" as Layout
+component "router.js\n（線を引く）" as Router
+Graph -> Marks : 全員の数を max に渡す
+Marks --> Graph : 折り返した印
+Graph -> Layout : orcaRows（Scope ごとの行の数）
+Layout -> Router : 伸びた箱の座標
 @enduml
 ```
 
+- 置き場（`.sd-orca`）は行の残りの幅まで縮み、部品の印が置き場の中で折り返します。
+- 1行増えるごとに、箱（と枠の見出し）は 18px 高くなります（orca-web の小さい印 16px と行の間 2px）。
+- 経過の表記だけが変わる要約では、行の数が同じなので配置し直しません。続けての配置し直しは2回までです。
+
 ## 確認方法
 
-読者が手元で確かめられる手順を書きます。
-
 ```sh
-spec-dock active show --json
+spec-dock scope show iss-602 --json
+uv run pytest tests/unit/presentation/test_dashboard_graph_js.py tests/unit/infra/test_dashboard_agents_tab_js.py
 ```
+
+実機の確かめ（写しと edgeAudit）は report.md に残します。
 </script>
 <script src="../../../design-system/ds.js"></script>
 </head>
