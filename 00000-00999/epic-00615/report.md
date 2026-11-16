@@ -41,7 +41,28 @@ ID: "epic-00615"
 - **iss-00616（P3）**：帯の端を印の下の辺にすると、制御点を端の上に持ち上げる曲線は帯の中へ戻る。帯から出る線は、制御点を下に置く（下へ垂れる弧）。
 - **iss-00616（P3）**：構造の `worktrees.status` が ok でない（読めない）と `matchWorktrees` が対応を作らず、このリポジトリのエージェントが全部帯に「ほかのリポジトリ」として出る。この状態では、稼働の印と同じく線と帯を出さない（F-01 に足す）ことを推す。
 
+### 改訂の仕様のレビュー（2026-11-17、合格）
+
+- 改訂の中身：線の端を印に、同じ箱の中の親子を弧で結ぶ、どこの印を押してもそのエージェントのチャット、Epic・Initiative の枠の worktree の印、印の並び順（orca-web の iss-00043）、ボードの札の専用の行。新しい Issue iss-00621 を作った。依頼の元は `.workbench/planner-epic-00615-r2.md` と `.workbench/coordinator-msg-2026-11-17-ab.md`。改訂前の文書の写しは `.workbench/rev2-before/`。
+- レビュアー：spec-reviewer（Opus 5.5 / high）1人。保証レベル standard なので、2人目（ChatGPT）は置いていない。
+- round-2：合格（P0 0、P1 0、P2 6、P3 6）。この改訂で入った誤りが含まれていたので、12件すべてを直した（`review-response-r2.md`）。
+- round-3：合格（P0 0、P1 0、P2 0、P3 2）。結果のファイルは main のチェックアウトの `.workbench/spec-review/epic-00615/round-3.json`（検査 `round-3.check.json`、`status: pass`）。
+- 合格した文書の sha256：
+  - `requirement.cue` 907740b7e4bd195225636cfe84b965efbad4598eb81c01abc9e8249456186d46
+  - `design.cue` a2b6dca48fe84afe295c95d66ab7cef6b9428c0e8214d75aa229f83beed9335c
+  - `plan.cue` 1ca6e2050add47790a4e198721ce697147c580282e74799e5c93ce5222233fbb
+  - `explanation.html` ccd5f18705cc1b3621b52796d53801e9cbfa162525af401b21b7a95b567f71fe（見出しの『状態』の欄は『改訂のレビュー前』のまま。合格した文書を変えないため）
+- `spec-dock scope check epic-00615`：誤り0、警告0。
+- 前回（round-1）の申し送りのうち、帯の同じ項目の組（弧で結ぶ）、両端ともほかのリポジトリの組（リポジトリの構造の図には出さない）、R-11 の入れ物（親がいるときだけ）、『横断の構造』の R-09（いちばん上に見えている枠を守る）、色の目安、worktree の一覧が読めないとき（F-01）は、改訂で文書に決めた。
+
+### 改訂の子の Issue への申し送り（round-3 の P3。止めない指摘。Issue の仕様で決める）
+
+- **iss-00617（P3）**：『横断の構造』で、1つのリポジトリだけ構造の worktree の一覧が読めないときの扱いが決まっていない。F-01 の考え（対応が作れないエージェントを帯に並べない）に合わせ、そのリポジトリの worktree の線と帯だけを外し（そのリポジトリのエージェントを「ほかの場所」に置かない）、ほかのリポジトリの線は出す形を推す。
+- **iss-00621・iss-00616（P3）**：D-08 は、枠の見出しの行に worktree の印を足しても行の数は変わらない（題名が縮む）とするが、iss-00620 で `.gx-fh` が折り返す flex になると、題名（`white-space: nowrap`、基準の大きさが中身の幅）より先に worktree の印か題名が次の行へ折り返し、見出しが `MARK_ROW` で数えない1行分伸びうる。iss-00621 で、見出しの行（状態の印・ID・題名・worktree の印）が1行に収まるよう、題名に `flex: 1 1 0`（か `min-width: 0` と基準0）を与えるなどで、題名だけが縮むことを確かめ、実機の `markOverflow` で確かめる。iss-00616 の `markSpots` の『題名の行の下』の位置は、その前提に立つ。
+
 ## Residual Risks / Follow-ups
 
 - orca-web の iss-00043 への依存は、リポジトリをまたぐので GitHub の blocked-by に登録できない（`spec-dock dependency add --to gh:chemitaro/orca-web#43` は `SCOPE_NOT_FOUND`）。`plan.cue` の `prerequisites` に書いた。orca-web の iss-00043 も本人の順序で iss-00614 の後に始める。
 - orca-web の epic-00004 の `plan.cue` の `slices` には iss-00043 がまだない（この依頼の範囲外のため書いていない）。
+- 改訂で、orca-web の iss-00043 の範囲が広がった（`startedAt`、`buildMarks` の並び、R-14・D-01）。iss-00043 の requirement.cue は保証レベルのほかは空なので、直すものはなかった。iss-00043 のタスク担当が、この Epic の R-14・D-01 から仕様を書く。並びの変更は orca-web の部品を読むすべての画面に効く。
+- 依存（2026-11-17 に登録）：`iss-00621 → iss-00620`、`iss-00621 → iss-00614`、`iss-00616 → iss-00621`、`iss-00616 → iss-00620`。iss-00616・iss-00617 の orca-web iss-00043 への依存は `plan.cue` の `prerequisites`（iss-00616 は始める前に入っていること）。
