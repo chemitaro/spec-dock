@@ -5,11 +5,11 @@ package spec
 goal: "構造の図の稼働の印をすべて、ほかの印の下の専用の行に収める（折り返して箱を伸ばす）。『後に続く』は今のまま"
 
 steps: {
-	"S-01": {title: "tests/js/dashboard_graph_check.mjs に layout の options の marks を通す口を足し、test_dashboard_graph_marks_rows.py に T-01〜T-05 を書いて、直す前のコードで markRows・nodeMarkRows・高さのテストが落ち、印なしの一致（T-03）と既存の digest のテストが通ることを確かめる（Red）", realizes: ["R-04", "R-05"], status: "todo", session: "impl-sol"}
-	"S-02": {title: "layout.js に D-01（MARK_ROW・MARK_INSET・markRows・nodeMarkRows。既存の rowsOf は変えない）と D-02（box・tbox・frame の高さ、flatten の rows）を入れ、S-01 のテストと構造の図の既存のテスト（graph_js・graph_range・graph_toolbar・small_screens）を通す（Green）", realizes: ["R-04", "R-05", "F-01"], status: "todo", after: ["S-01"], session: "impl-sol"}
-	"S-03": {title: "画面の静的・偽の DOM のテスト（T-06・T-07）を先に直して落ちることを確かめ、D-05（置き場の all・.gx-agents・CSS・edgeAudit の markOverflow）と D-03・D-04（measureMarks・checkRows・ResizeObserver・歯止め）を入れて通す", realizes: ["R-01", "R-02", "R-03", "R-04", "R-06", "R-07", "F-01", "F-02", "F-03"], status: "todo", after: ["S-02"], session: "impl-claude"}
-	"S-04": {title: "static-inventory.json の sha256 を直し（変われば）、make lint と全体の uv run pytest を通す", realizes: ["R-05", "R-07"], status: "todo", after: ["S-03"], session: "impl-claude"}
-	"S-05": {title: "D-07 の実機の写し（エージェント1人・3人・6人の箱、iss-00613 の箱の前後、構造の図とボードの『後に続く』、1440・390 × 明暗）、edgeAudit の違反0・markOverflow 0・ブラウザーのエラー0を report.md に残し、試しの URL を立てる", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06"], status: "todo", after: ["S-04"], session: "owner"}
+	"S-01": {title: "tests/js/dashboard_graph_check.mjs に layout の options の marks を通す口を足し、test_dashboard_graph_marks_rows.py に T-01〜T-05 を書いて、直す前のコードで markRows・nodeMarkRows・高さのテストが落ち、印なしの一致（T-03）と既存の digest のテストが通ることを確かめる（Red）", realizes: ["R-04", "R-05"], status: "done", session: "impl-sol"}
+	"S-02": {title: "layout.js に D-01（MARK_ROW・MARK_INSET・markRows・nodeMarkRows。既存の rowsOf は変えない）と D-02（box・tbox・frame の高さ、flatten の rows）を入れ、S-01 のテストと構造の図の既存のテスト（graph_js・graph_range・graph_toolbar・small_screens）を通す（Green）", realizes: ["R-04", "R-05", "F-01"], status: "done", after: ["S-01"], session: "impl-sol"}
+	"S-03": {title: "画面の静的・偽の DOM のテスト（T-06・T-07）を先に直して落ちることを確かめ、D-05（置き場の all・.gx-agents・CSS・edgeAudit の markOverflow）と D-03・D-04（measureMarks・checkRows・ResizeObserver・歯止め）を入れて通す", realizes: ["R-01", "R-02", "R-03", "R-04", "R-06", "R-07", "F-01", "F-02", "F-03"], status: "done", after: ["S-02"], session: "impl-claude"}
+	"S-04": {title: "static-inventory.json の sha256 を直し（変われば）、make lint と全体の uv run pytest を通す", realizes: ["R-05", "R-07"], status: "done", after: ["S-03"], session: "impl-claude"}
+	"S-05": {title: "D-07 の実機の写し（エージェント1人・3人・6人の箱、iss-00613 の箱の前後、構造の図とボードの『後に続く』、1440・390 × 明暗）、edgeAudit の違反0・markOverflow 0・ブラウザーのエラー0を report.md に残し、試しの URL を立てる", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06"], status: "done", after: ["S-04"], session: "owner"}
 }
 
 tests: {
