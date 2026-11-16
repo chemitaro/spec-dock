@@ -9,7 +9,7 @@ steps: {
 	"S-02": {title: "layout.js に D-01、prefs.js に D-02（restorePrefs と注釈）を実装し、dashboard_graph_check.mjs の組み合わせから deps をなくして、すべての組み合わせで edgeAudit の違反0を通す（Green）", realizes: ["R-02", "R-04", "F-01"], status: "done", after: ["S-01"], session: "impl-sol"}
 	"S-03": {title: "toolbar のテスト（帯に deps の group がない、保存が3つの鍵、版3の deps none でも線が出る）を先に書いて落ちることを確かめ、graph.js に D-03 と savePrefs（D-02）を実装する", realizes: ["R-01", "R-03", "R-04", "F-01"], status: "done", after: ["S-02"], session: "impl-ui"}
 	"S-04": {title: "make lint と全体の pytest を通す", realizes: ["R-01", "R-02", "R-04"], status: "done", after: ["S-03"], session: "impl-ui"}
-	"S-05": {title: "spec-dock と housing-lifecycle の実データで、直す前と後の道具の帯と線を 1440・390、明暗で写し、edgeAudit の違反0と帯の大きさを report.md に残し、tailnet の試しの URL を立てる", realizes: ["R-05"], status: "todo", after: ["S-04"], session: "owner"}
+	"S-05": {title: "spec-dock と housing-lifecycle の実データで、直す前と後の道具の帯と線を 1440・390、明暗で写し、edgeAudit の違反0と帯の大きさを report.md に残し、tailnet の試しの URL を立てる", realizes: ["R-05"], status: "done", after: ["S-04"], session: "owner"}
 }
 
 tests: {
