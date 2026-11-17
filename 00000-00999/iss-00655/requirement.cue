@@ -62,7 +62,7 @@ requirements: {
 		acceptance: [
 			"node のテスト：トラックパッドの2本指とピンチの代表の値（表）で、2本指は動かす（量は deltaX・deltaY）、ピンチは今の倍率。見分けられない値（`wheelDeltaY` がない、120 の倍数でない、deltaX が 0 でない）は動かす",
 			"node のテスト：動かす wheel から 200ms の内に来た、`wheelDeltaY` だけでマウスのホイールに見える wheel は動かし、一続きが続く限り（各 wheel の間が 200ms 未満なら、全体が 200ms を超えても）動かすを続ける。らしいマウスのホイールの一続きの途中の、値だけで動かすに見える wheel は拡大・縮小を続ける",
-			"実機：小さな deltaX・deltaY の wheel（`wheelDeltaY` が 120 の倍数にならない値）で、拡大率が変わらず、世界がその量だけ動く",
+			"実機：前の wheel から 200ms 以上あけた、小さな deltaX・deltaY の wheel（deltaX ≠ 0。CDP の合成の wheel はどんな deltaY でも `wheelDeltaY` ±120 になるので、deltaX で2本指を模す）で、拡大率が変わらず、世界がその量だけ動く。本物のトラックパッドは本人が試しの URL で確かめる（統括が頼む）",
 		]
 	}
 	"R-03": {
@@ -117,7 +117,7 @@ requirements: {
 failures: {
 	"F-01": {
 		title: "見分けられない wheel は動かす（今の動き）"
-		text:  "`deltaMode` が 0 で、`wheelDeltaY` がない・0・120 の倍数でない・`deltaX` が 0 でない wheel は、動かす。拡大・縮小に倒さない。"
+		text:  "`deltaMode` が 0 で、`wheelDeltaY` がない・0・120 の倍数でない・`deltaX` が 0 でない wheel は、一続きの初め（前の wheel から 200ms 以上あいた、または前が確かな判定）なら動かす。拡大・縮小に倒さない。らしいマウスのホイールの一続きの途中では、R-02 の引き継ぎに従う（その一続きの判定を続ける）。"
 	}
 	"F-02": {
 		title: "線の検査を保つ"

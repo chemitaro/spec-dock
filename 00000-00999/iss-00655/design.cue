@@ -88,9 +88,9 @@ design: {
 	"D-06": {
 		title: "実機の確かめ"
 		text: """
-			この worktree を隔離した venv に入れ、一時の状態の置き場で別のポート（18655）、`--tailscale` で立てる（常駐の 47800・8791 の設定、道具の環境には触れない）。headless でない Chrome を `--disable-features=MacAppCodeSignClone` で 1440×900 に開き、CDP で：
+			この worktree を隔離した venv に入れ、一時の状態の置き場で別のポート（18655）、`--tailscale` で立てる（常駐の 47800・8791 の設定、道具の環境には触れない）。Chrome（headless でよい）を `--disable-features=MacAppCodeSignClone` で 1440×900 に開き、CDP で：
 			- 両方の画面で、`Input.dispatchMouseEvent`（`mouseWheel`、deltaY −120・+120）の前と後の拡大率（`.zoomval`）と、カーソルの下の世界の点のずれ。そのとき届いた wheel の値（`deltaMode`・`deltaY`・`wheelDeltaY`）を記録する。
-			- 小さな deltaX・deltaY の `mouseWheel`（例 deltaX 3、deltaY 7）：拡大率が変わらず、世界が動く（届いた値も記録）。CDP の値が `wheelDeltaY` 120 の倍数になって見分けの表と違えば、その事実を記録し、統括に問う。
+			- 前の wheel から 200ms 以上あけて（一続きにしない）、小さな deltaX・deltaY の `mouseWheel`（例 deltaX 3、deltaY 7）：拡大率が変わらず、世界が動く（届いた値も記録）。CDP の合成の wheel は、どんな deltaY でも `wheelDeltaY` ±120 になる（2026-11-18 に確かめ、統括の決定で A：記録して本人の実機で確かめる）ので、2本指は deltaX ≠ 0 で模し、deltaX 0 の小さな値が拡大・縮小になることも事実として記録する。
 			- `Input.dispatchKeyEvent` で → ↓ ← ↑、Shift+→、`+`、`-`、`0`：世界の transform と拡大率の前と後。
 			- 両方の画面で `specdockEdgeAudit()` の違反0、`specdockCmdAudit()` の `boxOverlaps`・`edgeOverlaps`・`heads` 0、ブラウザーのエラー0。
 			- 前と後の写し（`.workbench/iss-00655/shots/`）。閉じるのは CDP の `Browser.close`。
