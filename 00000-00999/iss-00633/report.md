@@ -49,6 +49,43 @@ ID: "iss-00633"
 - 仕様のレビュー（spec-reviewer opus / high、standard、同じレビュアー）：round-1 **合格**（P0・P1 0、P2 2：golden の写しに木の run がある・入れ子の不変が経験的、P3 2：詰めの間隔の S と S − 0.5 の食い違い・T-02 の maxWiden の出力）→ 文を直した（golden は試作を一時的に当てて `test_dashboard_graph_golden.py` ほか 54 passed を確かめた。`.workbench/spec-review/iss-00633/review-response.md`）。round-2 **合格**（P0〜P2 0、P3 1：purpose と plan の goal に『入れ子の結果を変えない』の言い切りが残る。契約は constraints と D-02 の『悪くしない』で決まる。記録のみ）。結果 `.workbench/spec-review/iss-00633/round-{1,2}.json` と `.check.json`（reviewed_sha `3f5f8d8e9`）。
 - **合格した文書の sha256**：requirement.cue `767be0c836dd432015b5a8b4d678cf139138ecb1fb417f5d67f5046d481df2f9`、design.cue `04790767f9b05aacb1d6e018d87367c7382b4216ede124b874b739be599736cc`、plan.cue `ef8845772471321b673e445505014ecec05721d13d3f74c8ee532cab1d4af1fa`。
 
+## 実装の記録
+
+- 開始のコミット `3f5f8d8e9`（origin/main）。
+- 逸脱 codex-symlink-refusal：S-01・S-02 の impl-sol（codex gpt-6.1-sol / medium、dispatch `ctx_a63a8c1831f8`、launch.effective codex / gpt-6.1-sol / medium）は、chat-scratch の writable root の symlink（UnsupportedOperation）で手元のコマンドを起動できず、変更なしで止まった（worker_done failed）。plan の rationale と統括の了承どおり Claude Opus 5.5 / medium に切り替え、同じ値のタスク担当のこのセッションが S-01・S-02 を行った（iss-00627 と同じ扱い。別のセッションは起こしていない）。
+- S-01（Claude Opus 5.5 / medium、このセッション）：Red `672cb3153`（`tests/unit/presentation/test_dashboard_graph_tree_route.py`、`tests/js/dashboard_graph_route_fix.mjs` に mode・marks・problems・maxWiden。product の木の『全体』・通り道・静的な検査の3件が落ち、business の木の『全体』は直す前も0で通る：(A) だけを直したときの退行の見張り）→ Green `18958e562`（router.js D-01 の `prefer`・`packFree`・`centre`・nudgePass の (c)・`lacking` の packed、layout.js D-02）。静的な検査の正規表現が packFree の定義も数えていたので、呼び出しだけに直した（テストの誤り）。整形 `3ca68b2c9`。
+- 節目の検証：`uv run pytest tests/unit/presentation/test_dashboard_graph_tree_route.py tests/unit/presentation/test_dashboard_graph_route_fix.py tests/unit/presentation/test_dashboard_graph_js.py tests/unit/presentation/test_dashboard_graph_fit.py` 56 件（静的な検査を直した後、新しいテストの4件を再実行して全部合格）。`make lint` pass。static-inventory.json は dashboard の資産を持たないので変わらない。
+- 実装の経路は試作と同じ（300 組のすべてで経路の digest が試作と一致）。
+
+## 比べ（S-03、T-04）
+
+[sweep-300.txt](artifacts/20261117t044625z-01--sweep-300.txt)（`.workbench/iss-00633/tools/sweep.py`、直す前 `3f5f8d8e9` の資産 → 直した後）。
+
+| 組 | 数 | 違反の増えた組 | 減った組 | 経路が同じ | 経路が変わった | 違反のある組（前 → 後） |
+|---|---|---|---|---|---|---|
+| 8 リポジトリ（iss-00627 R-05 と同じ 240 組） | 240 | 0 | 1 | 233 | 7（すべて木） | 1 → 0 |
+| うち入れ子 | 216 | 0 | 0 | 216 | 0 | 0 → 0 |
+| 固定した入力を含む | 300 | 0 | 2 | 289 | 11（すべて木） | 2 → 0 |
+
+- 違反のあった組：taikyohiyou_project の木の『全体』 3 → 0、固定した入力 product の木の『全体』 9 → 0（巡 10 → 5）。
+- 固定した入力の木（product・business × 範囲3 × 稼働の印あり・なし）の 12 組：直した後すべて 0。
+- 既存の写し（`graph_dom_golden.json` の入れ子と木の run）は書き直しなしで通る。
+- 木の大きな構造では、字下げの広げが減り、世界が狭くなる（taikyohiyou の木の『全体』は幅 1182 → 712px）。
+
+## 実機の確かめ（S-03、T-05）
+
+- 試しのサーバー：この worktree の wheel（`3ca68b2c9`）を隔離した venv（`.workbench/iss-00633/venv-after`）に入れ、この PC の状態の置き場の写し（`.workbench/iss-00633/state`）と、空の `XDG_CONFIG_HOME`（orca-web なし＝稼働の印なし）で `spec-dock dashboard serve --offline --tailscale --port 18633`。直す前は開始のコミットの wheel（`venv-before`、状態の写しは別）を 127.0.0.1 の 18634 に。常駐の 47800 と 8791、道具の環境には触れていない。
+- headless Chrome（`--disable-features=MacAppCodeSignClone`、CDP `Browser.close`）、窓 1440×900、倍率 100%、taikyohiyou_project の木の『全体』（`.workbench/iss-00633/tools/shot.mjs`）。
+
+| 組 | 直す前 | 直した後 |
+|---|---|---|
+| 1440 明 | overlaps 9（ほか0、世界 1182×36908） | すべて 0（世界 712×37503） |
+| 1440 暗 | overlaps 9 | すべて 0 |
+
+  直す前の 9 は iss-00627 の報告の 9 と同じ線の組（`lane r90#11~r144#17` ほか）。違反は boxHits・ownHits・overlaps・diagonal・portShare・failed・missing・markOverflow。
+- 写し（題名は Scope の ID に置き換えて写した。公開のリポジトリに題名を載せないため）：直す前 [1440 明](artifacts/20261117t044624z--before-tree-all-1440-light.png)・[1440 暗](artifacts/20261117t044624z-02--before-tree-all-1440-dark.png) → 直した後 [1440 明](artifacts/20261117t044624z-01--after-tree-all-1440-light.png)・[1440 暗](artifacts/20261117t044625z--after-tree-all-1440-dark.png)。epic-02026 に入る線の束のあたり。直す前は Epic の左の通り道に線が 2〜6px で詰まり、直した後は車線（8px）に分かれ、字下げが狭くなる。
+- 試しの URL（本人の確かめ用、確かめまで残す）：tailnet の 18633 番（`/r/github.com/chemitaro/taikyohiyou_project/` で「木」と「全体」。URL は統括への報告で伝える）。止め方：`kill $(lsof -tnP -iTCP:18633 -sTCP:LISTEN) $(lsof -tnP -iTCP:18634 -sTCP:LISTEN)`（またはタスク担当・統括に頼む）。
+
 ## Outcome
 
 ## Verification
