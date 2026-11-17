@@ -8,8 +8,8 @@ steps: {
 	"S-01": {title: "D-06：Epic epic-00615 の requirement.cue・design.cue を直し、spec-dock scope check epic-615 を通す（仕様のレビューの前に、タスク担当が書く）", realizes: ["R-06"], status: "done", session: "owner"}
 	"S-02": {title: "T-01 を tests/js/dashboard_graph_command.mjs・tests/js/dashboard_allgraph_command.mjs に先に書いて（今の下の端・stubs・boxArc・frameArc・bandArc・曲線の制御点を固定した期待を、この設計に合わせて直すことを含む）落ちることを確かめ、D-01（端）、D-02（hop）、D-03（sameHop）、D-04 のモデルの mark、D-05（top・ceiling、crossModel の ceiling: 4）を views/graph/command.js・views/allgraph/command.js に入れて通す。描き方のファイルは変えない", realizes: ["R-01", "R-02", "R-03", "F-01", "F-02"], status: "done", after: ["S-01"], session: "impl-sol"}
 	"S-03": {title: "T-02・T-03 を先に書いて（端の層の cl-dot と stubs の期待を直すことを含む）落ちることを確かめ、D-04 の描き方（command_motion.js の ARROW・arrowPath・markRect・endsHtml・bandMarkHtml、command_view.js の layersHtml・paintCmdSel、graph.css）を入れて通す", realizes: ["R-04", "R-05", "F-01"], status: "done", after: ["S-02"], session: "impl-claude"}
-	"S-04": {title: "make lint と全体の uv run pytest を通す（直したテストの期待が、端・道・弧・端の層の変更だけによることを確かめる。static-inventory.json に載る資産の sha256 が変われば直す）", realizes: ["R-05"], status: "todo", after: ["S-03"], session: "impl-claude"}
-	"S-05": {title: "D-07 の写し・測り・検査（T-04）を report.md に残し、本人が見る試しの URL（tailnet）を立てたままにする。受入に届かないか、写しで崩れがあれば、実装担当に返す", realizes: ["R-02", "R-03", "R-04", "R-05"], status: "todo", after: ["S-04"], session: "owner"}
+	"S-04": {title: "make lint と全体の uv run pytest を通す（直したテストの期待が、端・道・弧・端の層の変更だけによることを確かめる。static-inventory.json に載る資産の sha256 が変われば直す）", realizes: ["R-05"], status: "done", after: ["S-03"], session: "impl-claude"}
+	"S-05": {title: "D-07 の写し・測り・検査（T-04）を report.md に残し、本人が見る試しの URL（tailnet）を立てたままにする。受入に届かないか、写しで崩れがあれば、実装担当に返す", realizes: ["R-02", "R-03", "R-04", "R-05"], status: "done", after: ["S-04"], session: "owner"}
 }
 
 tests: {

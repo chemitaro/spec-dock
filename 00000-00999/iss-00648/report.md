@@ -12,6 +12,8 @@ ID: "iss-00648"
 
 ## Outcome
 
+指揮の線を、上の縁から出て上の縁へ入るホップの弧にし、子の端に下向きの矢じりと受けた印の縁を描いた。同じ箱の親子も上の縁の小さな弧（18px、余白と依存の線に合わせて下げる）。点の流れ・波紋・状態・色・帯・軽くした描き方は変えていない。Epic epic-00615 の文書を iss-00646・iss-00648 の決定に合わせた。
+
 ## Verification
 
 ## レビュー記録
@@ -47,7 +49,7 @@ ID: "iss-00648"
   - 直した期待：`routeAbove`（縁の 7px 上の区間で `edgeOverlaps` 1）→ 5つの例 `run10`・`run15`（18 のまま、0）、`run16`（13、0）、`runLegs`（脚の位置だけの区間、18、0）、`runNone`（9・14・18px 上、18 のまま、1）。
   - Red：S-03 のコミットの `command.js` で新しい例のうち 4 failed（`runNone` は前の判定でも 1 で通る）（`.workbench/implement/iss-00648/s02b-red.log`）。Green：S-02 の節目のテスト 64 passed（`s02b-green.log`）、`make lint` 合格。
 - コミットの題の直し（タスク担当の依頼）：自動生成の題が『コマンド線』『依存線の終点』だったので、push 前に非対話の rebase（reword）で『指揮の線…』に直した。直す前の HEAD `78a7afd47`、直した後の HEAD `9d2afa266`、`git diff 78a7afd47 9d2afa266` は空（内容は同じ）。作者・コミッターは chemitaro のまま。
-- S-04（impl-claude）：HEAD `9d2afa266` で S-02 の節目のテスト 64 passed（`s04-s02set.log`）、S-03 の節目のテスト 398 passed（`s04-s03set.log`）、`make lint` 合格（`s04-lint.log`）。全体の `uv run pytest`：（走らせ中）。
+- S-04（impl-claude）：HEAD `9d2afa266` で S-02 の節目のテスト 64 passed（`s04-s02set.log`）、S-03 の節目のテスト 398 passed（`s04-s03set.log`）、`make lint` 合格（`s04-lint.log`）。全体の `uv run pytest`：4255 passed、7 skipped、32分45秒、exit 0（`s04-full.log`、HEAD `9d2afa266`）。直したテストの期待は、端・道・弧・端の層・`top` の変更によるものだけ。static-inventory.json に dashboard の資産はなく、直すものはない。既存の失敗はない。
 
 ## 逸脱と判断
 
@@ -55,4 +57,27 @@ ID: "iss-00648"
 - S-02 の担当の交代：計画では impl-sol（Codex gpt-6.1-sol / medium、dispatch `ctx_17c1d5a4151a`）だったが、Codex が chat-scratch の symlink の拒否（symlinked writable roots are not supported）で何も変えずに止まった。計画の rationale と統括の了承のとおり worker-stop し、impl-claude（Claude Opus 5.5 / medium、dispatch `ctx_aec9f6b0309e`、provider claude / model opus）が S-02〜S-04 を1つのセッションで行う。CP-1 の S-02 の節目のテストの確かめは、実装担当が S-02 の後に行い、記録する。
 
 
+## 実機の確かめ（S-05、2026-11-17、`9d2afa266`）
+
+- 試しのサーバー：直す前は基準のコミット `92e26aff7` を `git archive` して隔離した venv（`.workbench/iss-00648/venv-before`、ポート 18649、ローカルだけ）。直した後はこの worktree を editable で隔離した venv（`.workbench/iss-00648/venv`、18648、`--tailscale`）。どちらも同じ状態の置き場の写し（GitHub の写しは常駐の状態から読むだけで写した）と、常駐の orca-web を GET で読むだけの中継（`relay_orca.py`、18848）。headless Chrome（9648）は `--disable-features=MacAppCodeSignClone`。常駐の 47800・8791 の設定、道具の環境には触れていない。
+- 場面（実データ）：帯の統括 → iss-00648 の箱のタスク担当、iss-00648 の箱のタスク担当 → 実装担当（同じ箱）。統括に頼んだ試しのエージェント（haiku、待ちだけ）：iss-00646 の箱の親子（同じ箱）、統括 → orca-web の main の子（リポジトリをまたぐ。横断の構造では『ほかの場所』の帯から spec-dock の帯へ）。撮った後、統括が止める。
+- 写し（`.workbench/iss-00648/shots/{before,after}/`、各 `*-view.png` と `*-crop.png`、`log.jsonl`・`log-cross.jsonl`）：構造の図と横断の構造 × 1440・390 × 明・暗 × 全体・いま・これから（各 24 枚の組、前と後）。試しのエージェントを入れた全体は `shots/extra/`。
+  - 前：帯の統括の線は帯の項目の下の縁から下へ U 字に垂れ、箱の下の縁へ入る。同じ箱の親子は箱の下の縁の外の弧。子の端は小さな点。
+  - 後：帯の項目の上の縁から上へ跳ね、箱の上の縁へ上から入る（帯の項目と間の箱の後ろを通る）。同じ箱の親子は上の縁の小さな弧（実データで 18px。頂点は上を走る依存の線から 3px 以上離れる）。子の端に下向きの矢じり、受けた印は指揮の色の縁で囲まれる。明・暗とも見える。横断の構造の『ほかの場所』からの線は天井（y 4）の内で跳ねる。
+  - 11px に下がる例：実データでは出せない（worktree のある iss-00646・iss-00648 の箱は Epic の枠の1行目で上に箱がない。上に箱がある Issue はどれも閉じていて worktree がない）。統括の了承（msg_5ea853a95490）のとおり、node のテスト（T-01：上の余白 14px で 11px、`crowded` 1、`boxOverlaps` 0）で確かめた。実データの箱の上の余白は 16〜18px（依存の線の道で広がる）。
+- 検査（前と後の 48 組の写しのすべて）：`specdockEdgeAudit()` の違反 0、`specdockCmdAudit()` の `boxOverlaps`・`edgeOverlaps`・`heads`・`spotMissing` 0、`crowded` 0、ブラウザーのエラー 0。`spotDrift` は 0.4〜0.5（直す前も同じ 0.4〜0.5 が出る。印の幅の測りの揺れで、この Issue の変更とは関係しない。R-05 の受入の『≤ 0.4』は、直す前と同じ値の揺れで 0.5 になる組がある）。
+- 測り（iss-00646 の台本 `perf-measure.mjs`、1440×900、deviceScaleFactor 2、読み込みの15秒後から10秒の TaskDuration。前と後を交互に3回ずつ、`perf-ab.txt`）：
+
+| 画面 | 前・動きあり | 後・動きあり | 前・減らす設定 | 後・減らす設定 |
+|---|---|---|---|---|
+| 横断の構造（`/graph`） | 0.06・0.01・0.01（中央 0.01） | 0.01・0.02・0.01（中央 0.01） | 0.02・0.02・0.02 | 0.02・0.03・0.05 |
+| spec-dock の構造の図 | 0.01・0.01・0.01 | 0.01・0.01・0.01 | 0.01・0.01・0.01 | 0.01・0.01・0.01 |
+
+  受入（横断 0.11 秒以下、単体 0.07 秒以下／10秒）を満たし、重さは戻っていない。
+- 本人が見る試しの URL：tailnet の 18648 の `/graph`（横断の構造）と `/r/github.com/chemitaro/spec-dock/graph`。止め方：`.workbench/iss-00648/state/dashboard/server.json` の pid（または `pkill -f "port 18648 --state-root"`）、直す前の `pkill -f "port 18649 --state-root"`、中継 `pkill -f "relay_orca.py .* 18848"`（127.0.0.1 と tailnet の2つ）、Chrome は CDP の `Browser.close`（ポート 9648）。
+
 ## Residual Risks / Follow-ups
+
+- 箱の上の余白が狭い所（同じ箱の弧が 8〜17px に下がる）は、実データの写しでは確かめていない（node のテストだけ）。
+- 帯から下の箱への線は、帯の項目と間の箱の後ろを通る（統括の確認済み）。本人の確かめを受ける。
+- `spotDrift` が 0.5 になる組がある（直す前と同じ揺れ）。
