@@ -5,9 +5,9 @@ package spec
 goal: "1000 前後の幅で、上の帯の道具の列が、状態の札の次の行の右寄せに決まって並ぶようにする"
 
 steps: {
-	"S-01": {title: "T-01・T-02 を tests/js/dashboard_allgraph_screen.mjs と tests/unit/presentation/test_dashboard_allgraph_screen.py に先に書いて落ちることを確かめ（T-02 は検査の写しの変更だけで既に通ることを確かめる）、D-01（allgraph.css）を入れて通す", realizes: ["R-01", "R-03", "F-01"], status: "todo", session: "owner"}
-	"S-02": {title: "make lint と全体の uv run pytest を通す（static-inventory.json に dashboard の資産があれば sha256 を直す）", realizes: ["R-01", "R-03"], status: "todo", after: ["S-01"], session: "owner"}
-	"S-03": {title: "D-04 の実機の確かめ（帯の寸法、欄を開いた形とまとめなしの形、写し、24組の edgeAudit）を report.md に残し、試しの URL を立てる", realizes: ["R-01", "R-02", "R-03", "R-04", "F-01"], status: "todo", after: ["S-02"], session: "owner"}
+	"S-01": {title: "T-01・T-02 を tests/js/dashboard_allgraph_screen.mjs と tests/unit/presentation/test_dashboard_allgraph_screen.py に先に書いて落ちることを確かめ（T-02 は検査の写しの変更だけで既に通ることを確かめる）、D-01（allgraph.css）を入れて通す", realizes: ["R-01", "R-03", "F-01"], status: "done", session: "owner"}
+	"S-02": {title: "make lint と全体の uv run pytest を通す（static-inventory.json に dashboard の資産があれば sha256 を直す）", realizes: ["R-01", "R-03"], status: "done", after: ["S-01"], session: "owner"}
+	"S-03": {title: "D-04 の実機の確かめ（帯の寸法、欄を開いた形とまとめなしの形、写し、24組の edgeAudit）を report.md に残し、試しの URL を立てる", realizes: ["R-01", "R-02", "R-03", "R-04", "F-01"], status: "done", after: ["S-02"], session: "owner"}
 }
 
 tests: {

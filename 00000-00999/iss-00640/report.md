@@ -29,7 +29,9 @@ ID: "iss-00640"
 
 ## 最終品質ゲート
 
-（下に追記）
+- キャンペーン iss-00640-fqg-1（quality-gate-reviewer opus / medium、second opinion なし、範囲 `0ef2dfeae..c8d2679f8`、観点 functional-correctness・requirements-closure・test-adequacy・compatibility-regression、test_commands `make lint`・`uv run pytest`）：attempt 01（`c8d2679f8`）で **合格**。review lane P0〜P3 0、coverage complete。`make lint` exit 0、`uv run pytest` exit 0（4168 passed、7 skipped）。
+- 同じコミットのテストの列の最初の実行は、道具の背景の実行の上限（30分）で 96% の地点で止められた（結果なし、ログは `attempts/01/killed-run/`）。上限を2時間にして、全体をやり直した。
+- closure は worktree の `.workbench/final-quality-gate/iss-00640-fqg-1/closure.md`。PR の直前に origin/main を fetch し、新しいコミットがないことを確かめた（合格のコミットが PR の head）。
 
 ## 実機の確かめ（S-03、タスク担当）
 
