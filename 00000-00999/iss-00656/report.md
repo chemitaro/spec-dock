@@ -22,4 +22,13 @@ ID: "iss-00656"
 - P3 の扱い：D-08 は、帯の欄（`renderAgentPanel`）の描き直し（別のエージェントへの切り替え、明暗の変化）でも全面を保つ（今は半分に戻る）。片付けの候補と同じ考え（開いている欄の描き直しで段を変えない）なので受け入れ、統括に報告する。直しは構造の図（`graph.js`）の片付けの候補にも効く。
 - 申し送り（指摘でない懸念）：1000×800・祖先2つ・印2つで1行に収まる余地は小さい見込み。S-04 の実機で R-01 の受入[2]を測り、届かなければ統括に問う。
 
+## 実装の記録
+
+- 実装担当 impl-claude（Claude Opus 5.5 / medium）。開始のコミット `afe2df5c2af6c54672a7727e03e1a44525bf47ec`。基準（開始のコミット）：`make lint` 合格、S-02 の節目のテスト 113 passed（記録は worktree の `.workbench/implement/iss-00656/`）。
+- S-01（`7395f9148`）：T-01（`headerBand` の表、4件）を先に書いて落ちることを確かめ、`panel_logic.js` に D-01 の `headerBand` を入れた。`uv run pytest tests/unit/infra/test_dashboard_panel_logic_js.py` 12 passed。
+
+## 逸脱と判断
+
+- S-01：`headerBand` の `merge` は `MERGE_WORDS` の鍵（`needs_fix`・`mergeable`）だけを値として返し、ほかはすべて `null`。理由の文は `String(…).trim()` で読む（`reason` が null・text がない場合も空として扱う。F-01）。
+
 ## Residual Risks / Follow-ups
