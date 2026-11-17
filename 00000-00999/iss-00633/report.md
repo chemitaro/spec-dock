@@ -46,6 +46,9 @@ ID: "iss-00633"
 
 ## レビュー記録
 
+- 仕様のレビュー（spec-reviewer opus / high、standard、同じレビュアー）：round-1 **合格**（P0・P1 0、P2 2：golden の写しに木の run がある・入れ子の不変が経験的、P3 2：詰めの間隔の S と S − 0.5 の食い違い・T-02 の maxWiden の出力）→ 文を直した（golden は試作を一時的に当てて `test_dashboard_graph_golden.py` ほか 54 passed を確かめた。`.workbench/spec-review/iss-00633/review-response.md`）。round-2 **合格**（P0〜P2 0、P3 1：purpose と plan の goal に『入れ子の結果を変えない』の言い切りが残る。契約は constraints と D-02 の『悪くしない』で決まる。記録のみ）。結果 `.workbench/spec-review/iss-00633/round-{1,2}.json` と `.check.json`（reviewed_sha `3f5f8d8e9`）。
+- **合格した文書の sha256**：requirement.cue `767be0c836dd432015b5a8b4d678cf139138ecb1fb417f5d67f5046d481df2f9`、design.cue `04790767f9b05aacb1d6e018d87367c7382b4216ede124b874b739be599736cc`、plan.cue `ef8845772471321b673e445505014ecec05721d13d3f74c8ee532cab1d4af1fa`。
+
 ## Outcome
 
 ## Verification

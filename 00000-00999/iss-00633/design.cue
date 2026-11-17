@@ -5,7 +5,7 @@ package spec
 goals: [
 	"木の表示の長い通り道で、寄せが、同時に重なる本数に近い車線で線を分ける",
 	"広げの繰り返しが、検査の違反を残した巡を違反0として採らない",
-	"入れ子の表示の束の並べ方と経路は変えない（詰め直しは木だけ。落ち着きの判定は、違反0の巡では今と同じ）",
+	"入れ子の表示の束の並べ方は変えない（詰め直しは木だけ）。落ち着きの判定は、落ち着いた巡が違反0なら今と同じ巡を採る",
 ]
 
 current: """
@@ -70,14 +70,14 @@ design: {
 			```
 
 			settled なら、今と同じくその巡を採って終える。そうでなく、広げの要求も出入りの不足もない巡（足す間がない）は、今の `if (!Object.keys(add).length) break;` で、best（違反の最も少ない巡、同じなら早いもの）を採って終える。
-			入れ子の表示で今落ち着く巡は違反0なので、採る巡は今と同じ。problems を数える audit は落ち着いた巡でも1回走る（巡ごとに1回）。
+			落ち着いた巡が違反0なら採る巡は今と同じ（R-04 の入れ子の 270 組は、試作で経路まで同じ）。違反を残して落ち着いていた構造では、違反の少ない巡に変わる（悪くはならない）。problems を数える audit は落ち着いた巡でも1回走る（巡ごとに1回）。
 			"""
 		satisfies: ["R-02", "R-03", "F-02"]
 	}
 	"D-03": {
 		title: "回帰のテスト"
 		text: """
-			- node の検査の口 `tests/js/dashboard_graph_route_fix.mjs`（iss-00627）の case に、任意の `mode`（既定 "nest"）と `marks: false`（稼働の印を渡さない）を足し、結果に routeLayout の `problems` を返す。
+			- node の検査の口 `tests/js/dashboard_graph_route_fix.mjs`（iss-00627）の case に、任意の `mode`（既定 "nest"）と `marks: false`（稼働の印を渡さない）を足し、結果に routeLayout の `problems` を返す。graphs（route(G) に直接渡す入力）の結果には、広げの要求の最大 `maxWiden`（widen の amount の最大、なければ 0）を足す。
 			- `tests/unit/presentation/test_dashboard_graph_tree_route.py`（新しい）：
 			  T-01 固定した入力の product・business の木の『全体』（稼働の印なし）で audit の違反0、problems が audit の違反の数と一致。
 			  T-02 D-01 の受入の小さな入力（左に `lane: "v"` の親の線、右に 40 個の箱の列、箱 i → i + 5、`nested: false`）を route(G) に渡し、overlaps 0、広げの要求の最大が S 以下。
@@ -96,7 +96,7 @@ design: {
 	}
 }
 
-compatibility: "API・保存・モデルは変わらない。入れ子の表示の配置と経路は変わらない。木の表示では、混んだ束の線の位置と、広げの間（字下げ・行の間）の量が変わりうる。"
+compatibility: "API・保存・モデルは変わらない。入れ子の表示の配置と経路は、違反0で落ち着く構造では変わらない（D-02）。木の表示では、混んだ束の線の位置と、広げの間（字下げ・行の間）の量が変わりうる。"
 
 risks: [
 	"packFree は交差の数が同じ組の前後を決めないので、その束では交差の数が今と違うことがある（重ならないことを優先する。前後の決まる組の順は、範囲に収まる限り守る）",
