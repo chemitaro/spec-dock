@@ -456,5 +456,8 @@ def test_the_band_and_cleanup_panels_move_on_a_phone(runs: dict[str, Any]) -> No
     assert not closed["panel"]["open"] and closed["panel"]["agent"] is None
     assert closed["pressed"] == {"a-coord": "false"} and closed["lines"] == {"a-coord>c-own": ""}
     assert shots[5]["panel"]["clean"] and shots[5]["panel"]["grab"] == "button"
-    assert [sheet(5), sheet(6)] == [(True, "half", "490px"), (True, "full", "844px")]  # the last sheet's height is reset
+    assert [sheet(5), sheet(6)] == [
+        (True, "half", "490px"),
+        (True, "full", "844px"),
+    ]  # the last sheet's height is reset
     assert not shots[7]["panel"]["open"]
