@@ -33,6 +33,10 @@ ID: "iss-00629"
 - P3 1：拡大以外の操作の後に最初の表示へ戻らないことが、偽の DOM のテストでは拡大でしか守られていない（情報。直さない）。
 - 記録の変更は Git の外の Scope のディレクトリだけなので、記録のコミットはない（PR の head は合格したコミット）。
 
+## PR と CI
+
+- PR #631（https://github.com/chemitaro/spec-dock/pull/631、head `0fcc063b3`、base main `edfabc759`）。CI（Actions と commit status）は合格（observable_ci PASS、merge_readiness READY、mergeStateStatus CLEAN）。マージは統括が行う。
+
 ## Outcome
 
 - R-01（枠の中で親の図と子の枠を見える幅で並べる）：node のテストで、親の図の右に入る子は同じ行に、入らない子は次の行に置かれることを確かめた。実データ（この PC の9つの登録の写し）では、どの親の図も、子の枠が右に入るほど狭くない（housing-lifecycle 2024 px、input-devices 2332 px で、使える幅 1344 px を超える）。そのため、9つの枠の位置は開始のコミットと1つも変わらない（1440・1000・390 × 3範囲。下の表）。得は、プロダクトのように狭い図を持つ親が現れたときに出る。
