@@ -3,7 +3,7 @@
 // band agent's chat in the panel, and the check of the headings above the lines. The screens' own state stays in the
 // screens; these parts take what they draw from their arguments.
 import { esc, ic } from "./marks.js";
-import { bodyHtml, endsHtml, rippleHtml } from "./command_motion.js";
+import { bandMarkHtml, bodyHtml, endsHtml, rippleHtml } from "./command_motion.js";
 import { AGENT_SANDBOX, agentFrame } from "../_shared/agents_logic.js";
 import { currentTheme } from "../_shared/agents_tab.js";
 import { SHEET_GRAB } from "../_shared/panel.js";
@@ -49,9 +49,10 @@ export function removeLayers(world) {
 export const inBand = (model, r) => !!model.band?.items.some((it) => r.x >= it.x && r.x <= it.x + it.w && r.y >= it.y && r.y <= it.y + it.h);
 
 /**
- * The three layers' HTML of a commandModel (iss-00616 D-04, iss-00646 D-02): the lines' bodies and glows (.gx-cmd), the
- * stubs in the boxes, the ends' dots and the ripples outside the band (.gx-cmd-top), the band's items, buttons and the
- * ripples in it (.gx-band, "" without a band). Each layer is a box of SVGs of each line's own bounding box and HTML
+ * The three layers' HTML of a commandModel (iss-00616 D-04, iss-00646 D-02, iss-00648 D-04): the lines' bodies and
+ * glows (.gx-cmd), the arrowheads at the children's ends, the rings of the children's marks in the boxes and frames and
+ * the ripples outside the band (.gx-cmd-top), the band's items, buttons, and the rings of the band children's marks and
+ * the ripples in it (.gx-band, "" without a band). Each layer is a box of SVGs of each line's own bounding box and HTML
  * rings (command_motion.js), never one SVG as big as the world. A row with a lead has its text at the row's left
  * (iss-00617: "ほかの場所").
  */
@@ -69,8 +70,9 @@ export function layersHtml(model) {
         it.agents.map((a) => `<button type="button" class="gx-band-agent" data-cmd-agent="${esc(a.id)}" data-cmd-item="${esc(it.key)}" aria-pressed="false" aria-label="${esc(`${it.label}：${a.id}`)}"><span class="gx-band-slot"></span></button>`).join("") +
         `</div>`,
     );
-    // a band parent's ripples over its items (the items are opaque and the band lies over .gx-cmd-top)
-    const rings = model.ripples.filter((r) => inBand(model, r)).map(rippleHtml).join("");
+    // a band parent's ripples and the band children's rings over its items (the items are opaque and the band lies over
+    // .gx-cmd-top)
+    const rings = model.links.map(bandMarkHtml).join("") + model.ripples.filter((r) => inBand(model, r)).map(rippleHtml).join("");
     const over = rings ? `<div class="gx-band-cr" aria-hidden="true">${rings}</div>` : "";
     band = `<div class="gx-band">${leads.join("")}${items.join("")}${over}</div>`;
   }
@@ -187,7 +189,7 @@ export function paintCmdSel(w, model, sel) {
   const parents = new Set();
   if (sel) for (const l of links.values()) if (l.child === sel) parents.add(l.parent);
   for (const svg of w.querySelectorAll(".gx-cmd, .gx-cmd-top, .gx-band-cr")) svg.classList.toggle("has-cmd-sel", !!sel);
-  for (const g of w.querySelectorAll(".gx-cmd .cl, .gx-cmd-top .cl")) {
+  for (const g of w.querySelectorAll(".gx-cmd .cl, .gx-cmd-top .cl, .gx-band-cr .cl")) {
     const l = links.get(g.dataset.id);
     const on = !!sel && !!l && (l.parent === sel || l.child === sel);
     g.classList.toggle("is-cmd-hl", on);

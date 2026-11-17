@@ -63,6 +63,10 @@ function snap(root) {
     cmdSel: [...world.querySelectorAll(".gx-cmd, .gx-cmd-top")].map((s) => s.classList.contains("has-cmd-sel")),
     lines: classes(".gx-cmd .cl", "id"),
     ends: classes(".gx-cmd-top .cl", "id"),
+    // iss-00648: what each line's ends picture holds, the band children's rings in the band and the lines' paths
+    endParts: Object.fromEntries(world.querySelectorAll(".gx-cmd-top .cl").map((g) => [g.dataset.id, g.children.filter((c) => c instanceof Element).map((c) => c.getAttribute("class"))])),
+    bandMarks: classes(".gx-band-cr .cl", "id"),
+    paths: Object.fromEntries(world.querySelectorAll(".gx-cmd .cl").map((g) => [g.dataset.id, g.querySelector(".cl-glow, .cl-line").getAttribute("d")])),
     ripples: classes(".cr", "agent"),
     topRipples: world.querySelectorAll(".gx-cmd-top .cr").map((g) => g.dataset.agent),
     bandRipples: world.querySelectorAll(".gx-band .cr").map((g) => g.dataset.agent),

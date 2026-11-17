@@ -160,6 +160,11 @@ FLIP = summary(
     wt("wt-c2", "/w/c-2", "iss-00002", [ag("c-own", parent="f-coord")], PROJ["c"]),
 )
 
+# iss-00648: the coordinator directs a helper in its own band item too (a band child)
+BAND_KID = summary(
+    wt("wt-a", "/w/a", "main", [ag("a-coord"), ag("a-help", parent="a-coord")], PROJ["a"], main=True),
+    wt("wt-c2", "/w/c-2", "iss-00002", [ag("c-own", parent="a-coord")], PROJ["c"]),
+)
 BAND_BTN = '[data-cmd-agent="a-coord"]'
 RUNS = [
     {"name": "off", "orca": False, "repos": REPOS, "docs": DOCS},
@@ -202,6 +207,17 @@ RUNS = [
         ],
     },
     {"name": "otherFirst", "orca": {"summary": FLAT}, "repos": REPOS, "docs": DOCS, "steps": [{"summary": OTHER}]},
+    {
+        "name": "bandKid",
+        "orca": {"summary": FLAT},
+        "repos": REPOS,
+        "docs": DOCS,
+        "steps": [
+            {"summary": BAND_KID},  # 1
+            {"tap": BAND_BTN},  # 2: the coordinator chosen
+            {"tap": '[data-repo="github.com/o/c"] [data-id="iss-00002"] .orca-mark'},  # 3: the box's agent chosen
+        ],
+    },
     {
         "name": "keep",
         "range": "next",
@@ -325,12 +341,24 @@ def test_the_line_runs_from_the_band_to_the_mark_in_the_other_repository(runs: d
     d = shot["paths"]["a-coord>c-own"]
     start = [float(v) for v in d.split()[1:3]]
     item = shot["bandItems"][0]
-    assert item["x"] <= start[0] <= item["x"] + item["w"] and start[1] == item["y"] + ITEM_H
+    assert item["x"] <= start[0] <= item["x"] + item["w"] and start[1] == item["y"]  # iss-00648: the item's top
     c = _sec(shot, "c")
     box = c["boxes"]["iss-00002"]
-    end = shot["dots"]["a-coord>c-own"]
+    end = shot["arrows"]["a-coord>c-own"]  # the arrowhead's tip on the box's top
     assert c["body"]["x"] + box["x1"] < end[0] < c["body"]["x"] + box["x2"]
-    assert end[1] == c["body"]["y"] + box["y2"]
+    assert end[1] == c["body"]["y"] + box["y1"]
+    assert [float(v) for v in d.split()[-2:]] == end
+    assert shot["endParts"]["a-coord>c-own"] == ["cl-in", "cl-arrow"] and shot["dots"] == 0
+
+
+def test_a_band_childs_ring_is_in_the_band_and_follows_the_choice(runs: dict[str, Any]) -> None:
+    """iss-00648 T-03 / R-04: the band child's arrowhead in .gx-cmd-top and its ring in .gx-band-cr, highlighted with
+    its coordinator, faded when the box's agent is chosen."""
+    shot, chosen, other = runs["bandKid"][1], runs["bandKid"][2], runs["bandKid"][3]
+    assert shot["endParts"] == {"a-coord>a-help": ["cl-arrow"], "a-coord>c-own": ["cl-in", "cl-arrow"]}
+    assert shot["bandMarks"] == {"a-coord>a-help": ""} and shot["dots"] == 0
+    assert chosen["bandMarks"] == {"a-coord>a-help": "is-cmd-hl"}
+    assert other["bandMarks"] == {"a-coord>a-help": "is-cmd-off"}
 
 
 def test_news_never_lays_out_or_composes_again_for_the_same_shape(runs: dict[str, Any]) -> None:

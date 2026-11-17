@@ -21,6 +21,7 @@ import pytest
 from tests.unit.presentation.test_dashboard_graph_js import ASSETS, ROOT, _node, _small
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
     from pathlib import Path
 
 CHECK = ROOT / "tests" / "js" / "dashboard_graph_command.mjs"
@@ -211,41 +212,90 @@ SCENARIOS: dict[str, dict[str, Any]] = {
 }
 
 
-# --- arcs in a box with little room: a raw layout ----------------------------------------------------------------
+# --- raw layouts: the room above a box, marks above each other, ends above, beside and below ---------------------
 
-RAW_SCOPES = [
-    {"id": "iss-00001", "parent_id": None, "worktrees": [{"path": "/w/a", "branch": "a"}]},
-    {"id": "iss-00002", "parent_id": None, "worktrees": []},
-    {"id": "iss-00003", "parent_id": None, "worktrees": []},
-]
-RAW_SUMMARY = summary(wt("wt-a", "/w/a", "a", [ag("p"), ag("c", parent="p")]))
 A: dict[str, Any] = {"type": "box", "id": "iss-00001", "x1": 100, "y1": 100, "x2": 278, "y2": 188, "rows": 2}
 
 
-def _raw(below: float | None, right: float | None, routes: tuple[list[dict[str, Any]], ...] = ()) -> dict[str, Any]:
-    nodes = [A]
-    if below is not None:
-        nodes.append({"type": "box", "id": "iss-00002", "x1": 100, "y1": 188 + below, "x2": 278, "y2": 276 + below})
-    if right is not None:
-        nodes.append({"type": "box", "id": "iss-00003", "x1": 278 + right, "y1": 100, "x2": 456 + right, "y2": 188})
+def _box(scope_id: str, x1: float, y1: float, rows: int = 2) -> dict[str, Any]:
+    return {"type": "box", "id": scope_id, "x1": x1, "y1": y1, "x2": x1 + 178, "y2": y1 + 48 + 20 * rows, "rows": rows}
+
+
+def _raw(
+    nodes: list[dict[str, Any]],
+    agents: dict[str, list[dict[str, Any]]],
+    marks: dict[str, Any],
+    routes: tuple[list[dict[str, Any]], ...] = (),
+    band: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """A layout of the given nodes, each scope's worktree /w/<id> with its agents, and the main checkout /w/m in the band."""
+    scopes = [
+        {"id": n["id"], "parent_id": None, "worktrees": [{"path": f"/w/{n['id']}", "branch": n["id"]}]} for n in nodes
+    ]
+    worktrees = [wt(f"wt-{sid}", f"/w/{sid}", sid, list(ags)) for sid, ags in agents.items()]
+    if band:
+        worktrees.insert(0, wt("wt-m", "/w/m", "main", band, main=True))
     return {
-        "structure": {"worktrees": {"status": "ok", "paths": ["/w/a"]}, "scopes": RAW_SCOPES},
-        "summary": RAW_SUMMARY,
+        "structure": {
+            "worktrees": {"status": "ok", "paths": ["/w/m", *(f"/w/{n['id']}" for n in nodes)]},
+            "scopes": scopes,
+        },
+        "summary": summary(*worktrees),
         "layout": {"nodes": nodes, "groups": [], "width": 1000, "height": 1000},
-        "marks": {"iss-00001": mark("p", "c")},
+        "marks": marks,
         "routes": [{"pts": pts} for pts in routes],
     }
 
 
-H_RUN = [{"x": 50, "y": 195}, {"x": 400, "y": 195}]  # a dependency line's horizontal run just below the box
-V_RUN = [{"x": 285, "y": 50}, {"x": 285, "y": 300}]  # and a vertical one just right of it
+LEVELS = {2: "c-up", 3: "c-side", 4: "c-down", 5: "c-under"}
+PC = {"iss-00001": [ag("p"), ag("c", parent="p")]}
+PC_MARKS = {"iss-00001": mark("p", "c")}
+
+
+def _run_at(up: float, x1: float = 50, x2: float = 400) -> list[dict[str, float]]:
+    """A dependency line's horizontal run `up` px above the box A's upper edge."""
+    return [{"x": x1, "y": A["y1"] - up}, {"x": x2, "y": A["y1"] - up}]
+
+
+# the hop p > c in A runs from x 133 to 171: its middle half is 142.5..161.5
+RUNS_ABOVE = {
+    "run10": (_run_at(10),),
+    "run15": (_run_at(15),),
+    "run16": (_run_at(16),),
+    "runLegs": (_run_at(18, 50, 140), _run_at(18, 164, 400)),  # only where the legs are
+    "runNone": (_run_at(9), _run_at(14), _run_at(18)),
+}
 SCENARIOS |= {
-    "room": _raw(None, None),
-    "shallow": _raw(12, None),
-    "flip": _raw(6, None),
-    "crowded": _raw(6, 6),
-    "routeflip": _raw(None, None, (H_RUN,)),
-    "routeboth": _raw(None, None, (H_RUN, V_RUN)),
+    "room": _raw([A], PC, PC_MARKS),
+    # a box 14px above (the rows' gap), and 6px above
+    "above14": _raw([A, _box("iss-00002", 100, -2) | {"y2": 86}], PC, PC_MARKS),
+    "above6": _raw([A, _box("iss-00002", 100, 6) | {"y2": 94}], PC, PC_MARKS),
+    **{name: _raw([A], PC, PC_MARKS, runs) for name, runs in RUNS_ABOVE.items()},
+    # the child's mark right below the parent's (the second row's first mark)
+    "stacked": _raw(
+        [_box("iss-00001", 100, 100, rows=3)],
+        {"iss-00001": [ag("p"), ag("c", parent="p")]},
+        {"iss-00001": mark("p", "x1", "x2", "x3", "c")},
+    ),
+    # the child above, beside (the same height) and below the parent; one more right below it
+    "levels": _raw(
+        [
+            _box("iss-00001", 100, 300),
+            _box("iss-00002", 400, 40),
+            _box("iss-00003", 400, 300),
+            _box("iss-00004", 400, 600),
+            _box("iss-00005", 100, 700),
+        ],
+        {"iss-00001": [ag("p")]} | {f"iss-0000{i}": [ag(c, parent="p")] for i, c in LEVELS.items()},
+        {"iss-00001": mark("p")} | {f"iss-0000{i}": mark(c) for i, c in LEVELS.items()},
+    ),
+    # a tree's frame box directed from the band, its two marks one hop
+    "tframe": _raw(
+        [{"type": "tframe", "id": "iss-00001", "x1": 300, "y1": 200, "x2": 536, "y2": 308, "rows": 2}],
+        {"iss-00001": [ag("p", parent="m"), ag("c", parent="p")]},
+        {"iss-00001": mark("p", "c")},
+        band=[ag("m")],
+    ),
 }
 
 
@@ -439,6 +489,7 @@ def test_the_constants_of_the_marks_and_the_band(spots: dict[str, Any]) -> None:
         "FRAME_TITLE": 22,
         "FRAME_GAP": 4,
         "BAND": {"top": -16, "h": 28, "left": 24, "border": 1, "pad": 6, "gap": 10, "labelGap": 6, "slot": 52},
+        "HOP": HOP,
     }
 
 
@@ -508,7 +559,7 @@ def test_the_band_items_size_and_place(got: dict[str, Any]) -> None:
         x += item["w"] + 10
     assert band["right"] == x - 10
     assert [it["labelWidth"] for it in band["items"]] == [125, 85]
-    assert got["five"]["model"]["top"] == -32
+    assert got["five"]["model"]["top"] == -16 - 56 - 6  # iss-00648 D-05: the band's highest hop (H 56), 6 above it
     assert got["five"]["model"]["width"] == max(got["five"]["width"], band["right"] + 24)
     labels = got["labels"]["model"]["band"]["items"]
     assert len(labels) == 6 and all(b["x"] - (a["x"] + a["w"]) == 10 for a, b in pairwise(labels))
@@ -533,131 +584,288 @@ def _control(link: dict[str, Any]) -> tuple[tuple[float, float], ...]:
     return tuple(pts)
 
 
-def _k(p: tuple[float, float], c: tuple[float, float]) -> float:
-    return min(140, max(24, 0.45 * ((c[0] - p[0]) ** 2 + (c[1] - p[1]) ** 2) ** 0.5))
+HOP = {"min": 18, "kx": 0.15, "ky": 0.1, "max": 56, "side": 40, "chord": 12, "room": 3, "low": 8}
 
 
-def test_curve_ends_of_marks_and_the_band(got: dict[str, Any]) -> None:
-    """T-03 / R-03: from the band agent's lower edge down, into a box's lower edge from below with a stub from the mark."""
-    entry = got["five"]
-    link = _link(entry, "a-coord>a-own21")
-    slot = entry["model"]["band"]["items"][0]["agents"][0]
-    spot = next(s for s in entry["spots"]["iss-00021"] if s["id"] == "a-own21")
-    box = entry["nodes"]["iss-00021"]
-    p, c1, c2, c = _control(link)
-    assert p == (slot["x"] + 26, 12)
-    assert c == (spot["x"] + spot["w"] / 2, box["y2"])
-    k = _k(p, c)
-    assert c1 == pytest.approx((p[0], p[1] + k), abs=0.1)
-    assert c2 == pytest.approx((c[0], c[1] + k), abs=0.1)
-    assert link["stubs"] == [f"M {c[0]:g} {spot['y'] + 16:g} L {c[0]:g} {box['y2']:g}"]
-    # a nested frame's heading mark: from the mark's lower edge, no stub
-    frame = _link(entry, "a-coord>a-e30")
-    fspot = entry["spots"]["epic-00030"][0]
-    assert _control(frame)[3] == (fspot["x"] + 18, fspot["y"] + 16)
-    assert frame["stubs"] == []
+def _sample(d: str, n: int = 400) -> list[tuple[float, float]]:
+    pts = _points(d)
+    assert len(pts) == 4, d
+    (px, py), (ax, ay), (bx, by), (cx, cy) = pts
+    out = []
+    for i in range(n + 1):
+        t = i / n
+        u = 1 - t
+        out.append((
+            u**3 * px + 3 * u * u * t * ax + 3 * u * t * t * bx + t**3 * cx,
+            u**3 * py + 3 * u * u * t * ay + 3 * u * t * t * by + t**3 * cy,
+        ))  # fmt: skip
+    return out
 
 
-def test_curve_ends_on_groups_and_frames(got: dict[str, Any]) -> None:
-    """T-03 / R-03: a folded group's edge facing the other end; a frame holding the other end: its inner lower edge, up."""
+def _peak(d: str) -> float:
+    return min(y for _, y in _sample(d))
+
+
+def _height(p: Mapping[str, float], c: Mapping[str, float]) -> float:
+    return min(HOP["max"], max(HOP["min"], HOP["kx"] * abs(c["x"] - p["x"]) + HOP["ky"] * abs(c["y"] - p["y"])))
+
+
+def _all_links(got: dict[str, Any]) -> list[dict[str, Any]]:
+    return [link for entry in got.values() if entry.get("model") for link in entry["model"]["links"]]
+
+
+def _spot(entry: dict[str, Any], scope: str, agent: str) -> dict[str, Any]:
+    return next(s for s in entry["spots"][scope] if s["id"] == agent)
+
+
+def test_ends_of_marks_and_the_band_sit_on_the_upper_edge_right_above_the_mark(got: dict[str, Any]) -> None:
+    """T-01 / R-01: the band slot's middle on its item's upper edge; a box's, a tree frame box's and a nested frame's
+    heading mark's middle on that box's or frame's upper edge."""
+    five = got["five"]
+    link = _link(five, "a-coord>a-own21")
+    slot = five["model"]["band"]["items"][0]["agents"][0]
+    spot = _spot(five, "iss-00021", "a-own21")
+    assert link["from"] == {"x": slot["x"] + slot["w"] / 2, "y": -16}
+    assert link["to"] == {"x": spot["x"] + spot["w"] / 2, "y": five["nodes"]["iss-00021"]["y1"]}
+    frame = _link(five, "a-coord>a-e30")
+    fspot = five["spots"]["epic-00030"][0]
+    assert frame["to"] == {"x": fspot["x"] + fspot["w"] / 2, "y": five["nodes"]["epic-00030"]["y1"]}
+    tframe = got["tframe"]
+    tnode = tframe["nodes"]["iss-00001"]
+    assert tnode["type"] == "tframe"
+    tspot = _spot(tframe, "iss-00001", "p")
+    assert _link(tframe, "m>p")["to"] == {"x": tspot["x"] + tspot["w"] / 2, "y": tnode["y1"]}
+
+
+def test_ends_on_groups_and_frames_sit_on_the_middle_of_the_upper_edge(got: dict[str, Any]) -> None:
+    """T-01 / R-01: a folded group's upper edge; a frame holding the other end: its upper edge too (not inside)."""
     folded = got["folded"]
     group = next(g for g in folded["groups"] if "epic-00008" in g["ids"])
-    _, _, c2, c = _control(_link(folded, "a-coord>a-own09"))
-    assert c == ((group["x1"] + group["x2"]) / 2, group["y1"])  # the band is above: the top edge
-    assert c2[1] < c[1]  # leaving the top edge upward
+    assert _link(folded, "a-coord>a-own09")["to"] == {"x": (group["x1"] + group["x2"]) / 2, "y": group["y1"]}
     hidden = got["hidden"]
     frame = hidden["nodes"]["epic-00030"]
-    _, _, c2, c = _control(_link(hidden, "a-e30>a-own31"))
-    assert c == ((frame["x1"] + frame["x2"]) / 2, frame["y2"] - 1)
-    assert c2[1] < c[1]
+    link = _link(hidden, "a-e30>a-own31")  # the parent's mark is in the frame's heading: the frame holds it
+    assert link["from"]["y"] == link["to"]["y"] == frame["y1"]
 
 
 def test_lines_leaving_one_edge_are_spread(got: dict[str, Any]) -> None:
-    """T-03: the band's two lines into the frame's edge facing the band are 10px apart around the edge's middle."""
+    """T-01 / R-01: the three lines into the frame's upper edge are 10px apart around its middle, in the links' order."""
     hidden = got["hidden"]
     frame = hidden["nodes"]["epic-00030"]
-    (ax, ay), (bx, by) = [_control(_link(hidden, f"a-coord>{c}"))[3] for c in ("a-help31", "a-two31")]
-    mid = ((frame["x1"] + frame["x2"]) / 2, (frame["y1"] + frame["y2"]) / 2)
-    if ax == bx:  # a left or right edge
-        assert ax in (frame["x1"], frame["x2"]) and (ay, by) == (mid[1] - 5, mid[1] + 5)
-    else:
-        assert ay == by and ay in (frame["y1"], frame["y2"]) and (ax, bx) == (mid[0] - 5, mid[0] + 5)
+    mid = (frame["x1"] + frame["x2"]) / 2
+    ends = [_link(hidden, i)["to"] for i in ("a-coord>a-help31", "a-coord>a-two31", "a-e30>a-own31")]
+    assert ends == [{"x": mid + off, "y": frame["y1"]} for off in (-10, 0, 10)]
 
 
 def test_no_line_inside_one_group_or_ancestor_frame(got: dict[str, Any]) -> None:
-    """T-03 / R-03: both ends in the same ancestor frame without a mark: no line."""
+    """T-01 / R-01: both ends in the same ancestor frame without a mark: no line."""
     ids = [link["id"] for link in got["hidden"]["model"]["links"]]
     assert "a-own31>a-impl31" not in ids
     assert len(ids) == 4
 
 
-def _arc(link: dict[str, Any]) -> tuple[float, float, tuple[float, float]]:
-    """The chord, the bulge (from the control points: 4d/3) and the edge's coordinate of an arc."""
-    p, c1, _, c = _control(link)
-    chord = ((c[0] - p[0]) ** 2 + (c[1] - p[1]) ** 2) ** 0.5
-    bulge = abs((c1[0] - p[0]) + (c1[1] - p[1])) * 3 / 4
-    return chord, round(bulge, 1), p
+def test_unknown_marks_end_on_the_middle_of_the_upper_edge(got: dict[str, Any]) -> None:
+    """T-01 / F-01: a box's and a frame's upper edge; no hop in a box without both marks."""
+    entry = got["unknown"]
+    box = entry["nodes"]["iss-00022"]
+    assert _link(entry, "x-coord>a-own22")["to"] == {"x": (box["x1"] + box["x2"]) / 2, "y": box["y1"]}
+    frame = entry["nodes"]["epic-00030"]
+    assert _link(entry, "a-coord>a-e30")["to"] == {"x": (frame["x1"] + frame["x2"]) / 2, "y": frame["y1"]}
+    ids = [link["id"] for link in entry["model"]["links"]]
+    assert "a-own21>a-impl21" not in ids
+    assert {r["agent"] for r in entry["model"]["ripples"]} == {"a-coord", "x-coord"}
 
 
-def test_arcs_on_one_row_and_on_two_rows_of_a_box(got: dict[str, Any]) -> None:
-    """T-03 / R-03: one row: the lower edge; two rows: the right edge; chord ≥ 40, bulge 16."""
+def test_no_line_has_stubs(got: dict[str, Any]) -> None:
+    """T-01 / R-01: nothing is drawn inside a box."""
+    links = _all_links(got)
+    assert links and all(link["stubs"] == [] for link in links)
+
+
+def test_every_line_leaves_and_enters_from_above(got: dict[str, Any]) -> None:
+    """T-01 / R-01: the first control point above `from`, the last above `to`, with the child above, beside or below."""
+    levels = got["levels"]
+    to_y = {c: _link(levels, f"p>{c}")["to"]["y"] for c in ("c-up", "c-side", "c-down", "c-under")}
+    from_y = _link(levels, "p>c-up")["from"]["y"]
+    assert to_y["c-up"] < from_y == to_y["c-side"] < to_y["c-down"]
+    for link in _all_links(got):
+        (_, c1y), (_, c2y) = _control(link)[1:3]
+        assert c1y < link["from"]["y"] and c2y < link["to"]["y"], link
+
+
+def test_a_curve_is_a_hop_of_height_h_above_the_higher_end(got: dict[str, Any]) -> None:
+    """T-01 / R-02: every curve peaks H above its higher end, H from dx and dy within 18..56."""
+    curves = [link for link in _all_links(got) if link["kind"] == "curve"]
+    assert len(curves) > 10
+    for link in curves:
+        high = min(link["from"]["y"], link["to"]["y"])
+        h = _height(link["from"], link["to"])
+        assert _peak(link["d"]) == pytest.approx(high - h, abs=0.5), link
+        assert link["peak"] == pytest.approx(high - h, abs=0.5), link
+
+
+HOP_CASES = [
+    # (P, C, ceiling or None)
+    ({"x": 0, "y": 0}, {"x": 60, "y": 0}, None),
+    ({"x": 0, "y": 0}, {"x": 160, "y": 0}, None),
+    ({"x": 0, "y": 0}, {"x": 160, "y": 100}, None),
+    ({"x": 0, "y": 0}, {"x": 260, "y": 100}, None),
+    ({"x": 260, "y": 100}, {"x": 0, "y": 0}, None),
+    ({"x": 0, "y": 0}, {"x": 300, "y": 700}, None),
+    ({"x": 0, "y": 700}, {"x": 300, "y": 0}, None),
+    ({"x": 0, "y": 0}, {"x": 20, "y": 700}, None),
+    ({"x": 0, "y": 0}, {"x": 0, "y": 200}, None),
+    ({"x": 0, "y": 30}, {"x": 0, "y": 0}, None),
+    ({"x": 100, "y": 24}, {"x": 600, "y": 600}, 4),
+    ({"x": 0, "y": 10}, {"x": 300, "y": 600}, 4),
+]
+
+
+@pytest.fixture(scope="module")
+def hops(tmp_path_factory: pytest.TempPathFactory) -> list[dict[str, Any]]:
+    return _run(tmp_path_factory.mktemp("hop"), {"hop": [list(c) for c in HOP_CASES]})["hop"]
+
+
+def test_hop_peaks_exactly_h_above_the_higher_end(hops: list[dict[str, Any]]) -> None:
+    """T-01 / R-02: at the same height and at different heights (700px apart too), the peak is H (±0.5) above."""
+    heights = []
+    for (p, c, ceiling), h in zip(HOP_CASES, hops, strict=True):
+        if ceiling is not None:
+            continue
+        want = _height(p, c)
+        heights.append(want)
+        assert 18 <= want <= 56
+        assert _peak(h["d"]) == pytest.approx(min(p["y"], c["y"]) - want, abs=0.5), (p, c, h)
+        assert h["peak"] == pytest.approx(min(p["y"], c["y"]) - want, abs=0.5)
+        assert h["len"] % 8 == 0
+    # H grows with dx and with dy, from the floor to the ceiling
+    assert heights[:4] == [18, 24, 34, 49] and heights[5] == heights[7] == 56
+
+
+def test_hop_between_ends_above_each_other_bulges_sideways(hops: list[dict[str, Any]]) -> None:
+    """T-01 / R-02: dx 0: a point 8px or more off the vertical line through both ends."""
+    for (p, c, ceiling), h in zip(HOP_CASES, hops, strict=True):
+        if p["x"] == c["x"] and ceiling is None:
+            assert max(abs(x - p["x"]) for x, _ in _sample(h["d"])) >= 8, (p, c, h)
+
+
+def test_hop_stays_below_the_ceiling_but_at_least_low_above_the_higher_end(hops: list[dict[str, Any]]) -> None:
+    """T-01 / F-02: the peak is lowered to the ceiling, never closer than HOP.low to the higher end."""
+    for (p, c, ceiling), h in zip(HOP_CASES, hops, strict=True):
+        if ceiling is None:
+            continue
+        want = min(ceiling, min(p["y"], c["y"]) - HOP["low"])
+        assert _peak(h["d"]) == pytest.approx(want, abs=0.5) and _peak(h["d"]) >= want - 0.5, (p, c, h)
+
+
+def _bulge(link: dict[str, Any]) -> float:
+    """A hop's height in one box from its control points (handles 4d/3)."""
+    p, c1, _, _ = _control(link)
+    return round((p[1] - c1[1]) * 3 / 4, 1)
+
+
+def test_hops_in_one_box_frame_heading_and_band_item(got: dict[str, Any]) -> None:
+    """T-01 / R-03: one row, two rows, a tree frame box, a frame's heading and a band item: from the upper edge right
+    above each mark back to the same edge, 18 above it, the chord 12 or more."""
+    five, epic, tframe = got["five"], got["epic"], got["tframe"]
+    cases = [
+        (five, "a-own21>a-impl21", five["nodes"]["iss-00021"]["y1"], ("iss-00021", "a-own21", "a-impl21")),
+        (epic, "a-p23>a-c23", epic["nodes"]["iss-00023"]["y1"], ("iss-00023", "a-p23", "a-c23")),
+        (epic, "a-e30>a-e30b", epic["nodes"]["epic-00030"]["y1"], ("epic-00030", "a-e30", "a-e30b")),
+        (tframe, "p>c", tframe["nodes"]["iss-00001"]["y1"], ("iss-00001", "p", "c")),
+        (got["room"], "p>c", A["y1"], ("iss-00001", "p", "c")),
+        (five, "a-coord>a-research", -16, None),
+    ]
+    for entry, link_id, edge, marks in cases:
+        link = _link(entry, link_id)
+        assert link["kind"] == "arc", link_id
+        assert link["from"]["y"] == link["to"]["y"] == edge, link_id
+        assert _bulge(link) == 18 and link["bulge"] == 18, link_id
+        assert _peak(link["d"]) == pytest.approx(edge - 18, abs=0.5) and link["peak"] == edge - 18, link_id
+        assert abs(link["to"]["x"] - link["from"]["x"]) >= 12, link_id
+        if marks:
+            scope, parent, child = marks
+            sp, sc = _spot(entry, scope, parent), _spot(entry, scope, child)
+            assert (link["from"]["x"], link["to"]["x"]) == (sp["x"] + sp["w"] / 2, sc["x"] + sc["w"] / 2), link_id
+    two = _spot(epic, "iss-00023", "a-p23")["y"] != _spot(epic, "iss-00023", "a-c23")["y"]
+    assert two  # the two marks are on different rows
+
+
+def test_a_hop_between_marks_above_each_other_is_widened_to_12(got: dict[str, Any]) -> None:
+    """T-01 / R-03: the second row's first mark right below the first: 12 apart around their middle, the parent left."""
+    stacked = got["stacked"]
+    sp, sc = _spot(stacked, "iss-00001", "p"), _spot(stacked, "iss-00001", "c")
+    assert sp["x"] == sc["x"] and sp["y"] != sc["y"]
+    link = _link(stacked, "p>c")
+    mid = sp["x"] + sp["w"] / 2
+    assert (link["from"]["x"], link["to"]["x"]) == (mid - 6, mid + 6)
+    assert _bulge(link) == 18
+
+
+def test_hops_with_little_room_above(got: dict[str, Any]) -> None:
+    """T-01 / R-03: 14px above: 11, crowded, no overlap; 6px above: 8, crowded and overlapping; enough room: 18."""
+    assert _bulge(_link(got["room"], "p>c")) == 18
+    assert got["room"]["model"]["audit"]["crowded"] == 0
+    low = _link(got["above14"], "p>c")
+    assert _bulge(low) == 11 and low["bulge"] == 11 and low["peak"] == A["y1"] - 11
+    audit = got["above14"]["model"]["audit"]
+    assert (audit["crowded"], audit["boxOverlaps"], audit["edgeOverlaps"]) == (1, 0, 0)
+    least = _link(got["above6"], "p>c")
+    assert _bulge(least) == 8
+    audit = got["above6"]["model"]["audit"]
+    assert (audit["crowded"], audit["boxOverlaps"]) == (1, 1)
+
+
+@pytest.mark.parametrize(
+    ("name", "height", "overlaps"),
+    [("run10", 18, 0), ("run15", 18, 0), ("run16", 13, 0), ("runLegs", 18, 0), ("runNone", 18, 1)],
+)
+def test_a_hops_peak_keeps_3px_from_the_dependency_runs(
+    got: dict[str, Any], name: str, height: int, overlaps: int
+) -> None:
+    """T-01 / R-03 (D-03): the highest height whose peak is 3px or more from every run over the hop's middle half; the
+    legs crossing a run do not count; no such height: the upper limit, counted as an edge overlap."""
+    link = _link(got[name], "p>c")
+    assert (link["from"]["x"], link["to"]["x"]) == (133, 171)
+    assert _bulge(link) == height and link["bulge"] == height and link["peak"] == A["y1"] - height
+    audit = got[name]["model"]["audit"]
+    assert (audit["edgeOverlaps"], audit["crowded"], audit["boxOverlaps"]) == (overlaps, 0, 0)
+
+
+def test_each_line_carries_the_childs_mark(got: dict[str, Any]) -> None:
+    """T-01 / R-04: the child's mark (a band slot: band true); null for a group, an ancestor frame and an unknown mark."""
     five = got["five"]
-    box = five["nodes"]["iss-00021"]
-    link = _link(five, "a-own21>a-impl21")
-    assert link["kind"] == "arc"
-    chord, bulge, p = _arc(link)
-    assert chord >= 40 and bulge == 16 and p[1] == box["y2"]
-    assert link["from"]["y"] == link["to"]["y"] == box["y2"]
-    assert len(link["stubs"]) == 2
-    epic = got["epic"]
-    box23 = epic["nodes"]["iss-00023"]
-    two = _link(epic, "a-p23>a-c23")
-    chord, bulge, p = _arc(two)
-    assert two["kind"] == "arc" and chord >= 40 and 8 <= bulge <= 16  # shallower toward the next box on the right
-    assert two["from"]["x"] == two["to"]["x"] == box23["x2"]
+    rect = lambda s: {"x": s["x"], "y": s["y"], "w": s["w"], "h": s["h"]}  # noqa: E731
+    assert _link(five, "a-coord>a-own21")["mark"] == rect(_spot(five, "iss-00021", "a-own21")) | {"band": False}
+    assert _link(five, "a-own21>a-impl21")["mark"] == rect(_spot(five, "iss-00021", "a-impl21")) | {"band": False}
+    assert _link(five, "a-coord>a-e30")["mark"] == rect(five["spots"]["epic-00030"][0]) | {"band": False}
+    slot = five["model"]["band"]["items"][0]["agents"][1]
+    assert slot["id"] == "a-research"
+    assert _link(five, "a-coord>a-research")["mark"] == rect(slot) | {"band": True}
+    assert _link(got["folded"], "a-coord>a-own09")["mark"] is None
+    assert _link(got["hidden"], "a-e30>a-own31")["mark"] is None
+    assert _link(got["unknown"], "x-coord>a-own22")["mark"] is None
+    assert _link(got["unknown"], "a-coord>a-e30")["mark"] is None
 
 
-def test_arcs_in_a_frame_heading_and_in_a_band_item(got: dict[str, Any]) -> None:
-    """T-03 / R-03: below the heading's marks (d 12), above the band item (d 16)."""
-    epic = got["epic"]
-    heading = _link(epic, "a-e30>a-e30b")
-    spot = epic["spots"]["epic-00030"]
-    chord, bulge, p = _arc(heading)
-    assert heading["kind"] == "arc" and chord >= 40 and bulge == 12
-    assert p[1] == spot[0]["y"] + 16 and _control(heading)[1][1] > p[1]  # it bulges down
-    band = _link(got["five"], "a-coord>a-research")
-    chord, bulge, p = _arc(band)
-    assert band["kind"] == "arc" and chord >= 40 and bulge == 16
-    assert p[1] == -16 and _control(band)[1][1] < -16  # above the band
-
-
-def test_arcs_with_little_room(got: dict[str, Any]) -> None:
-    """T-03 / R-03: shallower down to 8, then the other edge, then the first edge at 8 counted as crowded."""
-    room = _link(got["room"], "p>c")
-    assert _arc(room)[1:] == (16, (A["x1"] + 15 + 18 - 1, A["y2"]))  # marks 38 apart, widened to 40
-    shallow = _link(got["shallow"], "p>c")
-    assert _arc(shallow)[1] == 9 and shallow["from"]["y"] == A["y2"]
-    flip = _link(got["flip"], "p>c")
-    assert _arc(flip)[1] == 16 and flip["from"]["x"] == A["x2"]
-    assert _arc(flip)[0] >= 40
-    crowded = _link(got["crowded"], "p>c")
-    assert _arc(crowded)[1] == 8 and crowded["from"]["y"] == A["y2"]
-    assert got["crowded"]["model"]["audit"]["crowded"] == 1
-    assert all(got[name]["model"]["audit"]["crowded"] == 0 for name in ("room", "shallow", "flip"))
-
-
-def test_arcs_turn_away_from_parallel_dependency_runs(got: dict[str, Any]) -> None:
-    """T-03 / R-03: a horizontal run under the box sends the arc right; runs on both sides: the lower edge, counted."""
-    flip = _link(got["routeflip"], "p>c")
-    assert flip["from"]["x"] == A["x2"]
-    assert got["routeflip"]["model"]["audit"]["edgeOverlaps"] == 0
-    both = _link(got["routeboth"], "p>c")
-    assert both["from"]["y"] == A["y2"]
-    assert got["routeboth"]["model"]["audit"]["edgeOverlaps"] == 1
+def test_the_top_holds_every_hop_above_the_band(got: dict[str, Any]) -> None:
+    """T-01 / R-02 (D-05): the world's top is 6 above the highest peak, the band's hops and the band item's own hop too."""
+    model = got["five"]["model"]
+    peaks = [link["peak"] for link in model["links"]]
+    assert model["top"] == min(-32, min(peaks) - 6)
+    assert model["top"] <= _link(got["five"], "a-coord>a-research")["peak"] - 6 == -16 - 18 - 6
+    assert model["top"] < -16 - 18 - 6  # the band's hops to the boxes rise higher still
+    for name in ("levels", "tframe"):
+        top = got[name]["model"]["top"]
+        assert top == min(
+            0,
+            *(link["peak"] - 6 for link in got[name]["model"]["links"]),
+            *([-32] if got[name]["model"]["band"] else []),
+        )
 
 
 def test_the_synthetic_layouts_have_no_overlap(got: dict[str, Any]) -> None:
-    """T-03 / R-03: boxOverlaps and edgeOverlaps are 0 with the routed layouts."""
+    """T-01 / R-03: boxOverlaps and edgeOverlaps are 0 with the routed layouts."""
     for name in ("five", "hidden", "folded", "epic", "others", "labels"):
         audit = got[name]["model"]["audit"]
         assert (audit["boxOverlaps"], audit["edgeOverlaps"], audit["crowded"]) == (0, 0, 0), name
@@ -665,13 +873,14 @@ def test_the_synthetic_layouts_have_no_overlap(got: dict[str, Any]) -> None:
     assert got["five"]["model"]["audit"] == {"links": 5, "arcs": 2, "boxOverlaps": 0, "edgeOverlaps": 0, "crowded": 0}
 
 
-def test_the_epic_coordinator_line_stays_inside_its_frame(got: dict[str, Any]) -> None:
-    """T-03 / R-03: from the Epic frame's heading down to the Issue inside: never above the frame's top edge."""
+def test_the_epic_coordinator_hops_from_the_frames_top_into_the_issue(got: dict[str, Any]) -> None:
+    """T-01 / R-01, R-02: from the Epic frame's heading mark up out of the frame's top edge, down into the Issue's top."""
     epic = got["epic"]
-    frame = epic["nodes"]["epic-00030"]
     link = _link(epic, "a-e30>a-own33")
     assert link["kind"] == "curve"
-    assert min(y for _, y in _control(link)) >= frame["y1"]
+    assert link["from"]["y"] == epic["nodes"]["epic-00030"]["y1"]
+    assert link["to"]["y"] == epic["nodes"]["iss-00033"]["y1"]
+    assert _peak(link["d"]) == pytest.approx(link["from"]["y"] - _height(link["from"], link["to"]), abs=0.5)
 
 
 def test_lengths_are_multiples_of_eight(got: dict[str, Any]) -> None:
@@ -709,20 +918,6 @@ def test_one_ripple_per_parent_at_its_mark(got: dict[str, Any]) -> None:
     assert ripples["a-coord"] == (slot["x"] + 26, -2)
     assert ripples["a-own21"] == (spot["x"] + 18, spot["y"] + 8)
     assert "x-coord" in ripples
-
-
-def test_unknown_marks_end_on_the_edge(got: dict[str, Any]) -> None:
-    """T-03 / F-04: a box's lower edge, a frame's upper edge (outward); no arc in a box without both marks."""
-    entry = got["unknown"]
-    box = entry["nodes"]["iss-00022"]
-    _, _, c2, c = _control(_link(entry, "x-coord>a-own22"))
-    assert c == ((box["x1"] + box["x2"]) / 2, box["y2"]) and c2[1] > c[1]
-    frame = entry["nodes"]["epic-00030"]
-    _, _, c2, c = _control(_link(entry, "a-coord>a-e30"))
-    assert c == ((frame["x1"] + frame["x2"]) / 2, frame["y1"]) and c2[1] < c[1]
-    ids = [link["id"] for link in entry["model"]["links"]]
-    assert "a-own21>a-impl21" not in ids
-    assert {r["agent"] for r in entry["model"]["ripples"]} == {"a-coord", "x-coord"}
 
 
 def test_the_key_is_the_same_for_the_same_inputs(tmp_path: Path) -> None:

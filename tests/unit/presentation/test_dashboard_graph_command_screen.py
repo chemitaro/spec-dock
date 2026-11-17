@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from tests.unit.presentation.test_dashboard_graph_command import FIVE, ag, structure, summary, wt
+from tests.unit.presentation.test_dashboard_graph_command import FIVE, _peak, ag, structure, summary, wt
 from tests.unit.presentation.test_dashboard_graph_js import ASSETS, ROOT, _node
 
 if TYPE_CHECKING:
@@ -183,6 +183,22 @@ def test_the_dots_flow_and_the_ripples_grow() -> None:
     assert "margin: -7.75px 0 0 -7.75px" in centre
     assert "animation-delay: 1.2s" in _rule(".gx .cr .cr-b")
     assert "position: absolute" in _rule(".gx .cl-svg") and "overflow: visible" in _rule(".gx .cl-svg")
+
+
+def test_the_arrowhead_and_the_ring_take_the_command_colour() -> None:
+    """iss-00648 T-02 / R-04: the arrowhead's fill and the ring's 1.5px line are --sd-cmd, faint when done, faded with
+    the other lines when an agent is chosen (in the band's layer too), the same with reduced motion; no dot rule."""
+    arrow = _rule(".gx .cl-arrow")
+    assert "fill: var(--sd-cmd)" in arrow and "stroke: none" in arrow
+    ring = _rule(".gx .cl-in")
+    assert "fill: none" in ring and "stroke: var(--sd-cmd)" in ring and "stroke-width: 1.5" in ring
+    assert "opacity: .35" in _rule('.gx .cl[data-state="done"] :is(.cl-arrow, .cl-in)')
+    assert [sel for sel, _ in _rules(GRAPH_CSS) if "cl-dot" in sel] == []
+    assert "opacity: .15" in _rule(".gx .has-cmd-sel .cl.is-cmd-off, .gx .has-cmd-sel .cr.is-cmd-off")
+    media = GRAPH_CSS[GRAPH_CSS.rindex("@media (prefers-reduced-motion: reduce)") :]
+    assert "cl-arrow" not in media and "cl-in" not in media
+    for sel in (".gx .cl-arrow", ".gx .cl-in"):
+        assert "animation" not in _rule(sel)
 
 
 def test_the_motion_stops_while_the_graph_moves_off_the_screen_and_at_the_back() -> None:
@@ -619,14 +635,21 @@ def test_a_band_parent_ripples_inside_the_band_over_its_items(runs: dict[str, li
 
 def test_the_first_view_on_a_return_holds_the_band(runs: dict[str, list[dict[str, Any]]]) -> None:
     """T-05 / R-07: the screen's CSS already there (the first view placed at once) still starts above the band."""
-    _, ty, s = _transform(runs["again"][0])
-    assert ty == pytest.approx(48 + 32 * s)
+    shot = runs["again"][0]
+    _, ty, s = _transform(shot)
+    assert ty == pytest.approx(48 - _cmd_top(shot) * s, abs=0.5)
 
 
 def test_the_legend_row_only_with_orca(runs: dict[str, list[dict[str, Any]]]) -> None:
     """T-05 / R-05."""
     assert runs["plain"][0]["legend"] is True
     assert runs["noorca"][0]["legend"] is False
+
+
+def _cmd_top(shot: dict[str, Any]) -> float:
+    """iss-00648 D-05: the world's top: the band's top -32, or 6 above the highest drawn hop."""
+    assert shot["paths"]
+    return min(-32, min(_peak(d) for d in shot["paths"].values()) - 6)
 
 
 def _transform(shot: dict[str, Any]) -> tuple[float, float, float]:
@@ -640,15 +663,41 @@ def test_the_band_never_moves_the_boxes_and_fit_shows_it(runs: dict[str, list[di
     view = runs["view"]
     assert _transform(view[2]) == _transform(view[1])  # the band came
     assert view[2]["edges"] == view[1]["edges"] and view[2]["html"] != view[1]["html"]
-    _, ty, s = _transform(view[3])  # fit with the band: from its top (-32) to the layout's bottom inside 48..792
+    # fit with the band: from the top above its hops (iss-00648 D-05) to the layout's bottom inside 48..792
+    _, ty, s = _transform(view[3])
     height = float(view[3]["size"][1].removesuffix("px"))
-    assert ty - 32 * s >= 48 - 0.5 and ty + height * s <= 800 - 8 + 0.5
+    assert ty + _cmd_top(view[3]) * s >= 48 - 0.5 and ty + height * s <= 800 - 8 + 0.5
     assert _transform(view[4]) == _transform(view[3])  # the band went
     _, ty0, s0 = _transform(view[5])  # fit without it
     assert s0 >= s and ty0 >= 48 - 0.5
     # the first view of a summary with pairs starts above the band's top
     _, ty1, s1 = _transform(runs["first"][1])
-    assert ty1 == pytest.approx(48 + 32 * s1)
+    assert ty1 == pytest.approx(48 - _cmd_top(runs["first"][1]) * s1, abs=0.5)
+
+
+# --- iss-00648 T-03: the arrowheads and the rings of the child's marks ------------------------------------------------
+
+
+def test_the_ends_have_an_arrowhead_and_ring_the_childs_mark(runs: dict[str, list[dict[str, Any]]]) -> None:
+    """iss-00648 T-03 / R-04: a box's or a frame heading's child: its ring and the arrowhead in .gx-cmd-top; a band
+    child: the arrowhead there and its ring in the band's .gx-band-cr; no dot anywhere."""
+    shot = runs["news"][0]
+    parts = shot["endParts"]
+    for line in ("a-coord>a-own21", "a-own21>a-impl21", "a-coord>a-e30"):
+        assert parts[line] == ["cl-in", "cl-arrow"], line
+    assert parts["a-coord>a-research"] == ["cl-arrow"]
+    assert shot["bandMarks"] == {"a-coord>a-research": ""}
+    assert all(p[-1] == "cl-arrow" for p in parts.values())
+    assert "cl-dot" not in shot["html"]
+
+
+def test_the_choice_reaches_the_band_childs_ring(runs: dict[str, list[dict[str, Any]]]) -> None:
+    """iss-00648 T-03 / R-04: the band coordinator chosen: its child's ring stands out; another agent: it fades."""
+    opened = runs["band"][1]
+    assert opened["bandMarks"] == {"a-coord>a-research": "is-cmd-hl"} and opened["bandSel"] == [True]
+    other = runs["mark"][1]
+    assert other["bandMarks"] == {"a-coord>a-research": "is-cmd-off"}
+    assert runs["band"][4]["bandMarks"] == {"a-coord>a-research": ""}
 
 
 # --- iss-00646 T-03: the lines in SVGs of their own, the still mark and the watching -----------------------------------
@@ -666,7 +715,7 @@ def test_the_layers_hold_one_svg_per_picture_and_none_is_as_big_as_the_world(
         m = re.fullmatch(r"left:(-?\d+)px;top:(-?\d+)px(;animation-delay:-?[\d.]+s)?", svg["style"])
         assert m, svg
         assert svg["viewBox"] == f"{m.group(1)} {m.group(2)} {svg['width']} {svg['height']}"
-        assert svg["layer"] in ("gx-cmd", "gx-cmd-top")
+        assert svg["layer"] in ("gx-cmd", "gx-cmd-top", "gx-band-cr")
     body: dict[str, int] = {}
     for svg in shot["svgs"]:
         if svg["layer"] == "gx-cmd":

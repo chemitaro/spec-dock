@@ -3,10 +3,12 @@
 //   node dashboard_graph_command_motion.mjs <assets/dashboard directory> <request.json>
 // request.json:
 //   boxOf: [[ds, pad | null, dots | null], …]  -> boxOf of each (pad null: the default)
-//   links: [link, …]                           -> bodyHtml and endsHtml of each
+//   links: [link, …]                           -> bodyHtml, endsHtml and bandMarkHtml of each
+//   arrow: [to, …]                             -> arrowPath of each (iss-00648 D-04)
+//   markRect: [mark, …]                        -> markRect of each
 //   ripples: [ripple, …]                       -> rippleHtml of each
 //   svgOpen: [[box, cls, extra], …]            -> svgOpen of each
-// Always: MOTION, phaseDelay and phaseOffset of 0..3, and which phase shows at each time (0..0.4 by 0.01), computed from
+// Always: MOTION, ARROW, phaseDelay and phaseOffset of 0..3, and which phase shows at each time (0..0.4 by 0.01), computed from
 // the switching keyframes (shown in 0..25% of each round) and each phase's delay.
 // Prints one JSON object; the Python test asserts on it.
 import { readFileSync } from "node:fs";
@@ -20,6 +22,7 @@ const out = {};
 
 const n = M.MOTION.phases;
 out.MOTION = M.MOTION;
+out.ARROW = M.ARROW ?? null;
 out.delays = [...Array(n).keys()].map((i) => M.phaseDelay(i));
 out.offsets = [...Array(n).keys()].map((i) => M.phaseOffset(i));
 
@@ -38,7 +41,9 @@ for (let k = 0; k <= 40; k++) {
 }
 
 if (request.boxOf) out.boxOf = request.boxOf.map(([ds, pad, dots]) => (pad === null ? M.boxOf(ds) : M.boxOf(ds, pad, dots ?? [])));
-if (request.links) out.links = request.links.map((l) => ({ body: M.bodyHtml(l), ends: M.endsHtml(l) }));
+if (request.links) out.links = request.links.map((l) => ({ body: M.bodyHtml(l), ends: M.endsHtml(l), band: M.bandMarkHtml ? M.bandMarkHtml(l) : null }));
+if (request.arrow) out.arrow = request.arrow.map((to) => (M.arrowPath ? M.arrowPath(to) : null));
+if (request.markRect) out.markRect = request.markRect.map((m) => (M.markRect ? M.markRect(m) : null));
 if (request.ripples) out.ripples = request.ripples.map((r) => M.rippleHtml(r));
 if (request.svgOpen) out.svgOpen = request.svgOpen.map(([box, cls, extra]) => M.svgOpen(box, cls, extra));
 
