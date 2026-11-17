@@ -288,6 +288,33 @@ RUNS += [
 ]
 
 
+# iss-00655 T-03: the mouse wheel, the trackpad and the keys on the cross-repository structure
+RUNS += [
+    {
+        "name": "input",
+        "orca": {"summary": FLAT},
+        "repos": REPOS,
+        "docs": DOCS,
+        "steps": [
+            {"advance": 400},  # 1
+            {"key": "ArrowRight"},  # 2: the reader moves the graph by a key
+            {"summary": OTHER},  # 3: drawn again: the first view is not placed again (A.moved)
+            {"advance": 400},  # 4
+            {"wheel": {"dx": 0, "dy": -100, "mode": 0, "wy": 120, "x": 300, "y": 200}},  # 5: a mouse wheel's notch
+            {"advance": 400},  # 6
+            {"wheel": {"dx": 3, "dy": 7, "mode": 0, "wy": -21, "x": 300, "y": 200}},  # 7: two fingers
+            {"key": "+"},  # 8
+            {"key": "0"},  # 9
+            {"click": '[data-act="fit"]'},  # 10
+            {"key": "ArrowRight", "on": "input"},  # 11
+            {"key": "ArrowRight", "on": "main"},  # 12
+            {"viewHidden": True},  # 13
+            {"key": "ArrowRight"},  # 14
+        ],
+    },
+]
+
+
 @pytest.fixture(scope="module")
 def drawn(tmp_path_factory: pytest.TempPathFactory) -> dict[str, list[dict[str, Any]]]:
     path = tmp_path_factory.mktemp("allcmdscreen") / "request.json"
@@ -472,6 +499,43 @@ def test_the_motion_stills_and_watches_on_the_cross_repository_structure(drawn: 
     assert drawn["motion"]["left"] == {"observed": 0, "timers": 0, "listeners": 0, "still": False}
     for name, run in drawn.items():
         assert run["left"]["observed"] == 0 and run["left"]["timers"] == 0, name
+
+
+# --- iss-00655 T-03 -----------------------------------------------------------------------------------------------------
+
+LABEL = "横断の構造。ドラッグ・2本指・矢印キーで移動、ホイール・ピンチ・+ と - で拡大・縮小、0 で全体"
+
+
+def _under(t: dict[str, float], x: float, y: float) -> tuple[float, float]:
+    return (x - t["tx"]) / t["s"], (y - t["ty"]) / t["s"]
+
+
+def test_a_key_move_keeps_the_readers_view_when_drawn_again(runs: dict[str, Any]) -> None:
+    shots = runs["input"]
+    t0, t1, t2 = shots[1]["t"], shots[2]["t"], shots[3]["t"]
+    assert (t1["tx"], t1["ty"], t1["s"]) == pytest.approx((t0["tx"] - 80, t0["ty"], t0["s"]))
+    assert shots[2]["keyPrevented"] is True and shots[2]["still"]
+    top = min(shots[2]["sections"], key=lambda s: s["body"]["y"] if s["body"] else 1e9)
+    after = _sec(shots[3], top["key"].rsplit("/", 1)[1])
+    assert t2["s"] == t1["s"]
+    assert t2["tx"] + after["body"]["x"] * t2["s"] == pytest.approx(t1["tx"] + top["body"]["x"] * t1["s"])
+    assert t2["tx"] != pytest.approx(t0["tx"])  # not the first view again
+
+
+def test_the_wheel_and_the_keys_on_the_cross_structure(runs: dict[str, Any]) -> None:
+    shots = runs["input"]
+    t = [shot["t"] for shot in shots]
+    assert t[5]["s"] == pytest.approx(t[4]["s"] * 1.15)
+    assert _under(t[5], 300, 200) == pytest.approx(_under(t[4], 300, 200))
+    assert (t[7]["tx"], t[7]["ty"], t[7]["s"]) == pytest.approx((t[6]["tx"] - 3, t[6]["ty"] - 7, t[6]["s"]))
+    assert t[8]["s"] == pytest.approx(t[7]["s"] * 1.25)
+    assert t[9] == t[10]  # 0 is the fit button
+    assert t[11] == t[10] and shots[11]["keyPrevented"] is False
+    assert t[12]["tx"] == pytest.approx(t[11]["tx"] - 80) and shots[12]["keyPrevented"] is True
+    assert t[14] == t[12] and shots[14]["keyPrevented"] is False
+    for i in (2, 5, 7, 8, 9, 12):
+        assert shots[i]["still"], i
+    assert shots[0]["label"] == LABEL
 
 
 def test_the_band_and_cleanup_panels_move_on_a_phone(runs: dict[str, Any]) -> None:

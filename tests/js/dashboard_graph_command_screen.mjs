@@ -9,6 +9,8 @@
 //       {sheet: {on: selector, dy}} (a finger on the panel moves dy px; up is positive), {grab: true} (a tap on the grab),
 //       {drag: true} (a drag on the graph area), {wheel: {dx, dy}}, {advance: ms} (the motion's clock, iss-00646),
 //       {hidden: bool} (the page goes to the back or comes back), {tell: {sel, hit}} (IntersectionObserver's answer)
+// iss-00655: wheel also takes {mode (deltaMode), wy (wheelDeltaY), shift, ctrl, x, y}; key takes shift, and on: "main"
+// (the screen's container) or "input" (an input in the graph area); {viewHidden: bool} hides the graph area.
 // run.io: the page has an IntersectionObserver (the fake one of fake_motion.mjs); without it, none (F-01).
 // Prints {runs: {name: [snapshot after the first render, snapshot after each step]}, after: {name: what is left after
 // leaving the screen}, legend: the legend's HTML by renderLegend's options (legend: true)}.
@@ -21,6 +23,10 @@ const [assets, requestPath] = process.argv.slice(2);
 const request = JSON.parse(readFileSync(requestPath, "utf8"));
 const page = install({ fetch: async () => json({ error: { message: "not found" } }, 404) });
 const motion = installMotion(page);
+// the page's clock moves with the motion's clock too: wheels an advance apart are not one stroke (iss-00655 D-02)
+const realNow = performance.now.bind(performance);
+let skew = 0;
+performance.now = () => realNow() + skew;
 let styled = false;
 const computed = globalThis.getComputedStyle;
 globalThis.getComputedStyle = (el) => ({ ...computed(el), position: styled && el?.classList?.contains("gx") ? "absolute" : "" });
@@ -95,6 +101,8 @@ function snap(root) {
     worldSvgs: world.children.filter((c) => c instanceof Element && c.tag === "svg").map((c) => c.getAttribute("class")),
     rings: world.querySelectorAll(".cr").map((c) => c.tag + ":" + c.children.filter((i) => i instanceof Element).map((i) => `${i.tag}.${i.getAttribute("class")}`).join(",")),
     still: q(".gx-view").classList.contains("is-still"),
+    label: q(".gx-view").getAttribute("aria-label"),
+    keyPrevented,
     off: world.querySelectorAll(".is-off").map((el) => (el.classList.contains("cr") ? "cr" : "ph")),
     phases: world.querySelectorAll(".cl-ph").length,
     observed: motion.observed(world),
@@ -124,6 +132,7 @@ function snap(root) {
   };
 }
 
+let keyPrevented = null; // whether the last key step was prevented (iss-00655)
 const target = (root, sel) => {
   const el = root.querySelector(sel);
   if (!el) throw new Error(`nothing at ${sel}`);
@@ -131,6 +140,7 @@ const target = (root, sel) => {
 };
 
 async function step(root, s, orca, ctx) {
+  keyPrevented = null;
   if (s.summary !== undefined) {
     orca.set({ summary: s.summary, order: s.order });
     orca.news();
@@ -158,7 +168,11 @@ async function step(root, s, orca, ctx) {
     for (const fn of view.listeners.pointerup || []) fn({ ...ev, type: "pointerup", clientX: 150, clientY: 100 });
   } else if (s.wheel) {
     const view = target(root, ".gx-view");
-    for (const fn of view.listeners.wheel || []) fn({ deltaX: s.wheel.dx, deltaY: s.wheel.dy, ctrlKey: false, metaKey: false, clientX: 0, clientY: 0, preventDefault() {} });
+    const w = s.wheel;
+    const ev = { deltaX: w.dx, deltaY: w.dy, shiftKey: !!w.shift, ctrlKey: !!w.ctrl, metaKey: false, clientX: w.x ?? 0, clientY: w.y ?? 0, preventDefault() {} };
+    if (w.mode !== undefined) ev.deltaMode = w.mode;
+    if (w.wy !== undefined) ev.wheelDeltaY = w.wy;
+    for (const fn of view.listeners.wheel || []) fn(ev);
   } else if (s.sheet) {
     // a finger on the panel: down, three moves, up (iss-00650 D-03)
     const panel = target(root, ".panel");
@@ -171,13 +185,21 @@ async function step(root, s, orca, ctx) {
     for (const fn of panel.listeners.pointerup || []) fn({ ...ev, type: "pointerup", clientY: y0 - s.sheet.dy });
     await new Promise((r) => setTimeout(r, 0)); // the click that ends a drag is not a tap
   } else if (s.grab) root.querySelector(".panel .pn-grab")?.dispatch("click");
-  else if (s.advance) motion.advance(s.advance);
+  else if (s.viewHidden !== undefined) target(root, ".gx-view").hidden = s.viewHidden;
+  else if (s.advance) {
+    skew += s.advance;
+    motion.advance(s.advance);
+  }
   else if (s.hidden !== undefined) motion.setHidden(s.hidden);
   else if (s.tell) motion.tell(s.tell.sel, s.tell.hit);
   else if (s.key) {
-    const el = s.on ? target(root, s.on) : target(root, ".gx-view");
-    const ev = { key: s.key, target: el, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
+    let el;
+    if (s.on === "main") el = root;
+    else if (s.on === "input") el = root.querySelector(".gx-view > input") ?? target(root, ".gx-view").appendChild(new Element("input"));
+    else el = s.on ? target(root, s.on) : target(root, ".gx-view");
+    const ev = { key: s.key, shiftKey: !!s.shift, target: el, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
     for (const fn of page.docListeners.keydown || []) fn(ev);
+    keyPrevented = ev.defaultPrevented;
   }
   await settle();
 }

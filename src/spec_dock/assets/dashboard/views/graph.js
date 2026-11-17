@@ -15,6 +15,7 @@ import { LEGACY_KEYS, PREFS_KEY, restorePrefs } from "./graph/prefs.js";
 import { createScopePanel, SHEET_GRAB } from "./_shared/panel.js";
 import { createOrcaWatch, markAgentAt, markIds, paintOrcaMarks } from "./_shared/orca_marks.js";
 import * as CV from "./graph/command_view.js";
+import { bindViewInput } from "./graph/view_input.js";
 import * as D from "./graph/draw.js";
 import { compactNeeds, headsDiffer, tallNeeds } from "./graph/measure.js";
 
@@ -372,7 +373,7 @@ function mount(root) {
   loadPrefs();
   root.innerHTML =
     `<section class="gx" aria-label="構造の図">` +
-    `<div class="gx-view" tabindex="0" aria-label="構造の図。ドラッグで移動、Ctrl とホイールか2本指で拡大・縮小"><div class="gx-world"></div><p class="gx-none" hidden></p></div>` +
+    `<div class="gx-view" tabindex="0" aria-label="構造の図。ドラッグ・2本指・矢印キーで移動、ホイール・ピンチ・+ と - で拡大・縮小、0 で全体"><div class="gx-world"></div><p class="gx-none" hidden></p></div>` +
     `<div class="gx-bar"><div class="gx-left"><div class="gx-crumbs" hidden></div><div class="gx-next" role="group" aria-label="状態で目立たせる"></div></div><div class="gx-tools"></div></div>` +
     `<div class="legend"></div>` +
     `<aside class="panel" aria-hidden="true" aria-label="Scope の欄"></aside>` +
@@ -411,6 +412,8 @@ function mount(root) {
 }
 
 function dispose() {
+  V.input?.dispose();
+  V.input = null;
   document.removeEventListener("keydown", onKey);
   for (const type of ["gesturestart", "gesturechange", "gestureend"]) document.removeEventListener(type, stopGesture, { passive: false });
   window.removeEventListener("resize", onResize);
@@ -1050,20 +1053,19 @@ function bindView() {
   };
   v.addEventListener("pointerup", end);
   v.addEventListener("pointercancel", end);
-  v.addEventListener(
-    "wheel",
-    (e) => {
-      e.preventDefault();
-      const b = v.getBoundingClientRect();
-      if (e.ctrlKey || e.metaKey) zoomAt(Math.exp(-e.deltaY * 0.01), e.clientX - b.left, e.clientY - b.top);
-      else {
-        V.tx -= e.deltaX;
-        V.ty -= e.deltaY;
-        applyT();
-      }
+  // the wheel and the keys (iss-00655): a mouse wheel zooms at the cursor, a trackpad as before, arrows and + - 0
+  V.input?.dispose();
+  V.input = bindViewInput(v, {
+    active: () => !!V.el && !V.el.view.hidden,
+    pan: (dx, dy) => {
+      V.tx += dx;
+      V.ty += dy;
+      applyT();
     },
-    { passive: false },
-  );
+    zoomAt,
+    zoomCenter,
+    fit,
+  });
   v.addEventListener("dblclick", (e) => {
     if (isPhone()) return; // phones open the detail with a second tap; a double tap is a zoom gesture there
     const hit = e.target.closest(".gx-box, .gx-fh");

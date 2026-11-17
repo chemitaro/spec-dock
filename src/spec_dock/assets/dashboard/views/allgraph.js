@@ -16,6 +16,7 @@ import { REPO, anchorShift, bodyWidth, compose } from "./allgraph/compose.js";
 import { bandShape, crossKey, crossModel, crossPlace } from "./allgraph/command.js";
 import { commandPairs } from "./graph/command.js";
 import * as CV from "./graph/command_view.js";
+import { bindViewInput } from "./graph/view_input.js";
 import { splitNotices } from "./allgraph/notices.js";
 import { createScopePanel, SHEET_GRAB } from "./_shared/panel.js";
 import { createOrcaWatch, markAgentAt, markIds, paintOrcaMarks } from "./_shared/orca_marks.js";
@@ -451,7 +452,7 @@ function mount(root) {
   loadPrefs();
   root.innerHTML =
     `<section class="gx" data-screen="allgraph" aria-label="横断の構造">` +
-    `<div class="gx-view" tabindex="0" aria-label="横断の構造。ドラッグで移動、Ctrl とホイールか2本指で拡大・縮小"><div class="gx-world"></div><p class="gx-none" hidden></p></div>` +
+    `<div class="gx-view" tabindex="0" aria-label="横断の構造。ドラッグ・2本指・矢印キーで移動、ホイール・ピンチ・+ と - で拡大・縮小、0 で全体"><div class="gx-world"></div><p class="gx-none" hidden></p></div>` +
     `<div class="gx-bar"><div class="gx-left"><div class="gx-next" role="group" aria-label="状態で目立たせる"></div><ul class="ax-sum" aria-label="リポジトリの知らせ" hidden></ul></div><div class="gx-tools"></div></div>` +
     `<div class="legend"></div>` +
     `<aside class="panel" aria-hidden="true" aria-label="Scope の欄"></aside>` +
@@ -493,6 +494,8 @@ function mount(root) {
 }
 
 function dispose() {
+  A.input?.dispose();
+  A.input = null;
   document.removeEventListener("keydown", onKey);
   document.removeEventListener("visibilitychange", onVisible);
   for (const type of ["gesturestart", "gesturechange", "gestureend"]) document.removeEventListener(type, stopGesture, { passive: false });
@@ -1363,21 +1366,20 @@ function bindView() {
   };
   v.addEventListener("pointerup", end);
   v.addEventListener("pointercancel", end);
-  v.addEventListener(
-    "wheel",
-    (e) => {
-      e.preventDefault();
-      const b = v.getBoundingClientRect();
-      if (e.ctrlKey || e.metaKey) zoomAt(Math.exp(-e.deltaY * 0.01), e.clientX - b.left, e.clientY - b.top);
-      else {
-        A.moved = true;
-        A.tx -= e.deltaX;
-        A.ty -= e.deltaY;
-        applyT();
-      }
+  // the wheel and the keys (iss-00655): a mouse wheel zooms at the cursor, a trackpad as before, arrows and + - 0
+  A.input?.dispose();
+  A.input = bindViewInput(v, {
+    active: () => !!A.el && !A.el.view.hidden,
+    pan: (dx, dy) => {
+      A.moved = true;
+      A.tx += dx;
+      A.ty += dy;
+      applyT();
     },
-    { passive: false },
-  );
+    zoomAt,
+    zoomCenter,
+    fit,
+  });
   v.addEventListener("dblclick", (e) => {
     if (isPhone()) return;
     const hit = hitOf(e.target);
