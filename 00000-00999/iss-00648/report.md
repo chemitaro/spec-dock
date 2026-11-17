@@ -32,6 +32,13 @@ ID: "iss-00648"
   - 直した今の期待：下の端（帯の項目の下の縁・箱の下の縁・枠の見出しの印の下・枠の内側の下の縁・F-04 の箱の下の縁）→ 上の縁。`stubs`（箱の中の短い線）→ 空。`boxArc`（下・右の縁の外、16px、弦 40、右へ逃げる・依存の線から逃げる）・`frameArc`（見出しの下 12px）・`bandArc`（上 16px）→ `sameHop`（上の縁、18px、弦 12、余白 − 3 へ下げ下限 8、`crowded`）。曲線の制御点（`k = min(140, max(24, 0.45·L))`、両端の向き）→ `hop`（頂点がちょうど H 上）。`top` の `-32` → ホップの頂点を含む `-78`（`five`）。同じ枠の上の縁へ入る3本のずらし（前は2本 ±5、内側の下の縁の1本は別）→ 3本 −10・0・+10。『Epic の統括の線が枠の上の縁より上に出ない』→『枠の上の縁から出て Issue の上の縁へ入るホップ』。`boundsOf` の弧の下の縁の制限 → 上の縁の制限（16/10 → 18/10）。依存の線から右へ逃げるテスト → `edgeOverlaps` に数えるテスト。
   - 足したテスト：木の枠の箱（`tframe`）、縦に重なる印（12 に離す）、上の余白 14px（11、`crowded` 1、`boxOverlaps` 0）・6px（8、重なり1）、依存の線の水平な区間（`edgeOverlaps` 1）、子が上・同じ高さ・下、`hop` の直の計算（同じ高さ、差 700px、dx 0 の横のふくらみ、`ceiling` と `HOP.low`）、線の `mark`、`top`、横断の構造の『ほかの場所』から 500px 以上下の箱（頂点 4）。
 
+- S-03（impl-claude）：コミット `489a46348`（`git-autocommit` が生成した件名は「依存線の終点を…」だが、変えたのは指揮の線の端。履歴は書き換えていない）。
+  - 変えたもの：`views/graph/command_motion.js`（`ARROW`・`arrowPath`・`markRect`・`bandMarkHtml`、`endsHtml` は `cl-dot` の代わりに `cl-arrow` と、箱・枠の印の `cl-in` を描き、SVG の四角は矢じりと縁を含む）、`views/graph/command_view.js`（`layersHtml` が帯の子の縁を波紋と同じ `.gx-band-cr` に入れる、`paintCmdSel` が `.gx-band-cr .cl` も塗る）、`views/graph.css`（`.cl-arrow`・`.cl-in`・done の .35、`.cl-dot` の規則を消す、層の説明の注釈）。
+  - Red：S-02 のコミットの上で新しいテストが 13 failed（`.workbench/implement/iss-00648/s03-red.log`）。Green：S-03 の節目のコマンド `uv run pytest tests/unit/presentation/ tests/unit/infra/test_dashboard_orca_marks_js.py tests/unit/infra/test_dashboard_orca_views_js.py tests/unit/infra/test_dashboard_screens_js.py tests/unit/infra/test_dashboard_allgraph_route.py` 394 passed（`s03-green.log`）。`make lint` 合格（`s03-lint.log`）。
+  - 直した今の期待：端の層の `cl-dot`（中心が `to`、半径 2.5）→ `cl-arrow`（先が `to`）。端の層の SVG の四角（点の半径を含む）→ 矢じりの3点を含む。構造の図の最初の表示・『収める』の『帯の上 −32』→ 描いた線の頂点の最も高い所 − 6 と −32 の小さい方（D-05 の `top`。S-02 の後にこの3件が落ちていた：`s02-s03set.log`）。横断の構造の画面で、帯から出る線の始めの y（項目の下の縁 → 上の縁）と、子の端（`cl-dot` の中心が箱の下の縁 → 矢じりの先が箱の上の縁）。線ごとの SVG の層の候補に `.gx-band-cr` を足した。
+  - 足したテスト：`arrowPath`（先・底・幅 7）、`markRect`（2px 外）、`endsHtml`（矢じり1つ・点なし・箱の印の縁・帯の子は縁なし・stubs が空の flow は止めた絵1枚）、`bandMarkHtml`（帯の子だけ）、CSS（`--sd-cmd`、1.5px、done .35、`.cl-dot` の規則なし、減らす設定に規則なし、薄めの規則）、構造の図と横断の構造の画面（箱・枠の子は `cl-in`＋`cl-arrow`、帯の子は `cl-arrow` と `.gx-band-cr` の縁、選びで `is-cmd-hl`・`is-cmd-off`）。
+  - static-inventory.json：dashboard の資産は載っていないので直すものはない。凡例（`lg-cmd`）は範囲外で変えていない。
+
 ## 逸脱と判断
 
 - 観察（仕様どおり、変えていない）：横断の構造の『ほかの場所』の帯の同じ項目のホップは、帯の上の縁 y 24 と `ceiling` 4 から `room` 20、高さ min(18, 20 − 3) = 17 になり、`crowded` に 1 数える（テストの場面 `deep`。`boxOverlaps`・`edgeOverlaps` は 0）。実データで『ほかの場所』の中の親子があると、`specdockCmdAudit()` の `crowded` が 1 以上になる。
