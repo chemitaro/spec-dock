@@ -78,7 +78,7 @@ ID: "iss-00648"
 
 - **最終品質ゲート（2026-11-18、合格）**：合格のコミット `9d2afa266`（base `92e26aff7`、origin/main は進んでいない）。レビュー（quality-gate-reviewer opus / medium、4観点）P0〜P2 0、P3 1（spotDrift ≤ 0.4 が 0.5 の組がある。直す前と同じ揺れ）、網羅は完全。`make lint` exit 0、`uv run pytest` 4255 passed・7 skipped。この worktree の `.workbench/final-quality-gate/iss-00648-b/closure.md`。記録だけのコミットはない（記録は Git の外）。
 - 実装担当の起動：impl-sol（Codex、dispatch `ctx_17c1d5a4151a`、launch.effective codex gpt-6.1-sol / medium）は chat-scratch の symlink の拒否で何も変えずに止まった（worker-stop）。impl-claude（dispatch `ctx_aec9f6b0309e`、launch.effective claude opus / medium）が S-02〜S-04 を行った。
-- **PR**：https://github.com/chemitaro/spec-dock/pull/658（head `9d2afa266`、`Refs #648`）。マージは統括。
+- **PR**：https://github.com/chemitaro/spec-dock/pull/658（head `9d2afa266`、`Refs #648`）。CI（SpecDock check・Provider CI・Commit identity）すべて合格、merge_readiness READY（2026-11-18、`.workbench/coding-task/iss-00648/ci.json`）。マージは統括。
 
 ## Residual Risks / Follow-ups
 
