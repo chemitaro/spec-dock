@@ -14,7 +14,7 @@ tests: {
 	"T-01": {title: "純粋な関数（test_dashboard_nesting.py）：この PC の登録の形の9つの親が今と同じ、名前の頭が同じだけのもの・同じ道・隠したもの・クローンが2つのもの・絶対でない道の親が今と同じ、`businesses/b/products/p` と `groups/b/team/p` で親の形が同じ。`TIER_LABELS` と `Nesting` を import できない", verifies: ["R-01"]}
 	"T-02": {title: "一覧の API（test_dashboard_repositories_nesting.py）：各リポジトリの項目が `[*FIELDS, \"parent\"]` の順で `tier` がなく、親の値が今と同じ。隠したもの・ambiguous・分からない行の扱いと、道を返さないことが今と同じ", verifies: ["R-01"]}
 	"T-03": {title: "画面（偽の DOM、test_dashboard_allgraph_screen.py）：`tier` を持つ入力でも、どの枠の見出しにも `sd-badge`・`ax-tier` がなく、`owner/name` とリンクがある。`allgraph.css` に `ax-tier` がなく、`allgraph.js` に `ax-tier` と語 `tier` がない。compose の入れ子のテストが通る", verifies: ["R-02", "F-01"]}
-	"T-04": {title: "文書（test_issue613_repository_nesting_docs.py）：配る側と dogfood の reference_cli.md が同じバイトで、API の行に `parent` の決め方と「0.9.6 で消した（版の規則の例外）」の1文があり、`段の札`・`businesses` がない。目録の sha256 が内容と合い、前の値が known_old_sha256 にある", verifies: ["R-03"]}
+	"T-04": {title: "文書（test_issue613_repository_nesting_docs.py）：配る側と dogfood の reference_cli.md が同じバイトで、API の行に `parent` の決め方と`tier` を 0.9.6 で消したことと「版の規則の例外」を含む1文があり（部分の文字列 `0.9.6 で消し` と `版の規則の例外` で確かめる）、`段の札`・`businesses` がない。目録の sha256 が内容と合い、前の値が known_old_sha256 にある", verifies: ["R-03"]}
 	"T-05": {title: "静的な確かめ：`src/spec_dock/runtime/` の .py に `TIER_LABELS`・`事業`・`プロダクト`・`サービス`・`businesses`・`products` の文字列がない", verifies: ["R-01"]}
 	"T-06": {title: "実機：作業ツリーの wheel を隔離した venv に入れ、この PC の状態の置き場の写し（一時の置き場）で別のポート・`--tailscale` で立て、`/api/v1/repositories` に `tier` がなく `parent` が今と同じこと、`/graph` の 1440・390 × 明・暗の写しで見出しに札がなく入れ子が今どおりであることを report.md と artifacts に残す。調べの表（D-06）も report.md に書く", verifies: ["R-01", "R-02", "R-04"]}
 }

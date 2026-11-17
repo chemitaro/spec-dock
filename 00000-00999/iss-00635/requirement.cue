@@ -68,7 +68,7 @@ requirements: {
 	"R-03": {
 		title: "契約の文書から段の札の記述を消す"
 		text: """
-			配る側の `docs/reference_cli.md` の「orca-web との連携」の API の行から、`tier` と段の札の決め方の記述を消し、`parent` の記述だけを残す。契約の版 `specdock.dashboard/v1` は変えず、版の規則（「消すか意味を変えるときは版を上げます」）の例外として、API の行に「0.9.5 だけで配った `tier` は、使う者がなく、0.9.6 で消した（版の規則の例外）」の1文を書く。目録 `static-inventory.json` の sha256 を新しい内容にし、今の値（0.9.5 の後に iss-00614 で入った、まだ配っていない内容。0.9.5 で配った値は既に `known_old_sha256` にある）を `known_old_sha256` に足す。dogfood の写し `spec-dock/docs/reference_cli.md` を同じバイトにする。
+			配る側の `docs/reference_cli.md` の「ダッシュボードのサーバーの契約」の API の行から、`tier` と段の札の決め方の記述を消し、`parent` の記述だけを残す。契約の版 `specdock.dashboard/v1` は変えず、版の規則（「消すか意味を変えるときは版を上げます」）の例外として、API の行に「0.9.5 だけで配った`tier`は、使う者がなく、0.9.6 で消しました（版の規則の例外）。」の1文を書く。目録 `static-inventory.json` の sha256 を新しい内容にし、今の値（0.9.5 の後に iss-00614 で入った、まだ配っていない内容。0.9.5 で配った値は既に `known_old_sha256` にある）を `known_old_sha256` に足す。dogfood の写し `spec-dock/docs/reference_cli.md` を同じバイトにする。
 			"""
 		acceptance: [
 			"配る側と dogfood の `reference_cli.md` が同じバイトで、API の行が `段の札`・`businesses` を含まず、`parent` の決め方（いちばん近い出す祖先、隠したもの、クローンが2つのもの、道を返さない）と、`tier` を 0.9.6 で消した版の規則の例外の1文を含む",
