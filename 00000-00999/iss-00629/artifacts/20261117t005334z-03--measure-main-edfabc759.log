@@ -1,0 +1,99 @@
+1440 844 next world 2412x6788 fit 10.6%
+1440 844    generic-mona:848x305@1312  housing-lifecycle:2024x1920@1344  input-devices:2332x644@1344  orca-web:468x305@1376  spec-dock:1078x603@1376  taikyohiyou_project:1242x1337@1312  tenting-cradle:1070x305@1312  yubisaki:468x305@1312
+1440 844     company-os 0 8 8 2396 5624
+1440 844     housing-lifecycle 1 24 96 2056 3481
+1440 844     taikyohiyou_project 2 40 2120 1274 1441
+1440 844     input-devices 1 24 3593 2364 2023
+1440 844     generic-mona 2 40 4341 880 409
+1440 844     tenting-cradle 2 40 4766 1102 409
+1440 844     yubisaki 2 40 5191 500 409
+1440 844     orca-web 0 8 5648 500 409
+1440 844     spec-dock 0 8 6073 1110 707
+1440 844 now world 2780x14114 fit 5.1%
+1440 844    generic-mona:2314x305@1312  housing-lifecycle:2700x4924@1344  input-devices:2332x644@1344  orca-web:1776x575@1376  spec-dock:1622x1724@1376  taikyohiyou_project:2040x3818@1312  tenting-cradle:2124x711@1312  yubisaki:474x305@1312
+1440 844     company-os 0 8 8 2764 11559
+1440 844     housing-lifecycle 1 24 140 2732 8966
+1440 844     taikyohiyou_project 2 40 5168 2072 3922
+1440 844     input-devices 1 24 9122 2378 2429
+1440 844     generic-mona 2 40 9870 2346 409
+1440 844     tenting-cradle 2 40 10295 2156 815
+1440 844     yubisaki 2 40 11126 506 409
+1440 844     orca-web 0 8 11583 1808 679
+1440 844     spec-dock 0 8 12278 1654 1828
+1440 844 all world 13348x34461 fit 2.1%
+1440 844    generic-mona:3082x542@1312  housing-lifecycle:6460x12014@1344  input-devices:2332x644@1344  orca-web:2852x570@1376  spec-dock:5716x10124@1376  taikyohiyou_project:13236x8310@1312  tenting-cradle:3212x844@1312  yubisaki:474x305@1312
+1440 844     company-os 0 8 8 13332 23511
+1440 844     housing-lifecycle 1 24 140 13300 20548
+1440 844     taikyohiyou_project 2 40 12258 13268 8414
+1440 844     input-devices 1 24 20704 3276 2799
+1440 844     generic-mona 2 40 21452 3114 646
+1440 844     tenting-cradle 2 40 22114 3244 948
+1440 844     yubisaki 2 40 23078 506 409
+1440 844     orca-web 0 8 23535 2884 674
+1440 844     spec-dock 0 8 24225 5748 10228
+1000 844 next world 2104x8015 fit 9.0%
+1000 844    generic-mona:848x305@872  housing-lifecycle:2024x2573@904  input-devices:1836x652@904  orca-web:468x305@936  spec-dock:1078x705@936  taikyohiyou_project:858x1801@872  tenting-cradle:1070x305@872  yubisaki:468x305@872
+1000 844     company-os 0 8 8 2088 6749
+1000 844     housing-lifecycle 1 24 96 2056 4598
+1000 844     taikyohiyou_project 2 40 2773 890 1905
+1000 844     input-devices 1 24 4710 1868 2031
+1000 844     generic-mona 2 40 5466 880 409
+1000 844     tenting-cradle 2 40 5891 1102 409
+1000 844     yubisaki 2 40 6316 500 409
+1000 844     orca-web 0 8 6773 500 409
+1000 844     spec-dock 0 8 7198 1110 809
+1000 844 now world 2426x16077 fit 4.5%
+1000 844    generic-mona:2314x305@872  housing-lifecycle:2246x6147@904  input-devices:1836x652@904  orca-web:1392x681@936  spec-dock:1622x2159@936  taikyohiyou_project:1974x4009@872  tenting-cradle:2124x711@872  yubisaki:474x305@872
+1000 844     company-os 0 8 8 2410 12981
+1000 844     housing-lifecycle 1 24 140 2278 10380
+1000 844     taikyohiyou_project 2 40 6391 2006 4113
+1000 844     input-devices 1 24 10536 2378 2437
+1000 844     generic-mona 2 40 11292 2346 409
+1000 844     tenting-cradle 2 40 11717 2156 815
+1000 844     yubisaki 2 40 12548 506 409
+1000 844     orca-web 0 8 13005 1424 785
+1000 844     spec-dock 0 8 13806 1654 2263
+1000 844 all world 13014x39204 fit 1.8%
+1000 844    generic-mona:3082x542@872  housing-lifecycle:5172x14184@904  input-devices:1836x652@904  orca-web:2812x676@936  spec-dock:5124x11500@936  taikyohiyou_project:12902x9393@872  tenting-cradle:3212x844@872  yubisaki:474x305@872
+1000 844     company-os 0 8 8 12998 26772
+1000 844     housing-lifecycle 1 24 140 12966 23801
+1000 844     taikyohiyou_project 2 40 14428 12934 9497
+1000 844     input-devices 1 24 23957 3276 2807
+1000 844     generic-mona 2 40 24713 3114 646
+1000 844     tenting-cradle 2 40 25375 3244 948
+1000 844     yubisaki 2 40 26339 506 409
+1000 844     orca-web 0 8 26796 2844 780
+1000 844     spec-dock 0 8 27592 5156 11604
+390 788 next world 2104x10341 fit 6.4%
+390 788    generic-mona:848x305@360  housing-lifecycle:2024x3715@360  input-devices:982x839@360  orca-web:468x305@360  spec-dock:1078x1011@360  taikyohiyou_project:726x2492@360  tenting-cradle:1070x305@360  yubisaki:468x305@360
+390 788     company-os 0 8 8 2088 8769
+390 788     housing-lifecycle 1 24 96 2056 6431
+390 788     taikyohiyou_project 2 40 3915 758 2596
+390 788     input-devices 1 24 6543 1134 2218
+390 788     generic-mona 2 40 7486 880 409
+390 788     tenting-cradle 2 40 7911 1102 409
+390 788     yubisaki 2 40 8336 500 409
+390 788     orca-web 0 8 8793 500 409
+390 788     spec-dock 0 8 9218 1110 1115
+390 788 now world 2426x27655 fit 2.4%
+390 788    generic-mona:2314x305@360  housing-lifecycle:2114x13021@360  input-devices:982x839@360  orca-web:1200x1061@360  spec-dock:1622x4710@360  taikyohiyou_project:2001x5493@360  tenting-cradle:2124x711@360  yubisaki:468x407@360
+390 788     company-os 0 8 8 2410 21628
+390 788     housing-lifecycle 1 24 140 2146 18738
+390 788     taikyohiyou_project 2 40 13265 2033 5597
+390 788     input-devices 1 24 18894 2378 2726
+390 788     generic-mona 2 40 19837 2346 409
+390 788     tenting-cradle 2 40 20262 2156 815
+390 788     yubisaki 2 40 21093 500 511
+390 788     orca-web 0 8 21652 1232 1165
+390 788     spec-dock 0 8 22833 1654 4814
+390 788 all world 12845x62433 fit 1.1%
+390 788    generic-mona:3082x542@360  housing-lifecycle:3722x24867@360  input-devices:982x839@360  orca-web:1884x1100@360  spec-dock:4354x20753@360  taikyohiyou_project:12733x11973@360  tenting-cradle:2910x844@360  yubisaki:468x407@360
+390 788     company-os 0 8 8 12829 40324
+390 788     housing-lifecycle 1 24 140 12797 37064
+390 788     taikyohiyou_project 2 40 25111 12765 12077
+390 788     input-devices 1 24 37220 3146 3096
+390 788     generic-mona 2 40 38163 3114 646
+390 788     tenting-cradle 2 40 38825 2942 948
+390 788     yubisaki 2 40 39789 500 511
+390 788     orca-web 0 8 40348 1916 1204
+390 788     spec-dock 0 8 41568 4386 20857
