@@ -59,4 +59,22 @@ SpecDock 0.9.7 のリリースの変更を作った。機能のコードは変�
 
 ## Verification
 
+- 最終品質ゲート：**合格**（attempt 1）。
+  - レビュアー：quality-gate-reviewer opus / medium。second opinion はない。範囲は `2fa809271..64fd56c67`。
+  - 結果：P0〜P3 は0、coverage complete。
+  - test lane：`make lint` exit 0、`uv run pytest` exit 0（4216 passed / 7 skipped、33分）。
+  - closure：`.workbench/final-quality-gate/iss-00645-fqg-1/closure.md`（worktree `/Volumes/990p2t/workspace/worktrees/orca/spec-dock/iss-00645`）。
+  - 区切りのレビューは、計画どおりなし。
+- wheel：隔離した venv で `spec-dock --version` が `spec-dock 0.9.7` を返した（Outcome の S-04）。
+- PR #647（https://github.com/chemitaro/spec-dock/pull/647）：head は 64fd56c67（合格のコミット）。記録のコミットはない（記録は Git の外）。CI は下に追記する。
+
+## 逸脱と判断
+
+- S-03 のコミット 64fd56c67 の文が英語（`test: add 0.9.7 release upgrade coverage`）。`git-autocommit` が生成した。リポジトリの規則は日本語。履歴を書き換えず、そのまま受け入れた（タスク担当の判断）。
+- 最終品質ゲートの review の最初の検査が、valid=false になった。キャンペーンを固定した後に、タスク担当が plan.cue の status を書き換え、authority の sha256 が合わなくなったため。指摘ではない。plan.cue を固定したバイトに戻して検査し直し、合格を確かめた。closure の後に status（S-02〜S-04 done）を書き直した。
+- 仕様のレビューの P2（round-1）も、配るバイトの事実の誤りなので、直してから合格させた。
+
 ## Residual Risks / Follow-ups
+
+- `work finish iss-00645` は実行していない（マージの後に統括が行う）。
+- マージの後のタグの確かめ、wheel、導入、必要なら配布資産の更新は、統括が行う（上の手順）。
