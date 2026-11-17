@@ -5,7 +5,7 @@ package spec
 goal: "作業中の Epic・Initiative の枠に worktree の印を出し、どこの稼働の印を押しても押したエージェントのチャットを開き、ボードの札の稼働の印を専用の行に置く"
 
 steps: {
-	"S-01": {title: "T-01〜T-03 を tests/unit/infra/test_dashboard_orca_marks_js.py と tests/unit/infra/test_dashboard_orca_views_js.py に先に書いて落ちることを確かめ、D-01（orca_marks.js の記録と markAgentAt）と D-02（panel.js の openAgent）を入れて通す。今の orca の node のテストを通す", realizes: ["R-02", "R-03", "R-04", "F-01", "F-02"], status: "todo", session: "impl-sol"}
+	"S-01": {title: "T-01〜T-03 を tests/unit/infra/test_dashboard_orca_marks_js.py と tests/unit/infra/test_dashboard_orca_views_js.py に先に書いて落ちることを確かめ、D-01（orca_marks.js の記録と markAgentAt）と D-02（panel.js の openAgent）を入れて通す。今の orca の node のテストを通す", realizes: ["R-02", "R-03", "R-04", "F-01", "F-02"], status: "done", session: "impl-sol"}
 	"S-02": {title: "T-04〜T-06 を先に書いて落ちることを確かめ、D-03（graph.js・allgraph.js・board.js・panel.js の押し）、D-04（draw.js の枠の worktree の印と、要れば graph.css）、D-05（parts.js の札の専用の行と parts.css）を入れて通す", realizes: ["R-01", "R-02", "R-05"], status: "todo", after: ["S-01"], session: "impl-claude"}
 	"S-03": {title: "make lint と全体の uv run pytest を通す（構造の図の golden や静的な検査が変われば、変わった理由が R-01・R-05 の HTML の足しか、R-02 の押しの置き換え（今の `preferTab(\"agents\")` の呼びを固定した検査）だけであることを確かめて直す。static-inventory.json の dashboard の sha256 が要れば直す）", realizes: ["R-01", "R-02", "R-05"], status: "todo", after: ["S-02"], session: "impl-claude"}
 	"S-04": {title: "D-06 の実機の確かめ（統括が用意する試しの送り先で、T-07 の写しと数え）を report.md に残し、本人が見る試しの URL（tailnet）を立てたままにする", realizes: ["R-01", "R-02", "R-03", "R-05"], status: "todo", after: ["S-03"], session: "owner"}
