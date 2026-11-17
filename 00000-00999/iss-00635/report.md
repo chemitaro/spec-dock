@@ -36,7 +36,7 @@ ID: "iss-00635"
 
 - 仕様のレビュー（spec-reviewer opus / high）：1回目は fail（P1：v1 のまま `tier` を消すと契約の版の規則に反する）。統括に問い（msg_0343f6514fea）、A（v1 のまま、例外を1文で明記）に決まり反映した。2回目は pass（P0・P1 0、P3 2件は直した）。記録は `.workbench/spec-review/iss-00635/`。
 - 節目のテスト：`uv run pytest tests/unit/application tests/unit/infra/test_issue613_repository_nesting_docs.py` 306 passed（S-01 の後）。`tests/unit/presentation/test_dashboard_allgraph_screen.py`・`test_dashboard_allgraph_compose.py` 35 passed（S-02 の後）。どちらも先にテストを直して落ちることを確かめた（Red：24 failed、2 failed）。
-- `make lint`：合格（`73d7e06c6`）。全体の `uv run pytest` の結果は、最終品質ゲートの closure.md に書く。
+- 最終品質ゲート（quality-gate-reviewer opus / medium、試行1回）：`73d7e06c6` で pass（P0〜P3 0、coverage complete）。`make lint` exit 0、`uv run pytest` exit 0（4083 passed, 7 skipped）。記録は [closure.md](artifacts/20261117t030937z--closure.md)。
 - 外の利用者：orca-web の main のチェックアウト `27b01fe` で、`spec-dock/` と `node_modules` を除き、語 `tier` も `specdock.dashboard/v` も検索が0件。
 
 ### 実機（T-06）
