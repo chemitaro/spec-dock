@@ -9,52 +9,57 @@
 <!-- ▼ 説明資料の本文（Markdown）。編集するのはこのブロックだけです。 -->
 <script type="text/markdown" id="ds-source">
 ---
-title: この Scope の説明資料（題名を書き換えます）
-lead: この資料で理解できることを、初めて読む人にも分かるように1〜2文で書きます。
+title: 枠のブランチの印と、押した印のエージェントのチャット（iss-00621）
+lead: 作業中の Epic・Initiative の枠にも worktree の印を出し、どこの稼働の印を押しても、押したそのエージェントのチャットが横の欄で開くようにする変更を説明します。
 category: 説明資料
 audience: 本日チームに加わった新メンバー
 status: 下書き
 ---
 
-<!-- spec-dock:explanation-skeleton -->
-<!-- 雛形から書き換えたら、上の印の行を消します。印が残っていると、検査は「雛形のまま」と判定します。 -->
-
 ## この資料で分かること
 
 :::summary
-- 読み終えたときに理解できていることを、1文ずつ書きます。
-- 背景、仕組み、失敗時の動き、確認方法のうち、特に伝えたい点を選びます。
-- 短い Scope なら、1〜2項目でかまいません。
+- Epic・Initiative も worktree を持てます。作業中で branch のある枠の見出しに、Issue の箱と同じ worktree の印（フォルダの形、title にブランチ）を出します。
+- 稼働の印（orca-web の部品が描くエージェントの印）を押すと、横の欄のエージェントのタブが、**押したエージェント**を選んで開きます。今までは前の選びか最後に置かれたエージェントでした。
+- ボードの札では、稼働の印を PR や人のタスクの印と同じ行に混ぜず、その下の専用の行に置きます。
 :::
 
 ## 背景と目的
 
-なぜこの Scope に取り組むのか、どの問題を解決するのかを具体的に説明します。
+Epic epic-00615 は、Orca のエージェントの指揮の関係を構造の図に線で出します。その前に、印そのものが「どの worktree の、どのエージェントか」をはっきり示し、押せばその人のチャットに行けるようにします。この Issue は線を描きません（iss-00616・iss-00617）。
 
-## 全体の構成
+## 仕組み
 
-構成要素の役割と関係を説明します。図は、理解を大きく助ける場合だけ入れます。
+1. `paintOrcaMarks` は、印の置き場ごとに、描いたときのエージェントの id の並び（部品の `buildMarks` の順）を覚えます。
+2. 印を押すと `markAgentAt` が、押した印の `data-agent-id`（orca-web の iss-00043 の後の部品）か、置き場の中で何番目の印かと覚えた並びから、エージェントの id を求めます。『+N』や結べないときは null です。
+3. 画面は Scope を選んだ後に、横の欄の `openAgent(id)` を呼びます。欄はエージェントのタブを開き、その id を選びます。null なら今どおりタブを開くだけです。
 
-```plantuml id=overview
+```plantuml id=flow
 @startuml
-title 全体の構成
-top to bottom direction
-actor "利用者" as User
-component "説明対象の仕組み" as System
-database "データ" as Data
-User -> System : 操作する
-System -> Data : 読み書きする
-System --> User : 結果を返す
+title 印を押したとき
+actor "利用者" as U
+participant "画面（構造の図・ボード・横断・欄の見出し）" as V
+participant "markAgentAt" as M
+participant "横の欄" as P
+U -> V : 稼働の印を押す
+V -> V : その Scope を選ぶ
+V -> M : 置き場と押した要素
+M --> V : エージェントの id（または null）
+V -> P : openAgent(id)
+P --> U : エージェントのタブで、そのエージェントのチャット
 @enduml
 ```
 
-## 確認方法
+## 変わらないこと
 
-読者が手元で確かめられる手順を書きます。
+- 印の並びは orca-web の部品が決めます。SpecDock は並べ替えません。
+- 印の上限（ボードと欄の見出しの 4）と『+N』、札の幅、ボードの並び順、箱を押したときの動き。
+- orca-web とつながっていない画面の HTML。
 
-```sh
-spec-dock active show --json
-```
+## 確かめ方
+
+- node のテスト：`markAgentAt` と並びの記録、欄の `openAgent`、枠と札の HTML、画面の押しの静的な検査。
+- 実機：統括が用意する、作業中の Epic の worktree に2人以上のエージェントがいる状態で、1440・390 × 明暗の写しを撮り、2つ目の印を押すとそのエージェントのチャットが開くことを確かめます。
 </script>
 <script src="../../../design-system/ds.js"></script>
 </head>
