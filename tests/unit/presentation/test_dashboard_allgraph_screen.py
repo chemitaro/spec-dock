@@ -141,9 +141,8 @@ SHOWN_NEXT = [
     "taikyohiyou_project",
     "input-devices",
     "tenting-cradle",
-    "yubisaki",
     "spec-dock",
-]
+]  # yubisaki's unreadable snapshot is in the page's summary (iss-00632 R-02): nothing keeps its frame in next
 
 
 @pytest.fixture(scope="module")
@@ -283,18 +282,24 @@ def test_a_frame_holds_what_its_graph_would_show_in_the_same_range(out: dict[str
     assert run["alone"][key("spec-dock")]["next"]
 
 
-def test_a_failed_or_unread_repository_says_why_and_the_info_warning_shows_too(out: dict[str, Any]) -> None:
-    f = frames(out["plain"]["shots"][0])
+def test_a_failed_repository_says_why_in_its_frame_and_the_shared_kinds_go_to_the_summary(out: dict[str, Any]) -> None:
+    shot = out["plain"]["shots"][0]
+    f = frames(shot)
     failed = f[key("tenting-cradle")]
-    assert failed["warn"][0]["level"] == "error"
+    assert [w["level"] for w in failed["warn"]] == ["error"]
     assert "このリポジトリを読めませんでした（boom）。" in failed["warn"][0]["text"]
     assert "spec-dock dashboard list" in failed["warn"][0]["text"]
     assert "spec-dock dashboard list" in failed["warn"][0]["title"]
-    unread = f[key("yubisaki")]
-    assert [w["level"] for w in unread["warn"]][:1] == ["error"]
-    assert "構造のスナップショットが読めません" in unread["warn"][0]["text"]
-    # the info warning (no pull request state) is listed in a shown frame
-    assert "PR の状態が分かりません。" in [w["text"] for w in f[key("spec-dock")]["warn"]]
+    # the unreadable snapshot (a readable repository with Scopes) and the unknown pull requests are summarised once
+    rows = shot["sum"]["rows"]
+    assert not shot["sum"]["hidden"] and shot["sum"]["inLeft"]
+    assert [(r["kind"], r["level"]) for r in rows] == [("snapshot-unreadable", "error"), ("pr-unknown", "info")]
+    assert rows[0]["text"].startswith("構造のスナップショットが読めません：yubisaki")
+    assert "spec-dock canonical status" in rows[0]["text"]
+    assert rows[1]["text"].startswith("PR の状態が分かりません：company-os、generic-mona、housing-lifecycle")
+    assert "tenting-cradle" not in rows[1]["text"]
+    for r in shot["repos"]:
+        assert all("PR の状態" not in w["text"] and "スナップショット" not in w["text"] for w in r["warn"]), r["key"]
 
 
 def test_the_two_notices(out: dict[str, Any]) -> None:
@@ -317,8 +322,15 @@ def test_the_css_adds_no_colour_and_places_the_parts_inside_a_frame() -> None:
     assert '.main[data-view="allgraph"]' in body
     panel = (ASSETS / "views" / "_shared" / "panel.css").read_text(encoding="utf-8")
     assert re.search(r'\[data-view="allgraph"\][^{]*\{[^}]*--pn-w', body + panel)
-    for selector in (".ax-repo", ".ax-head", ".ax-warn", ".ax-body", ".ax-line"):
+    for selector in (".ax-repo", ".ax-head", ".ax-warn", ".ax-body", ".ax-line", ".ax-sum"):
         assert selector in body, selector
+    # iss-00632 R-03: only the summary's rows take the pointer; the rest of the bar's column lets it through to the graph
+    assert re.search(r'\.gx\[data-screen="allgraph"\] \.gx-left \{[^}]*pointer-events: none', body)
+    assert re.search(r'\.gx\[data-screen="allgraph"\] \.gx-next \{[^}]*pointer-events: auto', body)
+    assert re.search(r"\.gx \.ax-sum \{[^}]*pointer-events: none", body)
+    assert re.search(r"\.gx \.ax-sum li \{[^}]*pointer-events: auto", body)
+    assert re.search(r"\.gx \.ax-sum li \{[^}]*width: fit-content", body)
+    assert re.search(r"\.gx \.ax-sum li \{[^}]*max-width: 100%", body)
 
 
 def test_the_screen_module_and_its_styles() -> None:
@@ -573,3 +585,99 @@ def test_a_new_range_fits_again_until_the_reader_moves_and_then_keeps_the_view(f
     assert _t(zoomed)[2] == pytest.approx(_t(arrived)[2] * 1.25)
     assert _world(ranged) != _world(zoomed)
     assert _t(ranged) == _t(zoomed) == _t(ticked)
+
+
+# --- iss-00632 T-03, T-04: the notices' summary ------------------------------------------------------------------
+
+STALE = {"status": "ok", "fetched_at": "2026-11-04T11:50:00Z", "age_seconds": 3 * 3600, "stale": True, "detail": None}
+PR_OK = {"status": "ok", "fetched_at": "2026-11-04T11:50:00Z", "error": None}
+
+
+def _quiet(doc: dict[str, Any]) -> dict[str, Any]:
+    return doc | {"notices": [], "pull_requests": PR_OK}
+
+
+def _notice_docs() -> dict[str, Any]:
+    out = {k: (_quiet(d) if "scopes" in d else d) for k, d in docs().items()}
+    out[key("yubisaki")] = _quiet(doc_of("yubisaki", *DONE))
+    for name in ("company-os", "housing-lifecycle", "orca-web"):
+        out[key(name)] = out[key(name)] | {"snapshot": STALE}
+    out[key("spec-dock")] = out[key("spec-dock")] | {
+        "pull_requests": {"status": "unknown", "fetched_at": None, "error": None}
+    }
+    # no Scope and an unreadable snapshot: the screen cannot draw it (failed), its frame tells why
+    empty = _quiet(doc_of("generic-mona"))
+    out[key("generic-mona")] = empty | {"snapshot": {**empty["snapshot"], "status": "unreadable", "age_seconds": 7200}}
+    return out
+
+
+@pytest.fixture(scope="module")
+def notices(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
+    quiet = {k: _quiet(doc_of(n, *DONE)) for n in SHAPE for k in [key(n)]}
+    styled = {"styled": True, "hold": True, "width": 1440}
+    return _run(
+        tmp_path_factory.mktemp("notices"),
+        [
+            base("notices", docs=_notice_docs()),
+            base("quiet", docs=quiet),
+            base("summed", steps=[{"release": True}], view=PC_VIEW | {"sum": 90}, **styled),
+            base(
+                "summed-phone",
+                steps=[{"release": True}],
+                view={"width": 390, "height": 800, "bar": 50, "sum": 90},
+                **(styled | {"width": 390}),
+            ),
+        ],
+    )
+
+
+def test_one_row_per_kind_names_the_repositories_and_no_frame_repeats_it(notices: dict[str, Any]) -> None:
+    shot = notices["notices"]["shots"][0]  # next
+    rows = shot["sum"]["rows"]
+    assert [(r["kind"], r["level"]) for r in rows] == [("stale", "warning"), ("pr-unknown", "info")]
+    stale, pr = rows
+    assert stale["text"].startswith(
+        "構造が更新されていません：company-os（3時間）、housing-lifecycle（3時間）、orca-web（3時間）"
+    )
+    assert stale["text"].count("spec-dock canonical status") == 1
+    assert stale["title"].startswith("構造が更新されていません：company-os（3時間）") and "次の1手" in stale["title"]
+    assert pr["text"] == "PR の状態が分かりません：spec-dock"
+    f = frames(shot)
+    # orca-web has nothing in next and no warning of its own: no frame, its name is in the summary (R-01, R-02)
+    assert key("orca-web") not in f
+    for r in shot["repos"]:
+        assert all(
+            w["text"].startswith("このリポジトリを読めませんでした") or "読めません" in w["text"] for w in r["warn"]
+        ), r["key"]
+    assert [w["text"] for w in f[key("company-os")]["warn"]] == []
+    # every range lists the same rows
+    for later in notices["notices"]["shots"][1:]:
+        assert later["sum"]["rows"] == rows
+
+
+def test_a_repository_the_screen_cannot_draw_keeps_its_reasons_in_its_frame(notices: dict[str, Any]) -> None:
+    f = frames(notices["notices"]["shots"][0])
+    mona = f[key("generic-mona")]
+    assert [w["level"] for w in mona["warn"]] == ["error"]
+    assert "構造のスナップショットが読めません（最後に読めたのは2時間前の取得）。" in mona["warn"][0]["text"]
+    assert re.search(r"height:80px$", mona["style"])  # the heading 40, one warning 24, the padding 16
+    cradle = f[key("tenting-cradle")]
+    assert [w["level"] for w in cradle["warn"]] == ["error"] and re.search(r"height:80px$", cradle["style"])
+    rows = notices["notices"]["shots"][0]["sum"]["rows"]
+    assert all("generic-mona" not in r["text"] and "tenting-cradle" not in r["text"] for r in rows)
+
+
+def test_no_notice_hides_the_summary(notices: dict[str, Any]) -> None:
+    shot = notices["quiet"]["shots"][0]
+    assert shot["sum"]["hidden"] and shot["sum"]["rows"] == []
+    assert all(r["warn"] == [] for r in shot["repos"])
+
+
+def test_the_first_view_starts_below_the_summary(notices: dict[str, Any]) -> None:
+    pc = notices["summed"]["shots"][-1]
+    assert not pc["sum"]["hidden"]
+    tx, ty, _ = _t(pc)
+    assert (tx, ty) == (8, 90 + 8)
+    phone = notices["summed-phone"]["shots"][-1]
+    tx, ty, s = _t(phone)
+    assert (tx, s) == (4, 0.74) and ty == 90 + 8

@@ -93,6 +93,9 @@ function snap(root, orca) {
     transform: world.style.transform,
     size: [world.style.width, world.style.height],
     next: q(".gx-next").innerHTML,
+    sum: q(".ax-sum")
+      ? { hidden: q(".ax-sum").hidden, inLeft: !!q(".gx-left .ax-sum"), rows: q(".ax-sum").elements.map((li) => ({ kind: li.dataset.kind, level: li.dataset.level, text: li.textContent, title: li.getAttribute("title") })) }
+      : null,
     tools: q(".gx-tools").innerHTML,
     legend: q(".legend").innerHTML,
     none: { hidden: q(".gx-none").hidden, text: q(".gx-none").textContent },
@@ -175,7 +178,8 @@ for (const r of request.runs) {
   globalThis.getComputedStyle = run.styled ? styledStyle : plainStyle;
   for (const [k, v] of Object.entries(run.saved || {})) page.store.set(k, v);
   globalThis.innerWidth = run.width ?? 1440;
-  // run.view {width, height, bar}: the graph area's size and the bottom of the bar above it (px), for the fit
+  // run.view {width, height, bar, sum}: the graph area's size and the bottom of the bar above it (px), for the fit;
+  // sum: the bottom of the notices' summary under the chips (iss-00632, default: the bar's)
   // and the screen's root is as wide as the window (isPhone)
   hooks.sizes = run.view
     ? (el) => {
@@ -188,6 +192,7 @@ for (const r of request.runs) {
     ? (el) => {
         if (el.classList?.contains("gx-view")) return { left: 0, top: 0, right: run.view.width, bottom: run.view.height, width: run.view.width, height: run.view.height };
         if (el.classList?.contains("gx-next") || el.classList?.contains("gx-tools")) return { left: 0, top: 0, right: 100, bottom: run.view.bar, width: 100, height: run.view.bar };
+        if (el.classList?.contains("ax-sum")) return { left: 0, top: 0, right: 100, bottom: run.view.sum ?? run.view.bar, width: 100, height: run.view.sum ?? run.view.bar };
         return null;
       }
     : null;
