@@ -23,8 +23,15 @@ ID: "iss-00617"
 ## 実装の記録
 
 - 開始のコミット `0ef2dfeae`（origin/main、iss-00616 の PR #642 の後）。
+- 実装担当（impl-claude、Claude Opus 5.5 / medium）が S-01 から担当した。開始のコミットでの S-01 の節目のテストの基準：今あるファイル（`test_dashboard_allgraph_compose.py`・`test_dashboard_graph_command.py`・`test_dashboard_graph_js.py`・`test_dashboard_graph_marks_rows.py`）で 90 passed（`test_dashboard_allgraph_command.py` は新しいので基準なし）。
+- S-01：T-01〜T-03 を先に書いて落ちることを確かめ（allgraph_command の 21 件のうち 21 件が失敗・エラー、compose の足した 6 件と `REPO` の完全一致の 1 件が失敗）、D-01（`graph/command.js` の `bandKeys` の export・`placer`・`bandRowWidth`・`commandModel` の `rows` と `boundsOf`）、D-02（新しい `allgraph/command.js` の `repoOfWorktrees`・`crossPlace`・`bandShape`・`crossModel`・`crossKey`）、D-03（`compose.js` の `REPO` の `band`・`bandTop`・`other`・`otherTop`、`bands[key]` の `{h, w}`、`keep`、`other`、`anchorShift`）を入れて通した。節目の5ファイルで 117 passed、変えたテストの ruff check・ruff format --check・mypy は合格。
 
 ## 逸脱と判断
+
+- S-01 の担当：計画では impl-sol（Codex）だが、Codex が chat-scratch の symlink の拒否で何も変えずに止まったので、統括が了承済みの取り決めどおり impl-claude が S-01 から引き継いだ。
+- F-05 の数えを0に戻す鍵（round-2 の P3 の申し送り）：`crossKey` の入力に、要約・各リポジトリの配置（`eg`）・測った印の幅と記録に加えて、各リポジトリの構造（`structure` の同一性。構造の読み込みで worktree の対応 `of`・`unknown` が変わる）と、帯を渡さない `compose` で見える集合（`visible`）を含めた。`comp` を `null` にすると `comp` を除いた鍵になり、`allgraph.js` はこれを F-05 の数えの鍵に使う（仕様の『居場所の入力』の意味の範囲の実装の判断）。
+- `crossPlace` で見えないリポジトリの端を『ほかの場所』へ移すのは、仕様どおり帯の端に限らず、`visible2` にないリポジトリのすべての端にした（グラフのあるリポジトリは必ず見えるので、帯の端のほかは起きない。起きたときに描けない端を残さないため）。
+- `crossModel` の `spotsOf` は `(配置の node, リポジトリの key) → markSpots の矩形（配置の座標）` を受け取り、`crossModel` が本文の原点だけずらす（純粋な計算のまま、呼び手は各リポジトリの測った幅と記録を渡すだけ）。戻りに、世界の座標の写し（`world: {nodes, groups, origin}`）を足した（`specdockCmdAudit` の `spotDrift` に使う）。
 
 - 2026-11-17 タスク担当：S-01 は plan.cue では impl-sol（Codex GPT-6.1 Sol / medium、dispatch `ctx_71115940fbe5`、launch.effective は計画どおり）だが、Codex が chat-scratch の symlink の拒否で何も変えずに止まったので、統括が了承済みの取り決めどおり止め（worker-stop）、Claude Opus 5.5 / medium（impl-claude、dispatch `ctx_78ece349361c`、launch.effective claude-opus-5-5 / medium）が S-01 から S-03 まで引き継ぐ。
 
