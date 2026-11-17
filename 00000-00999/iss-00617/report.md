@@ -42,4 +42,16 @@ ID: "iss-00617"
 - `window.specdockAllGraphStats` に `composes`（枠の組み立ての回数）を足した（T-05 の「同じ形で組み立て直さない」「F-05 の2回」の数え。今の項目は変えない）。
 - 偽の DOM には位置（offset）がないので、`specdockCmdAudit` の `spotDrift` は T-05 では項目があることだけを確かめ、値は実機（T-06）で数える。
 
+## 実機の確かめ（S-04、2026-11-17、`57517bb32`）
+
+- 試しのサーバー：この worktree の候補の wheel を隔離した venv（`.workbench/iss-00617/venv`）に入れ、この PC の状態の置き場の写し（`.workbench/iss-00617/state`）と試しの `XDG_CONFIG_HOME`（`orca_web.port` 18817）で、`spec-dock dashboard serve --offline --tailscale --port 18617`。試しの orca の口は iss-00616 の `relay_orca.py`（常駐の orca-web を GET で読むだけの中継）を写して 18817 に。常駐の 47800・8791 の設定、道具の環境には触れていない。エージェントには何も送っていない。
+- 実データ：今の Run の統括（spec-dock の main のチェックアウト）→ 各 Issue の worktree のタスク担当・実装担当、それに統括が用意した試しのエージェント3人（何もしない claude-haiku-5-5）：親 P は会社のリポジトリ（Scope がなく、子のリポジトリの入れ物の枠）の main のチェックアウト、子1はこの Issue の worktree（spec-dock）、子2はダッシュボードに登録していないリポジトリの main のチェックアウト。
+- 結果（`.workbench/iss-00617/shots/`、`result.json`）：『横断の構造』の 1440・390 × 明・暗 × 全体・いま・これから の12通りで、`specdockEdgeAudit().total` の違反0、`specdockCmdAudit()` の `boxOverlaps`・`edgeOverlaps`・`crowded`・`heads` 0、`spotDrift` 0.4、`spotMissing` 0、ブラウザーのエラー0、横のスクロールなし、『収める』の後に帯と全部の枠が図の領域に収まる、凡例に「指揮（親 → 子）」。線は6〜7本（done 5、flow 1〜2）。
+  - 全体の帯『ほかの場所』が世界のいちばん上に出て、行の頭の文字と「<登録していないリポジトリの名前> · main」の札が並び、そこから P の印への線が出た（R-01・R-02・R-03 の子だけの行き先）。
+  - 親 P は、その会社のリポジトリの枠の見出しのすぐ下の帯に「main のチェックアウト」で出て、そこから入れ子のリポジトリの枠をいくつもまたいで、spec-dock の枠の中の iss-00617 の箱の印へ線が出た（リポジトリをまたぐ線）。spec-dock の帯にも統括の「main のチェックアウト」が出た。
+  - 帯のエージェントを押すと、欄に `/embed/agent?id=<id>` の iframe が開き、そのエージェントの線1本が目立ち（ほかの5本は淡く）、`aria-pressed`。Esc で解けて欄が閉じた。
+  - 見出し：リポジトリの枠の名前、Initiative・Epic の ID の札・題名・要約の行の上を、線が通らない（文字の背の下地に隠れ、すき間では見える）。構造の図（spec-dock、1440 × 明・暗、これから）でも init-00423 の見出しの拡大（`graph-1440-{light,dark}-next-heading.png`）で同じ。構造の図の `specdockCmdAudit` も `heads` 0、違反0、`spotDrift` 0.4。
+- 写せなかったもの：帯だけの入れ物の枠（R-03）の実例。試しの親のいるリポジトリは、子のリポジトリの入れ物の枠として『これから』でも出るので、例外が効く場面にならなかった（node のテスト T-01・T-02 と偽の DOM の T-05 が、出る・消えるを確かめている）。
+- 本人が見る試しの URL：tailnet の 18617 の `/graph`（横断の構造）と `/r/github.com/chemitaro/spec-dock/graph`（`57517bb32`）。止め方：`.workbench/iss-00617/state/dashboard/server.json` の pid と、`relay_orca.py` の2つ（127.0.0.1 と tailnet の 18817）を止める。
+
 ## Residual Risks / Follow-ups
