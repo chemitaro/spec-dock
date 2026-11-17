@@ -29,6 +29,38 @@ const BASE = { world: 28, body: 12, wrapRow: 14, wrapCol: 14, cols: 44, col: 12,
 export const MARK_ROW = 20; // one row of agents: the 4px above it and the component's sm height 16px (.gx-agents, .orca-marks row-gap)
 export const MARK_INSET = { box: 26 }; // a box's width less its inner width: left edge 4 + left padding 11 + right padding 10 + right edge 1 (.gx-box)
 
+// iss-00616 D-02: where the agents' marks sit in a box or a nested frame (markSpots). Copies of graph.css too.
+export const MARK_H = 16; // the component's sm mark (.orca-mark)
+export const MARK_LEFT = { box: 15 }; // a box's left edge 4 + left padding 11 (.gx-box)
+export const MARK_BOTTOM = { box: 9 }; // a box's bottom edge 1 + bottom padding 8: the row of agents ends here (.gx-box > .gx-agents)
+export const FRAME_TITLE = 22; // a nested frame's title row (.gx-fhead)
+export const FRAME_GAP = 4; // the space above a frame's row of agents (.gx-agents margin-top)
+
+/**
+ * The agents' marks packed left to right into avail: [{row, x}] (x from the row's left), a mark wider than avail on a
+ * row of its own; [] without an agent, null without the measured widths. markRows and markSpots share it.
+ * @param m     {items: [width of each agent's mark], gap: px between them} as the page measured them, or none
+ * @param avail the inner width (px)
+ */
+export function packMarks(m, avail) {
+  const items = m?.items;
+  if (!Array.isArray(items)) return null;
+  const gap = Number(m.gap) || 0;
+  const out = [];
+  let row = 0;
+  let x = null;
+  for (const w of items) {
+    if (x === null) x = 0;
+    else if (x + gap + w > avail) {
+      row++;
+      x = 0;
+    } else x += gap;
+    out.push({ row, x });
+    x += w;
+  }
+  return out;
+}
+
 /**
  * The rows of a box's or frame's marks: 1 without an agent (no row of agents), else 1 + the rows the agents' marks take
  * packed left to right into avail (a mark wider than avail takes a row of its own).
@@ -36,19 +68,44 @@ export const MARK_INSET = { box: 26 }; // a box's width less its inner width: le
  * @param avail the inner width (px)
  */
 export function markRows(m, avail) {
-  const items = m?.items;
-  if (!Array.isArray(items) || !items.length) return 1;
-  const gap = Number(m.gap) || 0;
-  let k = 1;
-  let x = null;
-  for (const w of items) {
-    if (x === null) x = w;
-    else if (x + gap + w > avail) {
-      k++;
-      x = w;
-    } else x += gap + w;
+  const packed = packMarks(m, avail);
+  if (!packed || !packed.length) return 1;
+  return 1 + packed[packed.length - 1].row + 1;
+}
+
+/**
+ * The agents' marks of a laid out box, tframe or nested frame in world coordinates: [{id, x, y, w, h}] in the order
+ * drawn, or null when the position is not known (iss-00616 F-04): no measured widths or recorded ids, their numbers
+ * differ, or the rows they take are not the rows the layout used for the node.
+ * @param node a layout node
+ * @param m    {items, gap, ids}: the measured widths and the agent ids in the order the component drew them
+ */
+export function markSpots(node, m) {
+  if (!node || !m || !Array.isArray(m.items) || !Array.isArray(m.ids) || m.ids.length !== m.items.length) return null;
+  const w = node.x2 - node.x1;
+  const rows = node.rows ?? 1;
+  let avail;
+  if (node.type === "box" || node.type === "tframe") avail = w - MARK_INSET.box;
+  else if (node.type === "frame") avail = w - 2 * (SIZE.pad[node.kind] || SIZE.pad.epic)[1] - 2;
+  else return null;
+  const packed = packMarks(m, avail);
+  const k = packed.length ? packed[packed.length - 1].row + 1 : 0;
+  if (k !== rows - 1) return null;
+  if (node.type === "frame") {
+    const [padT, padX] = SIZE.pad[node.kind] || SIZE.pad.epic;
+    const base = compactHeight(node.kind, rows);
+    const t = FRAME_TITLE + (node.compact ? Math.max(0, (node.fit ?? base) - base) : 0);
+    return packed.map((p, i) => ({
+      id: m.ids[i], x: node.x1 + 1 + padX + p.x, y: node.y1 + padT + t + FRAME_GAP + p.row * MARK_ROW, w: m.items[i], h: MARK_H,
+    }));
   }
-  return 1 + k;
+  return packed.map((p, i) => ({
+    id: m.ids[i],
+    x: node.x1 + MARK_LEFT.box + p.x,
+    y: node.y2 - MARK_BOTTOM.box - MARK_H - (k - 1 - p.row) * MARK_ROW,
+    w: m.items[i],
+    h: MARK_H,
+  }));
 }
 
 /** markRows of a laid out node (box, tframe, frame) at its own width: what the layout used for it. */
