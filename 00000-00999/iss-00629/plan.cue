@@ -5,9 +5,9 @@ package spec
 goal: "『横断の構造』で、リポジトリの枠の中の親の図と子の枠を見える幅で横に並べて折り返し、最初の表示を『幅に合わせる』にして、読める大きさで縦に読み進められるようにする"
 
 steps: {
-	"S-01": {title: "D-01・D-02 の node のテスト（T-01・T-02：同じ行に入る子と入らない子、行の幅、重なりなし、graph でない親、9つの入れ子、帯で子孫も下がる）を先に書いて落ちることを確かめ、compose.js を直して通す。今の check_no_overlap の『子は親の図の下』の確かめは、R-01 に合わせて『子は親の図の四角と重ならない』に替える", realizes: ["R-01", "R-02", "F-01"], status: "todo", session: "impl-sol"}
-	"S-02": {title: "D-03 の偽の DOM のテスト（T-03：PC の最初の倍率と位置、狭い世界で 1、スマホで 0.74、拡大して範囲を変えても戻らない、『収める』のテストは変えずに通る）を先に書いて落ちることを確かめ、initialView を直して通す。make lint と全体の uv run pytest を通す", realizes: ["R-03"], status: "todo", after: ["S-01"], session: "impl-claude"}
-	"S-03": {title: "D-04 の実機の確かめ（T-04）：開始と候補の世界の寸法の比べ、最初の表示の倍率、写し、線の検査の比べを取り、report.md と artifacts に残し、本人が見る試しの URL を tailnet で立てる", realizes: ["R-01", "R-03", "R-04"], status: "todo", after: ["S-02"], session: "owner"}
+	"S-01": {title: "D-01・D-02 の node のテスト（T-01・T-02：同じ行に入る子と入らない子、行の幅、重なりなし、graph でない親、9つの入れ子、帯で子孫も下がる）を先に書いて落ちることを確かめ、compose.js を直して通す。今の check_no_overlap の『子は親の図の下』の確かめは、R-01 に合わせて『子は親の図の四角と重ならない』に替える", realizes: ["R-01", "R-02", "F-01"], status: "done", session: "impl-sol"}
+	"S-02": {title: "D-03 の偽の DOM のテスト（T-03：PC の最初の倍率と位置、狭い世界で 1、スマホで 0.74、拡大して範囲を変えても戻らない、『収める』のテストは変えずに通る）を先に書いて落ちることを確かめ、initialView を直して通す。make lint と全体の uv run pytest を通す", realizes: ["R-03"], status: "done", after: ["S-01"], session: "impl-claude"}
+	"S-03": {title: "D-04 の実機の確かめ（T-04）：開始と候補の世界の寸法の比べ、最初の表示の倍率、写し、線の検査の比べを取り、report.md と artifacts に残し、本人が見る試しの URL を tailnet で立てる", realizes: ["R-01", "R-03", "R-04"], status: "done", after: ["S-02"], session: "owner"}
 }
 
 tests: {
