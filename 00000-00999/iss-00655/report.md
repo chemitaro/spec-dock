@@ -22,6 +22,23 @@ ID: "iss-00655"
 - **今の合格の sha256**（round-4）：requirement.cue `4aefb2376a2f41326f2486d8b8d23a7f285faac3aa527cb7f2928cd337777732`、design.cue `87ce59e8a4973d7e9690ace66dc92b280d5df9de2ade646701a4dfedf7e95844`、plan.cue `4dbcadfe45ba0a2bed302a8aaaf0327ccd0e0cdbb84d5564a306ca40a8762f64`、explanation.html `51789b8a344fd342f5eb3242e1eab4ab7e227c39419a558e38896fdc9d1a3f62`。Epic の文書は round-2 と同じ。
 - 開始のコミット：`92e26aff7256a9a32ba6edd5bc7f790ed8e4f149`。
 
+## 実装の記録
+
+- impl-sol（Codex、dispatch `ctx_28d4b720342b`、launch.effective codex gpt-6.1-sol / medium）：chat-scratch の symlink の拒否（`symlinked writable roots are not supported`）で、何も変えずに止まった。worker-stop した。
+- impl-claude（dispatch `ctx_dd801e932b08`、launch.effective claude / claude-opus-5-5 / medium）が S-01〜S-03 を行った。開始のコミット `92e26aff7`（基準：画面のテスト2ファイル 49 passed）。
+  - S-01 `cee2f3cdd`：`views/graph/view_input.js`（新、D-01〜D-03）と T-01・T-02（`tests/js/dashboard_view_input.mjs`・`tests/unit/presentation/test_dashboard_view_input.py`）。Red（モジュールなし、10 error）→ Green 10 passed。
+  - S-02 `25d5e48d2`：D-04（`bindViewInput`、graph.js・allgraph.js のつなぎ、今の wheel の処理を消した）、D-05（aria-label）、T-03。Red（graph 5・allgraph 2 fail）→ Green。今のテストの期待は変えず、画面の台本に wheel の値・キーの shift・`on: main/input`・viewHidden・keyPrevented・label を足した。
+  - 仕様の変更の直し `4f29a42c9`：一続きの wheel の判定を両向きに引き継ぐ（D-02 の改訂）。Red（stroke 1 fail）→ Green。画面の台本の `advance` が `performance.now` も進めるようにした（しないと、間をあけた wheel が本物の時計で一続きと判定される）。
+  - S-03：`make lint` 合格、全体 `uv run pytest` 4253 passed・7 skipped（`4f29a42c9`）。ログは `.workbench/implement/iss-00655/`。`static-inventory.json` に dashboard の資産は載っていない（変更なし）。
+- origin/main の取り込み：`c607dc2ec`（#658 iss-00648 ほか、競合なし）、`b50c11ddb`（#659 iss-00650、画面のテスト3ファイルの競合を両方残して解いた）。
+
+## 逸脱と判断
+
+- S-01 の担当の交代（`deviation: codex-confirmation-takeover` 相当、chat-scratch の symlink の拒否）：計画の rationale と統括の了承のとおり impl-claude が S-01 から引き継いだ。
+- 実装担当のコミットは git-commit skill を通さず直接作った（実装担当の報告）。メッセージの形（Conventional Commits の日本語、箇条書き）は守っている。
+- 仕様の変更（2026-11-18、統括の決定 msg_e0c1b3a11a47）：実機の CDP の値の性質を受け、一続きの判定の引き継ぎを両向きにした（レビュー記録を参照）。
+- 実機の確かめは headless の Chrome で行った（D-06 の改訂で headless でよいとした）。
+
 ## 実機の確かめ（S-04、2026-11-18、`4f29a42c9`）
 
 - 試しのサーバー：この worktree を隔離した venv（`.workbench/iss-00655/venv`、editable）に入れ、iss-00646 の試しの状態の置き場の写し（`.workbench/iss-00655/state`）で、ポート 18655、`--tailscale`。orca-web は常駐の 8791 を GET で読むだけの中継（`relay_orca.py`、18855、127.0.0.1 と tailnet）。Chrome 157 を headless で `--disable-features=MacAppCodeSignClone`、CDP 9655、1440×900。常駐の 47800・8791 の設定、道具の環境には触れていない。
@@ -46,6 +63,12 @@ ID: "iss-00655"
 - 動かす間の止める扱い（iss-00646）：両方の画面で、ホイールの 50ms 後と → の直後に `.gx-view` に `is-still` があり、600ms 後には外れている。
 - 検査：両方の画面で `specdockEdgeAudit()` の違反0（単体は boxHits・overlaps など違反の数がすべて0、横断は total 0）、`specdockCmdAudit()` の `boxOverlaps`・`edgeOverlaps`・`heads`・`spotDrift` 0、ブラウザーのエラー0。`.gx-view` の aria-label は D-05 の文。
 - 本人が見る試しの URL：tailnet の 18655 の `/graph`（横断の構造）と `/r/github.com/chemitaro/spec-dock/graph`。止め方：`pkill -f "port 18655 --state-root"` と `pkill -f "relay_orca.py .* 18855"`（Chrome は CDP の Browser.close で閉じた）。
+
+- 最終のコミット `b50c11ddb` でも同じ台本で、両方の画面の数（×1.15、ずれ ≤0.002px、(−3,−7)、一続き (−8,−80)、×1.5209、Shift −120、ピンチ ×1.1052、矢印 ±80・320、+ ×1.25、- ×0.8、0 で収める）、線の検査の違反0、cmdAudit 0、エラー0 を確かめた（`.workbench/iss-00655/final/`）。
+
+## 最終品質ゲート（2026-11-18、合格）
+
+- **合格のコミット** `b50c11ddbf44dbbe9c400889385450764c272946`（base `92e26aff7`）。レビュー（quality-gate-reviewer opus / medium、4観点）P0〜P3 すべて0、網羅は完全。`make lint` exit 0、`uv run pytest` 4281 passed・7 skipped。この worktree の `.workbench/final-quality-gate/iss-00655/closure.md`。attempt 01（`c607dc2ec`）も合格したが、origin/main が進んだので取り込み直してやり直した。記録だけのコミットはない（記録は Git の外）。
 
 ## Residual Risks / Follow-ups
 
