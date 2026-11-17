@@ -37,8 +37,17 @@ const realNow = performance.now.bind(performance);
 let skew = 0;
 performance.now = () => realNow() + skew;
 // the bar above the graph is 40px tall; the graph area is the fake's 1200 × 800
+// the panel is as tall as its --pn-h (the phone sheet, iss-00650)
+const sheetRect = (el) => {
+  const h = parseFloat(el.style.getPropertyValue("--pn-h"));
+  return Number.isFinite(h) ? { left: 0, top: innerHeight - h, right: innerWidth, bottom: innerHeight, width: innerWidth, height: h } : null;
+};
 hooks.rect = (el) =>
-  ["gx-next", "gx-tools", "ax-sum"].some((c) => el.classList?.contains(c)) ? { left: 0, top: 0, right: 100, bottom: 40, width: 100, height: 40 } : null;
+  el.classList?.contains("panel")
+    ? sheetRect(el)
+    : ["gx-next", "gx-tools", "ax-sum"].some((c) => el.classList?.contains(c))
+      ? { left: 0, top: 0, right: 100, bottom: 40, width: 100, height: 40 }
+      : null;
 globalThis.setInterval = () => 0;
 globalThis.clearInterval = () => {};
 const allgraph = (await import(pathToFileURL(`${assets}/views/allgraph.js`).href)).default;
@@ -120,6 +129,11 @@ function snap(root) {
       agent: panel.dataset.cmdAgent ?? null,
       iframe: iframe ? { id: idOf(iframe), src: iframe.getAttribute("src") } : null,
       tab: panel.querySelector('[aria-selected="true"]')?.dataset?.pnTab ?? null,
+      bodyTab: panel.querySelector(".pn-body")?.getAttribute("data-tab") ?? null,
+      snap: panel.dataset.snap ?? null,
+      pnH: panel.style.getPropertyValue("--pn-h") || null,
+      grab: panel.querySelector(".pn-grab")?.tag ?? null,
+      clean: panel.querySelector(".pn-clean") ? true : false,
     },
     legend: q(".legend").innerHTML.includes("指揮（親 → 子）"),
     stats: stats ? { layouts: stats.layouts, composes: stats.composes ?? null } : null,
@@ -160,6 +174,18 @@ async function step(root, s, orca) {
     for (const fn of view.listeners.pointerdown || []) fn(ev);
     for (const fn of view.listeners.pointerup || []) fn({ ...ev, type: "pointerup" });
   } else if (s.click) target(root, s.click).dispatch("click");
+  else if (s.sheet) {
+    // a finger on the panel: down, three moves, up (iss-00650 D-03)
+    const panel = target(root, ".panel");
+    const el = root.querySelector(s.sheet.on);
+    if (!el) return; // nothing to hold: the shot shows the panel as it is
+    const ev = { pointerId: 3, pointerType: "touch", button: 0, target: el };
+    const y0 = 700;
+    for (const fn of panel.listeners.pointerdown || []) fn({ ...ev, clientY: y0 });
+    for (const k of [1, 2, 3]) for (const fn of panel.listeners.pointermove || []) fn({ ...ev, clientY: y0 - (s.sheet.dy * k) / 3 });
+    for (const fn of panel.listeners.pointerup || []) fn({ ...ev, type: "pointerup", clientY: y0 - s.sheet.dy });
+    await new Promise((r) => setTimeout(r, 0)); // the click that ends a drag is not a tap
+  } else if (s.grab) root.querySelector(".panel .pn-grab")?.dispatch("click");
   else if (s.key) {
     let el;
     if (s.on === "main") el = root;
@@ -191,6 +217,8 @@ async function step(root, s, orca) {
 const out = {};
 for (const r of request.runs) {
   run = structuredClone(r);
+  globalThis.innerWidth = run.width ?? 1440;
+  globalThis.innerHeight = run.height ?? 900;
   page.store.clear();
   motion.reset();
   motion.useObserver(!!run.io);

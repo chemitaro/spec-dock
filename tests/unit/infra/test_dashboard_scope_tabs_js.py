@@ -167,7 +167,7 @@ def test_the_panel_draws_its_tabs_from_the_same_list_and_the_graph_uses_it() -> 
     assert 'from "./scope_tabs.js"' in panel and "visibleTabs(first)" in panel and "pickTab(" in panel
     assert "export function createScopePanel(" in panel
     graph = (VIEWS / "graph.js").read_text()
-    assert 'import { createScopePanel } from "./_shared/panel.js";' in graph
+    assert 'import { createScopePanel, SHEET_GRAB } from "./_shared/panel.js";' in graph
     assert "V.pn.show(" in graph and "V.pn.hide()" in graph
     assert '"/assets/views/_shared/panel.css"' in graph and '"/assets/views/_shared/scope_tabs.css"' in graph
     assert ".gx .panel" not in (VIEWS / "graph.css").read_text()  # the panel's look moved to panel.css
@@ -200,7 +200,12 @@ def test_the_phone_sheet_moves_only_by_the_grab_and_the_header_band() -> None:
     css = (SHARED / "panel.css").read_text()
     phone = css[css.index("@container app (max-width: 640px)") :]
     touch = [line.split("{")[0].strip() for line in phone.splitlines() if "touch-action: none" in line]
-    assert touch == [".sd-pn .pn-grab", ".sd-pn .pn-top"]  # the contents and the frame scroll freely (R-07)
+    # the contents and the frame scroll freely (R-07); another drawing's heading moves the sheet too (iss-00650 D-03)
+    assert touch == [".sd-pn .pn-grab", ".sd-pn .pn-top, .sd-pn > .pn-head"]
+    # the full sheet folds only the Scope's heading into its top row; another drawing's heading keeps its box, so its
+    # touch-action holds the finger (iss-00650 D-03)
+    assert '.sd-pn[data-snap="full"] .pn-top > .pn-head { display: contents; }' in phone
+    assert '.sd-pn[data-snap="full"] .pn-head {' not in phone
     assert "height: var(--pn-h" in phone and ".sd-pn.is-dragging iframe { pointer-events: none; }" in phone
     assert "overscroll-behavior: contain" in css
 

@@ -17,6 +17,10 @@ const plainClick = (event) => event.button === 0 && !event.metaKey && !event.ctr
 const PHONE = 640;
 const DRAG_START = 6; // px a finger moves before the sheet follows it
 
+/** The phone sheet's grab. Every drawing in the panel's aside starts with it, so the sheet moves the same whatever the
+ * aside shows (iss-00650 D-03). */
+export const SHEET_GRAB = `<button type="button" class="pn-grab" aria-label="欄の高さを変える"></button>`;
+
 // Write the tab strip only when its HTML changed: the summaries redraw the panel every 10 seconds (iss-00593). The
 // heading row and the cover keep their own comparison (iss-00592 R-02).
 const written = new WeakMap();
@@ -64,7 +68,7 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
 
   function build() {
     aside.innerHTML =
-      `<button type="button" class="pn-grab" aria-label="欄の高さを変える"></button>` +
+      SHEET_GRAB +
       `<div class="pn-top"></div><div class="pn-tabs" role="tablist" aria-label="欄のタブ"></div>` +
       `<div class="pn-body" role="tabpanel"></div><div class="pn-foot"></div>`;
     const q = (sel) => aside.querySelector(sel);
@@ -181,7 +185,10 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
   }
 
   // --- The phone sheet (D-08): three heights, moved only by the grab and the header band -------------------
+  // It moves whatever the aside shows: the Scope, or another drawing (the band agent's chat, the cleanup list) whose
+  // heading is a .pn-head of its own (iss-00650 D-03).
   const isSheet = () => (aside.closest(".app") || document.documentElement).clientWidth <= PHONE;
+  const isShown = () => aside.classList.contains("is-open");
 
   function applySnap() {
     if (!isSheet()) {
@@ -215,10 +222,10 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
   }
 
   aside.addEventListener("pointerdown", (event) => {
-    if (!current || !isSheet() || (event.pointerType === "mouse" && event.button !== 0)) return;
+    if (!isShown() || !isSheet() || (event.pointerType === "mouse" && event.button !== 0)) return;
     const t = event.target;
     const grab = t.closest(".pn-grab");
-    if (!grab && (!t.closest(".pn-top") || t.closest("button, a"))) return; // the contents and frames scroll freely
+    if (!grab && (!t.closest(".pn-top, .pn-head") || t.closest("button, a"))) return; // the contents and frames scroll freely
     const now = performance.now();
     drag = { id: event.pointerId, y: event.clientY, h: aside.getBoundingClientRect().height, moved: false, last: { y: event.clientY, t: now }, velocity: 0 };
   });
@@ -245,7 +252,7 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
     applySnap();
   });
   const onResize = () => {
-    if (current) applySnap();
+    if (isShown()) applySnap();
   };
   window.addEventListener("resize", onResize);
   // The button follows the page's light and dark (D-04): the system's choice and the shell's data-theme.
@@ -256,15 +263,15 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
   themeWatch?.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 
   aside.addEventListener("click", (event) => {
-    if (!current || !parts || !aside.contains(parts.body)) return; // another drawing owns the aside
     const t = event.target;
     if (t.closest(".pn-grab")) {
-      if (!skipClick && isSheet()) {
-        snap = nextOnTap(snap); // a tap (or Enter) switches between half and full
+      if (!skipClick && isShown() && isSheet()) {
+        snap = nextOnTap(snap); // a tap (or Enter) switches between half and full, whatever the aside shows
         applySnap();
       }
       return;
     }
+    if (!current || !parts || !aside.contains(parts.body)) return; // another drawing owns the aside
     const slot = t.closest(".sd-orca");
     if (slot) {
       openAgent(markAgentAt(slot, t)); // a pressed mark in the heading opens the agents' tab on it (iss-00621 D-03)
@@ -336,6 +343,9 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
       follow(null);
       params = new Map();
       snap = "half"; // the next opening starts at the usual height
+      // A sheet's height stays on the aside: another drawing that takes it next opens at the usual height too
+      // (iss-00650 D-03). An aside that never was a sheet keeps the CSS's own height.
+      if (aside.dataset.snap) applySnap();
       drag = null;
       aside.classList.remove("is-open", "is-dragging");
       aside.setAttribute("aria-hidden", "true");

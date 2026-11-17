@@ -28,6 +28,7 @@ HARNESS = ROOT / "tests" / "js" / "dashboard_graph_command_screen.mjs"
 APP_CSS = (ASSETS / "app.css").read_text(encoding="utf-8")
 GRAPH_CSS = (ASSETS / "views" / "graph.css").read_text(encoding="utf-8")
 GRAPH_JS = (ASSETS / "views" / "graph.js").read_text(encoding="utf-8")
+PANEL_CSS = (ASSETS / "views" / "_shared" / "panel.css").read_text(encoding="utf-8")
 
 
 def _run(tmp_path: Path, request: dict[str, Any]) -> dict[str, Any]:
@@ -297,6 +298,12 @@ for _w in NO_PARENT["worktrees"]:
 # the same agents, the researcher now working: a new summary whose rows of marks do not change
 WORKING = copy.deepcopy(FIVE)
 WORKING["worktrees"][0]["agents"][1]["mark"] = "working"
+# the coordinator without a chat to frame (iss-00650 F-01)
+NO_CHAT = copy.deepcopy(FIVE)
+for _w in NO_CHAT["worktrees"]:
+    for _a in _w["agents"]:
+        if _a["id"] == "a-coord":
+            _a.pop("detail")
 # the coordinator gone
 GONE = summary(*[w | {"agents": [a for a in w["agents"] if a["id"] != "a-coord"]} for w in FIVE["worktrees"]])
 
@@ -326,6 +333,53 @@ RUNS: list[dict[str, Any]] = [
             {"tap": BAND},  # 11
             {"summary": GONE},  # 12: the coordinator left
         ],
+    },
+    {"name": "nochat", "orca": {"summary": NO_CHAT}, "steps": [{"tap": BAND}]},
+    # iss-00650 D-03: the phone sheet (390 × 844: half 490px, full 844px) moves the same whatever the panel shows
+    {
+        "name": "sheet-band",
+        "orca": {"summary": FIVE},
+        "width": 390,
+        "height": 844,
+        "steps": [
+            {"tap": BAND},  # 1: open at half
+            {"grab": True},  # 2: full
+            {"grab": True},  # 3: half
+            {"sheet": {"on": ".panel .pn-head b", "dy": 300}},  # 4: up: full
+            {"sheet": {"on": ".panel .pn-head b", "dy": -800}},  # 5: down: closed
+            {"tap": BAND},  # 6: open again at half
+            {"sheet": {"on": ".panel .pn-body", "dy": 300}},  # 7: the contents do not move the sheet
+            {"sheet": {"on": ".panel .pn-grab", "dy": -800}},  # 8: the grab down: closed
+        ],
+    },
+    {
+        "name": "sheet-clean",
+        "orca": {"summary": FIVE},
+        "width": 390,
+        "height": 844,
+        "steps": [
+            {"tap": ".gx-clean"},  # 1
+            {"grab": True},  # 2
+            {"sheet": {"on": ".panel .pn-head b", "dy": -300}},  # 3: down to half
+            {"sheet": {"on": ".panel .pn-head b", "dy": -800}},  # 4: closed
+        ],
+    },
+    {
+        "name": "sheet-scope",
+        "orca": {"summary": FIVE},
+        "width": 390,
+        "height": 844,
+        "steps": [
+            {"tap": '.gx-box[data-id="iss-00024"]'},  # 1
+            {"grab": True},  # 2
+            {"sheet": {"on": ".panel .pn-cover", "dy": -300}},  # 3
+            {"sheet": {"on": ".panel .pn-cover", "dy": -800}},  # 4
+        ],
+    },
+    {
+        "name": "sheet-pc",
+        "orca": {"summary": FIVE},
+        "steps": [{"tap": BAND}, {"grab": True}, {"sheet": {"on": ".panel .pn-head b", "dy": -800}}],
     },
     {
         "name": "mark",
@@ -538,6 +592,18 @@ def test_pressing_the_band_agent_opens_its_chat(runs: dict[str, list[dict[str, A
     assert panel["iframe"]["sandbox"] == "allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
     assert panel["iframe"]["referrer"] == "no-referrer"
     assert panel["text"] == "claude · main のチェックアウト"
+    # iss-00650 R-01: the body follows the agents tab's column rule of panel.css, so the frame fills the panel
+    assert panel["bodyTab"] == "agents" and panel["none"] is None
+    column = '.sd-pn .pn-body:is([data-tab="docs"], [data-tab="explanation"], [data-tab="agents"])'
+    rules = re.findall(rf"{re.escape(column)} {{([^}}]*)}}", PANEL_CSS)
+    assert "display: flex; flex-direction: column;" in rules[0] and len(rules) == 2  # the wide panel and the sheet
+
+
+def test_a_band_agent_without_a_chat_keeps_the_plain_body(runs: dict[str, list[dict[str, Any]]]) -> None:
+    """iss-00650 F-01 / R-02: no frame, no data-tab: the message keeps the panel body's own padding."""
+    panel = runs["nochat"][1]["panel"]
+    assert panel["open"] and panel["agent"] == "a-coord" and panel["iframe"] is None
+    assert panel["none"] == "チャットを開けません。" and panel["bodyTab"] is None
 
 
 def test_the_chat_stays_while_the_graph_draws_again(runs: dict[str, list[dict[str, Any]]]) -> None:
@@ -545,6 +611,7 @@ def test_the_chat_stays_while_the_graph_draws_again(runs: dict[str, list[dict[st
     band = runs["band"]
     frame = band[1]["panel"]["iframe"]["id"]
     assert band[2]["panel"]["iframe"]["id"] == frame and band[3]["panel"]["iframe"]["id"] == frame
+    assert band[2]["panel"]["bodyTab"] == band[3]["panel"]["bodyTab"] == "agents"
     assert band[3]["cmd"] != band[1]["cmd"]  # the lines were drawn again
     assert _hl(band[3]) == _hl(band[1])
 
@@ -799,3 +866,53 @@ def test_the_screens_leave_the_input_to_view_input() -> None:
         assert f'from "{imp}"' in src, name
         for word in ("ctrlKey", "deltaX", "deltaY", "ArrowLeft", "wheelDelta", '"wheel"'):
             assert word not in src, (name, word)
+
+
+# --- iss-00650 D-03: the phone sheet of the band's and the cleanup's panels -------------------------------------
+
+HALF, FULL = "490px", "844px"
+
+
+def _sheet(shot: dict[str, Any]) -> tuple[bool, str | None, str | None]:
+    return shot["panel"]["open"], shot["panel"]["snap"], shot["panel"]["pnH"]
+
+
+def test_the_band_panel_moves_on_a_phone_like_the_scope_panel(runs: dict[str, list[dict[str, Any]]]) -> None:
+    """iss-00650 R-03: the grab's tap switches half and full, the heading moves it up, a pull down closes it."""
+    band = runs["sheet-band"]
+    assert band[1]["panel"]["grab"] == "button"  # the Scope panel's grab (SHEET_GRAB)
+    assert [_sheet(band[i]) for i in (1, 2, 3, 4)] == [
+        (True, None, None),  # the CSS's own height (58%): no sheet was shown before
+        (True, "full", FULL),
+        (True, "half", HALF),
+        (True, "full", FULL),
+    ]
+    closed = band[5]
+    assert not closed["panel"]["open"] and closed["panel"]["agent"] is None and closed["panel"]["iframe"] is None
+    assert _hl(closed) == OFF_ALL and closed["cmdSel"] == [False, False] and closed["pressed"]["a-coord"] == "false"
+    assert _sheet(band[6]) == (True, "half", HALF) and band[6]["panel"]["agent"] == "a-coord"
+    assert _sheet(band[7]) == (True, "half", HALF)  # F-02: the chat's body scrolls, the sheet stays
+    assert not band[8]["panel"]["open"] and band[8]["panel"]["agent"] is None
+
+
+def test_the_cleanup_panel_moves_on_a_phone_like_the_scope_panel(runs: dict[str, list[dict[str, Any]]]) -> None:
+    """iss-00650 R-03: the cleanup list keeps the same sheet; a pull down closes it as its close button does."""
+    clean = runs["sheet-clean"]
+    assert clean[1]["panel"]["clean"] and clean[1]["panel"]["grab"] == "button"
+    assert [_sheet(clean[i]) for i in (1, 2, 3)] == [(True, None, None), (True, "full", FULL), (True, "half", HALF)]
+    assert not clean[4]["panel"]["open"]  # as the close button leaves it (the list stays in the closed aside)
+
+
+def test_the_scope_panel_still_moves_on_a_phone(runs: dict[str, list[dict[str, Any]]]) -> None:
+    """iss-00650 R-02: the Scope panel's sheet is what it was."""
+    scope = runs["sheet-scope"]
+    assert [_sheet(scope[i]) for i in (1, 2, 3)] == [(True, "half", HALF), (True, "full", FULL), (True, "half", HALF)]
+    assert not scope[4]["panel"]["open"] and scope[4]["selected"] == []
+
+
+def test_the_wide_panel_does_not_move(runs: dict[str, list[dict[str, Any]]]) -> None:
+    """iss-00650 F-02: on a wide screen the grab and the pull change nothing."""
+    pc = runs["sheet-pc"]
+    for shot in pc[1:]:
+        assert shot["panel"]["open"] and shot["panel"]["agent"] == "a-coord"
+        assert shot["panel"]["snap"] is None and shot["panel"]["pnH"] is None

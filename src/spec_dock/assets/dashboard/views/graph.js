@@ -12,7 +12,7 @@ import { BAND, bandItems, commandKey, commandModel, commandPairs, placeAgents } 
 import { audit, svg as edgeSvg } from "./graph/router.js";
 import * as M from "./graph/marks.js";
 import { LEGACY_KEYS, PREFS_KEY, restorePrefs } from "./graph/prefs.js";
-import { createScopePanel } from "./_shared/panel.js";
+import { createScopePanel, SHEET_GRAB } from "./_shared/panel.js";
 import { createOrcaWatch, markAgentAt, markIds, paintOrcaMarks } from "./_shared/orca_marks.js";
 import * as CV from "./graph/command_view.js";
 import { bindViewInput } from "./graph/view_input.js";
@@ -276,6 +276,15 @@ function pressBandAgent(id) {
   renderPanel();
 }
 
+// The panel's close, whatever it shows: its close button and the phone sheet pulled down (iss-00650 D-03).
+function closePanel() {
+  if (V.agentPanel) closeAgentPanel();
+  else if (V.cleanup) {
+    V.cleanup = false;
+    renderPanel();
+  } else select(null);
+}
+
 function closeAgentPanel() {
   V.agentPanel = null;
   V.cmdSel = null;
@@ -390,7 +399,7 @@ function mount(root) {
       select(id);
       centerOn(id);
     },
-    onClose: () => select(null),
+    onClose: closePanel, // the close button and the phone sheet pulled down (iss-00650 D-03)
     extraActions: (s) => (frameOf(s) ? `<button type="button" class="ds-btn" data-act="focus" data-focus="${esc(s.id)}" aria-label="この範囲に絞る" title="この範囲に絞る">${ic("target")}この範囲に絞る</button>` : ""),
   });
   V.motion?.stop();
@@ -683,7 +692,7 @@ function renderPanel() {
     const list = V.cleanup;
     panel.dataset.st = "unknown";
     panel.innerHTML =
-      `<div class="pn-grab"></div><div class="pn-head"><b>${ic("box")} 片付けの候補 ${list.length}件</b><button type="button" class="iconbtn" data-act="close" aria-label="閉じる">${ic("x")}</button></div>` +
+      `${SHEET_GRAB}<div class="pn-head"><b>${ic("box")} 片付けの候補 ${list.length}件</b><button type="button" class="iconbtn" data-act="close" aria-label="閉じる">${ic("x")}</button></div>` +
       `<div class="pn-body"><ul class="pn-clean">${list
         .map((c) => {
           const s = byId(c.id);
@@ -733,11 +742,7 @@ function onClick(event) {
       savePrefs();
       renderLegend();
     } else if (a === "close") {
-      if (V.agentPanel) closeAgentPanel();
-      else if (V.cleanup) {
-        V.cleanup = false;
-        renderPanel();
-      } else select(null);
+      closePanel();
     } else if (a === "focus") setFocus(act.dataset.focus);
     else if (a === "unfocus") setFocus(null);
     else {
