@@ -4,56 +4,59 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<title>説明資料</title>
+<title>指揮の線をホップの弧にする</title>
 <link rel="stylesheet" href="../../../design-system/ds.css">
 <!-- ▼ 説明資料の本文（Markdown）。編集するのはこのブロックだけです。 -->
 <script type="text/markdown" id="ds-source">
 ---
-title: この Scope の説明資料（題名を書き換えます）
-lead: この資料で理解できることを、初めて読む人にも分かるように1〜2文で書きます。
+title: 指揮の線をホップの弧にする
+lead: 構造の図と『横断の構造』の黄色い指揮の線は、親の印の下から出て子の印の下から入るため、横に並ぶ2つの印の間で U 字に回り込んでいました。どの線も、上の縁から出て上の縁へ跳ねて入る「ホップ」の弧に変えます。
 category: 説明資料
 audience: 本日チームに加わった新メンバー
-status: 下書き
+status: 仕様のレビュー前
 ---
-
-<!-- spec-dock:explanation-skeleton -->
-<!-- 雛形から書き換えたら、上の印の行を消します。印が残っていると、検査は「雛形のまま」と判定します。 -->
 
 ## この資料で分かること
 
 :::summary
-- 読み終えたときに理解できていることを、1文ずつ書きます。
-- 背景、仕組み、失敗時の動き、確認方法のうち、特に伝えたい点を選びます。
-- 短い Scope なら、1〜2項目でかまいません。
+- 線の端は、どれも「印の真上の、箱（枠・帯の項目）の上の縁」になります。箱の中には線を引きません。
+- 道は、上にふくらむ1本の弧です。高さは、2つの端の横の距離と高さの差で 18〜56px の間に決まります。
+- 同じ箱の中の親子も、同じ上の縁から出て戻る小さな弧（高さ 18px）で結びます。上に別の箱があって入らないときは、余白に収まる高さに下げます。
+- 子の側には、小さな下向きの矢じりと、受けた印を囲む指揮の色の縁を描きます。
+- 点の流れ・波紋・色・帯、iss-00646 で軽くした描き方は変えません。
 :::
 
 ## 背景と目的
 
-なぜこの Scope に取り組むのか、どの問題を解決するのかを具体的に説明します。
+本人から「指揮の線が下から回り込んで、いびつに見える」と指摘があり、「上から出て、上から入る。跳ねて渡るような見た目がよい」と決まりました。今の線は、端の向きがどれも下なので、同じ高さの2つの端を結ぶと、下へ大きく垂れる U 字になります。
 
-## 全体の構成
+## 形の決まり
 
-構成要素の役割と関係を説明します。図は、理解を大きく助ける場合だけ入れます。
-
-```plantuml id=overview
+```plantuml id=hop
 @startuml
-title 全体の構成
-top to bottom direction
-actor "利用者" as User
-component "説明対象の仕組み" as System
-database "データ" as Data
-User -> System : 操作する
-System -> Data : 読み書きする
-System --> User : 結果を返す
+title 今（U 字）と、これから（ホップ）
+rectangle "親の箱" as P
+rectangle "子の箱" as C
+P -[hidden]right- C
+note top of P : これから：印の真上の上の縁から上へ出る
+note top of C : 上から入り、矢じりと印の縁で届いたことを示す
+note bottom of P : 今：印の下から箱の下の縁へ出て、下へ回り込む
 @enduml
 ```
 
+| 場面 | 今 | これから |
+|---|---|---|
+| 違う箱の間 | 下の縁から出て下の縁へ入る曲線 | 上の縁から出て上の縁へ入る弧（高さ 18〜56px） |
+| 同じ箱の親子 | 箱の下（違う行なら右）の外の弧 | 上の縁の小さな弧（18px、入らなければ下げる） |
+| 帯の印 | 項目の下の縁から出る | 項目の上の縁から出る |
+| 子の端 | 小さな点 | 下向きの矢じりと、印の縁 |
+
 ## 確認方法
 
-読者が手元で確かめられる手順を書きます。
+試しのサーバーで、構造の図と『横断の構造』を開き、ページの検査で `specdockCmdAudit()` と `specdockEdgeAudit()` を見ます。重なりと違反が0であることを確かめます。
 
 ```sh
-spec-dock active show --json
+uv run pytest tests/unit/presentation/test_dashboard_graph_command.py
 ```
 </script>
 <script src="../../../design-system/ds.js"></script>
