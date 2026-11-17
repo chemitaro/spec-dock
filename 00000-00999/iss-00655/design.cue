@@ -44,7 +44,7 @@ design: {
 			`last` は前の写しの `{kind, at}`（初めは null）、`now` は時刻（ms）、`page` は横の1ページの画素（図の面の幅）。返り値は `{act, kind, at}` で、`act` は次のどれか：
 			- `{type: "zoom", f, x: e.clientX, y: e.clientY}`：`kind` が `pinch` なら `f = exp(−deltaY·0.01)`（今と同じ）。`wheel`・`wheel?` なら、刻み数 `n = min(WHEEL.maxSteps, max(1, round(|wheelDeltaY| / 120)))`（`wheelDeltaY` がないか `deltaMode` が 0 でないときは 1）、`f = WHEEL.step ^ (deltaY < 0 ? n : −n)`。`deltaY` が 0 なら `act` は null。`WHEEL = {step: 1.15, maxSteps: 2, stick: 200}`。
 			- `{type: "pan", dx, dy}`：`pan` は `dx = −deltaX·u`、`dy = −deltaY·u`（今と同じ向き。`deltaMode` 0 では今と同じ量）。`hpan` は、`deltaX` が 0 でなければ `dx = −deltaX·u`、0 なら `dx = −deltaY·u`、`dy = 0`。`u` は `deltaMode` 0 で 1、1 で 16、2 で `page`。
-			続きの扱い：`kind` が `wheel?`（弱い）で、`last.kind` が `pan` で、`now − last.at < WHEEL.stick` なら、`kind` を `pan` にする（トラックパッドの連続した動きの途中）。`wheel`・`pinch`・`hpan` は続きで変えない。返す `kind` は変えた後の値で、呼ぶ側はそれを次の `last` にする。
+			続きの扱い（一続きの wheel は、その一続きの最初の判定を引き継ぐ。統括の決定 2026-11-18）：`kind` が `pan` か `wheel?`（どちらも値だけによる弱い判定）で、`last.kind` も `pan` か `wheel?` で、`now − last.at < WHEEL.stick` なら、`kind` を `last.kind` にする。こうして、2本指の途中で `wheelDeltaY` 120 の値（勢いよくなぞった deltaY 40 など）が来ても動かすを続け、マウスのホイールを速く回す途中で値が変わっても拡大・縮小を続ける。`wheel`（`deltaMode` 1・2）・`pinch`・`hpan` は確かな判定なので引き継がず、そこから新しい一続きが始まる。`at` は毎回 `now` にする（一続きは、前の wheel から `stick` の内に次が来る限り続く）。返す `kind` は変えた後の値で、呼ぶ側はそれを次の `last` にする。
 			"""
 		satisfies: ["R-01", "R-02", "R-03", "F-01"]
 	}
@@ -103,6 +103,7 @@ compatibility: "マウスのホイールは、動かすから拡大・縮小に�
 
 risks: [
 	"ブラウザー・OS・マウスの設定（加速、高精度のホイール）によっては、マウスのホイールが `wheelDeltaY` 120 の倍数にならず、動かすに倒れる（F-01 の側。今と同じ動き）。そのときは Ctrl＋ホイール・+ と - で拡大・縮小できる",
-	"トラックパッドの動きの初めの1つがたまたま `wheelDeltaY` 120 の倍数（deltaY ±40）で deltaX 0 だと、1刻みだけ拡大・縮小する。続きの扱いで、動きの途中では起きない",
+	"トラックパッドの動きの初めの1つがたまたま `wheelDeltaY` 120 の倍数（deltaY ±40）で deltaX 0 だと、その一続きが拡大・縮小になる。勢いよくなぞる動きは小さな値から始まるので、初めの1つが 40 になることはまれと見る。本人の実機で確かめる（統括が頼む）",
+	"CDP の Input.dispatchMouseEvent（mouseWheel）は、どんな deltaY でも `wheelDeltaY` を ±120 にして渡す（2026-11-18 に Chrome 157 で確かめた）。CDP の合成の wheel は deltaX があるときだけトラックパッドを模せる。本物のトラックパッドの値ではない",
 	"代表の値の表は、ブラウザーの決まりから作った合成の値で、本人の機械で測ったものではない。実機の Chrome の値は S-04 で記録する",
 ]

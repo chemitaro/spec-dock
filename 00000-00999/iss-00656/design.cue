@@ -68,11 +68,24 @@ design: {
 			"""
 		satisfies: ["R-05", "F-02"]
 	}
+	"D-07": {
+		title: "1行目に収まらないときだけ、パンくずを下の行に送る（panel.js の fitHead）"
+		text: """
+			CSS の折り返しは、縮める前に、DOM の順で折れる（仕様のレビュー round-2 の P1）。そこで、送るかどうかは描いた後に測って決める。
+
+			- `panel_logic.js` に純粋な `headOverflows({scrollWidth, clientWidth})` → `scrollWidth > clientWidth + 1`（1px の丸めの差を許す）。
+			- `panel.js` の `fitHead()`：`parts.crumb` がなければ何もしない。`.pn-head` から `is-stacked` を外し、スマートフォンの全体の段（`aside.dataset.snap === "full"`）なら外したまま終える。ほかは `.pn-crumb` の `scrollWidth`・`clientWidth` を読み（外した後の配置。同じ処理の中で読むので、外した状態が画面に出ることはない）、`headOverflows` が真なら `is-stacked` を付ける。
+			- 呼ぶ時：`draw()` の終わり（`applySnap()` と `refreshOrca()` の後）、`refreshOrca()` の終わり（エージェントの印が描かれて幅が変わるため）、今の `onResize`。描き直しの度に1回の配置の読みだけで、時計は使わない。
+			- 片付けの候補の見出し（`.pn-crumb` がない）は対象外で、今のまま。
+			"""
+		satisfies: ["R-01", "R-06"]
+	}
 	"D-04": {
 		title: "CSS（panel.css・scope_tabs.css・scope.css）"
 		text: """
 			PC（panel.css）：
-			- `.pn-head`：今の flex・中央そろえ・`gap: 8px`・`padding: 12px 10px 0 16px` に、`flex-wrap: wrap-reverse; row-gap: 4px;` を足す。`.pn-crumb { flex: 1 1 12em; min-width: 0; }`（12em より狭くなるときだけ、`.pn-crumb` が右の部品の下の行に送られる。`wrap-reverse` なので右の部品と閉じるは上の行に残り、閉じるは `margin-left: auto` で右端）。`.pn-hl` の中身・`.pn-orca`・閉じるは縮まない。
+			- `.pn-head`：今の flex・中央そろえ・`gap: 8px`・`padding: 12px 10px 0 16px` のまま（折り返さない）。`.pn-crumb { flex: 1 1 0; min-width: 0; overflow: hidden; }`、`.pn-hl` の中身・`.pn-orca`・閉じるは縮まない。祖先と `.pn-kind` が縮み切ると、`.pn-crumb` の中身が切れ、`scrollWidth` が `clientWidth` を超える（D-07 がそれを測る）。
+			- 送り（D-07 の `is-stacked`）：`.pn-head.is-stacked { flex-wrap: wrap; row-gap: 4px; }`、`.pn-head.is-stacked .pn-crumb { order: 9; flex: 1 0 100%; overflow: visible; }`。札・印・Orca で開く・閉じるは DOM の順のまま上の行に残り、閉じるは今の `margin-left: auto` の規則で右端、パンくずのまとまりだけが下の1行に行く。
 			- 今の `.pn-head .iconbtn { margin-left: auto; … }`・`.pn-orca:not(:empty) { margin-left: auto; }`・`.pn-orca:not(:empty) + .pn-close { margin-left: 0; }`・`.pn-orca:empty` の規則は消さない（同じ欄に描く『片付けの候補』の `.pn-head` は `.pn-crumb` を持たず、閉じるの右寄せをこの規則に頼る）。`.pn-crumb` がない見出しの見た目は今と同じ。
 			- `.pn-path`（`.pn-crumb` の中の nav）：`display: flex; align-items: center; flex-wrap: nowrap; gap: 2px; min-width: 0; margin: 0; font-size: 12.5px; color: var(--ds-muted);`。祖先のボタンは今の見た目のまま `flex: 0 1 auto; min-width: 3ch;`（`max-width: 22ch`・省略記号は今のまま）。`.pn-self { flex: 0 1 auto; min-width: 0; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }`、`.pn-self .ds-docid { flex: none; }`、`.pn-kind { min-width: 0; overflow: hidden; text-overflow: ellipsis; }`。祖先のボタンは今の ID より先に縮む（`flex-shrink` の重みを祖先 4、`.pn-kind` 1 にする）。
 			- `.pn-cover { padding: 4px 16px 0; }`、`.pn-title { margin: 0; font-size: 16px; line-height: 1.45; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }`（今の折り返しの規則は残す）。
@@ -121,7 +134,8 @@ compatibility: """
 	"""
 
 risks: [
-	"1000px の幅（欄 440px）で、祖先が2つとエージェントの印が4つあると、祖先の ID が強く縮む。title と押して開く動きで辿れ、今の ID は縮まない。実機の写しで確かめる。",
+	"1000px の幅（欄 440px）で祖先が2つとエージェントの印が多いと、祖先の ID が縮み、縮み切るとパンくずが下の行に送られて見出しが1行分高くなる。title と押して開く動きで辿れ、今の ID は縮まない。実機の写しで確かめる。",
+	"`fitHead` は描き直しの度に配置を1回読む。描き直しは要約の知らせ（10秒ごと）と操作の時だけなので、重さは測れないほど小さいと見込む。",
 	"iss-00650 が同じ `panel.js`・`panel.css` を変える。実装はそのマージの後の `origin/main` から始め、引っぱりの判定（`.pn-top` の中のボタンとリンクを除く）を変えない。",
 	"`-webkit-line-clamp` は今の主なブラウザーで使えるが、標準の `line-clamp` ではない。使えないブラウザーでは題名が切れずに全文が出る（害はない）。",
 ]
