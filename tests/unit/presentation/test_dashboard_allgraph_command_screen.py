@@ -327,6 +327,7 @@ def test_pressing_the_band_agent_opens_its_chat_and_highlights_its_lines(runs: d
     on = shots[4]
     assert on["panel"]["open"] and on["panel"]["agent"] == "a-coord"
     assert "/embed/agent?id=a-coord" in on["panel"]["iframe"]["src"]
+    assert on["panel"]["bodyTab"] == "agents"  # iss-00650 R-01: the agents tab's column rule of panel.css
     assert on["pressed"] == {"a-coord": "true"}
     assert on["lines"] == {"a-coord>c-own": "is-cmd-hl"}
     for closed in (shots[5], shots[7], shots[9]):

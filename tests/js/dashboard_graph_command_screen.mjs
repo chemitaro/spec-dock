@@ -95,6 +95,8 @@ function snap(root) {
       text: panel.querySelector(".pn-head")?.textContent ?? null,
       tab: panel.querySelector('[aria-selected="true"]')?.dataset?.pnTab ?? null,
       agentPicked: panel.querySelector(".sd-agent")?.getAttribute("src") ?? null,
+      bodyTab: panel.querySelector(".pn-body")?.getAttribute("data-tab") ?? null,
+      none: panel.querySelector(".pn-cmd-none")?.textContent ?? null,
     },
     legend: q(".legend").innerHTML.includes("指揮（親 → 子）"),
     transform: world.style.transform,

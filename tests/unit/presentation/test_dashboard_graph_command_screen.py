@@ -28,6 +28,7 @@ HARNESS = ROOT / "tests" / "js" / "dashboard_graph_command_screen.mjs"
 APP_CSS = (ASSETS / "app.css").read_text(encoding="utf-8")
 GRAPH_CSS = (ASSETS / "views" / "graph.css").read_text(encoding="utf-8")
 GRAPH_JS = (ASSETS / "views" / "graph.js").read_text(encoding="utf-8")
+PANEL_CSS = (ASSETS / "views" / "_shared" / "panel.css").read_text(encoding="utf-8")
 
 
 def _run(tmp_path: Path, request: dict[str, Any]) -> dict[str, Any]:
@@ -281,6 +282,12 @@ for _w in NO_PARENT["worktrees"]:
 # the same agents, the researcher now working: a new summary whose rows of marks do not change
 WORKING = copy.deepcopy(FIVE)
 WORKING["worktrees"][0]["agents"][1]["mark"] = "working"
+# the coordinator without a chat to frame (iss-00650 F-01)
+NO_CHAT = copy.deepcopy(FIVE)
+for _w in NO_CHAT["worktrees"]:
+    for _a in _w["agents"]:
+        if _a["id"] == "a-coord":
+            _a.pop("detail")
 # the coordinator gone
 GONE = summary(*[w | {"agents": [a for a in w["agents"] if a["id"] != "a-coord"]} for w in FIVE["worktrees"]])
 
@@ -311,6 +318,7 @@ RUNS: list[dict[str, Any]] = [
             {"summary": GONE},  # 12: the coordinator left
         ],
     },
+    {"name": "nochat", "orca": {"summary": NO_CHAT}, "steps": [{"tap": BAND}]},
     {
         "name": "mark",
         "orca": {"summary": FIVE},
@@ -492,6 +500,18 @@ def test_pressing_the_band_agent_opens_its_chat(runs: dict[str, list[dict[str, A
     assert panel["iframe"]["sandbox"] == "allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
     assert panel["iframe"]["referrer"] == "no-referrer"
     assert panel["text"] == "claude · main のチェックアウト"
+    # iss-00650 R-01: the body follows the agents tab's column rule of panel.css, so the frame fills the panel
+    assert panel["bodyTab"] == "agents" and panel["none"] is None
+    column = '.sd-pn .pn-body:is([data-tab="docs"], [data-tab="explanation"], [data-tab="agents"])'
+    rules = re.findall(rf"{re.escape(column)} {{([^}}]*)}}", PANEL_CSS)
+    assert "display: flex; flex-direction: column;" in rules[0] and len(rules) == 2  # the wide panel and the sheet
+
+
+def test_a_band_agent_without_a_chat_keeps_the_plain_body(runs: dict[str, list[dict[str, Any]]]) -> None:
+    """iss-00650 F-01 / R-02: no frame, no data-tab: the message keeps the panel body's own padding."""
+    panel = runs["nochat"][1]["panel"]
+    assert panel["open"] and panel["agent"] == "a-coord" and panel["iframe"] is None
+    assert panel["none"] == "チャットを開けません。" and panel["bodyTab"] is None
 
 
 def test_the_chat_stays_while_the_graph_draws_again(runs: dict[str, list[dict[str, Any]]]) -> None:
@@ -499,6 +519,7 @@ def test_the_chat_stays_while_the_graph_draws_again(runs: dict[str, list[dict[st
     band = runs["band"]
     frame = band[1]["panel"]["iframe"]["id"]
     assert band[2]["panel"]["iframe"]["id"] == frame and band[3]["panel"]["iframe"]["id"] == frame
+    assert band[2]["panel"]["bodyTab"] == band[3]["panel"]["bodyTab"] == "agents"
     assert band[3]["cmd"] != band[1]["cmd"]  # the lines were drawn again
     assert _hl(band[3]) == _hl(band[1])
 

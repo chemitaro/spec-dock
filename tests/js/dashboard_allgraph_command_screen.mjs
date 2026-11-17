@@ -108,6 +108,7 @@ function snap(root) {
       agent: panel.dataset.cmdAgent ?? null,
       iframe: iframe ? { id: idOf(iframe), src: iframe.getAttribute("src") } : null,
       tab: panel.querySelector('[aria-selected="true"]')?.dataset?.pnTab ?? null,
+      bodyTab: panel.querySelector(".pn-body")?.getAttribute("data-tab") ?? null,
     },
     legend: q(".legend").innerHTML.includes("指揮（親 → 子）"),
     stats: stats ? { layouts: stats.layouts, composes: stats.composes ?? null } : null,
