@@ -1,6 +1,6 @@
 // The cross-repository structure (`/graph`, iss-00614; Epic epic-00612 R-04 to R-09): every shown repository's
-// structure graph in one world, each inside a repository frame, the frames nested as the company is (company-os →
-// business → product …; the list API's parent and tier). The default range is "next".
+// structure graph in one world, each inside a repository frame, the frames nested as the main checkouts' paths
+// contain one another (the list API's parent; no directory name means anything, iss-00635). The default range is "next".
 //
 // Each repository keeps the structure graph's own placement (graph/layout.js, nest), lines (graph/router.js) and parts
 // (graph/draw.js); graph/../allgraph/compose.js only places the frames. The selection, the panel, the dependency lines
@@ -437,11 +437,9 @@ function sizes() {
 const repoPath = (key) => `/r/${key}/`;
 
 function headHtml(it) {
-  const tier = (it.tier || []).map((t) => `<span class="sd-badge">${esc(t)}</span>`).join(" › ");
   const name = `${it.owner ?? ""}/${it.name ?? ""}`;
   return (
     `<header class="ax-head"><span class="ax-icon">${ic("folder")}</span><span class="ax-name" title="${esc(it.repository)}">${esc(name)}</span>` +
-    (tier ? `<span class="ax-tier">${tier}</span>` : "") +
     `<a class="ax-link" href="${esc(A.ctx.href(repoPath(it.repository)))}" title="このリポジトリの構造の図" aria-label="${esc(name)} の構造の図">${ic("arrowRight")}</a></header>`
   );
 }
