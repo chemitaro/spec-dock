@@ -6,8 +6,8 @@ goal: "帯の欄のチャットの枠を、欄の本文の高さいっぱいに�
 
 steps: {
 	"S-01": {title: "T-01 を先に足して落ちるのを確かめ、D-01（command_view.js の本文の属性）を入れて通す。make lint と全体の uv run pytest を通す（static-inventory.json に載る sha256 が変われば直す）", realizes: ["R-01", "R-02", "F-01"], status: "done", session: "owner"}
-	"S-03": {title: "T-03 を先に足して落ちるのを確かめ、D-03（panel.js の下からの欄の判定、SHEET_GRAB、hide の applySnap、graph.js・allgraph.js の closePanel、command_view.js と片付けの候補のつまみ）を入れて通す。make lint と全体の uv run pytest を通す", realizes: ["R-03", "F-02", "R-02"], status: "todo", after: ["S-01"], session: "owner"}
-	"S-02": {title: "T-02 と T-04 の実機の確かめ（直す前と後の写しと数）を report.md に残し、本人が見る試しの URL を立てたままにする", realizes: ["R-01", "R-02", "R-03"], status: "todo", after: ["S-03"], session: "owner"}
+	"S-03": {title: "T-03 を先に足して落ちるのを確かめ、D-03（panel.js の下からの欄の判定、SHEET_GRAB、hide の applySnap、graph.js・allgraph.js の closePanel、command_view.js と片付けの候補のつまみ）を入れて通す。make lint と全体の uv run pytest を通す", realizes: ["R-03", "F-02", "R-02"], status: "done", after: ["S-01"], session: "owner"}
+	"S-02": {title: "T-02 と T-04 の実機の確かめ（直す前と後の写しと数）を report.md に残し、本人が見る試しの URL を立てたままにする", realizes: ["R-01", "R-02", "R-03"], status: "done", after: ["S-03"], session: "owner"}
 }
 
 tests: {
