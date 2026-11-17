@@ -4,17 +4,21 @@
 //
 // Each repository keeps the structure graph's own placement (graph/layout.js, nest), lines (graph/router.js) and parts
 // (graph/draw.js); graph/../allgraph/compose.js only places the frames. The selection, the panel, the dependency lines
-// and orca-web's marks stay inside one repository. This screen never records "seen".
+// and orca-web's marks stay inside one repository; the command lines of orca-web's agents run across the frames
+// (iss-00617, allgraph/command.js and graph/command_view.js). This screen never records "seen".
 import * as api from "../core/api.js";
-import { index, nodeMarkRows, routeLayout } from "./graph/layout.js";
+import { index, markSpots, nodeMarkRows, routeLayout } from "./graph/layout.js";
 import { audit, svg as edgeSvg } from "./graph/router.js";
 import * as M from "./graph/marks.js";
 import * as D from "./graph/draw.js";
 import { compactNeeds, headsDiffer, tallNeeds } from "./graph/measure.js";
-import { REPO, bodyWidth, compose } from "./allgraph/compose.js";
+import { REPO, anchorShift, bodyWidth, compose } from "./allgraph/compose.js";
+import { bandShape, crossKey, crossModel, crossPlace } from "./allgraph/command.js";
+import { commandPairs } from "./graph/command.js";
+import * as CV from "./graph/command_view.js";
 import { splitNotices } from "./allgraph/notices.js";
 import { createScopePanel } from "./_shared/panel.js";
-import { createOrcaWatch, markAgentAt, paintOrcaMarks } from "./_shared/orca_marks.js";
+import { createOrcaWatch, markAgentAt, markIds, paintOrcaMarks } from "./_shared/orca_marks.js";
 import { overviewWarnings } from "./_shared/logic.js";
 
 const { esc, ic, stateIcon } = M;
@@ -49,6 +53,17 @@ const A = {
   width: 0, // the graph area's width at 100% the frames were composed for
   height: 0,
   comp: null, // the last compose() result
+  plain: null, // compose() of the same moment without a band: the frames shown and their bodies (iss-00617 D-02)
+  sizes: null, // the sizes the frames were composed with
+  // iss-00617: the command lines and the bands
+  cmdKey: null, // crossKey of the lines drawn; the same key draws nothing again
+  cmdModel: null, // the last crossModel drawn, or null without a pair
+  cmdSel: null, // the agent whose lines stand out
+  agentPanel: null, // the band's agent whose chat the panel shows
+  shape: null, // the bands' shape the frames are to be composed with (bandShape), or null without a band
+  compShape: null, // the key of the shape A.comp was composed with
+  shapeRedo: 0, // the frames composed again for a new shape with the same places' inputs (F-05)
+  shapeInput: null, // the key of those inputs
   ctx: null,
   root: null,
   el: null,
@@ -60,7 +75,7 @@ const A = {
 };
 // repository key → {item, status, structure, failure, revision, ix, desc, eg, sig, marks, rowsRedo, warnings, html}
 const R = new Map();
-const stats = { layouts: 0, loads: 0, repos: {} };
+const stats = { layouts: 0, loads: 0, composes: 0, repos: {} };
 
 function loadPrefs() {
   try {
@@ -121,6 +136,7 @@ function paintOrca() {
   }
   A.pn?.refreshOrca();
   checkRows();
+  paintCommand();
 }
 function onOrcaNews() {
   for (const r of R.values()) r.rowsRedo = 0;
@@ -181,7 +197,239 @@ function onMarksResize() {
   A.rowsRaf = requestAnimationFrame(() => {
     A.rowsRaf = 0;
     checkRows();
+    paintCommand(); // the marks' widths alone can move the lines' ends
   });
+}
+
+// --- The command lines and the bands (iss-00617 D-05) -------------------------------------------------------------
+// Which Orca agent directs which, across the repository frames: a band below each frame's heading for the ends in that
+// repository but in no drawn Scope, and the band "ほかの場所" above every frame for the worktrees of no shown repository.
+// The ends come from each repository's layout, its measured marks and the order the component drew them
+// (allgraph/command.js); the DOM is never measured for them.
+
+const bandMarks = new WeakMap(); // a band slot -> the key of the marks drawn in it
+const summaryNow = () => (A.ctx?.orca?.status?.() === "ok" ? A.ctx.orca.summary?.() ?? null : null);
+
+// The recorded agent ids of a repository's mark slots, {Scope id: [id, …]} (iss-00621 markIds).
+function slotIds(body) {
+  const out = {};
+  for (const slot of body?.querySelectorAll("[data-orca-scope]") || []) {
+    const ids = markIds(slot);
+    if (ids) out[slot.dataset.orcaScope] = ids;
+  }
+  return out;
+}
+
+// Every listed repository for allgraph/command.js, in the list's order: its structure (null while not read), its
+// layout and routes when its frame shows its graph, its measured marks and their recorded ids.
+function cmdRepos() {
+  const body = new Map(bodies());
+  return items().map(({ repository: key }) => {
+    const r = R.get(key);
+    const graph = !!r?.eg && A.plain?.frames.get(key)?.body.kind === "graph";
+    return {
+      key,
+      structure: r?.structure ?? null,
+      ix: r?.ix ?? null,
+      eg: r?.eg ?? null,
+      layout: graph ? r.eg.layout : null,
+      routes: graph ? r.eg.routes : [],
+      graph,
+      marks: r?.marks ?? null,
+      ids: body.has(key) ? slotIds(body.get(key)) : null,
+    };
+  });
+}
+
+const visibleWith = (keep) => new Set(compose(items(), A.sizes || {}, { range: A.range, width: A.width, keep }).order);
+
+// After the marks: the lines and the bands from the current summary. A new shape of the bands composes the frames again
+// (at most twice for the same places' inputs, F-05); the same inputs draw nothing again.
+function paintCommand() {
+  if (!A.el || !A.ctx || !A.comp || !A.plain) return;
+  const summary = summaryNow();
+  const repos = cmdRepos();
+  const visible = A.plain.order;
+  const key = crossKey({ summary, repos, comp: A.comp, visible });
+  if (key === A.cmdKey) {
+    paintBandMarks();
+    return;
+  }
+  const pairs = commandPairs(summary);
+  const placed = pairs.length ? crossPlace(pairs, { repos, summary, visible: new Set(visible), visibleWith, orderOf: CV.orderOf(A.ctx.orca?.marks?.()) }) : null;
+  if (!placed || !placed.pairs.length) {
+    if (A.shape) {
+      // F-01: no pair: the frames as they are without a band
+      A.shape = null;
+      draw();
+      return;
+    }
+    A.cmdKey = key;
+    clearCommand();
+    dropGone(summary);
+    paintCmdSel();
+    return;
+  }
+  const input = crossKey({ summary, repos, comp: null, visible });
+  if (input !== A.shapeInput) {
+    A.shapeInput = input;
+    A.shapeRedo = 0;
+  }
+  const shape = bandShape(placed.rows, placed.keep);
+  if (shape.key !== A.shape?.key && A.shapeRedo < 2) {
+    A.shape = shape;
+    A.shapeRedo++;
+    draw();
+    return;
+  }
+  // the shape the frames have, or F-05's limit: the rows without a band in the frames draw none of their pairs
+  A.cmdKey = key;
+  const model = crossModel({ comp: A.comp, repos, placed, spotsOf: (node, k) => spotsFor(repos, node, k) });
+  drawCommand(model);
+  dropGone(summary);
+  paintCmdSel();
+  paintBandMarks();
+}
+
+function spotsFor(repos, node, k) {
+  const r = repos.find((x) => x.key === k);
+  const m = r?.marks?.[node.id];
+  const ids = r?.ids?.[node.id];
+  return m && ids ? markSpots(node, { ...m, ids }) : null;
+}
+
+// No pair (F-01): no layer, no band; the world is as it was.
+function clearCommand() {
+  if (A.el) CV.removeLayers(A.el.world);
+  A.cmdModel = null;
+}
+
+function drawCommand(model) {
+  const w = A.el.world;
+  CV.removeLayers(w);
+  A.cmdModel = model;
+  const html = CV.layersHtml(model, { width: A.comp.width, height: A.comp.height });
+  // the layers stack by their z-index (graph.css) over the frames and under the boxes; the DOM's order is free
+  w.appendChild(CV.element(html.cmd));
+  w.appendChild(CV.element(html.top));
+  if (html.band) w.appendChild(CV.element(html.band));
+}
+
+function paintBandMarks() {
+  CV.paintBandMarks(A.el?.world.querySelector(".gx-band"), A.cmdModel, A.ctx?.orca?.marks?.(), bandMarks);
+}
+
+function paintCmdSel() {
+  CV.paintCmdSel(A.el?.world, A.cmdModel, A.cmdSel);
+}
+
+// A chosen agent that left the summary is chosen no more; its chat closes.
+function dropGone(summary) {
+  if (A.cmdSel && !CV.findAgent(summary, A.cmdSel)) A.cmdSel = null;
+  if (A.agentPanel && !CV.findAgent(summary, A.agentPanel)) {
+    A.agentPanel = null;
+    renderPanel();
+  }
+}
+
+// A band agent pressed (a tap, Enter or Space): its lines and its chat in the panel; the same agent again closes them.
+function pressBandAgent(id) {
+  if (!id) return;
+  if (A.agentPanel === id) {
+    closeAgentPanel();
+    return;
+  }
+  if (A.sel) select(null);
+  A.cleanup = false;
+  A.cmdSel = id;
+  A.agentPanel = id;
+  paintCmdSel();
+  renderPanel();
+}
+
+function closeAgentPanel() {
+  A.agentPanel = null;
+  A.cmdSel = null;
+  paintCmdSel();
+  renderPanel();
+}
+
+function renderAgentPanel(panel) {
+  const ok = CV.renderAgentPanel(panel, { id: A.agentPanel, summary: summaryNow(), model: A.cmdModel, orca: A.ctx?.orca, hide: () => A.pn.hide() });
+  if (!ok) {
+    A.agentPanel = null;
+    return false;
+  }
+  A.el.gx.dataset.panel = "open";
+  return true;
+}
+
+/**
+ * The command lines' check on the page (iss-00617 D-05, R-07): crossModel's audit, the largest distance (px) between a
+ * drawn mark and its spot (and a band button's middle and its slot's), the marks whose position is not known, the
+ * world's layers, the layers' pointer-events and the headings over the lines (heads).
+ */
+export function cmdAudit() {
+  if (!A.el || !A.comp) return null;
+  const w = A.el.world;
+  const model = A.cmdModel;
+  let drift = 0;
+  let missing = 0;
+  const repos = cmdRepos();
+  for (const [key, body] of bodies()) {
+    const r = R.get(key);
+    const f = A.comp.frames.get(key);
+    if (!r?.eg || !f) continue;
+    const at = new Map(r.eg.layout.nodes.map((n) => [n.id, n]));
+    for (const slot of body.querySelectorAll("[data-orca-scope]")) {
+      const marks = [...slot.querySelectorAll(".orca-mark:not(.orca-mark--more)")];
+      if (!marks.length) continue;
+      const node = at.get(slot.dataset.orcaScope);
+      const host = slot.closest(".gx-box, .gx-frame");
+      const spots = node ? spotsFor(repos, node, key) : null;
+      if (!node || !host || !spots || spots.length !== marks.length) {
+        missing += marks.length;
+        continue;
+      }
+      marks.forEach((m, i) => {
+        let x = 0;
+        let y = 0;
+        let e = m;
+        while (e && e !== host) {
+          x += e.offsetLeft;
+          y += e.offsetTop;
+          e = e.offsetParent;
+        }
+        if (e !== host) {
+          missing++;
+          return;
+        }
+        // the drawn mark and its spot, both moved by the body's origin (f.body) into the world: the origin cancels
+        drift = Math.max(drift, Math.abs(node.x1 + host.clientLeft + x - spots[i].x), Math.abs(node.y1 + host.clientTop + y - spots[i].y));
+      });
+    }
+  }
+  if (model?.band) {
+    const slots = new Map();
+    for (const it of model.band.items) for (const a of it.agents) slots.set(`${it.key}\n${a.id}`, a);
+    for (const b of w.querySelectorAll(".gx-band-agent")) {
+      const a = slots.get(`${b.dataset.cmdItem}\n${b.dataset.cmdAgent}`);
+      const item = b.offsetParent;
+      if (!a || !item) {
+        missing++;
+        continue;
+      }
+      drift = Math.max(drift, Math.abs(item.offsetLeft + item.clientLeft + b.offsetLeft + b.offsetWidth / 2 - (a.x + a.w / 2)));
+    }
+  }
+  return {
+    ...(model?.audit || { links: 0, arcs: 0, boxOverlaps: 0, edgeOverlaps: 0, crowded: 0 }),
+    spotDrift: Math.round(drift * 10) / 10,
+    spotMissing: missing,
+    layers: Array.from(w.children).map((c) => c.getAttribute("class")),
+    pointer: [...w.querySelectorAll(".gx-cmd, .gx-cmd-top")].map((s) => getComputedStyle(s).pointerEvents),
+    heads: CV.headsAudit(w),
+  };
 }
 
 // --- Shell DOM ------------------------------------------------------------------------------------------------
@@ -241,6 +489,7 @@ function dispose() {
   if (A.rowsRaf) cancelAnimationFrame(A.rowsRaf);
   A.rowsRaf = 0;
   if (window.specdockEdgeAudit === edgeAudit) delete window.specdockEdgeAudit;
+  if (window.specdockCmdAudit === cmdAudit) delete window.specdockCmdAudit;
   A.token++;
   A.root = null;
   A.el = null;
@@ -253,8 +502,18 @@ function dispose() {
   A.docState = "loading";
   A.docRevision = null;
   A.comp = null;
+  A.plain = null;
+  A.sizes = null;
+  A.cmdKey = null;
+  A.cmdModel = null;
+  A.cmdSel = null;
+  A.agentPanel = null;
+  A.shape = null;
+  A.compShape = null;
+  A.shapeRedo = 0;
+  A.shapeInput = null;
   R.clear();
-  Object.assign(stats, { layouts: 0, loads: 0, repos: {} }); // the counts are of one visit of the screen
+  Object.assign(stats, { layouts: 0, loads: 0, composes: 0, repos: {} }); // the counts are of one visit of the screen
   if (window.specdockAllGraphStats === stats) delete window.specdockAllGraphStats;
   orcaWatch.stop();
   A.pn?.destroy();
@@ -387,6 +646,7 @@ function render(root, ctx) {
   if (!A.fromRows) for (const r of R.values()) r.rowsRedo = 0;
   orcaWatch.follow(ctx.orca);
   window.specdockEdgeAudit = edgeAudit;
+  window.specdockCmdAudit = cmdAudit;
   window.specdockAllGraphStats = stats;
   if (!items().length) {
     showEmpty(EMPTY);
@@ -525,7 +785,23 @@ function draw() {
   if (!A.el || !items().length) return;
   const byKey = new Map(items().map((it) => [it.repository, it]));
   const N = notices();
-  A.comp = compose(items(), sizes(N.own), { range: A.range, width: A.width, bands: {} });
+  const sz = sizes(N.own);
+  const prev = A.comp;
+  const prevShape = A.compShape;
+  A.sizes = sz;
+  A.plain = compose(items(), sz, { range: A.range, width: A.width });
+  const S = A.shape;
+  A.comp = S ? compose(items(), sz, { range: A.range, width: A.width, bands: S.bands, keep: S.keep, other: S.other }) : A.plain;
+  A.compShape = S?.key ?? null;
+  stats.composes++;
+  // iss-00617 R-05: a new shape of the bands moves the frames; after the reader moved the graph, the top-most frame
+  // with a graph in view stays where it is on the screen
+  if (prev && A.moved && prevShape !== A.compShape) {
+    const d = anchorShift(prev, A.comp, viewRect());
+    A.tx -= d.dx * A.s;
+    A.ty -= d.dy * A.s;
+  }
+  A.cmdKey = null; // the world's HTML is new: the layers are drawn again
   const C = A.comp;
   const w = A.el.world;
   w.style.width = `${C.width}px`;
@@ -617,6 +893,9 @@ function paint() {
 async function select(repo, id) {
   A.token++;
   A.sel = repo && id ? { repo, id } : null;
+  A.cmdSel = null; // a mark pressed in the box sets it again after this (onTap)
+  A.agentPanel = null;
+  paintCmdSel();
   A.path = null;
   A.docState = "loading";
   A.cleanup = false;
@@ -693,7 +972,8 @@ function renderSum(summary) {
 }
 
 function renderLegend() {
-  D.renderLegend(A.el.legend, A.legend);
+  const orca = A.ctx?.orca;
+  D.renderLegend(A.el.legend, A.legend, { cmd: !!orca && orca.status?.() !== "off" });
 }
 
 function frameOf(repo, s) {
@@ -704,6 +984,8 @@ function frameOf(repo, s) {
 function renderPanel() {
   const panel = A.el?.panel;
   if (!panel) return;
+  if (A.agentPanel && renderAgentPanel(panel)) return;
+  CV.clearAgentPanel(panel); // the band agent's chat closes with its panel
   if (A.cleanup) {
     A.pn.hide();
     const { repo, list } = A.cleanup;
@@ -759,7 +1041,8 @@ function onClick(event) {
       A.legend = !A.legend;
       renderLegend();
     } else if (a === "close") {
-      if (A.cleanup) {
+      if (A.agentPanel) closeAgentPanel();
+      else if (A.cleanup) {
         A.cleanup = false;
         renderPanel();
       } else select(null);
@@ -795,6 +1078,14 @@ function onClick(event) {
 function onKey(event) {
   if (!A.el) return;
   if (event.key === "Escape") {
+    if (A.agentPanel) {
+      closeAgentPanel();
+      return;
+    }
+    if (A.cmdSel) {
+      A.cmdSel = null;
+      paintCmdSel();
+    }
     if (A.cleanup) {
       A.cleanup = false;
       renderPanel();
@@ -803,6 +1094,12 @@ function onKey(event) {
       A.hl = null;
       paint();
     }
+    return;
+  }
+  const band = event.target.closest?.("[data-cmd-agent]");
+  if (band && A.el.view.contains(band) && (event.key === "Enter" || event.key === " ")) {
+    event.preventDefault();
+    pressBandAgent(band.dataset.cmdAgent);
     return;
   }
   const target = event.target.closest?.(".gx-box, .gx-fh");
@@ -830,6 +1127,11 @@ function relayout() {
 }
 
 function onTap(target) {
+  const band = target.closest("[data-cmd-agent]");
+  if (band) {
+    pressBandAgent(band.dataset.cmdAgent);
+    return;
+  }
   const clean = target.closest(".gx-clean");
   const frame = target.closest("[data-repo]");
   if (clean && frame) {
@@ -838,6 +1140,9 @@ function onTap(target) {
     A.token++;
     A.sel = null;
     A.path = null;
+    A.cmdSel = null;
+    A.agentPanel = null;
+    paintCmdSel();
     A.cleanup = { repo, list: clean.dataset.ids.split(" ").map((id) => all.get(id) || { id, text: "" }) };
     paint();
     renderPanel();
@@ -846,6 +1151,11 @@ function onTap(target) {
   const hit = hitOf(target);
   if (!hit) {
     if (A.sel) select(null);
+    else if (A.agentPanel) closeAgentPanel();
+    else if (A.cmdSel) {
+      A.cmdSel = null;
+      paintCmdSel();
+    }
     return;
   }
   const same = A.sel?.repo === hit.repo && A.sel.id === hit.id;
@@ -853,7 +1163,13 @@ function onTap(target) {
   if (slot) {
     if (!same) select(hit.repo, hit.id);
     A.pn?.openAgent(markAgentAt(slot, target));
+    A.cmdSel = markAgentAt(slot, target); // its lines stand out (iss-00616 R-06)
+    paintCmdSel();
     return;
+  }
+  if (A.cmdSel) {
+    A.cmdSel = null;
+    paintCmdSel();
   }
   if (isPhone() && same) {
     goDetail(hit.repo, hit.id);
@@ -882,6 +1198,12 @@ function barBottom() {
 }
 
 const worldSize = () => ({ width: Math.max(1, A.comp?.width || 1), height: Math.max(1, A.comp?.height || 1) });
+
+// The world's rectangle seen in the graph area below the bar (iss-00617 D-03, anchorShift).
+function viewRect() {
+  const v = A.el.view;
+  return { x1: -A.tx / A.s, y1: (barBottom() - A.ty) / A.s, x2: (v.clientWidth - A.tx) / A.s, y2: (v.clientHeight - A.ty) / A.s };
+}
 
 // The first view (iss-00629 D-03): on a PC the world fits the graph area's width from its left (no part past it), read
 // down by panning; on a phone the structure graph's 74% from the left. Every draw places it again with the world of

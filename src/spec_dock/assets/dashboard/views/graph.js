@@ -14,8 +14,7 @@ import * as M from "./graph/marks.js";
 import { LEGACY_KEYS, PREFS_KEY, restorePrefs } from "./graph/prefs.js";
 import { createScopePanel } from "./_shared/panel.js";
 import { createOrcaWatch, markAgentAt, markIds, paintOrcaMarks } from "./_shared/orca_marks.js";
-import { AGENT_SANDBOX, agentFrame } from "./_shared/agents_logic.js";
-import { currentTheme } from "./_shared/agents_tab.js";
+import * as CV from "./graph/command_view.js";
 import * as D from "./graph/draw.js";
 import { compactNeeds, headsDiffer, tallNeeds } from "./graph/measure.js";
 
@@ -179,9 +178,6 @@ function onMarksResize() {
 // widths of the marks and the order the component drew them (graph/command.js); the DOM is never measured for them.
 
 const bandMarks = new WeakMap(); // a band slot -> the key of the marks drawn in it
-const LAYERS = ["gx-cmd", "gx-cmd-top", "gx-band"];
-const hasClass = (el, c) => !!el?.classList?.contains(c);
-const soloWorktree = (wt, id) => ({ ...wt, agents: (Array.isArray(wt?.agents) ? wt.agents : []).filter((a) => a?.id === id) });
 
 // The recorded agent ids of every mark slot in the world, {Scope id: [id, …]} (iss-00621 markIds).
 function slotIds(world) {
@@ -194,15 +190,7 @@ function slotIds(world) {
 }
 const spotsFor = (node, ids) => (V.marks[node.id] && ids[node.id] ? markSpots(node, { ...V.marks[node.id], ids: ids[node.id] }) : null);
 const summaryNow = () => (V.ctx?.orca?.status?.() === "ok" ? V.ctx.orca.summary?.() ?? null : null);
-
-function findAgent(summary, id) {
-  for (const worktree of Array.isArray(summary?.worktrees) ? summary.worktrees : []) {
-    if (!worktree || !Array.isArray(worktree.agents)) continue;
-    const agent = worktree.agents.find((a) => a?.id === id);
-    if (agent) return { agent, worktree };
-  }
-  return null;
-}
+const hasClass = (el, c) => !!el?.classList?.contains(c);
 
 // After the marks: the lines and the band from the current summary. The same inputs draw nothing again (R-08); a
 // new summary or new widths draw only these layers, never the layout.
@@ -218,16 +206,7 @@ function paintCommand() {
     const placed = pairs.length ? placeAgents(pairs, { structure: V.data, summary, layout: V.EG.layout, ix: V.ix }) : null;
     if (!placed || !placed.pairs.length) clearCommand();
     else {
-      const module = orca?.marks?.();
-      const orderOf = (wt) => {
-        try {
-          const list = typeof module?.orderAgents === "function" && Array.isArray(wt?.agents) ? module.orderAgents(wt.agents) : null;
-          return Array.isArray(list) ? list : null;
-        } catch {
-          return null; // the summary's order
-        }
-      };
-      const items = bandItems(placed.pairs, placed.places, placed.own, orderOf);
+      const items = bandItems(placed.pairs, placed.places, placed.own, CV.orderOf(orca?.marks?.()));
       const model = commandModel({ pairs: placed.pairs, places: placed.places, items, layout: V.EG.layout, spotsOf: (n) => spotsFor(n, ids), routes: V.EG.routes });
       drawCommand(model);
     }
@@ -237,94 +216,38 @@ function paintCommand() {
   paintBandMarks();
 }
 
-function removeLayers(world) {
-  for (const el of world.querySelectorAll(LAYERS.map((c) => `.${c}`).join(", "))) el.remove();
-}
-
 // No pair (F-01): no layer, no band; the world is as it was.
 function clearCommand() {
-  if (V.el) removeLayers(V.el.world);
+  if (V.el) CV.removeLayers(V.el.world);
   V.cmdModel = null;
   V.cmd = { top: 0, width: 0 };
 }
 
-function element(html) {
-  const holder = document.createElement("div");
-  holder.innerHTML = html;
-  return holder.children[0];
-}
-
-const ripple = (r) => `<g class="cr" data-agent="${esc(r.agent)}"><circle class="cr-a" cx="${r.x}" cy="${r.y}" r="7"/><circle class="cr-b" cx="${r.x}" cy="${r.y}" r="7"/></g>`;
-// A ripple centred in a band item: its parent is placed in the band (D-03).
-const inBand = (model, r) => !!model.band?.items.some((it) => r.x >= it.x && r.x <= it.x + it.w && r.y >= it.y && r.y <= it.y + it.h);
-
 function drawCommand(model) {
   const w = V.el.world;
   const L = V.EG.layout;
-  removeLayers(w);
+  CV.removeLayers(w);
   V.cmdModel = model;
   V.cmd = { top: model.top, width: model.width };
-  const size = `width="${L.width}" height="${L.height}"`;
-  const lines = model.links
-    .map((l) => `<g class="cl" data-id="${esc(l.id)}" data-parent="${esc(l.parent)}" data-child="${esc(l.child)}" data-state="${l.state}"><path class="cl-glow" d="${l.d}"/><path class="cl-line" d="${l.d}" style="--cl-len:${l.len}px"/></g>`)
-    .join("");
-  const ends =
-    model.links
-      .map((l) => `<g class="cl" data-id="${esc(l.id)}" data-state="${l.state}">${l.stubs.map((d) => `<path class="cl-stub" d="${d}" style="--cl-len:${l.len}px"/>`).join("")}<circle class="cl-dot" cx="${l.to.x}" cy="${l.to.y}" r="2.5"/></g>`)
-      .join("") +
-    model.ripples.filter((r) => !inBand(model, r)).map(ripple).join("");
-  const cmd = element(`<svg class="gx-cmd" ${size} aria-hidden="true">${lines}</svg>`);
-  const top = element(`<svg class="gx-cmd-top" ${size} aria-hidden="true">${ends}</svg>`);
+  const html = CV.layersHtml(model, { width: L.width, height: L.height });
+  const cmd = CV.element(html.cmd);
+  const top = CV.element(html.top);
   const kids = Array.from(w.children);
   // the bodies after the last frame (under the boxes), the ends after the last group (under the dependency lines)
   w.insertBefore(cmd, kids.find((c) => hasClass(c, "gx-box") || hasClass(c, "gx-clean") || hasClass(c, "gx-edges")) ?? null);
   w.insertBefore(top, kids.find((c) => hasClass(c, "gx-edges")) ?? null);
-  if (model.band) {
-    const items = model.band.items.map(
-      (it) =>
-        `<div class="gx-band-item" style="left:${it.x}px;top:${it.y}px;width:${it.w}px;height:${it.h}px"><span class="gx-band-lab" style="width:${it.labelWidth}px" title="${esc(it.label)}">${esc(it.label)}</span>` +
-        it.agents.map((a) => `<button type="button" class="gx-band-agent" data-cmd-agent="${esc(a.id)}" data-cmd-item="${esc(it.key)}" aria-pressed="false" aria-label="${esc(`${it.label}：${a.id}`)}"><span class="gx-band-slot"></span></button>`).join("") +
-        `</div>`,
-    );
-    // a band parent's ripples over its items (the items are opaque and the band lies over .gx-cmd-top)
-    const rings = model.ripples.filter((r) => inBand(model, r)).map(ripple).join("");
-    const over = rings ? `<svg class="gx-band-cr" width="1" height="1" aria-hidden="true">${rings}</svg>` : "";
-    w.appendChild(element(`<div class="gx-band">${items.join("")}${over}</div>`));
-  }
+  if (html.band) w.appendChild(CV.element(html.band));
 }
 
 // The band's marks, each drawn by the component (one agent each); a mark is drawn again only when it changes.
 function paintBandMarks() {
-  const band = V.el?.world.querySelector(".gx-band");
-  const module = V.ctx?.orca?.marks?.();
-  if (!band || !module || !V.cmdModel?.band) return;
-  const now = Date.now();
-  const at = new Map();
-  for (const it of V.cmdModel.band.items) for (const a of it.agents) at.set(`${it.key}\n${a.id}`, { it, a });
-  for (const button of band.querySelectorAll("[data-cmd-agent]")) {
-    const hit = at.get(`${button.dataset.cmdItem}\n${button.dataset.cmdAgent}`);
-    const slot = button.querySelector(".gx-band-slot");
-    if (!hit || !slot) continue;
-    const doc = soloWorktree(hit.it.worktree, hit.a.id);
-    try {
-      const built = module.buildMarks(doc, { now, max: 1 });
-      const key = JSON.stringify(built ?? null);
-      if (bandMarks.get(slot) === key) continue;
-      module.renderAgentMarks(slot, doc, { size: "sm", max: 1, now });
-      bandMarks.set(slot, key);
-      const label = built?.marks?.[0]?.label;
-      button.setAttribute("aria-label", `${hit.it.label}：${typeof label === "string" && label ? label : hit.a.id}`);
-    } catch {
-      slot.replaceChildren();
-      bandMarks.set(slot, "");
-    }
-  }
+  CV.paintBandMarks(V.el?.world.querySelector(".gx-band"), V.cmdModel, V.ctx?.orca?.marks?.(), bandMarks);
 }
 
 // A chosen agent that left the summary is chosen no more; its chat closes (R-06).
 function dropGone(summary) {
-  if (V.cmdSel && !findAgent(summary, V.cmdSel)) V.cmdSel = null;
-  if (V.agentPanel && !findAgent(summary, V.agentPanel)) {
+  if (V.cmdSel && !CV.findAgent(summary, V.cmdSel)) V.cmdSel = null;
+  if (V.agentPanel && !CV.findAgent(summary, V.agentPanel)) {
     V.agentPanel = null;
     renderPanel();
   }
@@ -332,25 +255,7 @@ function dropGone(summary) {
 
 // The chosen agent's lines stand out, the others fade; only classes change, no line is drawn again (R-06, R-08).
 function paintCmdSel() {
-  const w = V.el?.world;
-  if (!w) return;
-  const sel = V.cmdSel;
-  const links = new Map((V.cmdModel?.links || []).map((l) => [l.id, l]));
-  const parents = new Set();
-  if (sel) for (const l of links.values()) if (l.child === sel) parents.add(l.parent);
-  for (const svg of w.querySelectorAll(".gx-cmd, .gx-cmd-top, .gx-band-cr")) svg.classList.toggle("has-cmd-sel", !!sel);
-  for (const g of w.querySelectorAll(".gx-cmd .cl, .gx-cmd-top .cl")) {
-    const l = links.get(g.dataset.id);
-    const on = !!sel && !!l && (l.parent === sel || l.child === sel);
-    g.classList.toggle("is-cmd-hl", on);
-    g.classList.toggle("is-cmd-off", !!sel && !on);
-  }
-  for (const g of w.querySelectorAll(".gx-cmd-top .cr, .gx-band-cr .cr")) {
-    const on = !!sel && (g.dataset.agent === sel || parents.has(g.dataset.agent));
-    g.classList.toggle("is-cmd-hl", on);
-    g.classList.toggle("is-cmd-off", !!sel && !on);
-  }
-  for (const b of w.querySelectorAll("[data-cmd-agent]")) b.setAttribute("aria-pressed", String(!!sel && b.dataset.cmdAgent === sel));
+  CV.paintCmdSel(V.el?.world, V.cmdModel, V.cmdSel);
 }
 
 // A band agent pressed (a tap, Enter or Space): its lines and its chat in the panel; the same agent again closes them.
@@ -375,46 +280,21 @@ function closeAgentPanel() {
   renderPanel();
 }
 
-// The band agent's heading and chat (orca-web's /embed/agent, as the agents' tab frames it). A panel that already
-// shows the same agent in the same theme is left alone, so the chat is not loaded again (D-04). false: the agent is gone.
+// The band agent's heading and chat (graph/command_view.js). false: the agent is gone.
 function renderAgentPanel(panel) {
-  const id = V.agentPanel;
-  const found = findAgent(summaryNow(), id);
-  if (!found) {
+  const ok = CV.renderAgentPanel(panel, { id: V.agentPanel, summary: summaryNow(), model: V.cmdModel, orca: V.ctx.orca, hide: () => V.pn.hide() });
+  if (!ok) {
     V.agentPanel = null;
     return false;
   }
-  const theme = currentTheme();
   V.el.gx.dataset.panel = "open";
-  if (panel.dataset.cmdAgent === id && panel.dataset.theme === theme && panel.classList.contains("is-open")) return true;
-  V.pn.hide();
-  const { agent, worktree } = found;
-  const item = V.cmdModel?.band?.items.find((it) => it.agents.some((a) => a.id === id));
-  const label = item?.label ?? (typeof worktree.branch === "string" && worktree.branch ? worktree.branch : "ブランチ不明");
-  const type = typeof agent.agentType === "string" && agent.agentType ? agent.agentType : "種類不明";
-  const frame = typeof agent.detail === "string" ? agentFrame(V.ctx.orca?.origin, { detail: agent.detail, agentType: agent.agentType ?? null, branch: worktree.branch ?? null }, theme) : null;
-  panel.dataset.st = "unknown";
-  panel.dataset.cmdAgent = id;
-  panel.dataset.theme = theme;
-  panel.innerHTML =
-    `<div class="pn-grab"></div><div class="pn-head"><b><span class="gx-band-slot pn-cmd-mark"></span>${esc(type)} · ${esc(label)}</b><button type="button" class="iconbtn" data-act="close" aria-label="閉じる">${ic("x")}</button></div>` +
-    `<div class="pn-body">${frame ? `<iframe class="sd-agent" src="${esc(frame.src)}" sandbox="${AGENT_SANDBOX}" referrerpolicy="no-referrer" title="${esc(frame.title)}"></iframe>` : `<p class="pn-cmd-none">チャットを開けません。</p>`}</div>`;
-  const slot = panel.querySelector(".pn-cmd-mark");
-  const module = V.ctx.orca?.marks?.();
-  try {
-    if (slot && module) module.renderAgentMarks(slot, soloWorktree(worktree, id), { size: "sm", max: 1, now: Date.now() });
-  } catch {
-    slot?.replaceChildren();
-  }
-  panel.classList.add("is-open");
-  panel.setAttribute("aria-hidden", "false");
   return true;
 }
 
 /**
  * The command lines' check on the page (iss-00616 D-02, D-04): commandModel's audit, the largest distance (px) between a
  * drawn mark and markSpots (and a band button's middle and its slot's), the marks whose position is not known, the
- * world's layers in order and the layers' pointer-events.
+ * world's layers in order, the layers' pointer-events and the headings' check (iss-00617 heads).
  */
 export function cmdAudit() {
   if (!V.EG || !V.el) return null;
@@ -470,6 +350,7 @@ export function cmdAudit() {
     layers: Array.from(w.children).map((c) => c.getAttribute("class")),
     pointer: [...w.querySelectorAll(".gx-cmd, .gx-cmd-top")].map((s) => getComputedStyle(s).pointerEvents),
     band: BAND,
+    heads: CV.headsAudit(w), // iss-00617 D-05: the headings over the lines
   };
 }
 
@@ -786,11 +667,7 @@ function renderPanel() {
   const panel = V.el?.panel;
   if (!panel) return;
   if (V.agentPanel && renderAgentPanel(panel)) return;
-  if (panel.dataset.cmdAgent) {
-    panel.innerHTML = ""; // the band agent's chat closes with its panel
-    delete panel.dataset.cmdAgent;
-    delete panel.dataset.theme;
-  }
+  CV.clearAgentPanel(panel); // the band agent's chat closes with its panel
   if (V.cleanup) {
     V.pn.hide();
     const list = V.cleanup;
