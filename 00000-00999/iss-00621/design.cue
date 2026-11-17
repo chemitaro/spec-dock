@@ -28,6 +28,7 @@ design: {
 			  部品の `renderAgentMarks` は中で同じ引数（`now`・`max`）で `buildMarks` を呼び、その `marks` の順に `.orca-mark` を描き、最後に『+N』（`.orca-mark--more`）を足すので、記録の i 番目と、置き場の中の i 番目の `.orca-mark:not(.orca-mark--more)` が同じエージェントになる。
 			- `export function markAgentAt(slot, target)`：`const mark = target?.closest?.(".orca-mark")`。`mark` がない、`slot` の中でない（`slot.contains(mark)` が偽）、`mark.classList.contains("orca-mark--more")`、のどれかなら null。
 			  `mark.getAttribute("data-agent-id")` が空でない文字列ならそれ。なければ `const marks = [...slot.querySelectorAll(".orca-mark:not(.orca-mark--more)")]`、`const ids = shown.get(slot)`。`ids` がない、`ids.length !== marks.length`、`marks.indexOf(mark) < 0` なら null。そうでなければ `ids[i]`（null もそのまま返す）（F-01）。
+			- `export function markIds(slot)`：記録の写し（配列の複製）か null を返す。iss-00616 の印の位置（Epic の D-02 の `marks` の `ids`、D-10 の `markSpots`）は、graph.js の測り（`{Scope id: {items, gap}}`）に、この関数で置き場ごとの `ids` を足して使う（測りへの足しは iss-00616 が行う。この Issue は口だけを作る）。
 			- SpecDock の側に並べ替えのコードを置かない（R-03）。`marksKey` と置き場の HTML（`orcaSlot`）は今のまま。
 			"""
 		satisfies: ["R-03", "R-04", "F-01", "F-02"]
@@ -81,14 +82,14 @@ design: {
 		text: """
 			- node のテスト：`markAgentAt` と記録（`tests/unit/infra/test_dashboard_orca_marks_js.py` の偽の DOM）、`openAgent`（`tests/unit/infra/test_dashboard_orca_views_js.py` の `run_panel`）、`frameHtml`・`boxHtml` と `card` の HTML（同じファイルか近いもの）、画面の押しの静的な検査。
 			- 実機（Epic の D-07）：隔離した venv に、この branch の wheel を入れ、一時の状態の置き場（この PC の状態の置き場の写し）で `dashboard serve` を別のポートに `--tailscale` で立てる。orca-web は手元のもの（iss-00043 の後の部品）を読む（その設定は変えない）。
-			  統括が用意する試しの送り先（作業中の Epic の worktree に2人以上のエージェント）で、枠の見出しの worktree の印と稼働の印、2つ目の印を押したときのチャット、ボードの札の専用の行、横の欄の見出しと『横断の構造』の押しを、1440・390 × 明・暗で写し、edgeAudit の違反0、ブラウザーのエラー0を数える。エージェントには何も送らない。
+			  統括が用意する試しの送り先（作業中の Epic の worktree に2人以上のエージェント。置けるなら指揮の親子の組を含む）で、枠の見出しの worktree の印と稼働の印、2つ目の印を押したときのチャット、ボードの札の専用の行、横の欄の見出しと『横断の構造』の押しを、1440・390 × 明・暗で写し、edgeAudit の違反0、ブラウザーのエラー0を数える。エージェントには何も送らない。
 			- headless Chrome は `--disable-features=MacAppCodeSignClone` で起動し、CDP の `Browser.close` で閉じる。写しと道具は Issue の `.workbench/` に置く。
 			"""
 		satisfies: ["R-01", "R-02", "R-03", "R-05"]
 	}
 }
 
-compatibility: "API・保存・モデルは変わらない。置き場の HTML（`orcaSlot`）、`marksKey`、`preferTab` は今のまま。iss-00616 は D-01 の記録と `openAgent` を使う（Epic の D-09・D-10）。"
+compatibility: "API・保存・モデルは変わらない。置き場の HTML（`orcaSlot`）、`marksKey`、`preferTab` は今のまま。iss-00616 は D-01 の `markIds`（置き場ごとの ids）と `markAgentAt`、D-02 の `openAgent` を使う（Epic の D-02・D-09・D-10）。"
 
 risks: [
 	"orca-web の部品が `.orca-mark` の描く順を `buildMarks` の順から変えると、`data-agent-id` のない印で取り違える。今の部品は `data-agent-id` を出す（iss-00043）ので、その値を先に使い、記録は古い部品のための予備にする",

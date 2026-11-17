@@ -75,6 +75,7 @@ requirements: {
 		acceptance: [
 			"`paintOrcaMarks` が記録する並びが、部品の `buildMarks` の `marks[].id` の順と同じ（node のテスト。SpecDock の側に並べ替えのコードがない）",
 			"実データで、同じ worktree に2人以上のエージェントがいる箱・枠の印の並びが、その worktree の要約の `buildMarks` の並びと同じで、押した印のエージェントが選ばれる（実機、report.md）",
+			"実データで、同じ worktree の指揮の親子（統括が用意する試しの送り先に、親子の組を置けるとき）が、関係のないエージェントの右に、上流 → 下流の順で並ぶ（Epic R-14 の受入3）。親子の組を置けないときは、そのことと理由を report.md に書き、統括の最後の確かめ（Epic の verification）に回す",
 		]
 	}
 	"R-04": {
@@ -100,7 +101,7 @@ requirements: {
 			"`card(scope, ctx, {orca: true})` の HTML で、稼働の印の置き場（`orcaSlot(id, 4)`）が `.sd-card__meta` の中になく、その後の専用の行の要素の中にある（node のテスト）",
 			"`card(scope, ctx)`（orca なし）の HTML が今と同じ（node のテスト）",
 			"CSS で、専用の行は中に `.orca-mark` がなければ `display: none`。ほかの印がなく稼働の印だけの札で、ほかの印の行が出ない（静的な検査と実機）",
-			"エージェントのいない札（対応する worktree がない、エージェントが0、要約が読めない）の高さが、今と同じ（実機）",
+			"エージェントのいない札の高さ：対応する worktree がない、要約が読めない札は今と同じ。worktree があってエージェントが0人の札は、今は空の `.orca-marks` で隠れない高さ0の meta の行（margin-top と札の gap）の分だけ高いが、専用の行が隠れるので、その分だけ低くなり、同じ形の、worktree のない札と同じ高さになる（Epic R-15 の『高さを取らない』。実機）",
 			"1440・390 × 明・暗の写しで、札の印が札の縁の内にある（実機）",
 		]
 	}
