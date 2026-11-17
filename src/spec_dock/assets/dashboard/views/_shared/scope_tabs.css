@@ -34,7 +34,7 @@
     & .sd-progress ul { grid-template-columns: 1fr; }
   }
 }
-/* 文書と説明資料のタブ（iss-00589 D-02〜D-04）：誤りの帯（誤りがあるときだけ）と、1行の帯の下に残りの高さを使う枠。
+/* 文書と説明資料のタブ（iss-00589 D-02〜D-04）：誤りの帯（誤りがあるときだけ）と、枠（文書は1行の選びの帯の下）。残りの高さを使う。
    枠の高さはここでは決めない（欄は panel.css、詳しい画面は scope.css）。 */
 :is([data-view="scope"], .sd-pn) {
   & .sd-framebox { display: flex; flex-direction: column; gap: 2px; min-height: 0; }
@@ -45,9 +45,9 @@
   & .sd-seg > a:hover { color: var(--ds-text); background: var(--ds-surface-2); }
   & .sd-seg > [aria-current="true"] { background: var(--ds-accent-soft); color: var(--ds-accent-strong); }
   & .sd-seg > [aria-disabled="true"] { color: var(--ds-faint); cursor: default; }
-  & .sd-framebar__name { display: inline-flex; align-items: center; gap: 4px; min-width: 0; font-size: 12.5px; font-weight: 650; color: var(--ds-muted); white-space: nowrap; }
-  & .sd-framebar__open { flex: none; display: grid; place-items: center; width: 24px; height: 24px; margin-left: auto; border-radius: 6px; color: var(--ds-muted); font-size: 15px; }
-  & .sd-framebar__open:hover { color: var(--ds-text); background: var(--ds-surface-2); }
+  /* 枠を新しいタブで開く印は、タブの行に1つ（iss-00656 D-03） */
+  & .sd-tabopen { flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; color: var(--ds-muted); font-size: 15px; }
+  & .sd-tabopen:hover { color: var(--ds-text); background: var(--ds-surface-2); }
   & :is(.sd-docframe, .sd-explain, .sd-agent) { display: block; width: 100%; border: 1px solid var(--ds-border); border-radius: var(--ds-radius-l); background: var(--ds-bg); }
   & .sd-checkbar { flex: none; border-radius: var(--ds-radius); background: var(--ds-danger-bg); color: var(--ds-text); font-size: 12.5px; }
   & .sd-checkbar > summary { display: block; height: 28px; padding: 0 8px; line-height: 28px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }

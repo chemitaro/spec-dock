@@ -30,3 +30,21 @@ export function settleSheet({height, velocity, heights}) {
 export function nextOnTap(snap) {
   return snap === "full" ? "half" : "full";
 }
+
+// Header band contents: only reasons that add to the state name, idle time, and merge state (iss-00656 D-01).
+const PLAIN_REASONS = new Set(["closed", "in_progress", "no_waits"]);
+const MERGE_WORDS = {needs_fix: "マージ待ち・直す必要あり", mergeable: "マージ待ち・マージできる"};
+
+export function headerBand(scope, {idle = "", label = ""} = {}) {
+  const text = String(scope?.reason?.text ?? "").trim();
+  const plain = !text || text === label || PLAIN_REASONS.has(scope?.reason?.code);
+  const merge = Object.hasOwn(MERGE_WORDS, scope?.merge) ? scope.merge : null;
+  const reason = plain ? (merge ? MERGE_WORDS[merge] : "") : text;
+  if (!reason && !idle && !merge) return null;
+  return {reason, idle, merge};
+}
+
+// The heading's first row does not fit once its crumb is cut by more than a rounding pixel (iss-00656 D-07).
+export function headOverflows({scrollWidth, clientWidth}) {
+  return scrollWidth > clientWidth + 1;
+}

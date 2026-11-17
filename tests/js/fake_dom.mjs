@@ -223,6 +223,9 @@ export class Element {
   get clientWidth() {
     return this.size()?.width ?? 1200;
   }
+  get scrollWidth() {
+    return this.size()?.scrollWidth ?? this.clientWidth;
+  }
   get clientHeight() {
     return this.size()?.height ?? 800;
   }

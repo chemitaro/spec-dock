@@ -6,7 +6,7 @@
 import { ancestors, pullRequestNotice, withParam } from "./_shared/logic.js";
 import { assuranceMark, changeBadge, emptyState, esc, humanCount, humanMark, icon, kindLabel, legend, mergeBadge, newTabLink, prMark, stateChip } from "./_shared/parts.js";
 import { pickTab } from "./_shared/panel_logic.js";
-import { idleBadge, pageEnv, visibleTabs } from "./_shared/scope_tabs.js";
+import { idleBadge, pageEnv, tabOpenLink, visibleTabs } from "./_shared/scope_tabs.js";
 import { paintAgentList } from "./_shared/agents_tab.js";
 import { repositoryPath } from "../core/route.js";
 
@@ -64,7 +64,8 @@ function render(root, ctx) {
   const shown = visibleTabs(env);
   const tab = pickTab(ctx.route.params.get("tab"), shown.map((item) => item.key), doc.details);
   // The contents first: a choice the tab keeps by itself (keep) replaces the query, and every link below uses it.
-  const body = shown.find((item) => item.key === tab).render(env);
+  const current = shown.find((item) => item.key === tab);
+  const body = current.render(env);
   const path = ctx.route.path;
   const chain = ancestors(byId, scope);
   const pathHtml = chain.length
@@ -102,7 +103,9 @@ function render(root, ctx) {
     `<dt>PR</dt><dd>${prHtml}</dd>` +
     (branches.length ? `<dt>ブランチ</dt><dd>${branches.map((branch) => `<span class="sd-mono">${esc(branch)}</span>`).join(" ")}</dd>` : "") +
     `</dl></div></header>`;
-  const row = `<nav class="sd-tabs" role="tablist" aria-label="詳しい画面のタブ">${tabs}</nav>${legend()}`;
+  // The shown frame's new-tab link right after the tabs; the legend stays at the row's end (iss-00656 D-03).
+  const opener = current.open ? tabOpenLink(current.open(env)) : "";
+  const row = `<nav class="sd-tabs" role="tablist" aria-label="詳しい画面のタブ">${tabs}</nav>${opener}${legend()}`;
   let page = root.querySelector(".sd-page");
   if (!page || page.dataset.scope !== scope.id || !page.querySelector(".sd-tabpanel")) {
     // Another Scope, the first drawing or after a notice: everything anew, so no frame of another Scope stays (F-03).

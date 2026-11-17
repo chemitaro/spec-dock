@@ -5,11 +5,11 @@
 // It shows only the tabs that say so (visibleTabs), paints the agents strip after the contents, and redraws itself
 // on each orca-web summary (iss-00593 D-04).
 import { ancestors, withoutEmbed, withParam } from "./logic.js";
-import { esc, icon, idleText, kindLabel, mergeBadge, orcaSlot, stateChip, stateMark } from "./parts.js";
+import { esc, icon, idleText, kindLabel, orcaSlot, stateChip, STATES } from "./parts.js";
 import { themeOf } from "./orca_logic.js";
 import { createOpenButton, markAgentAt, paintOrcaMarks } from "./orca_marks.js";
-import { nextOnTap, pickTab, settleSheet, sheetHeights } from "./panel_logic.js";
-import { panelEnv, SCOPE_TABS, TAB_KEYS, visibleTabs } from "./scope_tabs.js";
+import { headerBand, headOverflows, nextOnTap, pickTab, settleSheet, sheetHeights } from "./panel_logic.js";
+import { panelEnv, SCOPE_TABS, TAB_KEYS, tabOpenLink, visibleTabs } from "./scope_tabs.js";
 import { mem, paintAgentList } from "./agents_tab.js";
 import { footChoice, forgetGone, memoryFor } from "./agents_logic.js";
 
@@ -43,9 +43,13 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
   let skipClick = false; // the click that ends a drag is not a tap
   let shownHl = null; // the heading row's chips and the cover, written only when their HTML changes (iss-00592 R-02)
   let shownCover = null;
+  let shownCrumb = null; // the crumb (ancestors and the Scope's ID), the same way (iss-00656 D-02)
   let openButton = null; // orca-web's "open in Orca" in the heading row (D-04)
   let followed = null; // the ctx.orca whose summaries redraw the panel
   let unfollow = null;
+  // The first row measures again when its width changes after a drawing: orca-web's button and marks arrive late
+  // (iss-00656 D-07, the spec review's P2).
+  const headWatch = typeof ResizeObserver === "function" ? new ResizeObserver(() => fitHead()) : null;
 
   function follow(orca) {
     if (orca === followed) return;
@@ -69,36 +73,58 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
   function build() {
     aside.innerHTML =
       SHEET_GRAB +
-      `<div class="pn-top"></div><div class="pn-tabs" role="tablist" aria-label="欄のタブ"></div>` +
+      `<div class="pn-top"></div><div class="pn-tabrow"><div class="pn-tabs" role="tablist" aria-label="欄のタブ"></div><span class="pn-tabopen"></span></div>` +
       `<div class="pn-body" role="tabpanel"></div><div class="pn-foot"></div>`;
     const q = (sel) => aside.querySelector(sel);
     const top = q(".pn-top");
     top.innerHTML =
-      `<div class="pn-head"><span class="pn-hl"></span><span class="pn-orca"></span>` +
+      `<div class="pn-head"><span class="pn-crumb"></span><span class="pn-hl"></span><span class="pn-orca"></span>` +
       `<button type="button" class="iconbtn pn-close" data-pn-act="close" aria-label="閉じる">${icon("x")}</button></div><div class="pn-cover"></div>`;
-    parts = { top, hl: q(".pn-hl"), orca: q(".pn-orca"), cover: q(".pn-cover"), tabs: q(".pn-tabs"), body: q(".pn-body"), foot: q(".pn-foot") };
+    parts = {
+      top, head: q(".pn-head"), crumb: q(".pn-crumb"), hl: q(".pn-hl"), orca: q(".pn-orca"), cover: q(".pn-cover"),
+      tabs: q(".pn-tabs"), tabopen: q(".pn-tabopen"), body: q(".pn-body"), foot: q(".pn-foot"),
+    };
     shownHtml = null;
     shownKey = null;
     shownHl = null;
     shownCover = null;
+    shownCrumb = null;
+    headWatch?.disconnect();
+    for (const element of [parts.head, parts.crumb]) if (element) headWatch?.observe(element);
     openButton = createOpenButton(parts.orca, { doc: document }); // a new slot forgets the last button (D-04)
   }
 
-  // The heading row's chips (and the mark slot), and the cover below it.
+  // The heading (iss-00656 D-02): the first row's crumb (the ancestors, then the Scope's ID, number and kind, the only
+  // place the ID shows) and chips, then the title and a band only when it adds to the state (headerBand).
   function header(scope, byId) {
     const chain = ancestors(byId, scope);
-    const pathHtml = chain.length
-      ? `<nav class="pn-path" aria-label="親の道筋">${chain.map((item) => `<button type="button" data-pn-goto="${esc(item.id)}" title="${esc(item.title)}">${esc(item.id)}</button>${icon("chevronRight")}`).join("")}<span>${esc(scope.id)}</span></nav>`
-      : `<p class="pn-path">${icon("layers")}最上位</p>`;
-    const idle = idleText(scope, byId);
+    const lead = chain.length
+      ? chain.map((item) => `<button type="button" data-pn-goto="${esc(item.id)}" title="${esc(`${item.id} ${item.title ?? ""}`)}">${esc(item.id)}</button>${icon("chevronRight")}`).join("")
+      : `<span class="pn-top-mark" role="img" aria-label="最上位" title="最上位">${icon("layers")}</span>`;
+    const self = `<span class="pn-self"><span class="ds-docid">${esc(scope.id)}</span><span class="pn-kind">#${esc(scope.number)}・${esc(kindLabel(scope.kind))}</span></span>`;
+    const band = headerBand(scope, { idle: idleText(scope, byId), label: STATES[scope.state]?.label });
+    const why = band
+      ? `<p class="pn-why" data-st="${esc(scope.state)}"${band.merge ? ` data-merge="${band.merge}"` : ""} title="${esc([band.reason, band.idle].filter(Boolean).join("・"))}">` +
+        (band.merge ? `<span class="pn-merge-mark">${icon(band.merge === "needs_fix" ? "zap" : "check")}</span>` : "") +
+        (band.reason ? `<span class="pn-reason">${esc(band.reason)}</span>` : "") +
+        (band.idle ? `<span class="pn-idle">${icon("clock")}${esc(band.idle)}</span>` : "") +
+        `</p>`
+      : "";
     return {
-      hl: `${stateChip(scope, byId, { motion: true })}<span class="pn-merge">${mergeBadge(scope)}</span>${orcaSlot(scope.id, 4)}`,
-      cover:
-        `<p class="pn-kicker"><span class="ds-docid">${esc(scope.id)}</span><span class="pn-kind">#${esc(scope.number)}・${esc(kindLabel(scope.kind))}</span></p><h2 class="pn-title">${esc(scope.title)}</h2>` +
-      `<p class="pn-why" data-st="${esc(scope.state)}">${stateMark(scope, byId, { motion: true, label: false })}<span>${esc(scope.reason?.text ?? "")}</span></p>` +
-        (idle ? `<p class="pn-idle">${icon("clock")}${esc(idle)}</p>` : "") +
-        pathHtml,
+      crumb: `<nav class="pn-path" aria-label="親の道筋">${lead}${self}</nav>`,
+      hl: `${stateChip(scope, byId, { motion: true })}${orcaSlot(scope.id, 4)}`,
+      cover: `<h2 class="pn-title" title="${esc(scope.title)}">${esc(scope.title)}</h2>${why}`,
     };
+  }
+
+  // Send the crumb to a row of its own only when the first row does not fit once its ancestors and kind are cut
+  // (iss-00656 D-07). Measured after drawing, as CSS wrapping breaks in DOM order before anything shrinks. The full
+  // phone sheet keeps one row. Another drawing's heading has no crumb and is left alone.
+  function fitHead() {
+    if (!parts?.crumb || !parts.head || !aside.contains(parts.crumb)) return;
+    parts.head.classList.remove("is-stacked");
+    if (aside.dataset.snap === "full") return;
+    if (headOverflows(parts.crumb)) parts.head.classList.add("is-stacked");
   }
 
   // orca-web's marks and button for the shown Scope: after each drawing, on the reader's news and on a theme change.
@@ -107,6 +133,7 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
     const { ctx, scope } = current;
     paintOrcaMarks(parts.top, ctx, ctx.data);
     openButton.update({ orca: ctx.orca, structure: ctx.data, scopeId: scope.id, embed: ctx.embed, theme: themeOf(document, (query) => matchMedia(query)) });
+    fitHead(); // the marks and the button change the first row's width
   }
 
   // F-01: the header comes from the structure; the contents say the detail could not be read.
@@ -140,6 +167,10 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
     }
     aside.dataset.st = scope.state;
     const head = header(scope, byId);
+    if (head.crumb !== shownCrumb) {
+      parts.crumb.innerHTML = head.crumb;
+      shownCrumb = head.crumb;
+    }
     if (head.hl !== shownHl) {
       parts.hl.innerHTML = head.hl;
       shownHl = head.hl;
@@ -152,6 +183,9 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
       const n = env ? count(env) : null;
       return `<button type="button" role="tab" data-pn-tab="${key}" aria-selected="${tab === key}">${label}${n != null ? `<small>${n}</small>` : ""}</button>`;
     }).join(""));
+    // The link that opens the shown frame in a new tab (iss-00656 D-03); none while loading or for another tab (F-02).
+    const row = env ? SCOPE_TABS.find((item) => item.key === tab) : null;
+    put(parts.tabopen, row?.open ? tabOpenLink(row.open(env)) : "");
     const html = body(docState, env, tab);
     const key = `${scope.id}|${tab}`;
     if (parts.body.dataset.dropped) {
@@ -219,6 +253,7 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
     }
     snap = settled;
     applySnap();
+    fitHead(); // the full sheet keeps one row; the others measure again (the spec review's P2)
   }
 
   aside.addEventListener("pointerdown", (event) => {
@@ -250,9 +285,12 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
     drag = null;
     aside.classList.remove("is-dragging");
     applySnap();
+    fitHead();
   });
   const onResize = () => {
-    if (isShown()) applySnap();
+    if (!isShown()) return;
+    applySnap();
+    fitHead();
   };
   window.addEventListener("resize", onResize);
   // The button follows the page's light and dark (D-04): the system's choice and the shell's data-theme.
@@ -268,6 +306,7 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
       if (!skipClick && isShown() && isSheet()) {
         snap = nextOnTap(snap); // a tap (or Enter) switches between half and full, whatever the aside shows
         applySnap();
+        fitHead();
       }
       return;
     }
@@ -331,6 +370,7 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
   return {
     element: aside,
     show(state) {
+      if (!isShown()) snap = "half"; // a closed aside opens at the usual height (iss-00656 D-08)
       if (current?.scope?.id !== state.scope.id) {
         params = new Map();
         if (snap === "peek") snap = "half"; // another Scope keeps the height, but not the smallest one
@@ -339,13 +379,18 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
       draw();
     },
     hide() {
+      // Another drawing open in the aside (the cleanup list, the band agent's chat) calls hide() before each of its
+      // redraws: it keeps the height the person chose (iss-00656 D-08). Otherwise the next opening starts at half.
+      const keep = current == null && isShown();
       current = null;
       follow(null);
       params = new Map();
-      snap = "half"; // the next opening starts at the usual height
-      // A sheet's height stays on the aside: another drawing that takes it next opens at the usual height too
-      // (iss-00650 D-03). An aside that never was a sheet keeps the CSS's own height.
-      if (aside.dataset.snap) applySnap();
+      if (!keep) {
+        snap = "half";
+        // A sheet's height stays on the aside: another drawing that takes it next opens at the usual height too
+        // (iss-00650 D-03). An aside that never was a sheet keeps the CSS's own height.
+        if (aside.dataset.snap) applySnap();
+      }
       drag = null;
       aside.classList.remove("is-open", "is-dragging");
       aside.setAttribute("aria-hidden", "true");
@@ -358,6 +403,7 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
     snap: () => (isSheet() ? snap : null),
     destroy() {
       follow(null);
+      headWatch?.disconnect();
       window.removeEventListener("resize", onResize);
       media?.removeEventListener("change", onTheme);
       themeWatch?.disconnect();

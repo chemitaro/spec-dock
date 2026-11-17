@@ -315,7 +315,7 @@ def test_slot_styles_stay_shared_and_leave_the_marks_to_orca_web() -> None:
 # --- T-04: the panel's heading ------------------------------------------------------------------------------
 
 PANEL_DOM = """
-const PARTS = [".pn-grab", ".pn-top", ".pn-tabs", ".pn-body", ".pn-foot", ".pn-hl", ".pn-orca", ".pn-cover"];
+const PARTS = [".pn-grab", ".pn-top", ".pn-tabs", ".pn-tabopen", ".pn-body", ".pn-foot", ".pn-crumb", ".pn-hl", ".pn-orca", ".pn-cover"];
 class El {
   constructor(name) {this.name = name; this.dataset = {}; this.children = []; this.writes = 0; this.html = ""; this.scrollTop = 0;}
   set innerHTML(value) {this.html = value; this.writes++;}
@@ -344,7 +344,7 @@ globalThis.document = {
   createElement(tag) {return {tag, dataset: {}};},
 };
 const aside = {
-  classList: {add() {}, remove() {}},
+  classList: {add() {}, remove() {}, contains() {return false;}},
   dataset: {}, style: {setProperty() {}, removeProperty() {}},
   setAttribute() {}, addEventListener(type, fn) {if (type === "click") this.click = fn;},
   closest() {return null;},
@@ -380,7 +380,7 @@ def test_the_heading_row_is_built_once_and_redrawn_only_when_it_changes(tmp_path
         pn.show(stateOf({orca: reader()}));
         out.top = part(".pn-top").innerHTML;
         out.hl = part(".pn-hl").innerHTML;
-        const writes = () => [part(".pn-top").writes, part(".pn-hl").writes, part(".pn-cover").writes];
+        const writes = () => [part(".pn-top").writes, part(".pn-crumb").writes, part(".pn-hl").writes, part(".pn-cover").writes];
         out.first = writes();
         pn.show(stateOf({orca: reader()}));
         out.second = writes();
@@ -391,13 +391,17 @@ def test_the_heading_row_is_built_once_and_redrawn_only_when_it_changes(tmp_path
         tmp_path,
     )
     top = out["top"]
-    assert top.startswith('<div class="pn-head"><span class="pn-hl"></span><span class="pn-orca"></span>')
+    # iss-00656 D-02: the crumb (ancestors and the Scope's ID) leads the first row
+    assert top.startswith(
+        '<div class="pn-head"><span class="pn-crumb"></span><span class="pn-hl"></span><span class="pn-orca"></span>'
+    )
     assert '<button type="button" class="iconbtn pn-close" data-pn-act="close" aria-label="閉じる">' in top
     assert top.endswith('</button></div><div class="pn-cover"></div>')
-    assert "pn-merge" in out["hl"] and 'data-orca-scope="iss-00007" data-orca-max="4"' in out["hl"]
-    assert out["first"] == [1, 1, 1]
-    assert out["second"] == [1, 1, 1]
-    assert out["third"] == [1, 1, 2]
+    # iss-00656 R-04: the merge chip folds into the band
+    assert "pn-merge" not in out["hl"] and 'data-orca-scope="iss-00007" data-orca-max="4"' in out["hl"]
+    assert out["first"] == [1, 1, 1, 1]
+    assert out["second"] == [1, 1, 1, 1]
+    assert out["third"] == [1, 1, 1, 2]
     assert out["built"] == 1
 
 
