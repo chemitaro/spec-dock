@@ -5,10 +5,10 @@ package spec
 goal: "指揮の線の点と波紋を合成スレッドだけで動かし、線ごとの小さな SVG に分け、図を動かす間・画面の外・裏で止めて、同じ台本の TaskDuration を今の5分の1以下にする"
 
 steps: {
-	"S-01": {title: "T-01 を tests/js/dashboard_graph_command_motion.mjs（新）・tests/unit/presentation/test_dashboard_graph_command_motion.py（新）に先に書いて落ちることを確かめ、D-01（新しい views/graph/command_motion.js の MOTION・boxOf・phaseDelay・phaseOffset・svgOpen・bodyHtml・endsHtml・rippleHtml）を入れて通す。今のファイルは変えない", realizes: ["R-01", "R-02", "R-05"], status: "todo", session: "impl-sol"}
-	"S-02": {title: "T-02・T-03 を先に書いて（今の iss-00616・iss-00617 の CSS と画面のテストのうち、層の中の HTML と点・波紋の CSS を固定している期待を、この設計に合わせて直すことを含む）落ちることを確かめ、D-02（layersHtml）、D-03（createMotion）、D-04（graph.js・allgraph.js のつなぎと specdockCmdAudit の motion）、D-05（graph.css）を入れて通す", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "F-01", "F-02"], status: "todo", after: ["S-01"], session: "impl-claude"}
-	"S-03": {title: "make lint と全体の uv run pytest を通す（直したテストの期待が、層の中の HTML と点・波紋の CSS の変更だけによることを確かめる。static-inventory.json に載る資産の sha256 が変われば直す）", realizes: ["R-02", "R-05"], status: "todo", after: ["S-02"], session: "impl-claude"}
-	"S-04": {title: "D-06 の測りと実機の確かめ（T-04）を report.md に残し、本人が見る試しの URL（tailnet）を立てたままにする。受入の数に届かないか、写しで見た目の違いがあれば、実装担当に返す", realizes: ["R-01", "R-02", "R-03", "R-05"], status: "todo", after: ["S-03"], session: "owner"}
+	"S-01": {title: "T-01 を tests/js/dashboard_graph_command_motion.mjs（新）・tests/unit/presentation/test_dashboard_graph_command_motion.py（新）に先に書いて落ちることを確かめ、D-01（新しい views/graph/command_motion.js の MOTION・boxOf・phaseDelay・phaseOffset・svgOpen・bodyHtml・endsHtml・rippleHtml）を入れて通す。今のファイルは変えない", realizes: ["R-01", "R-02", "R-05"], status: "done", session: "impl-sol"}
+	"S-02": {title: "T-02・T-03 を先に書いて（今の iss-00616・iss-00617 の CSS と画面のテストのうち、層の中の HTML と点・波紋の CSS を固定している期待を、この設計に合わせて直すことを含む）落ちることを確かめ、D-02（layersHtml）、D-03（createMotion）、D-04（graph.js・allgraph.js のつなぎと specdockCmdAudit の motion）、D-05（graph.css）を入れて通す", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "F-01", "F-02"], status: "done", after: ["S-01"], session: "impl-claude"}
+	"S-03": {title: "make lint と全体の uv run pytest を通す（直したテストの期待が、層の中の HTML と点・波紋の CSS の変更だけによることを確かめる。static-inventory.json に載る資産の sha256 が変われば直す）", realizes: ["R-02", "R-05"], status: "done", after: ["S-02"], session: "impl-claude"}
+	"S-04": {title: "D-06 の測りと実機の確かめ（T-04）を report.md に残し、本人が見る試しの URL（tailnet）を立てたままにする。受入の数に届かないか、写しで見た目の違いがあれば、実装担当に返す", realizes: ["R-01", "R-02", "R-03", "R-05"], status: "done", after: ["S-03"], session: "owner"}
 }
 
 tests: {
