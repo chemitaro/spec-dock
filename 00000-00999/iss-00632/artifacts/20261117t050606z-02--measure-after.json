@@ -1,0 +1,902 @@
+[
+ {
+  "width": 1440,
+  "scheme": "light",
+  "range": "next",
+  "first": {
+   "s": 0.590381,
+   "tx": 8,
+   "ty": 112,
+   "barBottom": 104,
+   "tyBelowBar": true
+  },
+  "total": {
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "missing": 0,
+   "markOverflow": 0,
+   "edges": 39
+  },
+  "sum": [
+   {
+    "kind": "stale",
+    "level": "warning",
+    "text": "構造が更新されていません：company-os（7時間）、generic-mona（7時間）、housing-lifecycle（7時間）、input-devices（7時間）、orca-web（7時間）、spec-dock（7時間）、taikyohiyou_project（7時間）、tenting-cradle（7時間）、yubisaki（7時間）次の1手：spec-dock canonical status"
+   },
+   {
+    "kind": "pr-unknown",
+    "level": "info",
+    "text": "PR の状態が分かりません：company-os、generic-mona、housing-lifecycle、input-devices、orca-web、spec-dock、taikyohiyou_project、tenting-cradle、yubisaki"
+   }
+  ],
+  "warns": [],
+  "compact": 6,
+  "overflow": [],
+  "marks": 6,
+  "frames": 9,
+  "pointer": {
+   "onRow": true,
+   "gapReachesView": true,
+   "rowRight": 791
+  },
+  "toolsTop": 68,
+  "nextTop": 68,
+  "errors": []
+ },
+ {
+  "width": 1440,
+  "scheme": "light",
+  "range": "now",
+  "first": {
+   "s": 0.514079,
+   "tx": 8,
+   "ty": 112,
+   "barBottom": 104,
+   "tyBelowBar": true
+  },
+  "total": {
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "missing": 0,
+   "markOverflow": 0,
+   "edges": 187
+  },
+  "sum": [
+   {
+    "kind": "stale",
+    "level": "warning",
+    "text": "構造が更新されていません：company-os（7時間）、generic-mona（7時間）、housing-lifecycle（7時間）、input-devices（7時間）、orca-web（7時間）、spec-dock（7時間）、taikyohiyou_project（7時間）、tenting-cradle（7時間）、yubisaki（7時間）次の1手：spec-dock canonical status"
+   },
+   {
+    "kind": "pr-unknown",
+    "level": "info",
+    "text": "PR の状態が分かりません：company-os、generic-mona、housing-lifecycle、input-devices、orca-web、spec-dock、taikyohiyou_project、tenting-cradle、yubisaki"
+   }
+  ],
+  "warns": [],
+  "compact": 42,
+  "overflow": [],
+  "marks": 34,
+  "frames": 9,
+  "pointer": {
+   "onRow": true,
+   "gapReachesView": true,
+   "rowRight": 791
+  },
+  "toolsTop": 68,
+  "nextTop": 68,
+  "errors": []
+ },
+ {
+  "width": 1440,
+  "scheme": "light",
+  "range": "all",
+  "first": {
+   "s": 0.10531,
+   "tx": 8,
+   "ty": 112,
+   "barBottom": 104,
+   "tyBelowBar": true
+  },
+  "total": {
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "missing": 0,
+   "markOverflow": 0,
+   "edges": 780
+  },
+  "sum": [
+   {
+    "kind": "stale",
+    "level": "warning",
+    "text": "構造が更新されていません：company-os（7時間）、generic-mona（7時間）、housing-lifecycle（7時間）、input-devices（7時間）、orca-web（7時間）、spec-dock（7時間）、taikyohiyou_project（7時間）、tenting-cradle（7時間）、yubisaki（7時間）次の1手：spec-dock canonical status"
+   },
+   {
+    "kind": "pr-unknown",
+    "level": "info",
+    "text": "PR の状態が分かりません：company-os、generic-mona、housing-lifecycle、input-devices、orca-web、spec-dock、taikyohiyou_project、tenting-cradle、yubisaki"
+   }
+  ],
+  "warns": [],
+  "compact": 12,
+  "overflow": [],
+  "marks": 38,
+  "frames": 9,
+  "pointer": {
+   "onRow": true,
+   "gapReachesView": true,
+   "rowRight": 791
+  },
+  "toolsTop": 68,
+  "nextTop": 68,
+  "errors": []
+ },
+ {
+  "width": 1440,
+  "scheme": "dark",
+  "range": "next",
+  "first": {
+   "s": 0.590381,
+   "tx": 8,
+   "ty": 112,
+   "barBottom": 104,
+   "tyBelowBar": true
+  },
+  "total": {
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "missing": 0,
+   "markOverflow": 0,
+   "edges": 39
+  },
+  "sum": [
+   {
+    "kind": "stale",
+    "level": "warning",
+    "text": "構造が更新されていません：company-os（7時間）、generic-mona（7時間）、housing-lifecycle（7時間）、input-devices（7時間）、orca-web（7時間）、spec-dock（7時間）、taikyohiyou_project（7時間）、tenting-cradle（7時間）、yubisaki（7時間）次の1手：spec-dock canonical status"
+   },
+   {
+    "kind": "pr-unknown",
+    "level": "info",
+    "text": "PR の状態が分かりません：company-os、generic-mona、housing-lifecycle、input-devices、orca-web、spec-dock、taikyohiyou_project、tenting-cradle、yubisaki"
+   }
+  ],
+  "warns": [],
+  "compact": 6,
+  "overflow": [],
+  "marks": 6,
+  "frames": 9,
+  "pointer": {
+   "onRow": true,
+   "gapReachesView": true,
+   "rowRight": 791
+  },
+  "toolsTop": 68,
+  "nextTop": 68,
+  "errors": []
+ },
+ {
+  "width": 1440,
+  "scheme": "dark",
+  "range": "now",
+  "first": {
+   "s": 0.514079,
+   "tx": 8,
+   "ty": 112,
+   "barBottom": 104,
+   "tyBelowBar": true
+  },
+  "total": {
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "missing": 0,
+   "markOverflow": 0,
+   "edges": 187
+  },
+  "sum": [
+   {
+    "kind": "stale",
+    "level": "warning",
+    "text": "構造が更新されていません：company-os（7時間）、generic-mona（7時間）、housing-lifecycle（7時間）、input-devices（7時間）、orca-web（7時間）、spec-dock（7時間）、taikyohiyou_project（7時間）、tenting-cradle（7時間）、yubisaki（7時間）次の1手：spec-dock canonical status"
+   },
+   {
+    "kind": "pr-unknown",
+    "level": "info",
+    "text": "PR の状態が分かりません：company-os、generic-mona、housing-lifecycle、input-devices、orca-web、spec-dock、taikyohiyou_project、tenting-cradle、yubisaki"
+   }
+  ],
+  "warns": [],
+  "compact": 42,
+  "overflow": [],
+  "marks": 34,
+  "frames": 9,
+  "pointer": {
+   "onRow": true,
+   "gapReachesView": true,
+   "rowRight": 791
+  },
+  "toolsTop": 68,
+  "nextTop": 68,
+  "errors": []
+ },
+ {
+  "width": 1440,
+  "scheme": "dark",
+  "range": "all",
+  "first": {
+   "s": 0.10531,
+   "tx": 8,
+   "ty": 112,
+   "barBottom": 104,
+   "tyBelowBar": true
+  },
+  "total": {
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "missing": 0,
+   "markOverflow": 0,
+   "edges": 780
+  },
+  "sum": [
+   {
+    "kind": "stale",
+    "level": "warning",
+    "text": "構造が更新されていません：company-os（7時間）、generic-mona（7時間）、housing-lifecycle（7時間）、input-devices（7時間）、orca-web（7時間）、spec-dock（7時間）、taikyohiyou_project（7時間）、tenting-cradle（7時間）、yubisaki（7時間）次の1手：spec-dock canonical status"
+   },
+   {
+    "kind": "pr-unknown",
+    "level": "info",
+    "text": "PR の状態が分かりません：company-os、generic-mona、housing-lifecycle、input-devices、orca-web、spec-dock、taikyohiyou_project、tenting-cradle、yubisaki"
+   }
+  ],
+  "warns": [],
+  "compact": 12,
+  "overflow": [],
+  "marks": 38,
+  "frames": 9,
+  "pointer": {
+   "onRow": true,
+   "gapReachesView": true,
+   "rowRight": 791
+  },
+  "toolsTop": 68,
+  "nextTop": 68,
+  "errors": []
+ },
+ {
+  "width": 1000,
+  "scheme": "light",
+  "range": "next",
+  "first": {
+   "s": 0.467681,
+   "tx": 8,
+   "ty": 152,
+   "barBottom": 104,
+   "tyBelowBar": true
+  },
+  "total": {
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "missing": 0,
+   "markOverflow": 0,
+   "edges": 39
+  },
+  "sum": [
+   {
+    "kind": "stale",
+    "level": "warning",
+    "text": "構造が更新されていません：company-os（7時間）、generic-mona（7時間）、housing-lifecycle（7時間）、input-devices（7時間）、orca-web（7時間）、spec-dock（7時間）、taikyohiyou_project（7時間）、tenting-cradle（7時間）、yubisaki（7時間）次の1手：spec-dock canonical status"
+   },
+   {
+    "kind": "pr-unknown",
+    "level": "info",
+    "text": "PR の状態が分かりません：company-os、generic-mona、housing-lifecycle、input-devices、orca-web、spec-dock、taikyohiyou_project、tenting-cradle、yubisaki"
+   }
+  ],
+  "warns": [],
+  "compact": 6,
+  "overflow": [],
+  "marks": 6,
+  "frames": 9,
+  "pointer": {
+   "onRow": true,
+   "gapReachesView": true,
+   "rowRight": 791
+  },
+  "toolsTop": 168,
+  "nextTop": 68,
+  "errors": []
+ },
+ {
+  "width": 1000,
+  "scheme": "light",
+  "range": "now",
+  "first": {
+   "s": 0.405606,
+   "tx": 8,
+   "ty": 152,
+   "barBottom": 104,
+   "tyBelowBar": true
+  },
+  "total": {
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "missing": 0,
+   "markOverflow": 0,
+   "edges": 187
+  },
+  "sum": [
+   {
+    "kind": "stale",
+    "level": "warning",
+    "text": "構造が更新されていません：company-os（7時間）、generic-mona（7時間）、housing-lifecycle（7時間）、input-devices（7時間）、orca-web（7時間）、spec-dock（7時間）、taikyohiyou_project（7時間）、tenting-cradle（7時間）、yubisaki（7時間）次の1手：spec-dock canonical status"
+   },
+   {
+    "kind": "pr-unknown",
+    "level": "info",
+    "text": "PR の状態が分かりません：company-os、generic-mona、housing-lifecycle、input-devices、orca-web、spec-dock、taikyohiyou_project、tenting-cradle、yubisaki"
+   }
+  ],
+  "warns": [],
+  "compact": 42,
+  "overflow": [],
+  "marks": 34,
+  "frames": 9,
+  "pointer": {
+   "onRow": true,
+   "gapReachesView": true,
+   "rowRight": 791
+  },
+  "toolsTop": 168,
+  "nextTop": 68,
+  "errors": []
+ },
+ {
+  "width": 1000,
+  "scheme": "light",
+  "range": "all",
+  "first": {
+   "s": 0.0754717,
+   "tx": 8,
+   "ty": 152,
+   "barBottom": 104,
+   "tyBelowBar": true
+  },
+  "total": {
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "missing": 0,
+   "markOverflow": 0,
+   "edges": 780
+  },
+  "sum": [
+   {
+    "kind": "stale",
+    "level": "warning",
+    "text": "構造が更新されていません：company-os（7時間）、generic-mona（7時間）、housing-lifecycle（7時間）、input-devices（7時間）、orca-web（7時間）、spec-dock（7時間）、taikyohiyou_project（7時間）、tenting-cradle（7時間）、yubisaki（7時間）次の1手：spec-dock canonical status"
+   },
+   {
+    "kind": "pr-unknown",
+    "level": "info",
+    "text": "PR の状態が分かりません：company-os、generic-mona、housing-lifecycle、input-devices、orca-web、spec-dock、taikyohiyou_project、tenting-cradle、yubisaki"
+   }
+  ],
+  "warns": [],
+  "compact": 12,
+  "overflow": [],
+  "marks": 38,
+  "frames": 9,
+  "pointer": {
+   "onRow": true,
+   "gapReachesView": true,
+   "rowRight": 791
+  },
+  "toolsTop": 168,
+  "nextTop": 68,
+  "errors": []
+ },
+ {
+  "width": 1000,
+  "scheme": "dark",
+  "range": "next",
+  "first": {
+   "s": 0.467681,
+   "tx": 8,
+   "ty": 152,
+   "barBottom": 104,
+   "tyBelowBar": true
+  },
+  "total": {
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "missing": 0,
+   "markOverflow": 0,
+   "edges": 39
+  },
+  "sum": [
+   {
+    "kind": "stale",
+    "level": "warning",
+    "text": "構造が更新されていません：company-os（7時間）、generic-mona（7時間）、housing-lifecycle（7時間）、input-devices（7時間）、orca-web（7時間）、spec-dock（7時間）、taikyohiyou_project（7時間）、tenting-cradle（7時間）、yubisaki（7時間）次の1手：spec-dock canonical status"
+   },
+   {
+    "kind": "pr-unknown",
+    "level": "info",
+    "text": "PR の状態が分かりません：company-os、generic-mona、housing-lifecycle、input-devices、orca-web、spec-dock、taikyohiyou_project、tenting-cradle、yubisaki"
+   }
+  ],
+  "warns": [],
+  "compact": 6,
+  "overflow": [],
+  "marks": 6,
+  "frames": 9,
+  "pointer": {
+   "onRow": true,
+   "gapReachesView": true,
+   "rowRight": 791
+  },
+  "toolsTop": 168,
+  "nextTop": 68,
+  "errors": []
+ },
+ {
+  "width": 1000,
+  "scheme": "dark",
+  "range": "now",
+  "first": {
+   "s": 0.405606,
+   "tx": 8,
+   "ty": 152,
+   "barBottom": 104,
+   "tyBelowBar": true
+  },
+  "total": {
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "missing": 0,
+   "markOverflow": 0,
+   "edges": 187
+  },
+  "sum": [
+   {
+    "kind": "stale",
+    "level": "warning",
+    "text": "構造が更新されていません：company-os（7時間）、generic-mona（7時間）、housing-lifecycle（7時間）、input-devices（7時間）、orca-web（7時間）、spec-dock（7時間）、taikyohiyou_project（7時間）、tenting-cradle（7時間）、yubisaki（7時間）次の1手：spec-dock canonical status"
+   },
+   {
+    "kind": "pr-unknown",
+    "level": "info",
+    "text": "PR の状態が分かりません：company-os、generic-mona、housing-lifecycle、input-devices、orca-web、spec-dock、taikyohiyou_project、tenting-cradle、yubisaki"
+   }
+  ],
+  "warns": [],
+  "compact": 42,
+  "overflow": [],
+  "marks": 34,
+  "frames": 9,
+  "pointer": {
+   "onRow": true,
+   "gapReachesView": true,
+   "rowRight": 791
+  },
+  "toolsTop": 168,
+  "nextTop": 68,
+  "errors": []
+ },
+ {
+  "width": 1000,
+  "scheme": "dark",
+  "range": "all",
+  "first": {
+   "s": 0.0754717,
+   "tx": 8,
+   "ty": 152,
+   "barBottom": 104,
+   "tyBelowBar": true
+  },
+  "total": {
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "missing": 0,
+   "markOverflow": 0,
+   "edges": 780
+  },
+  "sum": [
+   {
+    "kind": "stale",
+    "level": "warning",
+    "text": "構造が更新されていません：company-os（7時間）、generic-mona（7時間）、housing-lifecycle（7時間）、input-devices（7時間）、orca-web（7時間）、spec-dock（7時間）、taikyohiyou_project（7時間）、tenting-cradle（7時間）、yubisaki（7時間）次の1手：spec-dock canonical status"
+   },
+   {
+    "kind": "pr-unknown",
+    "level": "info",
+    "text": "PR の状態が分かりません：company-os、generic-mona、housing-lifecycle、input-devices、orca-web、spec-dock、taikyohiyou_project、tenting-cradle、yubisaki"
+   }
+  ],
+  "warns": [],
+  "compact": 12,
+  "overflow": [],
+  "marks": 38,
+  "frames": 9,
+  "pointer": {
+   "onRow": true,
+   "gapReachesView": true,
+   "rowRight": 791
+  },
+  "toolsTop": 168,
+  "nextTop": 68,
+  "errors": []
+ },
+ {
+  "width": 390,
+  "scheme": "light",
+  "range": "next",
+  "first": {
+   "s": 0.74,
+   "tx": 4,
+   "ty": 62,
+   "barBottom": 54,
+   "tyBelowBar": true
+  },
+  "total": {
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "missing": 0,
+   "markOverflow": 0,
+   "edges": 39
+  },
+  "sum": [
+   {
+    "kind": "stale",
+    "level": "warning",
+    "text": "構造が更新されていません：company-os（7時間）、generic-mona（7時間）、housing-lifecycle（7時間）、input-devices（7時間）、orca-web（7時間）、spec-dock（7時間）、taikyohiyou_project（7時間）、tenting-cradle（7時間）、yubisaki（7時間）次の1手：spec-dock canonical status"
+   },
+   {
+    "kind": "pr-unknown",
+    "level": "info",
+    "text": "PR の状態が分かりません：company-os、generic-mona、housing-lifecycle、input-devices、orca-web、spec-dock、taikyohiyou_project、tenting-cradle、yubisaki"
+   }
+  ],
+  "warns": [],
+  "compact": 6,
+  "overflow": [],
+  "marks": 6,
+  "frames": 9,
+  "pointer": {
+   "onRow": true,
+   "gapReachesView": true,
+   "rowRight": 382
+  },
+  "toolsTop": 631,
+  "nextTop": 107,
+  "errors": []
+ },
+ {
+  "width": 390,
+  "scheme": "light",
+  "range": "now",
+  "first": {
+   "s": 0.74,
+   "tx": 4,
+   "ty": 62,
+   "barBottom": 54,
+   "tyBelowBar": true
+  },
+  "total": {
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "missing": 0,
+   "markOverflow": 0,
+   "edges": 187
+  },
+  "sum": [
+   {
+    "kind": "stale",
+    "level": "warning",
+    "text": "構造が更新されていません：company-os（7時間）、generic-mona（7時間）、housing-lifecycle（7時間）、input-devices（7時間）、orca-web（7時間）、spec-dock（7時間）、taikyohiyou_project（7時間）、tenting-cradle（7時間）、yubisaki（7時間）次の1手：spec-dock canonical status"
+   },
+   {
+    "kind": "pr-unknown",
+    "level": "info",
+    "text": "PR の状態が分かりません：company-os、generic-mona、housing-lifecycle、input-devices、orca-web、spec-dock、taikyohiyou_project、tenting-cradle、yubisaki"
+   }
+  ],
+  "warns": [],
+  "compact": 42,
+  "overflow": [],
+  "marks": 34,
+  "frames": 9,
+  "pointer": {
+   "onRow": true,
+   "gapReachesView": true,
+   "rowRight": 382
+  },
+  "toolsTop": 631,
+  "nextTop": 107,
+  "errors": []
+ },
+ {
+  "width": 390,
+  "scheme": "light",
+  "range": "all",
+  "first": {
+   "s": 0.74,
+   "tx": 4,
+   "ty": 62,
+   "barBottom": 54,
+   "tyBelowBar": true
+  },
+  "total": {
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "missing": 0,
+   "markOverflow": 0,
+   "edges": 780
+  },
+  "sum": [
+   {
+    "kind": "stale",
+    "level": "warning",
+    "text": "構造が更新されていません：company-os（7時間）、generic-mona（7時間）、housing-lifecycle（7時間）、input-devices（7時間）、orca-web（7時間）、spec-dock（7時間）、taikyohiyou_project（7時間）、tenting-cradle（7時間）、yubisaki（7時間）次の1手：spec-dock canonical status"
+   },
+   {
+    "kind": "pr-unknown",
+    "level": "info",
+    "text": "PR の状態が分かりません：company-os、generic-mona、housing-lifecycle、input-devices、orca-web、spec-dock、taikyohiyou_project、tenting-cradle、yubisaki"
+   }
+  ],
+  "warns": [],
+  "compact": 12,
+  "overflow": [],
+  "marks": 38,
+  "frames": 9,
+  "pointer": {
+   "onRow": true,
+   "gapReachesView": true,
+   "rowRight": 382
+  },
+  "toolsTop": 631,
+  "nextTop": 107,
+  "errors": []
+ },
+ {
+  "width": 390,
+  "scheme": "dark",
+  "range": "next",
+  "first": {
+   "s": 0.74,
+   "tx": 4,
+   "ty": 62,
+   "barBottom": 54,
+   "tyBelowBar": true
+  },
+  "total": {
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "missing": 0,
+   "markOverflow": 0,
+   "edges": 39
+  },
+  "sum": [
+   {
+    "kind": "stale",
+    "level": "warning",
+    "text": "構造が更新されていません：company-os（7時間）、generic-mona（7時間）、housing-lifecycle（7時間）、input-devices（7時間）、orca-web（7時間）、spec-dock（7時間）、taikyohiyou_project（7時間）、tenting-cradle（7時間）、yubisaki（7時間）次の1手：spec-dock canonical status"
+   },
+   {
+    "kind": "pr-unknown",
+    "level": "info",
+    "text": "PR の状態が分かりません：company-os、generic-mona、housing-lifecycle、input-devices、orca-web、spec-dock、taikyohiyou_project、tenting-cradle、yubisaki"
+   }
+  ],
+  "warns": [],
+  "compact": 6,
+  "overflow": [],
+  "marks": 6,
+  "frames": 9,
+  "pointer": {
+   "onRow": true,
+   "gapReachesView": true,
+   "rowRight": 382
+  },
+  "toolsTop": 631,
+  "nextTop": 107,
+  "errors": []
+ },
+ {
+  "width": 390,
+  "scheme": "dark",
+  "range": "now",
+  "first": {
+   "s": 0.74,
+   "tx": 4,
+   "ty": 62,
+   "barBottom": 54,
+   "tyBelowBar": true
+  },
+  "total": {
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "missing": 0,
+   "markOverflow": 0,
+   "edges": 187
+  },
+  "sum": [
+   {
+    "kind": "stale",
+    "level": "warning",
+    "text": "構造が更新されていません：company-os（7時間）、generic-mona（7時間）、housing-lifecycle（7時間）、input-devices（7時間）、orca-web（7時間）、spec-dock（7時間）、taikyohiyou_project（7時間）、tenting-cradle（7時間）、yubisaki（7時間）次の1手：spec-dock canonical status"
+   },
+   {
+    "kind": "pr-unknown",
+    "level": "info",
+    "text": "PR の状態が分かりません：company-os、generic-mona、housing-lifecycle、input-devices、orca-web、spec-dock、taikyohiyou_project、tenting-cradle、yubisaki"
+   }
+  ],
+  "warns": [],
+  "compact": 42,
+  "overflow": [],
+  "marks": 34,
+  "frames": 9,
+  "pointer": {
+   "onRow": true,
+   "gapReachesView": true,
+   "rowRight": 382
+  },
+  "toolsTop": 631,
+  "nextTop": 107,
+  "errors": []
+ },
+ {
+  "width": 390,
+  "scheme": "dark",
+  "range": "all",
+  "first": {
+   "s": 0.74,
+   "tx": 4,
+   "ty": 62,
+   "barBottom": 54,
+   "tyBelowBar": true
+  },
+  "total": {
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "missing": 0,
+   "markOverflow": 0,
+   "edges": 780
+  },
+  "sum": [
+   {
+    "kind": "stale",
+    "level": "warning",
+    "text": "構造が更新されていません：company-os（7時間）、generic-mona（7時間）、housing-lifecycle（7時間）、input-devices（7時間）、orca-web（7時間）、spec-dock（7時間）、taikyohiyou_project（7時間）、tenting-cradle（7時間）、yubisaki（7時間）次の1手：spec-dock canonical status"
+   },
+   {
+    "kind": "pr-unknown",
+    "level": "info",
+    "text": "PR の状態が分かりません：company-os、generic-mona、housing-lifecycle、input-devices、orca-web、spec-dock、taikyohiyou_project、tenting-cradle、yubisaki"
+   }
+  ],
+  "warns": [],
+  "compact": 12,
+  "overflow": [],
+  "marks": 38,
+  "frames": 9,
+  "pointer": {
+   "onRow": true,
+   "gapReachesView": true,
+   "rowRight": 382
+  },
+  "toolsTop": 631,
+  "nextTop": 107,
+  "errors": []
+ }
+]
