@@ -97,7 +97,11 @@ def test_the_card_row_of_agents_hides_without_marks() -> None:  # iss-00621 T-05
     assert ".sd-card__agents > .sd-orca { margin-left: 0; }" in css
     card = _function((SHARED / "parts.js").read_text(), "card")
     assert "meta.push(orcaSlot" not in card
-    assert card.index('<span class="sd-card__meta">') < card.index('<span class="sd-card__agents">') < card.index("parentLine +")
+    assert (
+        card.index('<span class="sd-card__meta">')
+        < card.index('<span class="sd-card__agents">')
+        < card.index("parentLine +")
+    )
 
 
 @needs_node
@@ -245,7 +249,10 @@ def test_pressing_a_mark_opens_the_agents_tab_on_its_agent() -> None:  # iss-006
     for source in (tap, allgraph, board, click):
         assert 'preferTab("agents")' not in source
     for name in ("graph.js", "allgraph.js", "board.js"):
-        assert "markAgentAt" in (VIEWS / name).read_text().split("\n\n")[0] or "markAgentAt, paintOrcaMarks" in (VIEWS / name).read_text()
+        assert (
+            "markAgentAt" in (VIEWS / name).read_text().split("\n\n")[0]
+            or "markAgentAt, paintOrcaMarks" in (VIEWS / name).read_text()
+        )
     assert "markAgentAt" in panel[: panel.index("export function createScopePanel")]
 
 
@@ -457,7 +464,7 @@ def test_prefer_tab_chooses_only_shared_tabs_and_marks_ask_for_it(tmp_path: Path
     assert out["agents"] == "summary"
     panel = (SHARED / "panel.js").read_text()
     click = panel[panel.index('aside.addEventListener("click"') :]
-    assert 'if (slot) {' in click and "openAgent(markAgentAt(slot, t));" in click  # iss-00621 D-03
+    assert "if (slot) {" in click and "openAgent(markAgentAt(slot, t));" in click  # iss-00621 D-03
 
 
 @needs_node
