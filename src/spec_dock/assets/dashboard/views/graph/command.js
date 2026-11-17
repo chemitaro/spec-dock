@@ -166,10 +166,12 @@ export function bandItems(pairs, places, own, orderOf) {
 // border, padding and widths (.gx-band-item, .gx-band-lab, .gx-band-agent): change them together.
 export const BAND = { top: -16, h: 28, left: SIZE.margin, border: 1, pad: 6, gap: 10, labelGap: 6, slot: 52 };
 const SPREAD = 10; // lines leaving one edge of a group or frame are this far apart
-const CHORD = 40; // an arc's ends are at least this far apart
-const ARC_D = 16; // an arc's bulge
-const ARC_MIN = 8;
-const FRAME_ARC_D = 12; // the arc below a nested frame's heading
+/**
+ * The hops (iss-00648 D-02, D-03): a line's height H = kx·dx + ky·dy within min..max above the higher end; ends closer
+ * than side px across bulge sideways; the ends of a hop in one box, frame or band item at least chord px apart, room px
+ * below whatever is above, never lower than low px.
+ */
+export const HOP = { min: 18, kx: 0.15, ky: 0.1, max: 56, side: 40, chord: 12, room: 3, low: 8 };
 
 /** A label's width estimated from its characters: ASCII 6.6px, others 11.5px, within 24..200 (CSS cuts it with …). */
 export function labelWidth(text) {
@@ -218,9 +220,7 @@ function bandModel(rows) {
 const r1 = (v) => Math.round(v * 10) / 10;
 const pt = (p) => `${r1(p.x)} ${r1(p.y)}`;
 const rectOf = (o) => ({ x1: o.x1, y1: o.y1, x2: o.x2, y2: o.y2 });
-const contains = (r, p) => p.x >= r.x1 && p.x <= r.x2 && p.y >= r.y1 && p.y <= r.y2;
 const holds = (p, q) => p.x1 <= q.x1 + 0.01 && p.y1 <= q.y1 + 0.01 && p.x2 >= q.x2 - 0.01 && p.y2 >= q.y2 - 0.01;
-const center = (r) => ({ x: (r.x1 + r.x2) / 2, y: (r.y1 + r.y2) / 2 });
 const isBox = (n) => n.type === "box" || n.type === "tframe";
 
 /** The cubic Bézier's length as a polyline of 24 pieces. */
@@ -247,16 +247,53 @@ function cubic(P, dP, C, dC, k) {
   return { d: `M ${pt(P)} C ${pt(c1)} ${pt(c2)} ${pt(C)}`, len: roundLen(bezierLength(P, c1, c2, C)) };
 }
 
-const SIDES = {
-  top: { n: { x: 0, y: -1 }, at: (r) => ({ x: (r.x1 + r.x2) / 2, y: r.y1 }), along: "x" },
-  bottom: { n: { x: 0, y: 1 }, at: (r) => ({ x: (r.x1 + r.x2) / 2, y: r.y2 }), along: "x" },
-  left: { n: { x: -1, y: 0 }, at: (r) => ({ x: r.x1, y: (r.y1 + r.y2) / 2 }), along: "y" },
-  right: { n: { x: 1, y: 0 }, at: (r) => ({ x: r.x2, y: (r.y1 + r.y2) / 2 }), along: "y" },
+// every end sits on an upper edge and leaves it upward (iss-00648 D-01)
+const UP = { x: 0, y: -1 };
+const topOf = (r) => ({ x: (r.x1 + r.x2) / 2, y: r.y1 });
+
+// the y of the cubic Bézier at t
+const bezierY = (p0, c1, c2, p3, t) => {
+  const u = 1 - t;
+  return u * u * u * p0 + 3 * u * u * t * c1 + 3 * u * t * t * c2 + t * t * t * p3;
 };
-const DOWN = { x: 0, y: 1 };
+const peakOf = (P, c1, c2, C) => {
+  let y = Infinity;
+  for (let i = 0; i <= 96; i++) y = Math.min(y, bezierY(P.y, c1.y, c2.y, C.y, i / 96));
+  return y;
+};
 
 /**
- * The drawing of the command lines (iss-00616 D-03).
+ * A hop from P to C (iss-00648 D-02): one cubic Bézier leaving P upward and entering C from above, its peak exactly H
+ * above the higher end (H from the ends' horizontal distance and height difference), never above `ceiling` (but at
+ * least HOP.low above the higher end). Ends nearly above each other bulge sideways without changing the peak.
+ * @returns {d, len, peak}
+ */
+export function hop(P, C, ceiling = -Infinity) {
+  const dx = Math.abs(C.x - P.x), dy = Math.abs(C.y - P.y);
+  const H = Math.min(HOP.max, Math.max(HOP.min, HOP.kx * dx + HOP.ky * dy));
+  const high = Math.min(P.y, C.y);
+  let top = high - H;
+  if (top < ceiling) top = Math.min(ceiling, high - HOP.low);
+  const h1 = P.y - top, h2 = C.y - top;
+  // the peak falls as λ grows: λ = 0 peaks at the higher end, λ = 4/3 reaches top at t = 1/2
+  const at = (lam) => peakOf(P, { y: P.y - lam * h1 }, { y: C.y - lam * h2 }, C);
+  let lo = 0, hi = 4 / 3;
+  for (let i = 0; i < 40; i++) {
+    const mid = (lo + hi) / 2;
+    if (at(mid) > top) lo = mid;
+    else hi = mid;
+  }
+  const lam = hi;
+  const kP = lam * h1, kC = lam * h2;
+  const b = dx < HOP.side ? Math.min(HOP.side - dx, 0.5 * Math.min(kP, kC)) : 0;
+  const s = C.x >= P.x ? 1 : -1;
+  const c1 = { x: P.x + s * b, y: P.y - kP };
+  const c2 = { x: C.x + s * b, y: C.y - kC };
+  return { d: `M ${pt(P)} C ${pt(c1)} ${pt(c2)} ${pt(C)}`, len: roundLen(bezierLength(P, c1, c2, C)), peak: r1(peakOf(P, c1, c2, C)) };
+}
+
+/**
+ * The drawing of the command lines (iss-00616 D-03, iss-00648): every end on an upper edge, every line a hop above it.
  * @param pairs   placeAgents' pairs
  * @param places  placeAgents' places
  * @param items   bandItems
@@ -266,9 +303,10 @@ const DOWN = { x: 0, y: 1 };
  * @param rows    iss-00617 D-01: the band's rows [{key, left, top, lead, items}] in place of `items` (one row of `items`
  *                at BAND.left, BAND.top without it)
  * @param boundsOf node -> the rectangle an arc's bulge stays in (the world {0, 0, layout.width, layout.height} without it)
+ * @param ceiling iss-00648 D-05: no hop rises above this y (the cross-repository structure's world starts at 0)
  * @returns {band, links, ripples, audit, top, width}
  */
-export function commandModel({ pairs = [], places = new Map(), items = [], layout = {}, spotsOf = () => null, routes = [], rows = null, boundsOf = null }) {
+export function commandModel({ pairs = [], places = new Map(), items = [], layout = {}, spotsOf = () => null, routes = [], rows = null, boundsOf = null, ceiling = -Infinity }) {
   const band = bandModel(rows || [{ key: "", left: BAND.left, top: BAND.top, lead: null, items }]);
   const nodes = layout.nodes || [];
   const groups = layout.groups || [];
@@ -280,45 +318,46 @@ export function commandModel({ pairs = [], places = new Map(), items = [], layou
     return spotCache.get(node)?.find((s) => s.id === id) || null;
   };
   const audit = { links: 0, arcs: 0, boxOverlaps: 0, edgeOverlaps: 0, crowded: 0 };
+  const itemRect = (it) => ({ x1: it.x, y1: it.y, x2: it.x + it.w, y2: it.y + it.h });
   // the rectangles an arc's bulge must not enter: every node, group and band item but its own and the frames holding it
   const obstacles = [
     ...nodes.map((n) => ({ ...rectOf(n), self: n })),
     ...groups.map((g) => ({ ...rectOf(g), self: g })),
-    ...(band?.items || []).map((it) => ({ x1: it.x, y1: it.y, x2: it.x + it.w, y2: it.y + it.h, self: it })),
+    ...(band?.items || []).map((it) => ({ ...itemRect(it), self: it })),
   ];
+  const isItem = (self) => !!band?.items.includes(self);
   const others = (self) => {
-    const own = self && !band?.items.includes(self) ? rectOf(self) : null;
+    const own = self && !isItem(self) ? rectOf(self) : null;
     return obstacles.filter((o) => o.self !== self && !(own && o.self.type === "frame" && holds(o, own)));
   };
   const overlapsBox = (bb, self) => others(self).some((o) => Math.min(bb.x2, o.x2) - Math.max(bb.x1, o.x1) > 0 && Math.min(bb.y2, o.y2) - Math.max(bb.y1, o.y1) > 0);
-  // the dependency lines' runs parallel to an edge (along x: horizontal runs) inside the bulge's box
-  const overlapsRoute = (bb, along) => routes.some((rt) => (rt.pts || []).some((p, k, pts) => {
+  // the dependency lines' horizontal runs inside the bulge's box
+  const overlapsRoute = (bb) => routes.some((rt) => (rt.pts || []).some((p, k, pts) => {
     const q = pts[k + 1];
     if (!q) return false;
-    if (along === "x") return p.y === q.y && p.y >= bb.y1 && p.y <= bb.y2 && Math.min(bb.x2, Math.max(p.x, q.x)) - Math.max(bb.x1, Math.min(p.x, q.x)) > 0;
-    return p.x === q.x && p.x >= bb.x1 && p.x <= bb.x2 && Math.min(bb.y2, Math.max(p.y, q.y)) - Math.max(bb.y1, Math.min(p.y, q.y)) > 0;
+    return p.y === q.y && p.y >= bb.y1 && p.y <= bb.y2 && Math.min(bb.x2, Math.max(p.x, q.x)) - Math.max(bb.x1, Math.min(p.x, q.x)) > 0;
   }));
-  // the room outside an edge of `self` across [lo, hi]: up to the nearest facing node, group or band item, the inner
-  // edge of a frame holding it, the world's bounds
-  const roomOf = (self, side, lo, hi) => {
-    const r = rectOf(self);
+  // the room above the upper edge of `self` across [lo, hi] (iss-00648 D-03): up to the nearest node, group or band item
+  // above, the inner upper edge of a frame holding it, the world's bounds (not for a band item) and the ceiling
+  const roomOf = (self, lo, hi) => {
+    const item = isItem(self);
+    const r = item ? itemRect(self) : rectOf(self);
     const own = isBox(self) || self.type === "frame" ? r : null;
-    let room = Infinity;
-    const world = (boundsOf && boundsOf(self)) || { x1: 0, y1: 0, x2: layout.width ?? Infinity, y2: layout.height ?? Infinity };
-    const holders = [world, ...nodes.filter((n) => n !== self && n.type === "frame" && own && holds(n, own)).map((n) => ({ x1: n.x1 + 1, y1: n.y1 + 1, x2: n.x2 - 1, y2: n.y2 - 1 }))];
-    for (const h of holders) {
-      if (side === "bottom") room = Math.min(room, h.y2 - r.y2);
-      if (side === "right") room = Math.min(room, h.x2 - r.x2);
+    let room = r.y1 - ceiling;
+    if (!item) {
+      const world = (boundsOf && boundsOf(self)) || { x1: 0, y1: 0, x2: layout.width ?? Infinity, y2: layout.height ?? Infinity };
+      room = Math.min(room, r.y1 - world.y1);
     }
+    for (const n of nodes) if (n !== self && n.type === "frame" && own && holds(n, own)) room = Math.min(room, r.y1 - (n.y1 + 1));
     for (const o of others(self)) {
       if (o.self.type === "frame" && own && holds(o, own)) continue;
-      if (side === "bottom" && o.x1 < hi && o.x2 > lo && o.y1 >= r.y2) room = Math.min(room, o.y1 - r.y2);
-      if (side === "right" && o.y1 < hi && o.y2 > lo && o.x1 >= r.x2) room = Math.min(room, o.x1 - r.x2);
+      if (o.x1 < hi && o.x2 > lo && o.y2 <= r.y1) room = Math.min(room, r.y1 - o.y2);
     }
     return room;
   };
 
-  // the end of a placed agent that does not depend on the other end: a mark (box, frame heading) or the band
+  // the end of a placed agent that does not depend on the other end: a mark (box, frame heading) or the band, on the
+  // upper edge right above the mark (iss-00648 D-01)
   const fixedEnd = (ref) => {
     const place = places.get(ref.id);
     if (!place) return null;
@@ -326,36 +365,22 @@ export function commandModel({ pairs = [], places = new Map(), items = [], layou
       const hit = bandAgent.get(`${place.key}\n${ref.id}`);
       if (!hit) return null;
       const cx = hit.slot.x + hit.slot.w / 2;
-      return { kind: "band", item: hit.item, slot: hit.slot, p: { x: cx, y: hit.item.y + BAND.h }, n: DOWN, spot: { x: hit.slot.x, y: hit.slot.y, w: hit.slot.w, h: hit.slot.h } };
+      return { kind: "band", item: hit.item, slot: hit.slot, p: { x: cx, y: hit.item.y }, n: UP, spot: { x: hit.slot.x, y: hit.slot.y, w: hit.slot.w, h: hit.slot.h } };
     }
     if (place.kind === "mark") {
       const node = place.node;
       const spot = spotOf(node, ref.id);
-      if (!spot) {
-        // F-04: the position is not known: the middle of the edge near the row of marks
-        const side = isBox(node) ? "bottom" : "top";
-        return { kind: "edge", node, p: SIDES[side].at(node), n: SIDES[side].n, spot: null, unknown: true };
-      }
-      const cx = spot.x + spot.w / 2;
-      if (isBox(node)) {
-        return { kind: "mark", node, spot, p: { x: cx, y: node.y2 }, n: DOWN, stubs: [`M ${pt({ x: cx, y: spot.y + spot.h })} L ${pt({ x: cx, y: node.y2 })}`] };
-      }
-      return { kind: "mark", node, spot, p: { x: cx, y: spot.y + spot.h }, n: DOWN, stubs: [] };
+      // F-01: the position is not known: the middle of the upper edge
+      if (!spot) return { kind: "edge", node, p: topOf(node), n: UP, spot: null, unknown: true };
+      return { kind: "mark", node, spot, p: { x: spot.x + spot.w / 2, y: node.y1 }, n: UP };
     }
     return { kind: place.kind, rect: place.kind === "group" ? place.group : place.node, place };
   };
-  // the side of a rectangle facing q (the larger of the two axes), or the inner bottom of a frame holding q
-  const faceOf = (end, q) => {
-    const r = end.rect;
-    if (end.kind === "frame" && contains(r, q)) return { side: "inside", p: { x: (r.x1 + r.x2) / 2, y: r.y2 - 1 }, n: { x: 0, y: -1 } };
-    const c = center(r);
-    const dx = q.x - c.x, dy = q.y - c.y;
-    const side = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : dy > 0 ? "bottom" : "top";
-    return { side, p: SIDES[side].at(r), n: SIDES[side].n };
-  };
+  // the child's mark the line reaches (iss-00648 D-04), null without one
+  const markOf = (e) => (e.spot ? { x: e.spot.x, y: e.spot.y, w: e.spot.w, h: e.spot.h, band: e.kind === "band" } : null);
 
   const links = [];
-  const loose = []; // the ends on an edge of a group or frame, spread along the edge afterwards
+  const loose = []; // the ends on the upper edge of a group or frame, spread along the edge afterwards
   const ripples = new Map();
   for (const pair of pairs) {
     const a = fixedEnd(pair.parent);
@@ -372,19 +397,19 @@ export function commandModel({ pairs = [], places = new Map(), items = [], layou
     const sameNode = a.node && a.node === b.node;
     const sameItem = a.kind === "band" && b.kind === "band" && a.item === b.item;
     if (sameNode || sameItem) {
-      if (!a.spot || !b.spot || a.unknown || b.unknown) continue; // F-04: no arc without both marks
-      const arc = sameItem ? bandArc(a, b) : isBox(a.node) ? boxArc(a, b) : frameArc(a, b);
+      if (!a.spot || !b.spot || a.unknown || b.unknown) continue; // F-01: no arc without both marks
+      const arc = sameHop(a, b, sameItem ? a.item : a.node);
       audit.arcs++;
       audit.links++;
-      links.push({ id, parent: pair.parent.id, child: pair.child.id, state, kind: "arc", ...arc.out, from: arc.from, to: arc.to });
+      links.push({ id, parent: pair.parent.id, child: pair.child.id, state, kind: "arc", ...arc, mark: markOf(b) });
       continue;
     }
-    const link = { id, parent: pair.parent.id, child: pair.child.id, state, kind: "curve", a, b, stubs: [...(a.stubs || []), ...(b.stubs || [])] };
-    for (const [e, other] of [[a, b], [b, a]]) {
+    const link = { id, parent: pair.parent.id, child: pair.child.id, state, kind: "curve", a, b, mark: markOf(b) };
+    for (const e of [a, b]) {
       if (!loosen(e)) continue;
-      const q = loosen(other) ? center(other.rect) : other.p;
-      Object.assign(e, faceOf(e, q));
-      loose.push({ e, key: `${e.kind}:${e.rect.key ?? e.rect.id}:${e.side}`, id, along: e.side === "left" || e.side === "right" ? "y" : "x" });
+      // iss-00648 D-01: the middle of the upper edge, also for a frame holding the other end
+      Object.assign(e, { side: "top", p: topOf(e.rect), n: UP });
+      loose.push({ e, key: `${e.kind}:${e.rect.key ?? e.rect.id}:top`, id });
     }
     links.push(link);
     audit.links++;
@@ -399,96 +424,52 @@ export function commandModel({ pairs = [], places = new Map(), items = [], layou
     list.sort((x, y) => byText(x.id, y.id));
     list.forEach((l, i) => {
       const off = (i - (list.length - 1) / 2) * SPREAD;
-      l.e.p = { ...l.e.p, [l.along]: l.e.p[l.along] + off };
+      l.e.p = { ...l.e.p, x: l.e.p.x + off };
     });
   }
   const out = links.map((l) => {
     if (l.kind === "arc") return l;
     const P = l.a.p, C = l.b.p;
-    const L = Math.hypot(C.x - P.x, C.y - P.y);
-    const k = Math.min(140, Math.max(24, 0.45 * L));
-    const { d, len } = cubic(P, l.a.n, C, l.b.n, k);
-    return { id: l.id, parent: l.parent, child: l.child, state: l.state, kind: "curve", d, len, stubs: l.stubs, from: { x: r1(P.x), y: r1(P.y) }, to: { x: r1(C.x), y: r1(C.y) } };
+    const { d, len, peak } = hop(P, C, ceiling);
+    return { id: l.id, parent: l.parent, child: l.child, state: l.state, kind: "curve", d, len, stubs: [], from: { x: r1(P.x), y: r1(P.y) }, to: { x: r1(C.x), y: r1(C.y) }, mark: l.mark, peak };
   });
 
-  // --- the arcs (Epic D-10, iss-00616 D-03) ---
-  function widen(e1, e2, along, lo, hi) {
-    const span = Math.abs(e2[along] - e1[along]);
-    if (span >= CHORD) return [e1, e2];
-    const first = e1[along] <= e2[along];
-    let mid = (e1[along] + e2[along]) / 2;
-    mid = Math.min(hi - CHORD / 2, Math.max(lo + CHORD / 2, mid));
-    const low = mid - CHORD / 2, high = mid + CHORD / 2;
-    return first ? [{ ...e1, [along]: low }, { ...e2, [along]: high }] : [{ ...e1, [along]: high }, { ...e2, [along]: low }];
+  // --- the hops in one box, frame or band item (iss-00648 D-03) ---
+  function widen(e1, e2, lo, hi) {
+    if (Math.abs(e2.x - e1.x) >= HOP.chord) return [e1, e2];
+    const first = e1.x <= e2.x;
+    const mid = Math.min(hi - HOP.chord / 2, Math.max(lo + HOP.chord / 2, (e1.x + e2.x) / 2));
+    const low = mid - HOP.chord / 2, high = mid + HOP.chord / 2;
+    return first ? [{ ...e1, x: low }, { ...e2, x: high }] : [{ ...e1, x: high }, { ...e2, x: low }];
   }
-  // the box of an arc's bulge: its ends and d out of the edge (the cubic with handles 4d/3 peaks at d)
-  function bulgeBox(e1, e2, n, d) {
-    const xs = [e1.x, e2.x, e1.x + n.x * d, e2.x + n.x * d];
-    const ys = [e1.y, e2.y, e1.y + n.y * d, e2.y + n.y * d];
-    return { x1: Math.min(...xs), y1: Math.min(...ys), x2: Math.max(...xs), y2: Math.max(...ys) };
+  // the box of a hop's bulge: its ends and d above the edge (the cubic with handles 4d/3 peaks at d)
+  function bulgeBox(e1, e2, d) {
+    return { x1: Math.min(e1.x, e2.x), y1: Math.min(e1.y, e2.y) - d, x2: Math.max(e1.x, e2.x), y2: Math.max(e1.y, e2.y) };
   }
-  function arcOut(e1, e2, n, d, stubs) {
-    const { d: path, len } = cubic(e1, n, e2, n, (4 * d) / 3);
-    return { out: { d: path, len, stubs, bulge: d }, from: { x: r1(e1.x), y: r1(e1.y) }, to: { x: r1(e2.x), y: r1(e2.y) } };
-  }
-  function boxArc(a, b) {
-    const node = a.node;
-    const sameRow = a.spot.y === b.spot.y;
-    const trySide = (side) => {
-      const along = side === "bottom" ? "x" : "y";
-      const mid = (s) => ({ x: s.x + s.w / 2, y: s.y + s.h / 2 });
-      const base = (s) => (side === "bottom" ? { x: mid(s).x, y: node.y2 } : { x: node.x2, y: mid(s).y });
-      const [e1, e2] = widen(base(a.spot), base(b.spot), along, along === "x" ? node.x1 : node.y1, along === "x" ? node.x2 : node.y2);
-      const lo = Math.min(e1[along], e2[along]), hi = Math.max(e1[along], e2[along]);
-      const d = Math.min(ARC_D, roomOf(node, side, lo, hi) - 3);
-      const n = SIDES[side].n;
-      const stub = (s, e) => {
-        const m = mid(s);
-        if (side === "bottom") return `M ${pt({ x: m.x, y: s.y + s.h })} L ${pt({ x: m.x, y: node.y2 })}${m.x !== e.x ? ` L ${pt(e)}` : ""}`;
-        return `M ${pt({ x: s.x + s.w, y: m.y })} L ${pt({ x: node.x2, y: m.y })}${m.y !== e.y ? ` L ${pt(e)}` : ""}`;
-      };
-      return { side, e1, e2, n, d, along, stubs: [stub(a.spot, e1), stub(b.spot, e2)] };
-    };
-    const sides = sameRow ? ["bottom", "right"] : ["right", "bottom"];
-    const tries = sides.map(trySide).map((t) => ({ ...t, ok: t.d >= ARC_MIN, over: t.d >= ARC_MIN && overlapsRoute(bulgeBox(t.e1, t.e2, t.n, t.d), t.along) }));
-    // a clean edge first; else the first edge with room, its run of a dependency line counted; else the first edge at
-    // the least bulge, counted as crowded
-    let pick = tries.find((t) => t.ok && !t.over);
-    if (!pick) {
-      pick = tries.find((t) => t.ok);
-      if (!pick) {
-        audit.crowded++;
-        pick = { ...tries[0], d: ARC_MIN };
-      }
-      if (overlapsRoute(bulgeBox(pick.e1, pick.e2, pick.n, pick.d), pick.along)) audit.edgeOverlaps++;
-    }
-    if (overlapsBox(bulgeBox(pick.e1, pick.e2, pick.n, pick.d), node)) audit.boxOverlaps++;
-    return arcOut(pick.e1, pick.e2, pick.n, pick.d, pick.stubs);
-  }
-  function frameArc(a, b) {
-    const node = a.node;
-    const base = (s) => ({ x: s.x + s.w / 2, y: s.y + s.h });
-    const [e1, e2] = widen(base(a.spot), base(b.spot), "x", node.x1 + 1, node.x2 - 1);
-    const bb = bulgeBox(e1, e2, DOWN, FRAME_ARC_D);
-    if (overlapsRoute(bb, "x")) audit.edgeOverlaps++;
-    if (overlapsBox(bb, node)) audit.boxOverlaps++;
-    return arcOut(e1, e2, DOWN, FRAME_ARC_D, []);
-  }
-  function bandArc(a, b) {
-    const up = SIDES.top.n;
-    const e1 = { x: a.p.x, y: a.item.y }, e2 = { x: b.p.x, y: b.item.y };
-    const bb = bulgeBox(e1, e2, up, ARC_D);
-    if (overlapsBox(bb, a.item)) audit.boxOverlaps++;
-    return arcOut(e1, e2, up, ARC_D, []);
+  function sameHop(a, b, self) {
+    const item = isItem(self);
+    const r = item ? itemRect(self) : rectOf(self);
+    const inset = !item && self.type === "frame" ? 1 : 0;
+    const [e1, e2] = widen(a.p, b.p, r.x1 + inset, r.x2 - inset);
+    const lo = Math.min(e1.x, e2.x), hi = Math.max(e1.x, e2.x);
+    let d = Math.min(HOP.min, roomOf(self, lo, hi) - HOP.room);
+    if (d < HOP.min) audit.crowded++;
+    if (d < HOP.low) d = HOP.low;
+    const bb = bulgeBox(e1, e2, d);
+    if (overlapsBox(bb, self)) audit.boxOverlaps++;
+    if (overlapsRoute(bb)) audit.edgeOverlaps++;
+    const { d: path, len } = cubic(e1, UP, e2, UP, (4 * d) / 3);
+    return { d: path, len, stubs: [], bulge: d, from: { x: r1(e1.x), y: r1(e1.y) }, to: { x: r1(e2.x), y: r1(e2.y) }, peak: r1(r.y1 - d) };
   }
 
   const right = band ? band.right + SIZE.margin : 0;
+  const peaks = out.map((l) => l.peak - 6);
   return {
     band,
     links: out,
     ripples: [...ripples.values()],
     audit,
-    top: band ? band.top - 16 : 0,
+    top: Math.min(band ? band.top - 16 : 0, 0, ...peaks),
     width: Math.max(layout.width || 0, right),
   };
 }

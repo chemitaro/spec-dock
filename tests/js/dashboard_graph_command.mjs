@@ -9,6 +9,7 @@
 //              {items, gap, ids}}, routed: bool, routes: [{pts}], order: {worktree id: [agent id, …]}}}
 //              -> the pairs, places, band items and commandModel of each (null places: F-01)
 //   key: true                         -> commandKey's answers for the same and for changed inputs
+//   hop: [[P, C, ceiling | null], …]  -> hop of each (iss-00648 D-02)
 // Prints one JSON object; the Python test asserts on it.
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
@@ -23,8 +24,9 @@ const out = {};
 
 out.consts = {
   MARK_H: L.MARK_H ?? null, MARK_LEAD: L.MARK_LEAD ?? null, MARK_LEFT: L.MARK_LEFT ?? null, MARK_BOTTOM: L.MARK_BOTTOM ?? null,
-  FRAME_TITLE: L.FRAME_TITLE ?? null, FRAME_GAP: L.FRAME_GAP ?? null, BAND: C.BAND ?? null,
+  FRAME_TITLE: L.FRAME_TITLE ?? null, FRAME_GAP: L.FRAME_GAP ?? null, BAND: C.BAND ?? null, HOP: C.HOP ?? null,
 };
+if (request.hop) out.hop = request.hop.map(([P, Q, ceiling]) => C.hop(P, Q, ceiling ?? undefined));
 if (request.packMarks) out.packMarks = request.packMarks.map(([m, avail]) => ({ packed: L.packMarks(m, avail), rows: L.markRows(m, avail) }));
 if (request.markSpots) out.markSpots = request.markSpots.map(([node, m]) => L.markSpots(node, m));
 if (request.labelWidth) out.labelWidth = request.labelWidth.map((t) => C.labelWidth(t));
