@@ -47,16 +47,37 @@ def _corridor(boxes: int = 40, step: int = 5, room: int = 120) -> dict[str, Any]
     ]
     for i in range(boxes):
         y1 = i * (height + row) + 20
-        obs.append({"key": f"n:b{i}", "x1": x1, "y1": y1, "x2": x1 + 200, "y2": y1 + height, "p1": y1 + 12, "p2": y1 + height - 12})
+        obs.append({
+            "key": f"n:b{i}",
+            "x1": x1,
+            "y1": y1,
+            "x2": x1 + 200,
+            "y2": y1 + height,
+            "p1": y1 + 12,
+            "p2": y1 + height - 12,
+        })
     edges = [{"a": i, "z": i + step} for i in range(1, boxes - step + 1)]
-    return {"obs": obs, "frames": [], "edges": edges, "bounds": {"x1": 0, "y1": 0, "x2": x1 + 260, "y2": boxes * (height + row) + 40}, "nested": False}
+    return {
+        "obs": obs,
+        "frames": [],
+        "edges": edges,
+        "bounds": {"x1": 0, "y1": 0, "x2": x1 + 260, "y2": boxes * (height + row) + 40},
+        "nested": False,
+    }
 
 
 @pytest.fixture(scope="module")
 def checked(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
     inputs = json.loads(INPUTS.read_text(encoding="utf-8"))
     inputs["cases"] = [
-        {"name": f"{structure}-tree-all", "structure": structure, "mode": "tree", "range": "all", "width": 1240, "marks": False}
+        {
+            "name": f"{structure}-tree-all",
+            "structure": structure,
+            "mode": "tree",
+            "range": "all",
+            "width": 1240,
+            "marks": False,
+        }
         for structure in ("product", "business")
     ]
     path = tmp_path_factory.mktemp("tree-route") / "request.json"
