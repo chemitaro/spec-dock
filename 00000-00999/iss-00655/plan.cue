@@ -7,8 +7,8 @@ goal: "両方の図で、マウスのホイールがカーソルの位置で拡�
 steps: {
 	"S-01": {title: "T-01・T-02 を tests/js/dashboard_view_input.mjs（新）・tests/unit/presentation/test_dashboard_view_input.py（新）に先に書いて落ちることを確かめ、D-01〜D-03（新しい views/graph/view_input.js の WHEEL・KEYS・wheelKind・wheelAction・keyAction・ownsKey）を入れて通す。今のファイルは変えない", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "F-01"], status: "done", session: "impl-sol"}
 	"S-02": {title: "T-03 を先に書いて（両方の画面の今の画面のテストに、マウスのホイール・キー・aria-label の場面を足す）落ちることを確かめ、D-04（view_input.js の bindViewInput と、graph.js・allgraph.js のつなぎ。今の wheel の処理を消す）と D-05（aria-label）を入れて通す", realizes: ["R-01", "R-02", "R-04", "R-05", "R-06", "R-07", "F-02"], status: "done", after: ["S-01"], session: "impl-claude"}
-	"S-03": {title: "make lint と全体の uv run pytest を通す（今のテストの期待を変えたら、その理由が wheel・キー・aria-label の変更だけによることを確かめる。static-inventory.json に載る資産の sha256 が変われば直す）", realizes: ["R-06"], status: "todo", after: ["S-02"], session: "impl-claude"}
-	"S-04": {title: "D-06 の実機の確かめ（T-04）を report.md に残し、本人が見る試しの URL（tailnet）を立てたままにする。受入に届かないか、実機の値が見分けの表と食い違えば、実装担当に返すか統括に問う", realizes: ["R-01", "R-02", "R-04", "F-02"], status: "todo", after: ["S-03"], session: "owner"}
+	"S-03": {title: "make lint と全体の uv run pytest を通す（今のテストの期待を変えたら、その理由が wheel・キー・aria-label の変更だけによることを確かめる。static-inventory.json に載る資産の sha256 が変われば直す）", realizes: ["R-06"], status: "done", after: ["S-02"], session: "impl-claude"}
+	"S-04": {title: "D-06 の実機の確かめ（T-04）を report.md に残し、本人が見る試しの URL（tailnet）を立てたままにする。受入に届かないか、実機の値が見分けの表と食い違えば、実装担当に返すか統括に問う", realizes: ["R-01", "R-02", "R-04", "F-02"], status: "done", after: ["S-03"], session: "owner"}
 }
 
 tests: {
