@@ -22,7 +22,11 @@ slices: {
 		text:   "SpecDock 0.9.0 のリリース（PR #582）"
 		after: ["iss-00574", "iss-00575", "iss-00578"]
 	}
+	"iss-00656": {
+		covers: ["R-06"]
+		text:   "Scope の欄の見出しの重なりを除き、PC でもタブの中身を広く見せる（2026-11-18 に開き直して追加）"
+	}
 }
 
 verification: "各 Issue の report.md（ゲートの合格、headless Chrome の写し）と、統括のブラウザーでの確かめ。リリース後に7つのリポジトリで canonical check が合格する。"
-exit:         "4つの子の Issue が閉じ、0.9.0 が7つのリポジトリに配られている。"
+exit:         "子の Issue（2026-11-18 に足した iss-00656 を含む）が閉じ、0.9.0 が7つのリポジトリに配られている。"

@@ -28,6 +28,11 @@ design: {
 		text:      "版の番号、migration.md の「0.9.0 への更新」（0.8.0 の節の訂正を含む）、static-inventory の既知の古い版、0.8.0 からの更新の統合テスト。タグの後に統括が導入と配布を行う。"
 		satisfies: ["R-05"]
 	}
+	"D-06": {
+		title:     "欄の見出しの1行目と、足すときだけの帯"
+		text:      "`views/_shared/panel.js` の見出しを、祖先のパンくずと今の ID・番号・種類の行（右に状態の札・エージェントの印・Orca で開く・閉じる）と題名にする。帯は `panel_logic.js` の `headerBand` が、理由が状態の名前のほかに何かを足すときと動きなしがあるときだけ返す。枠を新しいタブで開く印は SCOPE_TABS の `open` でタブの行の右端に置く（詳細は iss-00656 の design.cue）。"
+		satisfies: ["R-06"]
+	}
 }
 
 compatibility: "公開の CLI と JSON の契約は変わらない。API に非契約の `progress` が足され、`revision` が作業中の Issue の plan.cue の書き換えでも変わる。"
