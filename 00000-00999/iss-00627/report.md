@@ -83,6 +83,16 @@ taikyohiyou_project の overlaps は、DOM なしで、ページで測った稼�
 
 ## Outcome
 
+構造の図（各リポジトリの `/r/<repo>/` と『横断の構造』`/graph`）で、枠の見出しの実寸を配置の見込みに合わせ（graph.css の行の高さを layout の px に固定）、2行の題名の縮めた枠は描いた後に測って配置をやり直し、router.js の寄せと入口の高さの3つの不具合を直した。受入の組で倍率 100% の線の検査の違反がすべて0になった。
+
 ## Verification
 
+- 仕様のレビュー合格（round-2）。最終品質ゲート合格（`10610ce89`、review P0〜P3 0、`make lint`・`uv run pytest` 4066 passed）。
+- 実機：54 組すべてで edgeAudit の違反0・はみ出し0・見出しの差 0px。再現の組 overlaps 8 → 0。240 組の node の比べで悪化0。
+- PR https://github.com/chemitaro/spec-dock/pull/630（head `10610ce89`）。CI（Actions と Commit Status）は observable_ci PASS、merge_readiness READY（2026-11-17T00:43Z、`.workbench/iss-00627/pr-checks.json`）。マージは統括が行う。
+
 ## Residual Risks / Follow-ups
+
+- 木の表示の taikyohiyou『全体』の線の違反 9（直す前から同じ）：統括が別の Issue にする。
+- 字体の違いで題名の行の中身が 22px を越える環境では、縮めていない枠の見出しが少しはみ出しうる（行の高さを px で固定するので、ふつうは起きない）。
+- 試しのサーバー 18627・18727 は本人の確かめまで残す。
