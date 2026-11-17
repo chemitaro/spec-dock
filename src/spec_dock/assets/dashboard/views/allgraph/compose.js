@@ -1,6 +1,6 @@
 // The cross-repository structure's frames (iss-00614 D-03; Epic epic-00612 D-04): from the list API's repositories,
-// their parents, and each one's laid-out structure graph, the rectangles of the repository frames nested as the
-// company is (company-os → business → product …), which to show in the chosen range, and the band each frame can
+// their parents, and each one's laid-out structure graph, the rectangles of the repository frames nested as their
+// main checkouts' paths contain one another, which to show in the chosen range, and the band each frame can
 // take later between its heading and its contents.
 // Inside a frame, below its heading, warnings and band, its own graph comes first and its children follow in the
 // list's order, left to right in rows no wider than the frame's usable width (iss-00629 D-01): a child that fits sits

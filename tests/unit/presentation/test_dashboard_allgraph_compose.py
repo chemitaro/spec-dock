@@ -20,18 +20,16 @@ if TYPE_CHECKING:
 HARNESS = ROOT / "tests" / "js" / "dashboard_allgraph_compose.mjs"
 REPO = {"head": 40, "warn": 24, "line": 28, "pad": 16, "gap": 16, "minW": 360, "headW": 280, "margin": 8}
 
-BUSINESS = ["事業"]
-PRODUCT = ["プロダクト"]
 SHAPE = {
-    "company-os": (None, []),
-    "housing-lifecycle": ("company-os", BUSINESS),
-    "taikyohiyou_project": ("housing-lifecycle", PRODUCT),
-    "input-devices": ("company-os", BUSINESS),
-    "generic-mona": ("input-devices", PRODUCT),
-    "tenting-cradle": ("input-devices", PRODUCT),
-    "yubisaki": ("input-devices", PRODUCT),
-    "spec-dock": (None, []),
-    "orca-web": (None, []),
+    "company-os": None,
+    "housing-lifecycle": "company-os",
+    "taikyohiyou_project": "housing-lifecycle",
+    "input-devices": "company-os",
+    "generic-mona": "input-devices",
+    "tenting-cradle": "input-devices",
+    "yubisaki": "input-devices",
+    "spec-dock": None,
+    "orca-web": None,
 }
 
 
@@ -39,11 +37,11 @@ def key(name: str) -> str:
     return f"github.com/o/{name}"
 
 
-def repos(shape: dict[str, tuple[str | None, list[str]]] = SHAPE) -> list[dict[str, Any]]:
+def repos(shape: dict[str, str | None] = SHAPE) -> list[dict[str, Any]]:
     """The list API's order: the keys sorted."""
     return [
-        {"repository": key(n), "parent": key(p) if p else None, "tier": t, "owner": "o", "name": n}
-        for n, (p, t) in sorted(shape.items(), key=lambda kv: key(kv[0]))
+        {"repository": key(n), "parent": key(p) if p else None, "owner": "o", "name": n}
+        for n, p in sorted(shape.items(), key=lambda kv: key(kv[0]))
     ]
 
 
@@ -103,11 +101,11 @@ def body_rect(f: dict) -> dict:
     return {"x1": b["x"], "y1": b["y"], "x2": b["x"] + b["w"], "y2": b["y"] + b["h"]}
 
 
-def check_no_overlap(out: dict, shape: dict[str, tuple[str | None, list[str]]] = SHAPE) -> None:
+def check_no_overlap(out: dict, shape: dict[str, str | None] = SHAPE) -> None:
     """A child is inside its parent, apart from the parent's body and from its siblings (iss-00629 R-01)."""
     frames = out["frames"]
     kids: dict[str | None, list[str]] = {}
-    for n, (p, _) in shape.items():
+    for n, p in shape.items():
         if key(n) in frames:
             kids.setdefault(key(p) if p and key(p) in frames else None, []).append(key(n))
     for parent, children in kids.items():
@@ -119,11 +117,11 @@ def check_no_overlap(out: dict, shape: dict[str, tuple[str | None, list[str]]] =
             assert apart(frames[a], frames[b]), (a, b)
 
 
-def check_rows(out: dict, width: int, shape: dict[str, tuple[str | None, list[str]]] = SHAPE) -> None:
+def check_rows(out: dict, width: int, shape: dict[str, str | None] = SHAPE) -> None:
     """iss-00629 R-01: in a frame, a row of two or more (the graph and the children) fits in bodyWidth of its depth."""
     frames = out["frames"]
     for f in frames.values():
-        kids = [frames[key(n)] for n, (p, _) in shape.items() if p and key(p) == f["key"] and key(n) in frames]
+        kids = [frames[key(n)] for n, p in shape.items() if p and key(p) == f["key"] and key(n) in frames]
         items = ([body_rect(f)] if f["body"]["kind"] == "graph" else []) + kids
         limit = max(REPO["minW"], width - 2 * REPO["margin"] - 2 * REPO["pad"] * (f["depth"] + 1))
         rows: dict[float, list[dict]] = {}
@@ -232,7 +230,7 @@ def test_the_top_level_and_the_shelves_wrap_at_their_widths(tmp_path: Path) -> N
     check_rows(got, width)
 
 
-SIDE = {"p": (None, []), "a": ("p", PRODUCT), "b": ("p", PRODUCT), "c": ("p", PRODUCT)}
+SIDE = {"p": None, "a": "p", "b": "p", "c": "p"}
 
 
 def test_children_that_fit_sit_right_of_the_parents_graph_and_the_rest_wrap(tmp_path: Path) -> None:
@@ -316,7 +314,7 @@ def test_body_width_is_the_width_less_the_margins_and_paddings_with_a_floor(tmp_
 
 
 def test_a_parent_not_in_the_list_or_a_cycle_puts_the_repository_at_the_top_once(tmp_path: Path) -> None:
-    shape = {"a": ("missing", []), "b": ("c", []), "c": ("b", []), "d": ("b", PRODUCT), "e": (None, [])}
+    shape = {"a": "missing", "b": "c", "c": "b", "d": "b", "e": None}
     rs = repos(shape)
     for r in rs:
         if r["name"] == "a":
@@ -438,7 +436,7 @@ def test_a_band_moves_the_body_and_the_shelf_down_and_no_band_is_zero(tmp_path: 
 
 def test_a_band_moves_the_graph_the_children_beside_it_and_their_children_down(tmp_path: Path) -> None:
     # T-02 with iss-00629's rows: p's graph with a (and a's child g) and b beside it
-    shape = {"p": (None, []), "a": ("p", BUSINESS), "b": ("p", BUSINESS), "g": ("a", PRODUCT)}
+    shape = {"p": None, "a": "p", "b": "p", "g": "a"}
     sizes = {key("p"): ok(500, 600), key("a"): ok(300, 100), key("b"): ok(300, 100), key("g"): ok(200, 80)}
     opts: dict[str, Any] = {"range": "all", "width": 1400}
     cases = {

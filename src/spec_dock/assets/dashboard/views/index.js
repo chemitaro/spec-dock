@@ -12,7 +12,7 @@
 //   ctx = {repository, route: {view, repository, scope, params, embed, path}, data (structure JSON),
 //          scope (scope JSON on the detail screen), repositories, embed, navigate(path), href(path)}
 //   The screens without a repository (overview, todos, allgraph) have repository and data null and read
-//   `repositories` (the list API's repositories, with parent and tier) themselves.
+//   `repositories` (the list API's repositories, with parent) themselves.
 //
 // #531 (board, scope, overview) and #532 (graph, timeline) replace their own file (and add CSS) only.
 import allgraph from "./allgraph.js"; // iss-00614
