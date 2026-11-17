@@ -56,6 +56,8 @@ ID: "iss-00633"
 - S-01（Claude Opus 5.5 / medium、このセッション）：Red `672cb3153`（`tests/unit/presentation/test_dashboard_graph_tree_route.py`、`tests/js/dashboard_graph_route_fix.mjs` に mode・marks・problems・maxWiden。product の木の『全体』・通り道・静的な検査の3件が落ち、business の木の『全体』は直す前も0で通る：(A) だけを直したときの退行の見張り）→ Green `18958e562`（router.js D-01 の `prefer`・`packFree`・`centre`・nudgePass の (c)・`lacking` の packed、layout.js D-02）。静的な検査の正規表現が packFree の定義も数えていたので、呼び出しだけに直した（テストの誤り）。整形 `3ca68b2c9`。
 - 節目の検証：`uv run pytest tests/unit/presentation/test_dashboard_graph_tree_route.py tests/unit/presentation/test_dashboard_graph_route_fix.py tests/unit/presentation/test_dashboard_graph_js.py tests/unit/presentation/test_dashboard_graph_fit.py` 56 件（静的な検査を直した後、新しいテストの4件を再実行して全部合格）。`make lint` pass。static-inventory.json は dashboard の資産を持たないので変わらない。
 - 実装の経路は試作と同じ（300 組のすべてで経路の digest が試作と一致）。
+- S-02（同じセッション）：全体の `uv run pytest` で `test_dashboard_graph_range.py::test_all_and_now_lay_out_as_the_two_old_combinations` が落ちた（iss-00603 の `tests/fixtures/issue603/layout-before.json` の木の routed の digest 4つ：spec-dock と generated の『全体』『いま』）。木の経路が変わる設計どおりの差で、その組の audit はすべて0、入れ子の digest は同じ。iss-00627 と同じく、digest を記録し直し注記の鍵 `iss-00633` を足した（`a4fe0f8f0`）。graph_dom_golden.json（入れ子と木の run）は書き直しなしで通る。
+- origin/main（#638・#639、dd3724b22）を取り込んだ（`5d7c5fb1a`、競合なし。graph の資産は上流で変わらない）。
 
 ## 比べ（S-03、T-04）
 
@@ -86,8 +88,30 @@ ID: "iss-00633"
 - 写し（題名は Scope の ID に置き換えて写した。公開のリポジトリに題名を載せないため）：直す前 [1440 明](artifacts/20261117t044624z--before-tree-all-1440-light.png)・[1440 暗](artifacts/20261117t044624z-02--before-tree-all-1440-dark.png) → 直した後 [1440 明](artifacts/20261117t044624z-01--after-tree-all-1440-light.png)・[1440 暗](artifacts/20261117t044625z--after-tree-all-1440-dark.png)。epic-02026 に入る線の束のあたり。直す前は Epic の左の通り道に線が 2〜6px で詰まり、直した後は車線（8px）に分かれ、字下げが狭くなる。
 - 試しの URL（本人の確かめ用、確かめまで残す）：tailnet の 18633 番（`/r/github.com/chemitaro/taikyohiyou_project/` で「木」と「全体」。URL は統括への報告で伝える）。止め方：`kill $(lsof -tnP -iTCP:18633 -sTCP:LISTEN) $(lsof -tnP -iTCP:18634 -sTCP:LISTEN)`（またはタスク担当・統括に頼む）。
 
+## 最終品質ゲート
+
+- キャンペーン iss-00633-fqg-1（quality-gate-reviewer opus / medium、second opinion なし、範囲 `3f5f8d8e9..HEAD`、観点 functional-correctness・requirements-closure・test-adequacy・compatibility-regression、test_commands `make lint`・`uv run pytest`）。
+- attempt 01（`a4fe0f8f0`）：レビュー合格（P0〜P3 0）。テストは origin/main が進んだ（統括 msg_73c77ba94794）ので途中で止め、数えない。
+- attempt 02（`5d7c5fb1a`、取り込みの後）で **合格**：review lane P0〜P3 0、coverage complete。`make lint` exit 0、`uv run pytest` exit 0（4108 passed、7 skipped）。closure は worktree の `.workbench/final-quality-gate/iss-00633-fqg-1/closure.md`。
+
 ## Outcome
+
+木の表示で、寄せの詰めが範囲からあふれる束を、前後の決まる組の順だけを守って空いた位置に詰め直し（router.js の packFree）、検査の違反が残る巡を落ち着いたと見なさないようにした（layout.js）。taikyohiyou_project の木の『全体』の線の違反は、node・実機とも 9（今日のデータの node は 3）→ 0。入れ子の表示は 270 組すべてで経路まで同じ。
 
 ## Verification
 
+- 仕様のレビュー合格（round-2）。最終品質ゲート合格（`5d7c5fb1a`、review P0〜P3 0、`make lint`・`uv run pytest` 4108 passed）。
+- 比べ：300 組で違反の増えた組0、違反のある組 2 → 0、入れ子 270 組は経路まで同じ。固定した入力の木 12 組（稼働の印あり・なし）すべて0。
+- 実機：taikyohiyou_project の木の『全体』1440 明暗で edgeAudit の違反 9 → 0。前後の写しあり。
+- PR https://github.com/chemitaro/spec-dock/pull/641（head `5d7c5fb1a`）。CI は観測中（`.workbench/iss-00633/pr-checks.json`）。マージは統括が行う。
+
 ## Residual Risks / Follow-ups
+
+- packFree は交差の数が同じ組の前後を決めないので、詰め直した束では交差の数が今と違うことがある（重ならないことを優先）。
+- 木の大きな構造では 10 巡で落ち着かない構造もありうる（そのときは今どおり最も違反の少ない巡）。今の 8 リポジトリと固定した入力の木は最大 9 巡で落ち着く。
+- 試しのサーバー 18633（tailnet）と 18634（127.0.0.1、直す前）は本人の確かめまで残す。
+
+## 次の提案
+
+- 横断の構造（`/graph`）には木の表示がないので範囲外にした。木の表示の線の検査を CI の node のテストで常に見るなら、固定した入力の木の『いま』『これから』も T-01 に足せる（今は比べで0を確かめただけ）。
+- 仕様のレビューの P3（purpose と plan の goal の『入れ子の結果を変えない』の言い切り）は、文書を合格の後に変えないため残した。
