@@ -72,6 +72,10 @@ ID: "iss-00657"
 
 epic-00615 の requirement.cue の R-05 の text（点の組・12枚・20px/秒・波紋 3.6秒・減らす設定の組の形）と decisions（iss-00657 の決定の1行。iss-00646 の行は残す）、design.cue の D-04 の動きの行を書き換えた。`spec-dock scope check epic-00615` は誤り0・指摘0。
 
+## 最終品質ゲート（2026-11-18、合格）
+
+- 合格のコミット `1f723bfcb`（origin/main `afe2df5c2` の取り込み。base `106f214e8`）。レビュー（quality-gate-reviewer opus / medium、functional-correctness・requirements-closure・test-adequacy・e2e-user-flow）P0〜P3 すべて0、網羅は完全。`make lint` exit 0、`uv run pytest` 4264 passed・7 skipped。この worktree の `.workbench/final-quality-gate/iss-00657/closure.md`。記録だけのコミットはない（記録は Git の外）。
+
 ## 逸脱
 
 - S-01 の担当の交代（impl-sol → impl-claude）：上の実装の記録のとおり。統括の了承済みの手順。

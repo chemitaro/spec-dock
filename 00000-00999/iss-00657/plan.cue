@@ -5,11 +5,11 @@ package spec
 goal: "指揮の線の点を、組の間 24px の大小2つの点の組にし、0.1秒ごとに 2px（20px/秒）で流し、波紋を 3.6秒にして、iss-00646 の重さの受入を保つ"
 
 steps: {
-	"S-01": {title: "iss-00648 のマージの後の origin/main から始め（開始のコミットを report.md に書く）、D-01 の前提（端の層の stubs が空、本体だけが切り替えの絵を持つ）を読み直す。T-01 を先に直して落ちることを確かめ、D-01（MOTION、dotsHtml、bodyHtml）を入れて通す", realizes: ["R-01", "R-02", "R-04", "F-01"], status: "todo", session: "impl-sol"}
-	"S-02": {title: "T-02・T-03 を先に直して落ちることを確かめ、D-02（graph.css の点・組・切り替え・波紋・注記）を入れて通す", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05"], status: "todo", after: ["S-01"], session: "impl-claude"}
-	"S-03": {title: "make lint と全体の uv run pytest を通す（直したテストの期待が、数と点の線の数の変更だけによることを確かめる。static-inventory.json に載る資産の sha256 が変われば直す）", realizes: ["R-04"], status: "todo", after: ["S-02"], session: "impl-claude"}
-	"S-04": {title: "D-04 の測り・連続の写し・線の検査（T-04）を report.md に残し、本人が見る試しの URL（tailnet）を立てたままにする。受入に届かないか、写しで向きが読めなければ、数を見直すか統括に問う", realizes: ["R-01", "R-02", "R-04", "R-05"], status: "todo", after: ["S-03"], session: "owner"}
-	"S-05": {title: "D-05（Epic epic-00615 の R-05・D-04・decisions）を書き換え、spec-dock scope check epic-00615 と iss-00657 を通す", realizes: ["R-02"], status: "todo", after: ["S-04"], session: "owner"}
+	"S-01": {title: "iss-00648 のマージの後の origin/main から始め（開始のコミットを report.md に書く）、D-01 の前提（端の層の stubs が空、本体だけが切り替えの絵を持つ）を読み直す。T-01 を先に直して落ちることを確かめ、D-01（MOTION、dotsHtml、bodyHtml）を入れて通す", realizes: ["R-01", "R-02", "R-04", "F-01"], status: "done", session: "impl-sol"}
+	"S-02": {title: "T-02・T-03 を先に直して落ちることを確かめ、D-02（graph.css の点・組・切り替え・波紋・注記）を入れて通す", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05"], status: "done", after: ["S-01"], session: "impl-claude"}
+	"S-03": {title: "make lint と全体の uv run pytest を通す（直したテストの期待が、数と点の線の数の変更だけによることを確かめる。static-inventory.json に載る資産の sha256 が変われば直す）", realizes: ["R-04"], status: "done", after: ["S-02"], session: "impl-claude"}
+	"S-04": {title: "D-04 の測り・連続の写し・線の検査（T-04）を report.md に残し、本人が見る試しの URL（tailnet）を立てたままにする。受入に届かないか、写しで向きが読めなければ、数を見直すか統括に問う", realizes: ["R-01", "R-02", "R-04", "R-05"], status: "done", after: ["S-03"], session: "owner"}
+	"S-05": {title: "D-05（Epic epic-00615 の R-05・D-04・decisions）を書き換え、spec-dock scope check epic-00615 と iss-00657 を通す", realizes: ["R-02"], status: "done", after: ["S-04"], session: "owner"}
 }
 
 tests: {
