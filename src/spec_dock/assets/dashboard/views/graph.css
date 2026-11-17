@@ -312,7 +312,8 @@
    波紋は塊の上・依存の線の下の .gx-cmd-top、帯は依存の線の上の .gx-band（帯の子の印の縁と帯の波紋は .gx-band-cr）。
    どれも押せない（帯のボタンだけが押せる）。
    色は指揮の札（app.css の --sd-cmd、--sd-cmd-glow）と今の変数だけ。層は入れ物の div で、中は線ごとの外接の四角の SVG と
-   波紋の HTML の輪（iss-00646 D-01・D-02）。動きは合成スレッドで動く opacity と transform だけ（主スレッドで描き直さない）
+   波紋の HTML の輪（iss-00646 D-01・D-02）。動きは合成スレッドで動く opacity と transform だけ（主スレッドで描き直さない）。
+   流れる線の点は、組の間 24px の大小2つの点（頭と尾）を 12枚 × 0.1秒の切り替えで 20px/秒で流す（iss-00657）
    ============================================================ */
 .gx .gx-world > .gx-cmd, .gx .gx-world > .gx-cmd-top { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
 .gx .gx-world > .gx-cmd { z-index: 1; }
@@ -320,25 +321,33 @@
 .gx .cl-svg { position: absolute; overflow: visible; }
 .gx .cl-glow { fill: none; stroke: var(--sd-cmd-glow); stroke-width: 6; stroke-linecap: round; }
 .gx .cl-line, .gx .cl-stub { fill: none; stroke: var(--sd-cmd); stroke-width: 2; stroke-linecap: round; }
-/* 点の1周は 8px。流れる線は、点を 2px ずつずらした止めた絵4枚（.cl-ph、data-ph 0〜3）を 0.05秒ずつ1枚だけ見せて流す
-   （40px/秒。command_motion.js の MOTION の写し。一緒に直す）。道は親から子へ描くので点は子へ流れる */
-.gx .cl[data-state="flow"] :is(.cl-line, .cl-stub) { stroke-dasharray: 0.1 7.9; }
+/* 流れる線の点は組の間 24px（MOTION.gap）の周期。1つの組は、進む向きの先の大きく明るい頭（.cl-hd）と、その 6px 後ろ
+   （MOTION.tail）の小さく薄い尾（.cl-tl）。点を 2px ずつずらした止めた絵12枚（.cl-ph、data-ph 0〜11）を 0.1秒ずつ1枚だけ
+   見せて流す（20px/秒、1周 1.2秒。command_motion.js の MOTION の写し。一緒に直す）。道は親から子へ描くので点は子へ流れる。
+   wait の止まった点線は流れる線と区別するため 8px の間のまま */
+.gx .cl[data-state="flow"] :is(.cl-line, .cl-stub) { stroke-dasharray: 0.1 23.9; }
+.gx .cl-hd { stroke-width: 3.5; }
+.gx .cl-tl { stroke-width: 2; opacity: .45; }
 .gx .cl[data-state="wait"] :is(.cl-line, .cl-stub) { stroke-dasharray: 0.1 7.9; animation: none; }
 .gx .cl[data-state="done"] :is(.cl-line, .cl-stub) { opacity: .35; animation: none; }
 .gx .cl[data-state="done"] .cl-glow { display: none; }
-.gx .cl-ph { animation: sd-cmd-phase .2s steps(1, end) infinite; }
-@keyframes sd-cmd-phase { 0% { opacity: 1; } 25% { opacity: 0; } 100% { opacity: 0; } }
+/* 1枚は1周の 1/12 だけ見える。8.334% は 1/12 を少し上に丸め、隣の絵と隙間なくつなぐ */
+.gx .cl-ph { animation: sd-cmd-phase 1.2s steps(1, end) infinite; }
+@keyframes sd-cmd-phase { 0% { opacity: 1; } 8.334% { opacity: 0; } 100% { opacity: 0; } }
 /* 受けた側（iss-00648 D-04）：子の端の下向きの矢じりと、受けた印を囲む縁。動かない絵で、done は薄い */
 .gx .cl-arrow { fill: var(--sd-cmd); stroke: none; }
 .gx .cl-in { fill: none; stroke: var(--sd-cmd); stroke-width: 1.5; }
 .gx .cl[data-state="done"] :is(.cl-arrow, .cl-in) { opacity: .35; }
-/* 波紋は中心に置いた輪の組。外径 15.5・内径 12.5 は今の半径 7・縁 1.5 の円と同じ */
+/* 波紋は中心に置いた輪の組。外径 15.5・内径 12.5 は今の半径 7・縁 1.5 の円と同じ。1つの輪は点の1周の3倍の 3.6秒、2つ目は半分遅れ */
 .gx .cr { position: absolute; width: 15.5px; height: 15.5px; margin: -7.75px 0 0 -7.75px; }
-.gx .cr > i { position: absolute; inset: 0; box-sizing: border-box; border: 1.5px solid var(--sd-cmd); border-radius: 50%; animation: sd-cmd-ripple 2.4s ease-out infinite; }
-.gx .cr .cr-b { animation-delay: 1.2s; }
+.gx .cr > i { position: absolute; inset: 0; box-sizing: border-box; border: 1.5px solid var(--sd-cmd); border-radius: 50%; animation: sd-cmd-ripple 3.6s ease-out infinite; }
+.gx .cr .cr-b { animation-delay: 1.8s; }
 @keyframes sd-cmd-ripple { from { transform: scale(.4); opacity: .9; } to { transform: scale(2.2); opacity: 0; } }
 .gx .has-cmd-sel .cl.is-cmd-off, .gx .has-cmd-sel .cr.is-cmd-off { opacity: .15; }
 .gx .cl.is-cmd-hl .cl-line { stroke-width: 3; }
+/* 選んだ線の組は今の比（2 → 3）で大きくする。上の規則と同じ詳しさで、後に置いて勝たせる */
+.gx .cl.is-cmd-hl .cl-hd { stroke-width: 4.5; }
+.gx .cl.is-cmd-hl .cl-tl { stroke-width: 3; }
 /* 図を動かす間とその後 0.3秒・ページが裏（.gx-view の is-still）、図の領域の外（is-off）は、その場で止める（iss-00646 D-03） */
 .gx .gx-view.is-still :is(.cl-ph, .cr > i), .gx .cl-ph.is-off, .gx .cr.is-off > i { animation-play-state: paused; }
 /* 帯：寸法は command.js の BAND の写し（縁 1 = border、左右の余白 6 = pad、札の後ろ 6 = labelGap、ボタン 52 = slot）。一緒に直す。

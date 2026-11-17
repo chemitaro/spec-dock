@@ -1,10 +1,15 @@
-// The command lines' drawing as pure computation (iss-00646 D-01): each line in SVGs of its own bounding box, a flowing
-// line's dots as four still pictures shifted along the line and shown in turn by an opacity animation (graph.css
-// sd-cmd-phase, run on the compositor), and each ripple as an HTML ring pair. No DOM: node checks it.
+// The command lines' drawing as pure computation (iss-00646 D-01, iss-00657 D-01): each line in SVGs of its own bounding
+// box, a flowing line's dots as pairs 24px apart (a large head and a small tail 6px behind it) in twelve still pictures
+// shifted 2px along the line and shown in turn for 0.1s each by an opacity animation (graph.css sd-cmd-phase, run on the
+// compositor: 20px/s, one round of 1.2s), and each ripple as an HTML ring pair. No DOM: node checks it.
 import { esc } from "./marks.js";
 
-/** The switching: phases pictures, each step px further along the line, each shown for tick s; pad px around a box. */
-export const MOTION = { phases: 4, step: 2, tick: 0.05, pad: 4 };
+/**
+ * The switching: phases pictures, each step px further along the line, each shown for tick s; the dots' pairs gap px
+ * apart (the dash period, phases·step: one round moves them one pair on), the tail tail px behind the head; pad px
+ * around a box. graph.css copies phases·tick (1.2s), gap (0.1 23.9) and 1/phases (8.334%).
+ */
+export const MOTION = { phases: 12, step: 2, tick: 0.1, gap: 24, tail: 6, pad: 4 };
 
 const NUM = /-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/gi;
 
@@ -41,17 +46,26 @@ export const phaseOffset = (i) => -MOTION.step * i || 0;
 export const svgOpen = (box, cls, extra = "", attrs = "") =>
   `<svg class="${cls}"${attrs} style="left:${box.x}px;top:${box.y}px${extra}" width="${box.w}" height="${box.h}" viewBox="${box.x} ${box.y} ${box.w} ${box.h}" aria-hidden="true">`;
 
+/**
+ * One picture's dots (iss-00657 D-01): the path twice, its head at offset off and its tail at off + tail. A dot sits at
+ * k·gap − offset along the path, so the tail's larger offset puts it tail px behind the head, on the parent's side.
+ */
+export function dotsHtml(d, off) {
+  const p = esc(d);
+  return `<path class="cl-line cl-hd" d="${p}" style="stroke-dashoffset:${off || 0}px"/><path class="cl-line cl-tl" d="${p}" style="stroke-dashoffset:${off + MOTION.tail || 0}px"/>`;
+}
+
 const phases = (box, g, inner) =>
   Array.from({ length: MOTION.phases }, (_, i) => `${svgOpen(box, "cl-svg cl-ph", `;animation-delay:${phaseDelay(i)}s`, ` data-ph="${i}"`)}${g}${inner(phaseOffset(i))}</g></svg>`).join("");
 
-/** The line's body layer (.gx-cmd): its glow and, unless it flows, its still line; a flowing line's four pictures. */
+/** The line's body layer (.gx-cmd): its glow and, unless it flows, its still line; a flowing line's twelve pictures. */
 export function bodyHtml(link) {
   const box = boxOf([link.d]);
   if (!box) return "";
   const g = `<g class="cl" data-id="${esc(link.id)}" data-parent="${esc(link.parent)}" data-child="${esc(link.child)}" data-state="${esc(link.state)}">`;
   const flow = link.state === "flow";
   const still = `${svgOpen(box, "cl-svg")}${g}<path class="cl-glow" d="${esc(link.d)}"/>${flow ? "" : `<path class="cl-line" d="${esc(link.d)}"/>`}</g></svg>`;
-  return flow ? still + phases(box, g, (off) => `<path class="cl-line" d="${esc(link.d)}" style="stroke-dashoffset:${off}px"/>`) : still;
+  return flow ? still + phases(box, g, (off) => dotsHtml(link.d, off)) : still;
 }
 
 /** The arrowhead at the child's end (iss-00648 D-04): len px long, half px to each side. */
@@ -78,7 +92,7 @@ const ringPath = (m) => {
 
 /**
  * The line's ends layer (.gx-cmd-top): its stubs, the arrowhead at its end and the ring of the child's mark in a box or
- * a frame's heading (a band child's ring is bandMarkHtml's); a flowing line's stubs in four pictures.
+ * a frame's heading (a band child's ring is bandMarkHtml's); a flowing line's stubs (one cl-stub each) in the pictures.
  */
 export function endsHtml(link) {
   const stubs = Array.isArray(link.stubs) ? link.stubs : [];
