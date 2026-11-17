@@ -27,19 +27,27 @@ ID: "iss-00648"
 - 開始のコミット `92e26aff7256a9a32ba6edd5bc7f790ed8e4f149`（origin/main、iss-00646 のマージ後）。
 - 仕様化と S-01（Epic の文書の直し）：タスク担当（Claude Opus 5.5 / medium、統括が選んだ値）。
 
-- S-02（impl-claude：Claude Opus 5.5 / medium。計画では impl-sol だったが、Codex が chat-scratch の symlink の拒否で何も変えずに止まったので、計画の rationale と統括の了承のとおり引き継いだ）：コミット `074191092`。
+- S-02（impl-claude：Claude Opus 5.5 / medium。計画では impl-sol だったが、Codex が chat-scratch の symlink の拒否で何も変えずに止まったので、計画の rationale と統括の了承のとおり引き継いだ）：コミット `e823115b2`（題を直す前は `074191092`）。
   - 基準（開始のコミット `92e26aff7`、`.workbench/implement/iss-00648/start.md`）：`make lint` 合格、S-02 の節目のテスト 51 passed。全体の `uv run pytest` は30分かかるので基準では省き、S-04 で行う。
   - 変えたもの：`views/graph/command.js`（`HOP`・`hop`・上の縁の端 `fixedEnd`・`sameHop`・線の `mark` と `peak`・`top`・引数 `ceiling`。`faceOf`・`DOWN`・`SIDES` の下と左右・`contains`・`center`・`boxArc`・`frameArc`・`bandArc`・`CHORD`・`ARC_D`・`ARC_MIN`・`FRAME_ARC_D` と `roomOf` の下・右を消した）、`views/allgraph/command.js`（`crossModel` が `ceiling: 4`）、`tests/js/dashboard_graph_command.mjs`（`hop` の依頼と `HOP` の定数）、`tests/unit/presentation/test_dashboard_{graph,allgraph}_command.py`。描き方のファイルは変えていない。
   - Red：新しいテストを開始のコミットの `command.js` 2つで走らせて 22 failed・3 errors（`hop` がない）（`.workbench/implement/iss-00648/s02-red.log`）。Green：`uv run pytest tests/unit/presentation/test_dashboard_graph_command.py tests/unit/presentation/test_dashboard_allgraph_command.py` 60 passed（`s02-green.log`）。`make lint` 合格（`s02-lint.log`）。CP-1 の『S-02 の節目のテストの合格』はこれで確かめた。
   - 直した今の期待：下の端（帯の項目の下の縁・箱の下の縁・枠の見出しの印の下・枠の内側の下の縁・F-04 の箱の下の縁）→ 上の縁。`stubs`（箱の中の短い線）→ 空。`boxArc`（下・右の縁の外、16px、弦 40、右へ逃げる・依存の線から逃げる）・`frameArc`（見出しの下 12px）・`bandArc`（上 16px）→ `sameHop`（上の縁、18px、弦 12、余白 − 3 へ下げ下限 8、`crowded`）。曲線の制御点（`k = min(140, max(24, 0.45·L))`、両端の向き）→ `hop`（頂点がちょうど H 上）。`top` の `-32` → ホップの頂点を含む `-78`（`five`）。同じ枠の上の縁へ入る3本のずらし（前は2本 ±5、内側の下の縁の1本は別）→ 3本 −10・0・+10。『Epic の統括の線が枠の上の縁より上に出ない』→『枠の上の縁から出て Issue の上の縁へ入るホップ』。`boundsOf` の弧の下の縁の制限 → 上の縁の制限（16/10 → 18/10）。依存の線から右へ逃げるテスト → `edgeOverlaps` に数えるテスト。
   - 足したテスト：木の枠の箱（`tframe`）、縦に重なる印（12 に離す）、上の余白 14px（11、`crowded` 1、`boxOverlaps` 0）・6px（8、重なり1）、依存の線の水平な区間（`edgeOverlaps` 1）、子が上・同じ高さ・下、`hop` の直の計算（同じ高さ、差 700px、dx 0 の横のふくらみ、`ceiling` と `HOP.low`）、線の `mark`、`top`、横断の構造の『ほかの場所』から 500px 以上下の箱（頂点 4）。
 
-- S-03（impl-claude）：コミット `489a46348`（`git-autocommit` が生成した件名は「依存線の終点を…」だが、変えたのは指揮の線の端。履歴は書き換えていない）。
+- S-03（impl-claude）：コミット `2f7934ab0`（題を直す前は `489a46348`）。
   - 変えたもの：`views/graph/command_motion.js`（`ARROW`・`arrowPath`・`markRect`・`bandMarkHtml`、`endsHtml` は `cl-dot` の代わりに `cl-arrow` と、箱・枠の印の `cl-in` を描き、SVG の四角は矢じりと縁を含む）、`views/graph/command_view.js`（`layersHtml` が帯の子の縁を波紋と同じ `.gx-band-cr` に入れる、`paintCmdSel` が `.gx-band-cr .cl` も塗る）、`views/graph.css`（`.cl-arrow`・`.cl-in`・done の .35、`.cl-dot` の規則を消す、層の説明の注釈）。
   - Red：S-02 のコミットの上で新しいテストが 13 failed（`.workbench/implement/iss-00648/s03-red.log`）。Green：S-03 の節目のコマンド `uv run pytest tests/unit/presentation/ tests/unit/infra/test_dashboard_orca_marks_js.py tests/unit/infra/test_dashboard_orca_views_js.py tests/unit/infra/test_dashboard_screens_js.py tests/unit/infra/test_dashboard_allgraph_route.py` 394 passed（`s03-green.log`）。`make lint` 合格（`s03-lint.log`）。
   - 直した今の期待：端の層の `cl-dot`（中心が `to`、半径 2.5）→ `cl-arrow`（先が `to`）。端の層の SVG の四角（点の半径を含む）→ 矢じりの3点を含む。構造の図の最初の表示・『収める』の『帯の上 −32』→ 描いた線の頂点の最も高い所 − 6 と −32 の小さい方（D-05 の `top`。S-02 の後にこの3件が落ちていた：`s02-s03set.log`）。横断の構造の画面で、帯から出る線の始めの y（項目の下の縁 → 上の縁）と、子の端（`cl-dot` の中心が箱の下の縁 → 矢じりの先が箱の上の縁）。線ごとの SVG の層の候補に `.gx-band-cr` を足した。
   - 足したテスト：`arrowPath`（先・底・幅 7）、`markRect`（2px 外）、`endsHtml`（矢じり1つ・点なし・箱の印の縁・帯の子は縁なし・stubs が空の flow は止めた絵1枚）、`bandMarkHtml`（帯の子だけ）、CSS（`--sd-cmd`、1.5px、done .35、`.cl-dot` の規則なし、減らす設定に規則なし、薄めの規則）、構造の図と横断の構造の画面（箱・枠の子は `cl-in`＋`cl-arrow`、帯の子は `cl-arrow` と `.gx-band-cr` の縁、選びで `is-cmd-hl`・`is-cmd-off`）。
   - static-inventory.json：dashboard の資産は載っていないので直すものはない。凡例（`lg-cmd`）は範囲外で変えていない。
+
+- S-02 の続き（仕様の変更 R-03・D-03・T-01、round-3 合格。タスク担当の依頼 msg_7027cb394ce9）：コミット `9d2afa266`（作った時は `78a7afd47`）。
+  - round-3 の sha256（requirement `51441f51…`、design `9538b011…`、plan `8bacb983…`、Epic design `117672e3…`）が report.md の値と一致することを確かめてから始めた。走っていた全体の `uv run pytest`（9% まで）は止めた。
+  - 変えたもの：`sameHop` の高さを、上限 u から HOP.low へ 1 ずつ下げ、頂点（`self.y1 − d`）と、弧の幅の中央の半分に x が重なる依存の線の横の区間の y との差がどれも 3 以上になる最初の値にする。なければ u で `edgeOverlaps++`。ふくらみの四角での依存の線の判定（`overlapsRoute`）は消した。
+  - 直した期待：`routeAbove`（縁の 7px 上の区間で `edgeOverlaps` 1）→ 5つの例 `run10`・`run15`（18 のまま、0）、`run16`（13、0）、`runLegs`（脚の位置だけの区間、18、0）、`runNone`（9・14・18px 上、18 のまま、1）。
+  - Red：S-03 のコミットの `command.js` で新しい例のうち 4 failed（`runNone` は前の判定でも 1 で通る）（`.workbench/implement/iss-00648/s02b-red.log`）。Green：S-02 の節目のテスト 64 passed（`s02b-green.log`）、`make lint` 合格。
+- コミットの題の直し（タスク担当の依頼）：自動生成の題が『コマンド線』『依存線の終点』だったので、push 前に非対話の rebase（reword）で『指揮の線…』に直した。直す前の HEAD `78a7afd47`、直した後の HEAD `9d2afa266`、`git diff 78a7afd47 9d2afa266` は空（内容は同じ）。作者・コミッターは chemitaro のまま。
+- S-04（impl-claude）：HEAD `9d2afa266` で S-02 の節目のテスト 64 passed（`s04-s02set.log`）、S-03 の節目のテスト 398 passed（`s04-s03set.log`）、`make lint` 合格（`s04-lint.log`）。全体の `uv run pytest`：（走らせ中）。
 
 ## 逸脱と判断
 
