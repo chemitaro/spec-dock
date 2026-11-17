@@ -54,16 +54,17 @@ design: {
 			- `repoOfWorktrees(repos, summary)`：`repos` は一覧の API の順の `[{key, structure}]`（読めていないリポジトリは `structure: null`）。
 			  戻り `{of: Map<worktree, key>, unknown: boolean}`。各リポジトリのパスの集合（`structure.worktrees.status === "ok"` のときの `paths` の `normPath`）で、まずパスの当たりを、一覧の順の最初のリポジトリに決める。
 			  残りの worktree は、各リポジトリでパスの当たった worktree の `project.id` と同じものを、一覧の順の最初のリポジトリに決める。`unknown` は、`structure` がない、または `worktrees.status` が ok でないリポジトリが1つでもあること（F-02）。
-			- `crossPlace(pairs, {repos, summary, visible, orderOf})`：`repos` は `[{key, structure, layout, ix, graph}]`（`graph` は、その枠の本文がグラフであること）、`visible` は帯を渡さない `compose` の `order` の集合。
+			- `crossPlace(pairs, {repos, summary, visible, visibleWith, orderOf})`：`repos` は `[{key, structure, layout, ix, graph}]`（`graph` は、その枠の本文がグラフであること）、`visible` は帯を渡さない `compose` の `order` の集合、`visibleWith(keep)` は `keep` だけを渡した `compose` の `order` の集合を返す関数（純粋な計算のまま、呼び手が `compose` を渡す）。
 			  1. 各端の worktree のリポジトリ `k`（`of`）。`k` がないとき、`unknown` ならその組を落とし（F-02）、そうでなければ `{kind: "band", key, row: ""}`（『ほかの場所』）。
 			  2. `k` があり `graph` なら、そのリポジトリの `placer` で居場所を決め、`repo: k` を付ける。band なら `row: k`。
 			  3. `k` があり `graph` でなければ `{kind: "band", key, repo: k, row: k}`。
-			  4. 見えない（`visible` にない）リポジトリ `k` の帯の端：その行に組の親の端が1つでもあれば `k` を `keep` に入れる（R-03）。なければ、その行の端を `row: ""` に移す。
+			  4. 見えない（`visible` にない）リポジトリ `k` の帯の端：その行に組の親の端が1つでもあれば `k` を `keep` に入れる（R-03）。
+			     次に、`keep` を渡した `compose` で見える集合 `visible2`（帯の形は見えるかどうかに効かないので、`keep` だけで決まる）を求め、`visible2` にないリポジトリの行の端だけを `row: ""` に移す（`keep` した子の枠のために出る親のリポジトリの帯の端は、その親の帯に残る）。端を移しても `keep` は変わらないので、1回で決まる。
 			  5. 帯の項目：行ごとに `bandItems` を、その行の端だけの places と、own の集合（その行のリポジトリの worktree の集合。『ほかの場所』は空の集合）で呼ぶ（札：own なら「main のチェックアウト」かブランチ名、『ほかの場所』は「<project.name> · <branch>」）。
 			  戻り `{pairs, places, rows: Map<row, items>, keep: Set<key>}`。
 			- `bandShape(rows, keep)`：`compose` に渡す形 `{bands: {key: {h: REPO.band, w: bandRowWidth(items) + 2·REPO.pad}}, keep: [...], other: rows.get("") ? {h: REPO.other, w: bandRowWidth(items, "ほかの場所") + 2·REPO.pad} : null}` と、その鍵の文字列（同じ形なら同じ文字列。R-05）。
 			- `crossModel({comp, repos, placed, spotsOf, orderOf})`：
-			  - 世界の座標に移した配置：`comp.frames` で本文がグラフの各リポジトリ `k` の原点 `(f.body.x, f.body.y)` だけずらした node・塊の写し（`{…n, x1+ox, y1+oy, x2+ox, y2+oy, repo: k, src: n}`）と、依存の線の道（`r.eg.routes` の `pts` をずらしたもの）。`places` の node・group を写しに置き換える。
+			  - 世界の座標に移した配置：`comp.frames` で本文がグラフの各リポジトリ `k` の原点 `(f.body.x, f.body.y)` だけずらした node・塊の写し（`{…n, x1+ox, y1+oy, x2+ox, y2+oy, repo: k, src: n, key: `${k}\n${n.key ?? n.id}`}`。`key` にリポジトリを含め、別のリポジトリの同じ id の枠・塊の端を、同じ縁のずらしの組にしない）と、依存の線の道（`r.eg.routes` の `pts` をずらしたもの）。`places` の node・group を写しに置き換える。
 			  - `spotsOf(写し)`：`markSpots(src, そのリポジトリの測った幅と記録)` の矩形を同じだけずらす（F-03 は `markSpots` の null のまま）。
 			  - `boundsOf(写し)`：そのリポジトリの本文の矩形 `{ox, oy, ox + L.width, oy + L.height}`。
 			  - 帯の行：帯のある各リポジトリ `k` は `{key: k, left: f.x1 + REPO.pad, top: f.band.y1 + REPO.bandTop, lead: null}`、『ほかの場所』は `{key: "", left: comp.other.x1 + REPO.pad, top: comp.other.y1 + REPO.otherTop, lead: "ほかの場所"}`。
@@ -75,11 +76,11 @@ design: {
 	"D-03": {
 		title: "枠の組み立ての口と補い（allgraph/compose.js）"
 		text: """
-			- `REPO` に足す（allgraph.css の写し。一緒に直す）：`band: 40`（帯の高さ。項目は上から `bandTop: 8` に高さ 28、下に 4。その下に本文の配置の余白 24 が続く）、`other: 56`（全体の帯の高さ。項目は上から `otherTop: 16`（帯の項目の上の弧の余白）に高さ 28、下に 12）。
+			- `REPO` に足す（allgraph.css の写し。一緒に直す）：`band: 48`（帯の高さ。項目は上から `bandTop: 16`（同じ項目の弧が上へ 16px ふくらむ余白で、知らせの行・見出しの行へ入らない）に高さ 28、下に 4。その下に本文の配置の余白 24 が続く）、`other: 56`（全体の帯の高さ。項目は上から `otherTop: 16`（帯の項目の上の弧の余白）に高さ 28、下に 12）。
 			- `options.bands[key]`：数（今と同じく高さ）か `{h, w}`。`w` があれば、その枠の幅を `max(今の幅, w)` にする（帯の行が枠からはみ出さない）。
 			- `options.keep`：key の配列か Set。そのリポジトリは、`visible` の判定によらず出す（R-03。中身は今の body の表のまま：『これから』で Scope のないものは本文の高さ 0）。その親のリポジトリは、子が出るので今の規則で出る。
-			- `options.other`：`{h, w}` か null。あれば、すべての枠を `h` だけ下げ（`REPO.margin + h` から並べる）、戻りに `other: {x1: REPO.margin, y1: REPO.margin, x2: REPO.margin + max(w, 並べた幅), y2: REPO.margin + h}` を、`width` を `max(今の幅, w + 2·REPO.margin)` にする。なければ `other: null`。
-			- 3つとも渡さなければ、戻りは今と同じ（`other: null` が足されるだけ）。
+			- `options.other`：`{h, w}` か null。あれば、すべての枠を `h` だけ下げ（`REPO.margin + h` から並べる）、戻りに `other: {x1: REPO.margin, y1: REPO.margin, x2: REPO.margin + max(w, 並べた幅), y2: REPO.margin + h}` を、`width` を `max(今の幅, w + 2·REPO.margin)`、`height` を今の高さ ＋ `h` にする。なければ `other: null`。
+			- 3つとも渡さなければ、戻りは今と同じ（`other: null` が足されるだけ）。`REPO` にキーを足すので、今の `test_dashboard_allgraph_compose.py` の `REPO` の完全一致の期待は、足したキーを含めて直す（S-01）。
 			- `anchorShift(prev, next, view)`：`view = {x1, y1, x2, y2}` は世界の座標の見えている範囲（`(-tx)/s` から `(clientWidth − tx)/s`、`(barBottom − ty)/s` から `(clientHeight − ty)/s`）。
 			  `prev` で本文がグラフの枠のうち、本文の矩形が `view` と重なるものから、見えている上の端 `max(body.y, view.y1)` がいちばん小さいもの（同じなら `prev.order` の先）を選び、その key の `next` の本文の原点との差 `{dx, dy}` を返す（`next` にない、重なるものがない、なら `{0, 0}`）。
 			  `allgraph.js` は、帯の形が変わって組み立て直したとき、`A.moved` なら `A.tx −= dx·A.s`、`A.ty −= dy·A.s`。
@@ -101,11 +102,11 @@ design: {
 	"D-05": {
 		title: "『横断の構造』への描画（allgraph.js）"
 		text: """
-			- 状態を足す：`A.cmdKey`、`A.cmdModel`、`A.cmdSel`、`A.agentPanel`、`A.shape`（今の帯の形と鍵。初めは形なし）、`A.shapeRedo`（F-05 の数え。要約の知らせと `render` で0に戻す）。
+			- 状態を足す：`A.cmdKey`、`A.cmdModel`、`A.cmdSel`、`A.agentPanel`、`A.shape`（今の帯の形と鍵。初めは形なし）、`A.shapeRedo`（F-05 の数え。居場所の入力の鍵（`crossKey` から `comp` を除いたもの）が前と変われば0に戻す。リポジトリの配置が終わるたびの描画でも、配置が変われば鍵が変わるので0に戻る）。
 			- `draw()`：`compose(items(), sizes(N.own), {range, width, bands: A.shape.bands, keep: A.shape.keep, other: A.shape.other})`。帯の形が変わった組み立てのときは、組み立ての前の `A.comp` と後で `anchorShift` を求め、`A.moved` なら補う（R-05）。
 			  世界の innerHTML の後、`paintOrca()` が今の流れの最後に `paintCommand()` を呼ぶ。`ResizeObserver` の後（`onMarksResize`）も呼ぶ（印の幅だけで端が動く）。
 			- `paintCommand()`：要約（`orca.status()` が ok のときだけ）、組（`commandPairs`）。組がない、または `crossPlace` の組がないとき：帯の形があれば形をなくして `draw()`、なければ層を外す（F-01）。
-			  組があるとき：`crossPlace`（`visible` は帯を渡さない `compose` の `order`）→ `bandShape`。形の鍵が `A.shape` と違い、`A.shapeRedo < 2` なら、`A.shape` を置き換えて `draw()` して戻る（F-05）。
+			  組があるとき：`crossPlace`（`visible` は帯を渡さない `compose` の `order`）→ `bandShape`。形の鍵が `A.shape` と違い、`A.shapeRedo < 2` なら、`A.shape` を置き換え、`A.shapeRedo` を1増やして `draw()` して戻る。上限に届いていれば、今の `comp` のまま、`comp` に帯の行（`band` の高さが0より大きい枠、`comp.other`）がない行の端を持つ組を除いて描く（F-05）。
 			  同じなら、`crossKey` が前と違うときだけ `crossModel` で模型を作り、`layersHtml` の3つの要素を世界の最後に置く（`.gx-cmd`、`.gx-cmd-top`、`.gx-band`。z-index で重なるので DOM の順は問わない）。その後 `paintBandMarks` と `paintCmdSel`。
 			- 層の大きさは `comp.width`・`comp.height`。世界の大きさは今のとおり `comp` の大きさ（帯は世界の中なので、初めの見え方と『収める』は今の計算のまま帯を含む）。
 			- 指揮の選び：帯のボタンの押し（onTap・Enter・Space）で `A.cmdSel`・`A.agentPanel` を置き、Scope の選びを解き、欄に帯のエージェントのチャット（`renderAgentPanel`）。同じものをもう一度・閉じる・Esc・空いたところで解ける。
@@ -125,7 +126,7 @@ design: {
 			- 枠の地の色の変数：`.gx .gx-ini { --gx-fbg: color-mix(in srgb, var(--ds-surface) 55%, var(--ds-bg-2)) }`、`.gx .gx-epic { --gx-fbg: var(--ds-surface) }`、`.gx .gx-frame[data-st="done"] { --gx-fbg: var(--ds-surface-2) }`（今の背景の値の写し。背景もこの変数で書いてよい）。新しい色の値は足さない。
 			- `.gx :is(.gx-ini, .gx-epic) > :is(.gx-fh, .gx-fm) { position: relative; z-index: 2 }`（行ごと上げる。行そのものには背景を付けない）。
 			- 下地：`.gx :is(.gx-ini, .gx-epic) > .gx-fh > :not(.gx-agents)` と `.gx :is(.gx-ini, .gx-epic) > .gx-fm > *` に `background-color: var(--gx-fbg)`。自分の地の色を持つ札（`.ds-docid`、`.sbar`、`.hm`、`.dn`、片付けの印など。実装担当が今の CSS から列挙する）は、`background: linear-gradient(<自分の色>, <自分の色>) var(--gx-fbg)` の2層にして、見え方を今と同じにする（暗いテーマの `--ds-accent-soft` は半透明のため）。
-			- `allgraph.css`：`.gx .ax-body > .gx-frame` の z-index を `auto`。`.gx .ax-head { z-index: 2 }`、`.gx .ax-head > * { position: relative; background-color: var(--ds-bg-2) }`、`.gx .ax-repo:is([data-depth="1"], [data-depth="3"]) .ax-head > * { background-color: var(--ds-surface-2) }`（今の枠の背景の写し。独自の変数は書かない）。`.ax-link:hover` の背景は今のまま上に効かせる。
+			- `allgraph.css`：`.gx .ax-body > .gx-frame` の z-index を `auto`。`.gx .ax-head { z-index: 2 }`、`.gx .ax-head > * { position: relative; background-color: var(--ds-bg-2) }`、`.gx .ax-repo:is([data-depth="1"], [data-depth="3"]) .ax-head > * { background-color: var(--ds-surface-2) }`（今の枠の背景の写し。独自の変数は書かない）。`.ax-link:hover` の背景は、下地の規則より詳細度の高い `.gx .ax-repo .ax-head > .ax-link:hover`（深さ1・3も同じに効く `.gx .ax-repo:is([data-depth]) .ax-head > .ax-link:hover`）で、今の色のまま上に効かせる。
 			- 『ほかの場所』の行の頭：`.gx .gx-band-lead { position: absolute; height: 28px; line-height: 28px; font-size: 11.5px; font-weight: 700; color: var(--ds-text-2); white-space: nowrap }`（graph.css の帯の規則の所。帯の寸法の写しのコメントに足す）。
 			- 帯（z 6）、端の層（z 3）、依存の線（z 5）、箱（z 2）、指揮の層（z 1）は今のまま。見出しの行（z 2）は箱と重ならない。暗くした枠（`is-dim`・`is-poff` の opacity）の見出しの行は、それ自体が z 2 の重なりの文脈になるので、線より上のまま淡くなる。
 			- 入れ子の枠の見出しの同じ枠の弧（iss-00616 の `frameArc`、印の下へ 12px）は、要約の行の文字の後ろを通る所が隠れる（risks）。
