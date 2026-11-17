@@ -21,6 +21,10 @@ ID: "iss-00634"
 - 仕様のレビュー round-4（同じレビュアー）：**合格**。P0〜P3 0。結果 `.workbench/spec-review/iss-00634/round-4.json`、検査 `round-4.check.json`（valid、status pass）。固定したコミット 32e3257ed。
 - 合格した文書の sha256（round-4）：requirement.cue `62b47da1efa4b2e628251011b28292fca42b4c4396bfa1c89d20d3df551cf366`、design.cue `b9bff008ef9671f74f125abcdd034db9ee2d14a19ad3f4743295c3e83e465256`、plan.cue `985c6af9c08ccdbfb50462dc4f1d885a3b8175863fe6125ffd66303582a975aa`（以後 plan.cue は手順の status だけを書き換える）。
 
+- 仕様の変更（統括の指示 msg_dabb1c03680a）：0.9.6 に #637（iss-00621）も入れる。origin/main を取り込み（合流 dba84e9b7）、migration.md の 0.9.6 の節（d50bde195）と要件・設計・計画を直した。
+- 仕様のレビュー round-5（同じレビュアー）：**合格**。P0 0、P1 0、P2 0、P3 1（requirement.cue の background の変わった dashboard の資産の一覧に #637 のファイルがない。受入と実装に効かないので記録だけ）。結果 `.workbench/spec-review/iss-00634/round-5.json`、検査 `round-5.check.json`。固定したコミット d50bde195。
+- 今の合格した文書の sha256（round-5）：requirement.cue `b6d00a1aeca686617e898f0e0b7fa0fa6bb7c6301909ed227bd6d0d44e2b35ac`、design.cue `93fe94ec1a84107a5c3d25a990296b747964a81bf2ce4b44b19965bc2e2d5547`、plan.cue `69e214b1b670498772e240967aed87aab53b66627f6f614d3ced5e3acb4ba688`（以後 plan.cue は手順の status だけを書き換える）。
+
 ## Outcome
 
 ## Verification
