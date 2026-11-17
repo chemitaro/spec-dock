@@ -80,6 +80,16 @@ design: {
 			"""
 		satisfies: ["R-01", "R-06"]
 	}
+	"D-08": {
+		title: "hide() で段を保つ条件（R-09）"
+		text: """
+			`panel.js` の `hide()` の初めに `const keep = current == null && isShown();`（Scope の欄が何も出していないのに aside が開いている＝ほかの描き手が aside を使っていて、その描き直しのための呼び出し）を求める。
+			`keep` が真なら、`snap` と aside の `--pn-h`・`data-snap` を変えない（今の `snap = "half"` と `if (aside.dataset.snap) applySnap()` を飛ばす）。ほかの後始末（`current`・`follow`・`params`・`drag`・class・`aria-hidden`・`openButton`）は今どおり。偽なら今どおり『半分』に戻して当てる。
+			片付けの候補を閉じるボタンも、片付けの候補が開いたまま `hide()` を通るので `keep` が真になり、段が残る。そこで『次の開きは半分』を `show()` でも保つ：`show()` の初めに、aside が閉じている（`!isShown()`）なら `snap = "half"` にする（今の『別の Scope では peek を half にする』はそのまま）。片付けの候補から中の Scope を選ぶ（aside が開いたまま `show()`）ときは段を保つ。
+			描き手（`allgraph.js` の片付けの候補、帯の欄）は変えない。引っぱりとタップで変えた段は、今どおり `snap` に入るので、次の描き直しでもそのまま当たる。
+			"""
+		satisfies: ["R-09"]
+	}
 	"D-04": {
 		title: "CSS（panel.css・scope_tabs.css・scope.css）"
 		text: """
