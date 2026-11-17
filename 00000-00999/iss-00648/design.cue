@@ -31,9 +31,9 @@ design: {
 			`hop(P, C, ceiling = −Infinity)`（`export`、純粋）：
 			1. `dx = |C.x − P.x|`、`dy = |C.y − P.y|`、`H = clamp(HOP.kx·dx + HOP.ky·dy, HOP.min, HOP.max)`。
 			2. `top = min(P.y, C.y) − H`。`top < ceiling` なら `top = ceiling`（F-02。ただし `min(P.y, C.y) − top` が `HOP.low` より小さくはしない）。
-			3. 制御点の縦の長さ `kP = 4/3·(P.y − top)`、`kC = 4/3·(C.y − top)`（同じ高さなら頂点がちょうど `top`）。
-			4. 横のふくらみ：`dx < HOP.side` なら `b = min(HOP.side − dx, 0.5·min(kP, kC))`、`s = C.x ≥ P.x ? 1 : −1`。でなければ `b = 0`。
-			5. `c1 = {x: P.x + s·b, y: P.y − kP}`、`c2 = {x: C.x + s·b, y: C.y − kC}`、道は `M P C c1 c2 C`、`len` は今の `roundLen(bezierLength(…))`。返すのは `{d, len, peak}`（`peak` は道の24分割の点の y の最小、四捨五入 0.1）。
+			3. 制御点の縦の長さ：`h1 = P.y − top`、`h2 = C.y − top`、`kP = λ·h1`、`kC = λ·h2`。λ は、道の頂点（t を 1/96 刻みで取った点の y の最小）がちょうど `top` になる値を、[0, 4/3] の二分探索（40回）で求める。各 t の y は λ について単調に減り、λ = 0 で頂点は `min(P.y, C.y)`（`top` より下）、λ = 4/3 で `top` 以上の高さに届く（同じ高さの端ではちょうど `top`）ので、解は1つに決まる。こうして、高さの差が大きくても頂点が `top` を越えない（`ceiling` も越えない）。
+			4. 横のふくらみ：`dx < HOP.side` なら `b = min(HOP.side − dx, 0.5·min(kP, kC))`（λ を決めた後の値）、`s = C.x ≥ P.x ? 1 : −1`。でなければ `b = 0`。横のふくらみは頂点の高さを変えない（制御点の x だけを動かす）。
+			5. `c1 = {x: P.x + s·b, y: P.y − kP}`、`c2 = {x: C.x + s·b, y: C.y − kC}`、道は `M P C c1 c2 C`、`len` は今の `roundLen(bezierLength(…))`。返すのは `{d, len, peak}`（`peak` は手順3の頂点の y、四捨五入 0.1）。
 			違う箱・枠・項目の線（`kind: "curve"`）は `hop(a.p, b.p, ceiling)` で描く。今の `k = min(140, max(24, 0.45·L))` の曲線はやめる。
 			"""
 		satisfies: ["R-01", "R-02", "F-02"]
@@ -47,7 +47,7 @@ design: {
 			3. 高さ `d = min(HOP.min, room − HOP.room)`。`d < HOP.min` なら `audit.crowded++`。`d < HOP.low` なら `d = HOP.low`。
 			4. 道は、両端を上向きに `4d/3` の制御点で結ぶ三次ベジェ（今の `arcOut(e1, e2, UP, d)`）。
 			5. 検査：ふくらみの四角（`bulgeBox(e1, e2, UP, d)`）が `self` を除く障害と重なれば `boxOverlaps++`、依存の線の水平な区間と重なれば `edgeOverlaps++`（今の `overlapsBox`・`overlapsRoute`）。`audit.arcs` と `audit.links` を数える（今と同じ）。
-			返す線は今と同じ `{kind: "arc", d, len, stubs: [], bulge: d, from, to}` に、D-04 の `mark` を足したもの。`ARC_D`・`FRAME_ARC_D`・`CHORD`・`ARC_MIN` は `HOP` に置き換える。
+			返す線は今と同じ `{kind: "arc", d, len, stubs: [], bulge: d, from, to}` に、D-04 の `mark` と `peak`（`self` の上の縁の y − d。両端を同じ高さで 4d/3 の制御点で結ぶ三次ベジェの頂点は、ちょうど縁から d 上）を足したもの。`ARC_D`・`FRAME_ARC_D`・`CHORD`・`ARC_MIN` は `HOP` に置き換える。
 			"""
 		satisfies: ["R-03"]
 	}
@@ -68,7 +68,7 @@ design: {
 	"D-05": {
 		title: "世界の上の縁と、横断の構造の天井"
 		text: """
-			`commandModel` の `top` を `min(帯があれば band.top − 16 、なければ 0, 0, すべての線の peak − 6)` にする（構造の図の『収める』と世界の大きさが、帯の上へふくらむ弧を含む）。今の `top` の使い方（`graph.js` の `V.cmd.top`）は変えない。
+			`commandModel` の `top` を `min(帯があれば band.top − 16 、なければ 0, 0, すべての線（`curve` と `arc`）の peak − 6)` にする（構造の図の『収める』と世界の大きさが、帯の上へふくらむ弧を含む）。今の `top` の使い方（`graph.js` の `V.cmd.top`）は変えない。
 			`commandModel` に引数 `ceiling`（既定 −Infinity）を足し、`hop` と `sameHop` の高さの上限に使う（`sameHop` は `room` を `self.y1 − ceiling` 以下にする）。`allgraph/command.js` の `crossModel` は `ceiling: 4` を渡す（横断の構造の世界は y が 0 から始まり、`top` を使わないため。F-02）。
 			"""
 		satisfies: ["R-02", "F-02"]
@@ -76,8 +76,8 @@ design: {
 	"D-06": {
 		title: "Epic epic-00615 の文書の直し"
 		text: """
-			requirement.cue：R-04 の text と acceptance の端（『印の位置から出て』『箱の中の部分（印から箱の縁までの短い線）』『印の行に近い縁の外へ…違う行なら右の縁の外』『枠の見出しの統括の印の下から下へ出て』）を、上の縁のホップ（iss-00648）に書き換える。R-05 と制約の『stroke-dashoffset（点の流れ）』を、止めた絵4枚の opacity の切り替え（40px/秒、iss-00646）と HTML の輪の波紋に書き換える。decisions に、この Issue と iss-00646 の決定で置き換えたことを1行ずつ足す（前の決定の行は消さない）。
-			design.cue：D-02 の端と道（下・内側の下の縁・`stubs`・制御点の長さ）、D-04 の動き（『端から端まで2〜3秒』『stroke-dashoffset』『世界の中の SVG の層』）、D-10 の弧（縁の選び・弦 40px・下や右の縁）を、iss-00646 と iss-00648 の設計を指す短い文に書き換える。番号と `satisfies` は変えない。
+			requirement.cue：F-05（印の位置が分からない端を上の縁の中央に）、R-04 の text と acceptance の端（『印の位置から出て』『箱の中の部分（印から箱の縁までの短い線）』『印の行に近い縁の外へ…違う行なら右の縁の外』『枠の見出しの統括の印の下から下へ出て』）を、上の縁のホップ（iss-00648）に書き換える。R-05 と制約の『stroke-dashoffset（点の流れ）』を、止めた絵4枚の opacity の切り替え（40px/秒、iss-00646）と HTML の輪の波紋に書き換える。decisions に、この Issue と iss-00646 の決定で置き換えたことを1行ずつ足す（前の決定の行は消さない）。
+			design.cue：D-03 の線の描き方（箱の中の短い線をやめ、矢じりと印の縁、帯の印の縁は帯の層）、D-02 の端と道（下・内側の下の縁・`stubs`・制御点の長さ）、D-04 の動き（『端から端まで2〜3秒』『stroke-dashoffset』『世界の中の SVG の層』）、D-10 の弧（縁の選び・弦 40px・下や右の縁）を、iss-00646 と iss-00648 の設計を指す短い文に書き換える。番号と `satisfies` は変えない。
 			直した後に `spec-dock scope check epic-615` を通す。
 			"""
 		satisfies: ["R-06"]
