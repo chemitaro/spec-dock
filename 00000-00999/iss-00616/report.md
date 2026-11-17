@@ -24,6 +24,9 @@ ID: "iss-00616"
 - **今の合格した文書の sha256**（round-3）：requirement.cue `421c66e1ca141fa3ccfc654d8fa0a5436e39be6ae23d334fcc6804c13cc4d5df`、design.cue `8f3e94c6a65e39ee9e356f78fdd0495b715f3b07e1a623d1ada566cb5825e812`、plan.cue `11c8412ba8d0785321960672fa90d48cd0d2f7c70665afde70e15306a0992ac9`、explanation.html `51938e4bf6855968e342451f25d14b68d52cbc1f4297410838e0347685ef1159`。
 - round-3 の P2・P3（止めない。文面の残りで、実装は直っている）：(1) `MARK_LEAD` の例外が R-02 の4つ目の受け入れ（組がないときの世界の HTML が今と同じ）と design の goals・compatibility・risks に入っていない（エージェントのいる箱の高さだけ変わる。decisions に記録済み）。(2) 帯の親の波紋は帯の中の `.gx-band-cr` に描く（FQG-001 の直し）が、R-03・D-04・D-05 の文面は端の層のまま。(3) D-04 は `--cl-len` を本体の道だけに書く（実装は stubs にも付けた）。
 
+- **最終品質ゲート（2026-11-17、合格）**：合格のコミット `f95e2d19c`（origin/main の #638・#639・#641 を取り込んだマージ。base `3f5f8d8e9`）。レビュー（quality-gate-reviewer opus / medium）P0〜P3 すべて0、網羅は完全。`make lint` exit 0、`uv run pytest` 4163 passed・7 skipped。この worktree の `.workbench/final-quality-gate/iss-00616-r2/closure.md`。前のキャンペーン iss-00616（`382762e45`）はレビュー合格（P2 1：帯の親の波紋が隠れる、P3 1：再訪の初めの見え方）だったが、写しで見つけた題名の切れとあわせて S-05 で直し、仕様の round-3 の合格の後に、新しいキャンペーンでやり直した。記録だけのコミットはない（記録は Git の外）。
+- 実機の3回目（`f95e2d19c`、`.workbench/iss-00616/shots-r3/`）：18通りで依存の線の違反0、`boxOverlaps`・`edgeOverlaps` 0、`spotDrift` 0、エラー0、横のスクロールなし、『収める』で収まる、帯の押しとEsc、減らす設定の動き0（その時点の組は1つ）。
+
 ## 実装の記録
 
 - 開始のコミット `3f5f8d8e9`（origin/main、iss-00621 の PR #637 の後）。
