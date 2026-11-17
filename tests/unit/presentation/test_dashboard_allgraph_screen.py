@@ -468,3 +468,111 @@ def test_the_tier_badges_look_like_the_shared_badges() -> None:
         "font-weight: 700",
     ):
         assert decl in rule.group(1), decl
+
+
+# --- iss-00629 T-03: the first view fits the width and follows the world until the reader moves it ----------------
+
+PC_VIEW = {"width": 1440, "height": 900, "bar": 50}
+
+
+def _chain(n: int) -> tuple[Any, ...]:
+    """An Initiative of n issues blocked one after another: a graph wider than the graph area."""
+    return (
+        node(1, "epic"),
+        *(node(i, "issue", parent=1, blocked_by=(i - 1,) if i > 2 else ()) for i in range(2, n + 2)),
+    )
+
+
+def _done_chain(n: int) -> tuple[Any, ...]:
+    return (
+        closed(1, "epic"),
+        *(closed(i, "issue", parent=1, blocked_by=(i - 1,) if i > 2 else ()) for i in range(2, n + 2)),
+    )
+
+
+def _wide_docs() -> dict[str, Any]:
+    # spec-dock is wider than the area in every range; orca-web's finished chain widens all further
+    return docs() | {
+        key("spec-dock"): doc_of("spec-dock", *_chain(10)),
+        key("orca-web"): doc_of("orca-web", *_done_chain(20)),
+    }
+
+
+def _t(shot: dict[str, Any]) -> tuple[float, float, float]:
+    m = re.fullmatch(r"translate\(([-\d.e]+)px, ([-\d.e]+)px\) scale\(([-\d.e]+)\)", shot["transform"])
+    assert m, shot["transform"]
+    tx, ty, s = (float(x) for x in m.groups())
+    return tx, ty, s
+
+
+def _world(shot: dict[str, Any]) -> float:
+    return float(shot["size"][0].removesuffix("px"))
+
+
+@pytest.fixture(scope="module")
+def first(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
+    phone = {"width": 390, "height": 800, "bar": 50}
+    styled = {"styled": True, "hold": True, "view": PC_VIEW, "width": 1440}
+    return _run(
+        tmp_path_factory.mktemp("first"),
+        [
+            base("wide", docs=_wide_docs(), steps=[{"release": True}], **styled),
+            base("narrow", steps=[{"release": True}], **styled),
+            base("phone", docs=_wide_docs(), steps=[{"release": True}], **(styled | {"view": phone, "width": 390})),
+            base(
+                "range",
+                docs=_wide_docs(),
+                saved={KEY: json.dumps({"range": "now"})},
+                steps=[{"release": True}, {"act": "range", "range": "all"}],
+                **styled,
+            ),
+            base(
+                "moved",
+                docs=_wide_docs(),
+                saved={KEY: json.dumps({"range": "now"})},
+                steps=[{"release": True}, {"act": "zin"}, {"act": "range", "range": "all"}, {"tick": 1}],
+                **styled,
+            ),
+        ],
+    )
+
+
+def _fits(shot: dict[str, Any]) -> None:
+    tx, ty, s = _t(shot)
+    width = _world(shot)
+    assert s == pytest.approx(min(1, (PC_VIEW["width"] - 16) / width)), (width, s)
+    assert tx == 8 and ty == PC_VIEW["bar"] + 8
+    assert tx + width * s <= PC_VIEW["width"] - 8 + 1e-6
+
+
+def test_the_first_view_on_a_pc_fits_a_wide_world_to_the_width(first: dict[str, Any]) -> None:
+    loading, arrived = first["wide"]["shots"]
+    _fits(loading)
+    # the structures arrive after the first draw: the scale follows the wider world (not the loading world's 1)
+    assert _world(arrived) > PC_VIEW["width"], arrived["size"]
+    _fits(arrived)
+    assert _t(arrived)[2] < 1
+
+
+def test_the_first_view_of_a_narrow_world_is_at_100_percent_from_the_left(first: dict[str, Any]) -> None:
+    shot = first["narrow"]["shots"][-1]
+    assert _world(shot) <= PC_VIEW["width"] - 16, shot["size"]
+    assert _t(shot) == (8, PC_VIEW["bar"] + 8, 1)
+
+
+def test_the_first_view_on_a_phone_stays_as_the_structure_graphs(first: dict[str, Any]) -> None:
+    for shot in first["phone"]["shots"]:
+        tx, ty, s = _t(shot)
+        assert (tx, s) == (4, 0.74) and ty == 50 + 8
+
+
+def test_a_new_range_fits_again_until_the_reader_moves_and_then_keeps_the_view(first: dict[str, Any]) -> None:
+    now, all_ = first["range"]["shots"][1:]
+    assert _world(now) != _world(all_)
+    _fits(now)
+    _fits(all_)
+    arrived, zoomed, ranged, ticked = first["moved"]["shots"][1:]
+    _fits(arrived)
+    assert _t(zoomed)[2] == pytest.approx(_t(arrived)[2] * 1.25)
+    assert _world(ranged) != _world(zoomed)
+    assert _t(ranged) == _t(zoomed) == _t(ticked)
