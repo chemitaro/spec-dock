@@ -18,6 +18,8 @@ ID: "iss-00650"
 - **今の合格した文書の sha256**（round-2）：requirement.cue `6561b39a410974f1cc8024b2952e906f7dc3039d6b4a07c8838c0cea594372e8`、design.cue `58af6bb3de035380c7f8b9a0da4d23cd07cbe06d3a18845fa11c156b1b32fa6d`、plan.cue `e7f8798e88b244bba3a883849304aa82ac3c2c58ef609c8f7a390c3a4eb796a0`（この後の plan.cue の変更は手順の status だけ）。
 - round-2 の P2・P3（止めない）：(P2) 『横断の構造』の片付けの候補の欄の引っぱりと閉じ方に検証がない → 実装で `test_dashboard_allgraph_command_screen.py` の `sheet` の走り（片付けの候補の欄を開いて全面、下へ引いて閉じる）と実機の測りに含めた。(P3) 保証の理由と CP-1 の理由が「1行の変更」のまま（文面の残り。変更は panel.js・panel.css・graph.js・allgraph.js・command_view.js の小さな判定と規則の直し）。
 
+- **最終品質ゲート（2026-11-18、合格）**：キャンペーン iss-00650-r2、合格のコミット `85930f177`（base `92e26aff7`、attempt 01）。レビュー（quality-gate-reviewer opus / medium）P0〜P3 すべて0、網羅は完全。`make lint` exit 0、`uv run pytest` 4239 passed・7 skipped。closure：この worktree の `.workbench/final-quality-gate/iss-00650-r2/closure.md`。記録だけのコミットはない（記録は Git の外）。PR の直前に origin/main を取り込み直す必要はなかった（`92e26aff7` のまま）。
+
 ## Outcome
 
 - 原因：帯の欄（`views/graph/command_view.js` の `renderAgentPanel`）の本文 `.pn-body` に `data-tab` がなく、`panel.css` の縦の flex の規則（`.pn-body:is([data-tab="docs"], [data-tab="explanation"], [data-tab="agents"])`）に乗らないため、`.sd-agent` の `flex: 1` が効かず、iframe は `min-height: 240px` のままだった。
