@@ -10,14 +10,11 @@ from __future__ import annotations
 
 import json
 import subprocess
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import pytest
 
 from tests.unit.presentation.test_dashboard_graph_js import ASSETS, ROOT, _node
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 CHECK = ROOT / "tests" / "js" / "dashboard_allgraph_notices.mjs"
 
@@ -28,15 +25,32 @@ FINE = {"snapshot": OK, "notices": [], "pull_requests": {"status": "ok"}}
 PR = {"snapshot": OK, "notices": [], "pull_requests": {"status": "unknown"}}
 AMBIGUOUS = {
     "snapshot": OK,
-    "notices": [{"code": "REPOSITORY_AMBIGUOUS", "text": "同じリポジトリのクローンが2つあります。", "next_steps": ["spec-dock dashboard list"]}],
+    "notices": [
+        {
+            "code": "REPOSITORY_AMBIGUOUS",
+            "text": "同じリポジトリのクローンが2つあります。",
+            "next_steps": ["spec-dock dashboard list"],
+        }
+    ],
     "pull_requests": {"status": "ok"},
 }
-UNREADABLE = {"snapshot": {"status": "unreadable", "age_seconds": 7200}, "notices": [], "pull_requests": {"status": "unknown"}}
+UNREADABLE = {
+    "snapshot": {"status": "unreadable", "age_seconds": 7200},
+    "notices": [],
+    "pull_requests": {"status": "unknown"},
+}
 
 
 def repo(key: str, structure: Any = None, failure: str | None = None, *, failed: bool = False) -> dict[str, Any]:
     owner, name = key.split("/")[-2:]
-    return {"repository": key, "owner": owner, "name": name, "failed": failed, "structure": structure, "failure": failure}
+    return {
+        "repository": key,
+        "owner": owner,
+        "name": name,
+        "failed": failed,
+        "structure": structure,
+        "failure": failure,
+    }
 
 
 @pytest.fixture(scope="module")
@@ -75,7 +89,13 @@ def out(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
                 repo("github.com/a/broken", None, "HTTP 500", failed=True),
                 repo("github.com/a/twice", {**AMBIGUOUS, "pull_requests": {"status": "unknown"}}),
                 repo("github.com/a/unread", UNREADABLE, failed=True),
-                {"repository": "github.com/a/loading", "owner": "a", "name": "loading", "failed": False, "warnings": None},
+                {
+                    "repository": "github.com/a/loading",
+                    "owner": "a",
+                    "name": "loading",
+                    "failed": False,
+                    "warnings": None,
+                },
             ],
             "quiet": [repo("github.com/a/one", FINE), repo("github.com/a/two", FINE)],
         },
@@ -149,7 +169,14 @@ def test_the_rows_go_by_level_then_by_the_shared_kinds_order(out: dict[str, Any]
     assert [r["kind"] for r in rows] == ["snapshot-missing", "stale", "anomalies", "pr-unknown"]
     assert [r["level"] for r in rows] == ["error", "warning", "warning", "info"]
     assert rows[2]["repos"] == [{"repository": "github.com/a/two", "label": "two", "detail": "1件"}]
-    assert out["shared"] == ["snapshot-missing", "snapshot-unsupported", "snapshot-unreadable", "stale", "anomalies", "pr-unknown"]
+    assert out["shared"] == [
+        "snapshot-missing",
+        "snapshot-unsupported",
+        "snapshot-unreadable",
+        "stale",
+        "anomalies",
+        "pr-unknown",
+    ]
 
 
 def test_a_repository_that_cannot_be_read_keeps_every_warning_in_its_frame(out: dict[str, Any]) -> None:
@@ -160,7 +187,9 @@ def test_a_repository_that_cannot_be_read_keeps_every_warning_in_its_frame(out: 
     assert [w["kind"] for w in own["github.com/a/unread"]] == ["snapshot-unreadable", "pr-unknown"]
     # readable: the two clones stay, the unknown pull requests go up
     assert [w["kind"] for w in own["github.com/a/twice"]] == ["ambiguous"]
-    assert [(r["kind"], [x["repository"] for x in r["repos"]]) for r in s["summary"]] == [("pr-unknown", ["github.com/a/twice"])]
+    assert [(r["kind"], [x["repository"] for x in r["repos"]]) for r in s["summary"]] == [
+        ("pr-unknown", ["github.com/a/twice"])
+    ]
     # a repository still loading is not counted
     assert "github.com/a/loading" not in own
 

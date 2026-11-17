@@ -602,7 +602,9 @@ def _notice_docs() -> dict[str, Any]:
     out[key("yubisaki")] = _quiet(doc_of("yubisaki", *DONE))
     for name in ("company-os", "housing-lifecycle", "orca-web"):
         out[key(name)] = out[key(name)] | {"snapshot": STALE}
-    out[key("spec-dock")] = out[key("spec-dock")] | {"pull_requests": {"status": "unknown", "fetched_at": None, "error": None}}
+    out[key("spec-dock")] = out[key("spec-dock")] | {
+        "pull_requests": {"status": "unknown", "fetched_at": None, "error": None}
+    }
     # no Scope and an unreadable snapshot: the screen cannot draw it (failed), its frame tells why
     empty = _quiet(doc_of("generic-mona"))
     out[key("generic-mona")] = empty | {"snapshot": {**empty["snapshot"], "status": "unreadable", "age_seconds": 7200}}
@@ -619,7 +621,12 @@ def notices(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
             base("notices", docs=_notice_docs()),
             base("quiet", docs=quiet),
             base("summed", steps=[{"release": True}], view=PC_VIEW | {"sum": 90}, **styled),
-            base("summed-phone", steps=[{"release": True}], view={"width": 390, "height": 800, "bar": 50, "sum": 90}, **(styled | {"width": 390})),
+            base(
+                "summed-phone",
+                steps=[{"release": True}],
+                view={"width": 390, "height": 800, "bar": 50, "sum": 90},
+                **(styled | {"width": 390}),
+            ),
         ],
     )
 
@@ -629,7 +636,9 @@ def test_one_row_per_kind_names_the_repositories_and_no_frame_repeats_it(notices
     rows = shot["sum"]["rows"]
     assert [(r["kind"], r["level"]) for r in rows] == [("stale", "warning"), ("pr-unknown", "info")]
     stale, pr = rows
-    assert stale["text"].startswith("構造が更新されていません：company-os（3時間）、housing-lifecycle（3時間）、orca-web（3時間）")
+    assert stale["text"].startswith(
+        "構造が更新されていません：company-os（3時間）、housing-lifecycle（3時間）、orca-web（3時間）"
+    )
     assert stale["text"].count("spec-dock canonical status") == 1
     assert stale["title"].startswith("構造が更新されていません：company-os（3時間）") and "次の1手" in stale["title"]
     assert pr["text"] == "PR の状態が分かりません：spec-dock"
@@ -637,7 +646,9 @@ def test_one_row_per_kind_names_the_repositories_and_no_frame_repeats_it(notices
     # orca-web has nothing in next and no warning of its own: no frame, its name is in the summary (R-01, R-02)
     assert key("orca-web") not in f
     for r in shot["repos"]:
-        assert all(w["text"].startswith("このリポジトリを読めませんでした") or "読めません" in w["text"] for w in r["warn"]), r["key"]
+        assert all(
+            w["text"].startswith("このリポジトリを読めませんでした") or "読めません" in w["text"] for w in r["warn"]
+        ), r["key"]
     assert [w["text"] for w in f[key("company-os")]["warn"]] == []
     # every range lists the same rows
     for later in notices["notices"]["shots"][1:]:
