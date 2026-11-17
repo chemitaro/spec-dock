@@ -7,11 +7,15 @@
 // only places (graph/layout.js), routes (graph/router.js) and draws.
 import * as api from "../core/api.js";
 import { DEFAULTS, index, nodeMarkRows, routeLayout } from "./graph/layout.js";
+import { markSpots } from "./graph/layout.js";
+import { BAND, bandItems, commandKey, commandModel, commandPairs, placeAgents } from "./graph/command.js";
 import { audit, svg as edgeSvg } from "./graph/router.js";
 import * as M from "./graph/marks.js";
 import { LEGACY_KEYS, PREFS_KEY, restorePrefs } from "./graph/prefs.js";
 import { createScopePanel } from "./_shared/panel.js";
-import { createOrcaWatch, markAgentAt, paintOrcaMarks } from "./_shared/orca_marks.js";
+import { createOrcaWatch, markAgentAt, markIds, paintOrcaMarks } from "./_shared/orca_marks.js";
+import { AGENT_SANDBOX, agentFrame } from "./_shared/agents_logic.js";
+import { currentTheme } from "./_shared/agents_tab.js";
 import * as D from "./graph/draw.js";
 import { compactNeeds, headsDiffer, tallNeeds } from "./graph/measure.js";
 
@@ -56,6 +60,12 @@ const V = {
   fromRows: false, // the render running was called by checkRows
   ro: null, // the ResizeObserver of the world's mark slots
   rowsRaf: 0,
+  // iss-00616: the command lines and the band
+  cmd: { top: 0, width: 0 }, // the band's top and the world's width with it, for the first view and "fit" (D-04)
+  cmdKey: null, // commandKey of the lines drawn; the same key draws nothing again (R-08)
+  cmdModel: null, // the last commandModel drawn, or null without a pair
+  cmdSel: null, // the agent whose lines stand out (R-06)
+  agentPanel: null, // the band's agent whose chat the panel shows
 };
 
 // The saved choices (iss-00603 D-04): version 3, with what carries over from versions 2 and 1 (graph/prefs.js).
@@ -99,6 +109,7 @@ function paintOrca() {
   paintOrcaMarks(V.el.world, V.ctx, V.data);
   V.pn?.refreshOrca();
   checkRows();
+  paintCommand();
 }
 // The reader's news (every summary) starts the count of the lay-outs again that the rows of agents asked for.
 function onOrcaNews() {
@@ -159,7 +170,307 @@ function onMarksResize() {
   V.rowsRaf = requestAnimationFrame(() => {
     V.rowsRaf = 0;
     checkRows();
+    paintCommand(); // the marks' widths alone can move the lines' ends
   });
+}
+
+// --- The command lines and the band (iss-00616 D-04) --------------------------------------------------------
+// Which Orca agent directs which: lines from the parent's mark to the child's, drawn from the layout, the measured
+// widths of the marks and the order the component drew them (graph/command.js); the DOM is never measured for them.
+
+const bandMarks = new WeakMap(); // a band slot -> the key of the marks drawn in it
+const LAYERS = ["gx-cmd", "gx-cmd-top", "gx-band"];
+const hasClass = (el, c) => !!el?.classList?.contains(c);
+const soloWorktree = (wt, id) => ({ ...wt, agents: (Array.isArray(wt?.agents) ? wt.agents : []).filter((a) => a?.id === id) });
+
+// The recorded agent ids of every mark slot in the world, {Scope id: [id, …]} (iss-00621 markIds).
+function slotIds(world) {
+  const out = {};
+  for (const slot of world.querySelectorAll("[data-orca-scope]")) {
+    const ids = markIds(slot);
+    if (ids) out[slot.dataset.orcaScope] = ids;
+  }
+  return out;
+}
+const spotsFor = (node, ids) => (V.marks[node.id] && ids[node.id] ? markSpots(node, { ...V.marks[node.id], ids: ids[node.id] }) : null);
+const summaryNow = () => (V.ctx?.orca?.status?.() === "ok" ? V.ctx.orca.summary?.() ?? null : null);
+
+function findAgent(summary, id) {
+  for (const worktree of Array.isArray(summary?.worktrees) ? summary.worktrees : []) {
+    if (!worktree || !Array.isArray(worktree.agents)) continue;
+    const agent = worktree.agents.find((a) => a?.id === id);
+    if (agent) return { agent, worktree };
+  }
+  return null;
+}
+
+// After the marks: the lines and the band from the current summary. The same inputs draw nothing again (R-08); a
+// new summary or new widths draw only these layers, never the layout.
+function paintCommand() {
+  if (!V.el || !V.EG || !V.data || !V.ctx) return;
+  const orca = V.ctx.orca;
+  const summary = summaryNow();
+  const ids = slotIds(V.el.world);
+  const key = commandKey({ summary, routing: V.EG, marks: V.marks, ids });
+  if (key !== V.cmdKey) {
+    V.cmdKey = key;
+    const pairs = commandPairs(summary);
+    const placed = pairs.length ? placeAgents(pairs, { structure: V.data, summary, layout: V.EG.layout, ix: V.ix }) : null;
+    if (!placed || !placed.pairs.length) clearCommand();
+    else {
+      const module = orca?.marks?.();
+      const orderOf = (wt) => {
+        try {
+          const list = typeof module?.orderAgents === "function" && Array.isArray(wt?.agents) ? module.orderAgents(wt.agents) : null;
+          return Array.isArray(list) ? list : null;
+        } catch {
+          return null; // the summary's order
+        }
+      };
+      const items = bandItems(placed.pairs, placed.places, placed.own, orderOf);
+      const model = commandModel({ pairs: placed.pairs, places: placed.places, items, layout: V.EG.layout, spotsOf: (n) => spotsFor(n, ids), routes: V.EG.routes });
+      drawCommand(model);
+    }
+    dropGone(summary);
+    paintCmdSel();
+  }
+  paintBandMarks();
+}
+
+function removeLayers(world) {
+  for (const el of world.querySelectorAll(LAYERS.map((c) => `.${c}`).join(", "))) el.remove();
+}
+
+// No pair (F-01): no layer, no band; the world is as it was.
+function clearCommand() {
+  if (V.el) removeLayers(V.el.world);
+  V.cmdModel = null;
+  V.cmd = { top: 0, width: 0 };
+}
+
+function element(html) {
+  const holder = document.createElement("div");
+  holder.innerHTML = html;
+  return holder.children[0];
+}
+
+const ripple = (r) => `<g class="cr" data-agent="${esc(r.agent)}"><circle class="cr-a" cx="${r.x}" cy="${r.y}" r="7"/><circle class="cr-b" cx="${r.x}" cy="${r.y}" r="7"/></g>`;
+// A ripple centred in a band item: its parent is placed in the band (D-03).
+const inBand = (model, r) => !!model.band?.items.some((it) => r.x >= it.x && r.x <= it.x + it.w && r.y >= it.y && r.y <= it.y + it.h);
+
+function drawCommand(model) {
+  const w = V.el.world;
+  const L = V.EG.layout;
+  removeLayers(w);
+  V.cmdModel = model;
+  V.cmd = { top: model.top, width: model.width };
+  const size = `width="${L.width}" height="${L.height}"`;
+  const lines = model.links
+    .map((l) => `<g class="cl" data-id="${esc(l.id)}" data-parent="${esc(l.parent)}" data-child="${esc(l.child)}" data-state="${l.state}"><path class="cl-glow" d="${l.d}"/><path class="cl-line" d="${l.d}" style="--cl-len:${l.len}px"/></g>`)
+    .join("");
+  const ends =
+    model.links
+      .map((l) => `<g class="cl" data-id="${esc(l.id)}" data-state="${l.state}">${l.stubs.map((d) => `<path class="cl-stub" d="${d}" style="--cl-len:${l.len}px"/>`).join("")}<circle class="cl-dot" cx="${l.to.x}" cy="${l.to.y}" r="2.5"/></g>`)
+      .join("") +
+    model.ripples.filter((r) => !inBand(model, r)).map(ripple).join("");
+  const cmd = element(`<svg class="gx-cmd" ${size} aria-hidden="true">${lines}</svg>`);
+  const top = element(`<svg class="gx-cmd-top" ${size} aria-hidden="true">${ends}</svg>`);
+  const kids = Array.from(w.children);
+  // the bodies after the last frame (under the boxes), the ends after the last group (under the dependency lines)
+  w.insertBefore(cmd, kids.find((c) => hasClass(c, "gx-box") || hasClass(c, "gx-clean") || hasClass(c, "gx-edges")) ?? null);
+  w.insertBefore(top, kids.find((c) => hasClass(c, "gx-edges")) ?? null);
+  if (model.band) {
+    const items = model.band.items.map(
+      (it) =>
+        `<div class="gx-band-item" style="left:${it.x}px;top:${it.y}px;width:${it.w}px;height:${it.h}px"><span class="gx-band-lab" style="width:${it.labelWidth}px" title="${esc(it.label)}">${esc(it.label)}</span>` +
+        it.agents.map((a) => `<button type="button" class="gx-band-agent" data-cmd-agent="${esc(a.id)}" data-cmd-item="${esc(it.key)}" aria-pressed="false" aria-label="${esc(`${it.label}：${a.id}`)}"><span class="gx-band-slot"></span></button>`).join("") +
+        `</div>`,
+    );
+    // a band parent's ripples over its items (the items are opaque and the band lies over .gx-cmd-top)
+    const rings = model.ripples.filter((r) => inBand(model, r)).map(ripple).join("");
+    const over = rings ? `<svg class="gx-band-cr" width="1" height="1" aria-hidden="true">${rings}</svg>` : "";
+    w.appendChild(element(`<div class="gx-band">${items.join("")}${over}</div>`));
+  }
+}
+
+// The band's marks, each drawn by the component (one agent each); a mark is drawn again only when it changes.
+function paintBandMarks() {
+  const band = V.el?.world.querySelector(".gx-band");
+  const module = V.ctx?.orca?.marks?.();
+  if (!band || !module || !V.cmdModel?.band) return;
+  const now = Date.now();
+  const at = new Map();
+  for (const it of V.cmdModel.band.items) for (const a of it.agents) at.set(`${it.key}\n${a.id}`, { it, a });
+  for (const button of band.querySelectorAll("[data-cmd-agent]")) {
+    const hit = at.get(`${button.dataset.cmdItem}\n${button.dataset.cmdAgent}`);
+    const slot = button.querySelector(".gx-band-slot");
+    if (!hit || !slot) continue;
+    const doc = soloWorktree(hit.it.worktree, hit.a.id);
+    try {
+      const built = module.buildMarks(doc, { now, max: 1 });
+      const key = JSON.stringify(built ?? null);
+      if (bandMarks.get(slot) === key) continue;
+      module.renderAgentMarks(slot, doc, { size: "sm", max: 1, now });
+      bandMarks.set(slot, key);
+      const label = built?.marks?.[0]?.label;
+      button.setAttribute("aria-label", `${hit.it.label}：${typeof label === "string" && label ? label : hit.a.id}`);
+    } catch {
+      slot.replaceChildren();
+      bandMarks.set(slot, "");
+    }
+  }
+}
+
+// A chosen agent that left the summary is chosen no more; its chat closes (R-06).
+function dropGone(summary) {
+  if (V.cmdSel && !findAgent(summary, V.cmdSel)) V.cmdSel = null;
+  if (V.agentPanel && !findAgent(summary, V.agentPanel)) {
+    V.agentPanel = null;
+    renderPanel();
+  }
+}
+
+// The chosen agent's lines stand out, the others fade; only classes change, no line is drawn again (R-06, R-08).
+function paintCmdSel() {
+  const w = V.el?.world;
+  if (!w) return;
+  const sel = V.cmdSel;
+  const links = new Map((V.cmdModel?.links || []).map((l) => [l.id, l]));
+  const parents = new Set();
+  if (sel) for (const l of links.values()) if (l.child === sel) parents.add(l.parent);
+  for (const svg of w.querySelectorAll(".gx-cmd, .gx-cmd-top, .gx-band-cr")) svg.classList.toggle("has-cmd-sel", !!sel);
+  for (const g of w.querySelectorAll(".gx-cmd .cl, .gx-cmd-top .cl")) {
+    const l = links.get(g.dataset.id);
+    const on = !!sel && !!l && (l.parent === sel || l.child === sel);
+    g.classList.toggle("is-cmd-hl", on);
+    g.classList.toggle("is-cmd-off", !!sel && !on);
+  }
+  for (const g of w.querySelectorAll(".gx-cmd-top .cr, .gx-band-cr .cr")) {
+    const on = !!sel && (g.dataset.agent === sel || parents.has(g.dataset.agent));
+    g.classList.toggle("is-cmd-hl", on);
+    g.classList.toggle("is-cmd-off", !!sel && !on);
+  }
+  for (const b of w.querySelectorAll("[data-cmd-agent]")) b.setAttribute("aria-pressed", String(!!sel && b.dataset.cmdAgent === sel));
+}
+
+// A band agent pressed (a tap, Enter or Space): its lines and its chat in the panel; the same agent again closes them.
+function pressBandAgent(id) {
+  if (!id) return;
+  if (V.agentPanel === id) {
+    closeAgentPanel();
+    return;
+  }
+  if (V.sel) select(null);
+  V.cleanup = false;
+  V.cmdSel = id;
+  V.agentPanel = id;
+  paintCmdSel();
+  renderPanel();
+}
+
+function closeAgentPanel() {
+  V.agentPanel = null;
+  V.cmdSel = null;
+  paintCmdSel();
+  renderPanel();
+}
+
+// The band agent's heading and chat (orca-web's /embed/agent, as the agents' tab frames it). A panel that already
+// shows the same agent in the same theme is left alone, so the chat is not loaded again (D-04). false: the agent is gone.
+function renderAgentPanel(panel) {
+  const id = V.agentPanel;
+  const found = findAgent(summaryNow(), id);
+  if (!found) {
+    V.agentPanel = null;
+    return false;
+  }
+  const theme = currentTheme();
+  V.el.gx.dataset.panel = "open";
+  if (panel.dataset.cmdAgent === id && panel.dataset.theme === theme && panel.classList.contains("is-open")) return true;
+  V.pn.hide();
+  const { agent, worktree } = found;
+  const item = V.cmdModel?.band?.items.find((it) => it.agents.some((a) => a.id === id));
+  const label = item?.label ?? (typeof worktree.branch === "string" && worktree.branch ? worktree.branch : "ブランチ不明");
+  const type = typeof agent.agentType === "string" && agent.agentType ? agent.agentType : "種類不明";
+  const frame = typeof agent.detail === "string" ? agentFrame(V.ctx.orca?.origin, { detail: agent.detail, agentType: agent.agentType ?? null, branch: worktree.branch ?? null }, theme) : null;
+  panel.dataset.st = "unknown";
+  panel.dataset.cmdAgent = id;
+  panel.dataset.theme = theme;
+  panel.innerHTML =
+    `<div class="pn-grab"></div><div class="pn-head"><b><span class="gx-band-slot pn-cmd-mark"></span>${esc(type)} · ${esc(label)}</b><button type="button" class="iconbtn" data-act="close" aria-label="閉じる">${ic("x")}</button></div>` +
+    `<div class="pn-body">${frame ? `<iframe class="sd-agent" src="${esc(frame.src)}" sandbox="${AGENT_SANDBOX}" referrerpolicy="no-referrer" title="${esc(frame.title)}"></iframe>` : `<p class="pn-cmd-none">チャットを開けません。</p>`}</div>`;
+  const slot = panel.querySelector(".pn-cmd-mark");
+  const module = V.ctx.orca?.marks?.();
+  try {
+    if (slot && module) module.renderAgentMarks(slot, soloWorktree(worktree, id), { size: "sm", max: 1, now: Date.now() });
+  } catch {
+    slot?.replaceChildren();
+  }
+  panel.classList.add("is-open");
+  panel.setAttribute("aria-hidden", "false");
+  return true;
+}
+
+/**
+ * The command lines' check on the page (iss-00616 D-02, D-04): commandModel's audit, the largest distance (px) between a
+ * drawn mark and markSpots (and a band button's middle and its slot's), the marks whose position is not known, the
+ * world's layers in order and the layers' pointer-events.
+ */
+export function cmdAudit() {
+  if (!V.EG || !V.el) return null;
+  const w = V.el.world;
+  const model = V.cmdModel;
+  const ids = slotIds(w);
+  const at = new Map(V.EG.layout.nodes.map((n) => [n.id, n]));
+  let drift = 0;
+  let missing = 0;
+  for (const slot of w.querySelectorAll("[data-orca-scope]")) {
+    const marks = [...slot.querySelectorAll(".orca-mark:not(.orca-mark--more)")];
+    if (!marks.length) continue;
+    const node = at.get(slot.dataset.orcaScope);
+    const host = slot.closest(".gx-box, .gx-frame");
+    const spots = node ? spotsFor(node, ids) : null;
+    if (!node || !host || !spots || spots.length !== marks.length) {
+      missing += marks.length;
+      continue;
+    }
+    marks.forEach((m, i) => {
+      let x = 0;
+      let y = 0;
+      let e = m;
+      while (e && e !== host) {
+        x += e.offsetLeft;
+        y += e.offsetTop;
+        e = e.offsetParent;
+      }
+      if (e !== host) {
+        missing++;
+        return;
+      }
+      drift = Math.max(drift, Math.abs(node.x1 + host.clientLeft + x - spots[i].x), Math.abs(node.y1 + host.clientTop + y - spots[i].y));
+    });
+  }
+  if (model?.band) {
+    const slots = new Map();
+    for (const it of model.band.items) for (const a of it.agents) slots.set(`${it.key}\n${a.id}`, a);
+    for (const b of w.querySelectorAll(".gx-band-agent")) {
+      const a = slots.get(`${b.dataset.cmdItem}\n${b.dataset.cmdAgent}`);
+      const item = b.offsetParent;
+      if (!a || !item) {
+        missing++;
+        continue;
+      }
+      drift = Math.max(drift, Math.abs(item.offsetLeft + item.clientLeft + b.offsetLeft + b.offsetWidth / 2 - (a.x + a.w / 2)));
+    }
+  }
+  return {
+    ...(model?.audit || { links: 0, arcs: 0, boxOverlaps: 0, edgeOverlaps: 0, crowded: 0 }),
+    spotDrift: Math.round(drift * 10) / 10,
+    spotMissing: missing,
+    layers: Array.from(w.children).map((c) => c.getAttribute("class")),
+    pointer: [...w.querySelectorAll(".gx-cmd, .gx-cmd-top")].map((s) => getComputedStyle(s).pointerEvents),
+    band: BAND,
+  };
 }
 
 // --- Shell DOM ---------------------------------------------------------------------------------------------
@@ -213,6 +524,12 @@ function dispose() {
   if (V.rowsRaf) cancelAnimationFrame(V.rowsRaf);
   V.rowsRaf = 0;
   if (window.specdockEdgeAudit === edgeAudit) delete window.specdockEdgeAudit;
+  if (window.specdockCmdAudit === cmdAudit) delete window.specdockCmdAudit;
+  V.cmdKey = null;
+  V.cmdModel = null;
+  V.cmd = { top: 0, width: 0 };
+  V.cmdSel = null;
+  V.agentPanel = null;
   V.token++; // an answer of the scope API that arrives after leaving the screen is dropped
   V.root = null;
   V.el = null;
@@ -240,6 +557,7 @@ function render(root, ctx) {
   if (!V.fromRows) V.rowsRedo = 0;
   orcaWatch.follow(ctx.orca);
   window.specdockEdgeAudit = edgeAudit;
+  window.specdockCmdAudit = cmdAudit;
   const data = ctx.data;
   const focus = ctx.route.params.get("focus") || null;
   if (!data || !Array.isArray(data.scopes) || !data.scopes.length) {
@@ -269,6 +587,7 @@ function render(root, ctx) {
       V.fitted = true;
       whenStyled(() => {
         relayout(); // the screen's CSS can change the width the first layout used
+        paintCommand(); // the band's top for the first view: on a return the CSS is there and this runs at once
         initialView();
         applyT();
       });
@@ -380,6 +699,9 @@ function paint() {
 async function select(id) {
   V.token++;
   V.sel = id;
+  V.cmdSel = null; // a mark pressed in the box sets it again after this (onTap)
+  V.agentPanel = null;
+  paintCmdSel();
   V.path = null;
   V.docState = "loading";
   V.cleanup = false;
@@ -450,7 +772,8 @@ function renderBar(focus) {
 }
 
 function renderLegend() {
-  D.renderLegend(V.el.legend, V.legend);
+  const orca = V.ctx?.orca;
+  D.renderLegend(V.el.legend, V.legend, { cmd: !!orca && orca.status?.() !== "off" });
 }
 
 // --- The Scope panel (iss-00587 D-06): the shared panel, or the cleanup list in the same aside ---------------
@@ -462,6 +785,12 @@ function frameOf(s) {
 function renderPanel() {
   const panel = V.el?.panel;
   if (!panel) return;
+  if (V.agentPanel && renderAgentPanel(panel)) return;
+  if (panel.dataset.cmdAgent) {
+    panel.innerHTML = ""; // the band agent's chat closes with its panel
+    delete panel.dataset.cmdAgent;
+    delete panel.dataset.theme;
+  }
   if (V.cleanup) {
     V.pn.hide();
     const list = V.cleanup;
@@ -517,7 +846,8 @@ function onClick(event) {
       savePrefs();
       renderLegend();
     } else if (a === "close") {
-      if (V.cleanup) {
+      if (V.agentPanel) closeAgentPanel();
+      else if (V.cleanup) {
         V.cleanup = false;
         renderPanel();
       } else select(null);
@@ -561,6 +891,14 @@ function onClick(event) {
 function onKey(event) {
   if (!V.el) return;
   if (event.key === "Escape") {
+    if (V.agentPanel) {
+      closeAgentPanel();
+      return;
+    }
+    if (V.cmdSel) {
+      V.cmdSel = null;
+      paintCmdSel();
+    }
     if (V.cleanup) {
       V.cleanup = false;
       renderPanel();
@@ -569,6 +907,12 @@ function onKey(event) {
       V.hl = null;
       paint();
     }
+    return;
+  }
+  const band = event.target.closest?.("[data-cmd-agent]");
+  if (band && V.el.view.contains(band) && (event.key === "Enter" || event.key === " ")) {
+    event.preventDefault();
+    pressBandAgent(band.dataset.cmdAgent);
     return;
   }
   const target = event.target.closest?.(".gx-box, .gx-fh");
@@ -599,6 +943,11 @@ function relayout() {
 // A tap or click on the graph (pointer events give both): select; on a phone the second tap on the selected box
 // opens its detail screen. PC double click opens it directly (dblclick below).
 function onTap(target) {
+  const band = target.closest("[data-cmd-agent]");
+  if (band) {
+    pressBandAgent(band.dataset.cmdAgent);
+    return;
+  }
   const clean = target.closest(".gx-clean");
   if (clean) {
     const ids = clean.dataset.ids.split(" ");
@@ -606,6 +955,9 @@ function onTap(target) {
     V.token++;
     V.sel = null;
     V.path = null;
+    V.cmdSel = null;
+    V.agentPanel = null;
+    paintCmdSel();
     V.cleanup = ids.map((id) => all.get(id) || { id, text: "" });
     paint();
     renderPanel();
@@ -614,6 +966,11 @@ function onTap(target) {
   const hit = target.closest(".gx-box, .gx-fh");
   if (!hit) {
     if (V.sel) select(null);
+    else if (V.agentPanel) closeAgentPanel();
+    else if (V.cmdSel) {
+      V.cmdSel = null;
+      paintCmdSel();
+    }
     return;
   }
   const id = hit.dataset.id;
@@ -623,7 +980,13 @@ function onTap(target) {
   if (slot) {
     if (V.sel !== id) select(id);
     V.pn?.openAgent(markAgentAt(slot, target));
+    V.cmdSel = markAgentAt(slot, target); // its lines stand out (iss-00616 R-06)
+    paintCmdSel();
     return;
+  }
+  if (V.cmdSel) {
+    V.cmdSel = null;
+    paintCmdSel();
   }
   if (isPhone() && V.sel === id) {
     goDetail(id);
@@ -652,37 +1015,44 @@ function barBottom() {
   return bottom - view.top;
 }
 
+// The box the first view and "fit" show: the layout and the command band above it (iss-00616 D-04; without a band the
+// layout's own size).
+const shown = () => {
+  const L = V.EG.layout;
+  return { top: V.cmd.top, width: Math.max(L.width, V.cmd.width), height: L.height - V.cmd.top };
+};
+
 function initialView() {
   const v = V.el.view;
-  const L = V.EG.layout;
+  const S = shown();
   const top = barBottom() + 8;
   if (isPhone()) {
     V.s = 0.74;
     V.tx = 4;
   } else {
-    V.s = Math.min(1, Math.max(0.88, (v.clientWidth - 16) / L.width));
-    V.tx = Math.max(0, (v.clientWidth - L.width * V.s) / 2);
+    V.s = Math.min(1, Math.max(0.88, (v.clientWidth - 16) / S.width));
+    V.tx = Math.max(0, (v.clientWidth - S.width * V.s) / 2);
   }
-  V.ty = top;
+  V.ty = top - S.top * V.s;
 }
 
 // The smallest zoom: 0.12, or less when that is what it takes to show the whole graph. With no wrapping
 // (iss-00556 R-07) a graph can be several thousand pixels wide, wider than 0.12 shows on a phone.
 const fitScale = () => {
   const v = V.el.view;
-  const L = V.EG.layout;
+  const S = shown();
   const top = barBottom() + 8;
-  return Math.min(1, (v.clientWidth - 16) / L.width, (v.clientHeight - top - 16) / L.height);
+  return Math.min(1, (v.clientWidth - 16) / S.width, (v.clientHeight - top - 16) / S.height);
 };
 const minScale = () => Math.max(0.02, Math.min(0.12, fitScale()));
 
 function fit() {
   const v = V.el.view;
-  const L = V.EG.layout;
+  const S = shown();
   const top = barBottom() + 8;
   V.s = Math.max(minScale(), fitScale());
-  V.tx = (v.clientWidth - L.width * V.s) / 2;
-  V.ty = top + Math.max(0, (v.clientHeight - top - 8 - L.height * V.s) / 2);
+  V.tx = (v.clientWidth - S.width * V.s) / 2;
+  V.ty = top + Math.max(0, (v.clientHeight - top - 8 - S.height * V.s) / 2) - S.top * V.s;
   applyT();
 }
 

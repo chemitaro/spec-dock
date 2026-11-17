@@ -6,6 +6,10 @@ agents' rows of marks) and what `views/graph.js` of the start commit 7f7dd2b1d d
 `tests/js/dashboard_graph_golden.mjs`. The current graph.js must draw exactly the same.
 iss-00627 wrote the copy again after its routing fixes (router.js D-04, D-05): only the stored structure's "all" run
 moved (its lines, and the world 6px wider); every other run is the same as 7f7dd2b1d drew.
+iss-00616 keeps the copy: the run with Orca draws the legend's two command rows more (D-05), which the check removes
+before comparing; the fake orca's summary is empty, so no command line or band is drawn. Its D-02 MARK_LEAD wrote the
+"marks" run again: a box with a row of agents is 10px taller (iss-00004, iss-00016, epic-00002), and only the positions
+below them (and the routing's gaps that follow those heights) moved; the legend in the copy is without the command rows.
 
 To write the copy again from another tree of assets (only when the drawing is meant to change):
     uv run python -m tests.unit.presentation.test_dashboard_graph_golden <dashboard assets dir>
@@ -26,6 +30,11 @@ from tests.unit.presentation.test_dashboard_graph_js import ASSETS, ROOT, SNAPSH
 HARNESS = ROOT / "tests" / "js" / "dashboard_graph_golden.mjs"
 GOLDEN = ROOT / "tests" / "fixtures" / "issue614" / "graph_dom_golden.json"
 V3 = "specdock.graph.v3"
+# iss-00616 D-05: the rows renderLegend adds to "そのほか" on a graph with Orca
+CMD_ROWS = (
+    '<li class="wide"><span><span class="lg-cmd"></span></span>指揮（親 → 子）</li>'
+    '<li><span><span class="lg-cr"></span></span>指揮している親（波紋）</li>'
+)
 
 
 def _small() -> Any:
@@ -135,9 +144,16 @@ def test_the_graph_draws_what_the_start_commit_drew(tmp_path: Path) -> None:
     assert golden["commit"] == "7f7dd2b1d"
     got = draw(ASSETS, golden["request"], tmp_path)
     assert set(got) == set(golden["runs"])
+    with_orca = {run["name"] for run in golden["request"]["runs"] if run.get("orca")}
+    assert with_orca == {"marks"}
     for name, shots in golden["runs"].items():
         assert len(got[name]) == len(shots), name
         for i, (a, b) in enumerate(zip(got[name], shots, strict=True)):
+            if (
+                name in with_orca
+            ):  # iss-00616 D-05: with Orca the legend adds the command rows, and nothing else changes
+                assert CMD_ROWS in a["legend"], f"{name} step {i}"
+                a = a | {"legend": a["legend"].replace(CMD_ROWS, "")}
             for part in b:
                 assert a[part] == b[part], f"{name} step {i} {part}"
 

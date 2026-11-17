@@ -189,6 +189,13 @@ export class Element {
     this.append(n);
     return n;
   }
+  insertBefore(n, ref) {
+    if (!ref) return this.appendChild(n);
+    if (n.parent) n.parent.children = n.parent.children.filter((c) => c !== n);
+    n.parent = this;
+    this.children.splice(this.children.indexOf(ref), 0, n);
+    return n;
+  }
   replaceChildren(...nodes) {
     for (const c of this.children) c.parent = null;
     this.children = [];
@@ -465,26 +472,45 @@ export const settle = async (rounds = 20) => {
 
 // orca-web's reader as the shell gives it (iss-00592), from {repository: {Scope id: [agent widths]}}: one worktree
 // per listed Scope, one mark per agent, each mark as wide as given (data-w).
+// iss-00616: set({summary}) gives a summary document instead (agents with ids, parents and widths w): summary() returns it,
+// forScope gives the summary's worktrees at the paths the structure records for the Scope, and an agent with an id is
+// drawn with data-agent-id. orderAgents gives the agents in their order (or `order`, a list of ids, when set).
 export function fakeOrca(byRepo) {
   const subs = new Set();
+  let doc = null;
+  let order = null;
   const module = {
-    buildMarks: (wt) => ({ w: wt.agents.map((a) => a.w) }),
-    renderAgentMarks: (slot, wt) => {
-      slot.innerHTML = `<span class="orca-marks">${wt.agents.map((a, i) => `<span class="orca-mark" data-w="${a.w}" data-i="${i}"></span>`).join("")}</span>`;
+    buildMarks: (wt) => {
+      const built = { w: wt.agents.map((a) => a.w) };
+      if (wt.agents.length && wt.agents.every((a) => typeof a.id === "string")) built.marks = wt.agents.map((a) => ({ id: a.id, label: `label ${a.id}`, mark: a.mark }));
+      return built;
     },
+    renderAgentMarks: (slot, wt) => {
+      const tag = (a) => (typeof a.id === "string" ? ` data-agent-id="${a.id}"` : "");
+      slot.innerHTML = `<span class="orca-marks">${wt.agents.map((a, i) => `<span class="orca-mark" data-w="${a.w ?? 36}" data-i="${i}"${tag(a)}></span>`).join("")}</span>`;
+    },
+    orderAgents: (agents) => (order ? order.map((id) => agents.find((a) => a.id === id)).filter(Boolean) : agents.slice()),
   };
   return {
     origin: "http://192.0.2.1:8791",
     status: () => "ok",
     marks: () => module,
+    summary: () => doc,
     forScope: (data, id) => {
+      if (doc) {
+        const paths = (data?.scopes?.find((s) => s.id === id)?.worktrees || []).map((r) => r.path);
+        return doc.worktrees.filter((w) => paths.includes(w.path));
+      }
       const widths = byRepo?.[data?.repository]?.[id];
       return widths ? [{ id: `wt-${id}`, agents: widths.map((w) => ({ w })) }] : [];
     },
     subscribe: (fn) => (subs.add(fn), () => subs.delete(fn)),
     news: () => [...subs].forEach((fn) => fn()),
     set(next) {
-      byRepo = next;
+      if (next && typeof next === "object" && "summary" in next) {
+        doc = next.summary;
+        order = next.order ?? order;
+      } else byRepo = next;
     },
   };
 }

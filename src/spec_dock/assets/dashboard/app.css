@@ -48,6 +48,7 @@
   --sd-ready: #2457c5;   --sd-ready-bg: #edf2fc;   --sd-ready-line: #c3d3f3;   --sd-ready-ink: #1d469f;
   --sd-doing: #0b8a4a;   --sd-doing-bg: #e7f6ee;   --sd-doing-line: #b3e0c6;   --sd-doing-ink: #0a6b3a;
   --sd-blocked: #a86e00; --sd-blocked-bg: #fff6dc; --sd-blocked-line: #efd595; --sd-blocked-ink: #7a5000;
+  --sd-cmd: #8a8100; --sd-cmd-glow: rgb(255 236 64 / 45%); /* iss-00616 D-05: the command lines (graph.css) */
   --sd-unknown: #7048c0; --sd-unknown-bg: #f3effc; --sd-unknown-line: #d6c8f2; --sd-unknown-ink: #5b37a6;
   --sd-done: var(--ds-faint); --sd-done-bg: var(--ds-tip-bg); --sd-done-line: var(--ds-tip-line); --sd-done-ink: var(--ds-tip-ink);
   --sd-track: var(--ds-border-2);
@@ -92,6 +93,7 @@
     --sd-ready: #6f9dff;   --sd-ready-bg: rgb(111 157 255 / 10%); --sd-ready-line: rgb(111 157 255 / 28%); --sd-ready-ink: #a8c3ff;
     --sd-doing: #3ddc84;   --sd-doing-bg: rgb(61 220 132 / 10%);  --sd-doing-line: rgb(61 220 132 / 28%);  --sd-doing-ink: #7ce8ab;
     --sd-blocked: #ffc93c; --sd-blocked-bg: rgb(255 201 60 / 10%); --sd-blocked-line: rgb(255 201 60 / 28%); --sd-blocked-ink: #ffd978;
+    --sd-cmd: #fff04d; --sd-cmd-glow: rgb(255 240 77 / 22%);
     --sd-unknown: #b79bff; --sd-unknown-bg: rgb(183 155 255 / 10%); --sd-unknown-line: rgb(183 155 255 / 28%); --sd-unknown-ink: #d2c0ff;
   }
 }
@@ -132,6 +134,7 @@
   --sd-ready: #6f9dff;   --sd-ready-bg: rgb(111 157 255 / 10%); --sd-ready-line: rgb(111 157 255 / 28%); --sd-ready-ink: #a8c3ff;
   --sd-doing: #3ddc84;   --sd-doing-bg: rgb(61 220 132 / 10%);  --sd-doing-line: rgb(61 220 132 / 28%);  --sd-doing-ink: #7ce8ab;
   --sd-blocked: #ffc93c; --sd-blocked-bg: rgb(255 201 60 / 10%); --sd-blocked-line: rgb(255 201 60 / 28%); --sd-blocked-ink: #ffd978;
+  --sd-cmd: #fff04d; --sd-cmd-glow: rgb(255 240 77 / 22%);
   --sd-unknown: #b79bff; --sd-unknown-bg: rgb(183 155 255 / 10%); --sd-unknown-line: rgb(183 155 255 / 28%); --sd-unknown-ink: #d2c0ff;
 }
 
