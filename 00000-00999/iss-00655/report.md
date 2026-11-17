@@ -22,4 +22,31 @@ ID: "iss-00655"
 - **今の合格の sha256**（round-4）：requirement.cue `4aefb2376a2f41326f2486d8b8d23a7f285faac3aa527cb7f2928cd337777732`、design.cue `87ce59e8a4973d7e9690ace66dc92b280d5df9de2ade646701a4dfedf7e95844`、plan.cue `4dbcadfe45ba0a2bed302a8aaaf0327ccd0e0cdbb84d5564a306ca40a8762f64`、explanation.html `51789b8a344fd342f5eb3242e1eab4ab7e227c39419a558e38896fdc9d1a3f62`。Epic の文書は round-2 と同じ。
 - 開始のコミット：`92e26aff7256a9a32ba6edd5bc7f790ed8e4f149`。
 
+## 実機の確かめ（S-04、2026-11-18、`4f29a42c9`）
+
+- 試しのサーバー：この worktree を隔離した venv（`.workbench/iss-00655/venv`、editable）に入れ、iss-00646 の試しの状態の置き場の写し（`.workbench/iss-00655/state`）で、ポート 18655、`--tailscale`。orca-web は常駐の 8791 を GET で読むだけの中継（`relay_orca.py`、18855、127.0.0.1 と tailnet）。Chrome 157 を headless で `--disable-features=MacAppCodeSignClone`、CDP 9655、1440×900。常駐の 47800・8791 の設定、道具の環境には触れていない。
+- 台本：`.workbench/iss-00655/check.mjs`（結果 `one.json`・`all.json`）、`still.mjs`。写しは `.workbench/iss-00655/shots/`（`{one,all}-{0-start,1-after-wheel,2-after-arrows,3-after-fit}.png`）。
+
+| 操作（CDP） | spec-dock の構造の図 | 横断の構造 |
+|---|---|---|
+| mouseWheel deltaY −120（カーソル 720,500） | 88% → 101%（×1.15）、カーソルの下の点のずれ 0px | 59% → 68%（×1.15）、ずれ 0.002px |
+| もう一度 −120 / +120 | ×1.15 / ×0.8696（1/1.15）、ずれ 0 | 同じ、ずれ ≤0.001px |
+| 速く回す（−120 を 40ms ごとに3つ） | ×1.5209（1.15³） | ×1.5209 |
+| 2本指を模した wheel（deltaX 3、deltaY 7、前から 400ms あけて） | 拡大率そのまま、(−3, −7) 動く | 同じ |
+| 一続き（deltaX 2・deltaY 10 を 40ms ごとに4つ、続けて deltaX 0・deltaY 40） | 拡大率そのまま、(−8, −80) 動く（最後の 40 も動かすを引き継ぐ） | 同じ |
+| Shift＋deltaY 120 | 横に −120、縦 0 | 同じ |
+| Ctrl＋deltaY −10（ピンチ） | ×1.1052（exp(0.1)、今と同じ） | 同じ |
+| → ↓ ← ↑（フォーカスは body） | tx −80、ty −80、tx +80、ty +80 | 同じ |
+| Shift＋→ | tx −320 | 同じ |
+| `+` / `-` | ×1.25 / ×0.8（中央） | 同じ |
+| `0` | 収める（101%系 → 32%） | 収める（→ 12%） |
+| 検索の input にフォーカスして → | 動かない | （検索の欄なし） |
+
+- 届いた wheel の値（CDP の性質）：CDP の Input.dispatchMouseEvent（mouseWheel）は、どんな deltaY（7、10、12.5、40、±120）でも `deltaMode` 0、`wheelDeltaY` ±120 を渡す。そのため deltaX 0・deltaY 12.5 の合成の wheel（前の wheel から 400ms あけた一続きの初め）は、らしいマウスのホイールとして ×0.8696 に縮小した。統括の決定（A、2026-11-18）のとおり、本物のマウスとトラックパッドは本人が試しの URL で確かめる（統括が頼む）。
+- 動かす間の止める扱い（iss-00646）：両方の画面で、ホイールの 50ms 後と → の直後に `.gx-view` に `is-still` があり、600ms 後には外れている。
+- 検査：両方の画面で `specdockEdgeAudit()` の違反0（単体は boxHits・overlaps など違反の数がすべて0、横断は total 0）、`specdockCmdAudit()` の `boxOverlaps`・`edgeOverlaps`・`heads`・`spotDrift` 0、ブラウザーのエラー0。`.gx-view` の aria-label は D-05 の文。
+- 本人が見る試しの URL：tailnet の 18655 の `/graph`（横断の構造）と `/r/github.com/chemitaro/spec-dock/graph`。止め方：`pkill -f "port 18655 --state-root"` と `pkill -f "relay_orca.py .* 18855"`（Chrome は CDP の Browser.close で閉じた）。
+
 ## Residual Risks / Follow-ups
+
+- 本物のマウス・トラックパッドの値は手元で測れていない（CDP の合成の値は `wheelDeltaY` ±120 に固定）。マウスのホイールが 120 の倍数にならない環境では動かすに倒れ（今と同じ動き）、トラックパッドの一続きの初めの1つがちょうど deltaY 40（`wheelDeltaY` 120）で deltaX 0 だと、その一続きが拡大・縮小になる。本人の確かめで食い違えば、見分けの決まりを直す別の Issue にする。
