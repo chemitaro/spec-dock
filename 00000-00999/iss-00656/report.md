@@ -72,7 +72,7 @@ ID: "iss-00656"
 
 - **最終品質ゲート（2026-11-18、合格）**：合格のコミット `40299192a`（`ebbca611f` に origin/main の #660 を取り込んだマージ。衝突なし。base `afe2df5c2`）。attempt 01（`ebbca611f`）でもレビュー P0〜P3 0・テスト合格（4283 passed）だったが、PR の前の取り込みの後に attempt 02 で全体をやり直した。attempt 02：レビュー（quality-gate-reviewer opus / medium、4観点）P0〜P3 すべて0、網羅は完全。`make lint` exit 0、`uv run pytest` 4286 passed・7 skipped。この worktree の `.workbench/final-quality-gate/iss-00656/closure.md`。記録だけのコミットはない（記録は Git の外）。
 - 実装担当の起動：impl-claude（dispatch `ctx_a67cac37b1a5`、launch.effective claude / claude-opus-5-5 / medium）が S-01〜S-03 を行った。Codex は使っていない（plan の rationale のとおり）。
-- **PR**：https://github.com/chemitaro/spec-dock/pull/662（head `40299192a`、`Refs #656`）。マージは統括。
+- **PR**：https://github.com/chemitaro/spec-dock/pull/662（head `40299192a`、`Refs #656`）。CI（check・route・spec-dock-check・provider-tests・Provider distribution parity の ubuntu と macos）すべて合格、merge_readiness READY、mergeStateStatus CLEAN（2026-11-18）。マージは統括。
 
 ## Residual Risks / Follow-ups
 
