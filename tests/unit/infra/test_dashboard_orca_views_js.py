@@ -75,12 +75,29 @@ def test_the_card_holds_a_slot_only_when_asked(tmp_path: Path) -> None:
         tmp_path,
     )
     slot = '<span class="sd-orca" data-orca-scope="iss-00005" data-orca-max="4"></span>'
+    row = f'<span class="sd-card__agents">{slot}</span>'
     assert out["plain"] == out["plainOpts"]
     assert "sd-card__meta" not in out["plain"] and "sd-orca" not in out["plain"]
-    assert f'<span class="sd-card__meta">{slot}</span>' in out["orca"]
+    # iss-00621 T-05: the agents sit on a row of their own below the other marks, never inside them
+    assert "sd-card__meta" not in out["orca"] and out["orca"].count(row) == 1
     assert out["orcaMarks"].count("sd-card__meta") == 1
-    assert f"{slot}</span>" in out["orcaMarks"]
+    meta = out["orcaMarks"][out["orcaMarks"].index('<span class="sd-card__meta">') :]
+    meta = meta[: meta.index(row)]
+    assert "sd-orca" not in meta and meta.endswith("</span>")
+    assert out["orcaMarks"].count(row) == 1
+    assert out["orcaMarks"].replace(row, "") == out["marks"]
+    assert out["orca"].replace(row, "") == out["plain"]
     assert "sd-orca" not in out["marks"]
+
+
+def test_the_card_row_of_agents_hides_without_marks() -> None:  # iss-00621 T-05
+    css = (SHARED / "parts.css").read_text()
+    assert ".sd-card__agents { display: flex;" in css
+    assert ".sd-card__agents:not(:has(.orca-mark)) { display: none; }" in css
+    assert ".sd-card__agents > .sd-orca { margin-left: 0; }" in css
+    card = _function((SHARED / "parts.js").read_text(), "card")
+    assert "meta.push(orcaSlot" not in card
+    assert card.index('<span class="sd-card__meta">') < card.index('<span class="sd-card__agents">') < card.index("parentLine +")
 
 
 @needs_node
@@ -207,27 +224,45 @@ def test_graph_and_board_paint_after_drawing_and_on_news() -> None:
     assert "card(item, ctx)" not in board
 
 
-def test_pressing_a_mark_prefers_the_agents_tab() -> None:
+def test_pressing_a_mark_opens_the_agents_tab_on_its_agent() -> None:  # iss-00621 T-06
     graph = (VIEWS / "graph.js").read_text()
-    # A box's mark is pressed through the graph's taps; the panel takes the presses on its own heading's marks.
+    # A box's or a frame heading's mark is pressed through the graph's taps.
     tap = _function(graph, "onTap")
-    assert 'closest(".sd-orca")' in tap and 'V.pn?.preferTab("agents")' in tap
-    assert tap.index("select(id)") < tap.index("preferTab")
+    assert 'const slot = target.closest(".sd-orca");' in tap
+    assert "V.pn?.openAgent(markAgentAt(slot, target));" in tap
+    assert tap.index("select(id)") < tap.index("openAgent")
+    allgraph = _function((VIEWS / "allgraph.js").read_text(), "onTap")
+    assert 'const slot = target.closest(".sd-orca");' in allgraph
+    assert "if (!same) select(hit.repo, hit.id);\n    A.pn?.openAgent(markAgentAt(slot, target));" in allgraph
     board = _function((VIEWS / "board.js").read_text(), "onCardClick")
-    assert 'closest(".sd-orca")' in board and 'B.pn?.preferTab("agents")' in board
-    assert board.index("plainClick(event)") < board.index("preferTab")
+    assert 'const slot = event.target.closest(".sd-orca");' in board
+    assert "if (slot) B.pn?.openAgent(markAgentAt(slot, event.target));" in board
+    assert board.index("plainClick(event)") < board.index("select(anchor.dataset.id)") < board.index("openAgent")
+    panel = (SHARED / "panel.js").read_text()
+    click = panel[panel.index('aside.addEventListener("click"') : panel.index("  // Choose a tab as if")]
+    assert 'const slot = t.closest(".sd-orca");' in click
+    assert "openAgent(markAgentAt(slot, t));" in click
+    for source in (tap, allgraph, board, click):
+        assert 'preferTab("agents")' not in source
+    for name in ("graph.js", "allgraph.js", "board.js"):
+        assert "markAgentAt" in (VIEWS / name).read_text().split("\n\n")[0] or "markAgentAt, paintOrcaMarks" in (VIEWS / name).read_text()
+    assert "markAgentAt" in panel[: panel.index("export function createScopePanel")]
 
 
-def test_a_mark_on_a_selected_box_opens_the_agents_tab_on_a_phone_too() -> None:  # iss-00602 T-01
-    tap = _function((VIEWS / "graph.js").read_text(), "onTap")
-    mark = tap.index('if (target.closest(".sd-orca")) {')
-    second = tap.index("if (isPhone() && V.sel === id) {")
-    assert mark < second  # the mark is read before a phone's second tap opens the detail screen
-    branch = tap[mark : tap.index("\n  }\n", mark)]
-    assert "if (V.sel !== id) select(id);" in branch
-    assert branch.index("select(id)") < branch.index('V.pn?.preferTab("agents");')
-    assert branch.rstrip().endswith("return;")
-    assert tap[second:].index("goDetail(id);") < tap[second:].index("return;")
+def test_a_mark_on_a_selected_box_opens_the_agents_tab_on_a_phone_too() -> None:  # iss-00602 T-01, iss-00621 T-06
+    for name, select, call in (
+        ("graph.js", "if (V.sel !== id) select(id);", "V.pn?.openAgent(markAgentAt(slot, target));"),
+        ("allgraph.js", "if (!same) select(hit.repo, hit.id);", "A.pn?.openAgent(markAgentAt(slot, target));"),
+    ):
+        tap = _function((VIEWS / name).read_text(), "onTap")
+        mark = tap.index("if (slot) {")
+        second = tap.index("if (isPhone() && ")
+        assert mark < second  # the mark is read before a phone's second tap opens the detail screen
+        branch = tap[mark : tap.index("\n  }\n", mark)]
+        assert select in branch
+        assert branch.index(select) < branch.index(call)
+        assert branch.rstrip().endswith("return;")
+        assert tap[second:].index("goDetail(") < tap[second:].index("return;")
 
 
 @needs_node
@@ -421,7 +456,7 @@ def test_prefer_tab_chooses_only_shared_tabs_and_marks_ask_for_it(tmp_path: Path
     assert out["agents"] == "summary"
     panel = (SHARED / "panel.js").read_text()
     click = panel[panel.index('aside.addEventListener("click"') :]
-    assert 'if (t.closest(".sd-orca")) {' in click and 'preferTab("agents");' in click
+    assert 'if (slot) {' in click and "openAgent(markAgentAt(slot, t));" in click  # iss-00621 D-03
 
 
 @needs_node
@@ -513,3 +548,54 @@ def test_open_agent_chooses_the_agent_and_null_only_prefers_the_tab(tmp_path: Pa
     assert out["emptyFrame"] == ["b"]
     assert out["otherScope"] == ["agents", ["y"]]
     assert out["again"] == ["y"]
+
+
+# --- iss-00621 T-04: the worktree mark on a working Epic's or Initiative's frame ----------------------------
+
+
+@needs_node
+def test_working_frames_show_the_worktree_mark(tmp_path: Path) -> None:
+    out = run_node(
+        f"const draw = await import({json.dumps((VIEWS / 'graph/draw.js').as_uri())});\n"
+        + """
+        const epic = {id: "epic-01234", number: 1234, kind: "epic", state: "doing", title: "E", branch: "worktree/epic-01234", parent_id: null, children: []};
+        const ini = {...epic, id: "init-01235", number: 1235, kind: "initiative", branch: "worktree/init-01235"};
+        const data = {scopes: [epic, ini]};
+        const byId = new Map(data.scopes.map((s) => [s.id, s]));
+        const V = {data, ix: {byId, kids: new Map()}, desc: () => [], cleanup: new Map(), range: "all"};
+        const n = {type: "frame", x1: 0, y1: 0, x2: 300, y2: 200};
+        const t = {type: "tframe", x1: 0, y1: 0, x2: 200, y2: 80};
+        const html = (s) => ({frame: draw.frameHtml(V, s, n), box: draw.boxHtml(V, s, t)});
+        out.epic = html(epic);
+        out.ini = html(ini);
+        out.ready = html({...epic, state: "ready"});
+        out.readyBare = html({...epic, state: "ready", branch: null});
+        out.noBranch = html({...epic, branch: null});
+        """,
+        tmp_path,
+    )
+    for key, branch in (("epic", "worktree/epic-01234"), ("ini", "worktree/init-01235")):
+        frame, box = out[key]["frame"], out[key]["box"]
+        wt = f'<span class="wt" title="worktree：{branch}" role="img" aria-label="worktree {branch}">'
+        head = frame[frame.index('<div class="gx-fh"') : frame.index('<div class="gx-fm">')]
+        assert head.count(wt) == 1 and frame.count(wt) == 1
+        # after the title, outside the row of agents
+        assert head.index('class="gx-fttl"') < head.index(wt) < head.index('<div class="gx-agents">')
+        marks = box[box.index('<div class="gx-marks">') : box.index('<div class="gx-agents">')]
+        assert marks.count(wt) == 1 and box.count(wt) == 1
+    # the heading's label stays
+    assert 'aria-label="epic-01234 E。作業中"' in out["epic"]["frame"]
+    # not working, or no branch: the same HTML as before (no mark)
+    assert out["ready"] == out["readyBare"]
+    for key in ("ready", "noBranch"):
+        assert 'class="wt"' not in out[key]["frame"] and 'class="wt"' not in out[key]["box"]
+    assert out["noBranch"]["frame"] == re.sub(r'<span class="wt" [^>]*>.*?</span>', "", out["epic"]["frame"], count=1)
+    assert out["noBranch"]["box"] == re.sub(r'<span class="wt" [^>]*>.*?</span>', "", out["epic"]["box"], count=1)
+
+
+def test_the_frame_heading_keeps_the_worktree_mark_on_the_title_row() -> None:  # iss-00621 T-04
+    frame = _function((VIEWS / "graph/draw.js").read_text(), "frameHtml")
+    head = frame[frame.index("const head") : frame.index("const meta")]
+    assert '</span>${M.wtMark(s.state === "doing" ? s.branch : null)}<div class="gx-agents">' in head
+    box = _function((VIEWS / "graph/draw.js").read_text(), "boxHtml")
+    assert box.count('${M.wtMark(s.state === "doing" ? s.branch : null)}') == 2
