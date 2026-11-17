@@ -66,7 +66,7 @@ SpecDock 0.9.7 のリリースの変更を作った。機能のコードは変�
   - closure：`.workbench/final-quality-gate/iss-00645-fqg-1/closure.md`（worktree `/Volumes/990p2t/workspace/worktrees/orca/spec-dock/iss-00645`）。
   - 区切りのレビューは、計画どおりなし。
 - wheel：隔離した venv で `spec-dock --version` が `spec-dock 0.9.7` を返した（Outcome の S-04）。
-- PR #647（https://github.com/chemitaro/spec-dock/pull/647）：head は 64fd56c67（合格のコミット）。記録のコミットはない（記録は Git の外）。CI は下に追記する。
+- PR #647（https://github.com/chemitaro/spec-dock/pull/647）：head は 64fd56c67（合格のコミット）。記録のコミットはない（記録は Git の外）。CI は合格した。observer の結果は OBSERVED_CI_PASS、merge_readiness は READY、mergeStateStatus は CLEAN（2026-11-17T11:43Z UTC、`.workbench/coding-task/iss-00645/ci-2.json`）。最初の observer は、provider-tests の実行中に idle timeout（600秒）で止まった（`ci-1.json`）。idle の上限を 3000 秒にして、同じ head で見直した。
 
 ## 逸脱と判断
 
