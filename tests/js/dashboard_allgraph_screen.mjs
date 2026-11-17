@@ -8,7 +8,9 @@
 // step: {act, range?} | {hl} | {tap: selector} | {dbl: selector} | {click: selector} | {key: "Escape"} |
 //       {tick: n} (the 5-second refresh n times) | {set: {revisions?, docs?}} (the server's answers change) |
 //       {news: true} (orca-web's news) | {orca: {key: {id: [w]}}} (the reader's worktrees change, then news) |
-//       {remount: true} (leave the screen and open it again)
+//       {remount: true} (leave the screen and open it again) | {release: true} (the held structure answers arrive)
+// run.styled: the screen's CSS is in effect (.gx is position: absolute) and the animation frames run, as in a browser;
+// run.hold: the structure answers wait for a {release} step, so they arrive after the first draw (iss-00629 T-03).
 // Prints {runs: {name: [snapshot after the first render, after each step]}}.
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
@@ -18,6 +20,7 @@ const [assets, requestPath] = process.argv.slice(2);
 const request = JSON.parse(readFileSync(requestPath, "utf8"));
 let run = null;
 const calls = [];
+let held = [];
 const page = install({
   fetch: async (url, init = {}) => {
     calls.push(`${init.method || "GET"} ${url}`);
@@ -26,6 +29,7 @@ const page = install({
     const [, key, op, id] = m;
     if (op === "revision") return json({ revision: run.revisions?.[key] ?? run.docs[key]?.revision ?? null });
     if (op === "structure") {
+      if (run.hold) await new Promise((resolve) => held.push(resolve));
       const doc = run.docs[key];
       if (!doc || doc.status >= 400) return json({ error: { message: doc?.message ?? "not found" } }, doc?.status ?? 404);
       return json(doc);
@@ -40,6 +44,9 @@ globalThis.clearInterval = (id) => {
   if (id) intervals[id - 1] = null;
 };
 const navigated = [];
+const plainStyle = globalThis.getComputedStyle;
+const styledStyle = (el) => ({ ...plainStyle(el), position: el?.classList?.contains("gx") ? "absolute" : "" });
+const frames = () => run.styled && page.flushFrames();
 const allgraph = (await import(pathToFileURL(`${assets}/views/allgraph.js`).href)).default;
 const { routeLayout } = await import(pathToFileURL(`${assets}/views/graph/layout.js`).href);
 
@@ -150,8 +157,12 @@ async function step(root, s, ctx, orca) {
     allgraph.dispose();
     root.replaceChildren();
     allgraph.render(root, ctx);
+  } else if (s.release) {
+    for (const resolve of held.splice(0)) resolve();
   }
+  frames();
   await settle();
+  frames();
 }
 
 const out = {};
@@ -160,10 +171,19 @@ for (const r of request.runs) {
   page.store.clear();
   intervals.length = 0;
   calls.length = 0;
+  held = [];
+  globalThis.getComputedStyle = run.styled ? styledStyle : plainStyle;
   for (const [k, v] of Object.entries(run.saved || {})) page.store.set(k, v);
   globalThis.innerWidth = run.width ?? 1440;
   // run.view {width, height, bar}: the graph area's size and the bottom of the bar above it (px), for the fit
-  hooks.sizes = run.view ? (el) => (el.classList?.contains("gx-view") ? { width: run.view.width, height: run.view.height } : null) : null;
+  // and the screen's root is as wide as the window (isPhone)
+  hooks.sizes = run.view
+    ? (el) => {
+        if (el.classList?.contains("gx-view")) return { width: run.view.width, height: run.view.height };
+        if (el.getAttribute?.("data-view") === "allgraph") return { width: run.width ?? 1440, height: run.view.height };
+        return null;
+      }
+    : null;
   hooks.rect = run.view
     ? (el) => {
         if (el.classList?.contains("gx-view")) return { left: 0, top: 0, right: run.view.width, bottom: run.view.height, width: run.view.width, height: run.view.height };
@@ -187,7 +207,9 @@ for (const r of request.runs) {
   };
   ctx.current = () => ctx;
   allgraph.render(root, ctx);
+  frames();
   await settle();
+  frames();
   const shots = [snap(root, orca)];
   for (const s of run.steps || []) {
     await step(root, s, ctx, orca);
