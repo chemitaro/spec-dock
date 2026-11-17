@@ -13,15 +13,15 @@ steps: {
 
 tests: {
 	"T-01": {title: "overviewWarnings の各種類に D-01 の kind と detail が付き、level と text は今のまま（tests/unit/infra/test_dashboard_screens_js.py の既存の検査も通る）", verifies: ["R-05"]}
-	"T-02": {title: "splitNotices（純粋）：種類ごとに1行、名前は一覧の順、detail、同じ name のときだけ owner/name、行の順（error→warning→info、同じ level は SHARED の順）、next が1回、failure と ambiguous は own に残る、warnings が null のリポジトリは数えない、知らせがなければ summary が空", verifies: ["R-01", "R-02", "F-01"]}
-	"T-03": {title: "画面の node の検査：2つが古く1つが PR 不明のとき .ax-sum が2行で、どの枠の .ax-warn にもその知らせがない。読めなかった枠は理由の1行だけ（枠の高さが1行分）。『これから』で Scope がなく古いだけの枠は出ず、名前はまとめの行にある。知らせがなければ .ax-sum は hidden", verifies: ["R-01", "R-02", "F-01"]}
-	"T-04": {title: "画面の node の検査（styled）：まとめの行があるとき、最初の表示の ty がまとめの行の下端 + 8 以上（barBottom が .ax-sum を含む）", verifies: ["R-03"]}
+	"T-02": {title: "splitNotices（純粋）：種類ごとに1行、名前は一覧の順、detail、同じ name のときだけ owner/name、行の順（error→warning→info、同じ level は SHARED の順）、next が1回、failure と ambiguous は own に残る、warnings が null のリポジトリは数えない、failed のリポジトリは知らせのすべてが own に残りまとめに出ない、知らせがなければ summary が空", verifies: ["R-01", "R-02", "F-01"]}
+	"T-03": {title: "画面の node の検査：2つが古く1つが PR 不明のとき .ax-sum が2行で、どの枠の .ax-warn にもその知らせがない。読めなかった枠は理由の1行だけ（枠の高さが1行分）。『これから』で Scope がなく古いだけの枠は出ず、名前はまとめの行にある。Scope が0件でスナップショットが読めない failed の枠には読めない理由の行が残り、まとめの行に名前がない。知らせがなければ .ax-sum は hidden", verifies: ["R-01", "R-02", "F-01"]}
+	"T-04": {title: "画面の node の検査（styled）：まとめの行があるとき、最初の表示の ty がまとめの行の下端 + 8 以上（barBottom が .ax-sum を含む）。静的な検査で .ax-sum の pointer-events: none と li の auto・fit-content", verifies: ["R-03"]}
 	"T-05": {title: "実機：R-04 の18組の edgeAudit の total の違反0、縮めた枠のはみ出し0、まとめの行の写し（1440・390 × 明暗）", verifies: ["R-03", "R-04"]}
 }
 
 verification: """
 	節目：S-01 の後は `uv run pytest tests/unit/presentation/test_dashboard_allgraph_notices.py tests/unit/infra/test_dashboard_screens_js.py`、
-	S-02 の後は `uv run pytest tests/unit/presentation/ -k allgraph tests/unit/infra/test_dashboard_screens_js.py tests/unit/presentation/test_dashboard_graph_fit.py`。
+	S-02 の後は `uv run pytest tests/unit/presentation/test_dashboard_allgraph_notices.py tests/unit/presentation/test_dashboard_allgraph_screen.py tests/unit/presentation/test_dashboard_allgraph_compose.py tests/unit/infra/test_dashboard_screens_js.py tests/unit/presentation/test_dashboard_graph_fit.py`。
 	最後に `make lint`、`uv run pytest`（全体）。実機は D-04。
 	"""
 
