@@ -64,6 +64,8 @@ ID: "iss-00646"
 - **最終品質ゲート（2026-11-17、合格）**：合格のコミット `b400ed00f`（origin/main の 0.9.7 #647 を取り込んだマージ。base `2fa809271`）。レビュー（quality-gate-reviewer opus / medium、4観点）P0〜P3 すべて0、網羅は完全。`make lint` exit 0、`uv run pytest` 4233 passed・7 skipped。この worktree の `.workbench/final-quality-gate/iss-00646/closure.md`。記録だけのコミットはない（記録は Git の外）。
 - 実装担当の起動：impl-sol（Codex、dispatch `ctx_ce223ee3c6ca`、launch.effective codex gpt-6.1-sol / medium）は chat-scratch の symlink の拒否で何も変えずに止まった（worker-stop）。impl-claude（dispatch `ctx_35f9782138ae`、launch.effective claude-opus-5-5 / medium）が S-01〜S-03 を行った。
 
+- **PR**：https://github.com/chemitaro/spec-dock/pull/649（head `b400ed00f`、`Refs #646`）。CI（check・route・spec-dock-check・provider-tests・Provider distribution parity の ubuntu と macos）すべて合格、merge_readiness READY（2026-11-17）。マージは統括。
+
 ## Residual Risks / Follow-ups
 
 - Epic epic-00615 の D-04・R-05（点を端から端まで2〜3秒、stroke-dashoffset の動き）は、この Issue の統括の決定（40px/秒、止めた絵の切り替え）で置き換わった。Epic の文書を直すかどうかは統括に任せる（仕様のレビュー round-1 の P2-2）。
