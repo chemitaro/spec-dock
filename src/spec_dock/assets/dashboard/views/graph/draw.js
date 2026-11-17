@@ -175,7 +175,9 @@ export const rangesHtml = (range) =>
   RANGES.map(([v, label, icon, title]) => `<button type="button" class="tool" data-act="range" data-range="${v}" aria-pressed="${range === v}" title="見せる範囲：${label}（${title}）">${ic(icon)}<span class="lab">${label}</span></button>`).join("") +
   `</span>`;
 
-export function renderLegend(el, open) {
+// iss-00616 D-05: cmd adds the command lines' rows to "そのほか" (the structure graph with Orca); off by default, so the
+// shared legend of the cross-repository structure stays as it is.
+export function renderLegend(el, open, { cmd = false } = {}) {
   const li = (a, b, wide) => `<li${wide ? ' class="wide"' : ""}><span>${a}</span>${b}</li>`;
   el.dataset.open = String(open);
   el.innerHTML =
@@ -184,7 +186,7 @@ export function renderLegend(el, open) {
     `<div class="lg-grp"><h4>PR と CI</h4><ul>${li(`<span class="pr" data-pr="open">${ic("branch")}</span>`, "開いている")}${li(`<span class="pr" data-pr="draft">${ic("branch")}</span>`, "下書き")}${li(`<span class="pr" data-pr="merged">${ic("merge")}</span>`, "マージ済み")}${li(`<span class="pr" data-pr="closed">${ic("prClosed")}</span>`, "閉じた")}` +
     `${li('<span class="ci" data-ci="success"></span>', "CI 成功")}${li('<span class="ci" data-ci="failure"></span>', "CI 失敗")}${li('<span class="ci" data-ci="running"></span>', "CI 実行中")}${li(`<span class="mg" data-mg="ok">${ic("check")}</span>`, "マージできる")}${li(`<span class="mg" data-mg="conflict">${ic("zap")}</span>`, "衝突")}</ul></div>` +
     `<div class="lg-grp"><h4>保証</h4><ul>${M.AS_LEVELS.map((l) => li(M.asMark(l), l)).join("")}</ul></div>` +
-    `<div class="lg-grp"><h4>そのほか</h4><ul>${li('<span class="lg-chg"></span>', "前回から変化")}${li(`<span class="wt">${ic("folder")}</span>`, "worktree あり")}${li('<span class="stg">2</span>', "進める段")}${li(`<span class="dn">${ic("down")}3</span>`, "後に続く数")}${li(`<span class="hm">${ic("person")}人 2</span>`, "人のタスクが止めている数（枠は配下も）")}${li(`<span class="cln">${ic("box")}</span>`, "片付けの候補（全体では箱と枠に印、いまでは畳んで1つに、これからでは出さない）", 1)}${li('<span class="lg-line"></span>', "待っている依存", 1)}${li('<span class="lg-line is-done"></span>', "終わった依存", 1)}${li('<span class="lg-tree"></span>', "親子（木）", 1)}</ul></div>` +
+    `<div class="lg-grp"><h4>そのほか</h4><ul>${li('<span class="lg-chg"></span>', "前回から変化")}${li(`<span class="wt">${ic("folder")}</span>`, "worktree あり")}${li('<span class="stg">2</span>', "進める段")}${li(`<span class="dn">${ic("down")}3</span>`, "後に続く数")}${li(`<span class="hm">${ic("person")}人 2</span>`, "人のタスクが止めている数（枠は配下も）")}${li(`<span class="cln">${ic("box")}</span>`, "片付けの候補（全体では箱と枠に印、いまでは畳んで1つに、これからでは出さない）", 1)}${li('<span class="lg-line"></span>', "待っている依存", 1)}${li('<span class="lg-line is-done"></span>', "終わった依存", 1)}${li('<span class="lg-tree"></span>', "親子（木）", 1)}${cmd ? li('<span class="lg-cmd"></span>', "指揮（親 → 子）", 1) + li('<span class="lg-cr"></span>', "指揮している親（波紋）") : ""}</ul></div>` +
     `<div class="lg-grp"><h4>箱を選んだとき</h4><ul>${li('<span class="lg-box is-sel"></span>', "選んだ箱（1つだけ）")}${li('<span class="lg-line is-p1"></span>', "直接の依存", 1)}${li('<span class="lg-line is-p2"></span>', "間接（2段目より先）", 1)}${li('<span class="lg-line is-off"></span><span class="lg-box is-off"></span>', "関係ない")}${li(`<span class="rt lg-rt">${ic("target")}大もと</span>`, "大もとの待ち先")}${li(ic("arrowRight"), "矢印：選んだ箱へ入る線＝待ち先、出る線＝後に続く", 1)}</ul></div>` +
     `</div>`;
 }
