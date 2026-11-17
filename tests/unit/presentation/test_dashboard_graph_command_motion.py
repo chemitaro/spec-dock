@@ -1,8 +1,9 @@
-"""The command lines' drawing as pure computation (iss-00646 T-01), run in node like the other graph checks.
+"""The command lines' drawing as pure computation (iss-00646 T-01, iss-00657 T-01), run in node like the other graph checks.
 
-`views/graph/command_motion.js` draws each command line in SVGs of its own bounding box: a flowing line's dots are four
-still pictures, each shifted 2px along the line and shown for 0.05s in turn by an opacity animation, and a ripple is an
-HTML ring. Every value is synthetic: no real path, address or session id.
+`views/graph/command_motion.js` draws each command line in SVGs of its own bounding box: a flowing line's dots are pairs
+24px apart (a large head and, 6px behind it, a small tail) in twelve still pictures, each shifted 2px along the line and
+shown for 0.1s in turn by an opacity animation, and a ripple is an HTML ring. Every value is synthetic: no real path,
+address or session id.
 """
 
 from __future__ import annotations
@@ -119,6 +120,7 @@ def motion(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
             "arrow": [{"x": 200, "y": 134}, {"x": 12.5, "y": -16}],
             "markRect": [MARK, SLOT],
             "ripples": [{"agent": "p-a", "x": 12.5, "y": 30}, {"agent": 'a"<&', "x": 0, "y": -4}],
+            "dots": [[CURVE, 0], [CURVE, -22], [CURVE, -6], ['M 0 0 L "<&> 1', -2]],
             "svgOpen": [
                 [{"x": -3, "y": 4, "w": 20, "h": 10}, "cl-svg", ""],
                 [{"x": 0, "y": 0, "w": 1, "h": 2}, "cl-svg cl-ph", ";animation-delay:-0.1s"],
@@ -128,25 +130,30 @@ def motion(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
 
 
 def test_the_constants(motion: dict[str, Any]) -> None:
-    assert motion["MOTION"] == {"phases": 4, "step": 2, "tick": 0.05, "pad": 4}
+    assert motion["MOTION"] == {"phases": 12, "step": 2, "tick": 0.1, "gap": 24, "tail": 6, "pad": 4}
     m = motion["MOTION"]
-    assert m["step"] / m["tick"] == pytest.approx(40)  # 40px/s on every line
-    assert m["phases"] * m["step"] == 8  # one round of the dots' period of 8px
+    assert m["step"] / m["tick"] == pytest.approx(20)  # 20px/s on every line
+    assert m["phases"] * m["step"] == m["gap"]  # one round moves the dots one pair on (24px)
+    assert m["phases"] * m["tick"] == pytest.approx(1.2)  # one round of 1.2s
 
 
 def test_the_delays_and_the_offsets(motion: dict[str, Any]) -> None:
-    assert motion["delays"] == pytest.approx([0, -0.15, -0.1, -0.05])
-    assert motion["offsets"] == [0, -2, -4, -6]
+    assert motion["delays"] == pytest.approx([0, *(-(12 - i) / 10 for i in range(1, 12))])
+    # rounded in ms: written without a float tail (−1.1, not −1.1000000000000001)
+    assert [str(d) for d in motion["delays"]] == ["0", "-1.1", "-1", *(f"-0.{9 - i}" for i in range(9))]
+    assert motion["offsets"] == [-2 * i for i in range(12)]
+    assert motion["offsets"][-1] == -22
 
 
 def test_one_phase_shows_at_every_time_and_the_dots_move_forward(motion: dict[str, Any]) -> None:
     timeline = motion["timeline"]
-    assert len(timeline) == 41
+    assert len(timeline) == 241  # 0..2.4s by 0.01s: two rounds
     for at in timeline:
         assert len(at["shown"]) == 1, at
-        assert at["shown"][0] == round(at["t"] * 1000) // 50 % 4, at
+        assert at["shown"][0] == round(at["t"] * 1000) // 100 % 12, at
     shown = [at["offsets"][0] for at in timeline]
-    assert shown[:21:5] == [0, -2, -4, -6, 0]  # −2 each 0.05s, back to 0 after a round (one period of 8px)
+    assert shown[:121:10] == [*(-2 * i for i in range(12)), 0]  # −2 each 0.1s, back to 0 after a round of 1.2s
+    assert shown[120:241:10] == [*(-2 * i for i in range(12)), 0]  # the second round the same
 
 
 def test_the_box_holds_every_point_and_the_dots(motion: dict[str, Any]) -> None:
@@ -165,9 +172,21 @@ def test_svg_open(motion: dict[str, Any]) -> None:
     ]
 
 
-def test_a_flowing_line_is_its_glow_and_four_phases(motion: dict[str, Any]) -> None:
+def test_dots_html_is_a_head_and_a_tail_6px_behind(motion: dict[str, Any]) -> None:
+    """iss-00657 R-01: the same path twice, the tail's offset 6 more (6px behind, on the parent's side); no −0."""
+    assert motion["dots"][:3] == [
+        f'<path class="cl-line cl-hd" d="{CURVE}" style="stroke-dashoffset:0px"/><path class="cl-line cl-tl" d="{CURVE}" style="stroke-dashoffset:6px"/>',
+        f'<path class="cl-line cl-hd" d="{CURVE}" style="stroke-dashoffset:-22px"/><path class="cl-line cl-tl" d="{CURVE}" style="stroke-dashoffset:-16px"/>',
+        f'<path class="cl-line cl-hd" d="{CURVE}" style="stroke-dashoffset:-6px"/><path class="cl-line cl-tl" d="{CURVE}" style="stroke-dashoffset:0px"/>',
+    ]
+    escaped = motion["dots"][3]
+    assert 'd="M 0 0 L &quot;&lt;&amp;&gt; 1"' in escaped and "<&>" not in escaped
+    assert "-0px" not in "".join(motion["dots"])
+
+
+def test_a_flowing_line_is_its_glow_and_twelve_phases(motion: dict[str, Any]) -> None:
     body = svgs(motion["links"][0]["body"])
-    assert len(body) == 5
+    assert len(body) == 13
     (first, inner), phases = body[0], body[1:]
     assert first["class"] == "cl-svg"
     assert re.fullmatch(
@@ -182,7 +201,9 @@ def test_a_flowing_line_is_its_glow_and_four_phases(motion: dict[str, Any]) -> N
         assert box_of(a) == box
         assert float(style(a["style"])["animation-delay"].removesuffix("s")) == pytest.approx(motion["delays"][i])
         g = re.fullmatch(
-            r'<g ([^>]*)><path class="cl-line" d="([^"]+)" style="stroke-dashoffset:(-?\d+)px"/></g>', inner
+            r'<g ([^>]*)><path class="cl-line cl-hd" d="([^"]+)" style="stroke-dashoffset:(-?\d+)px"/>'
+            r'<path class="cl-line cl-tl" d="([^"]+)" style="stroke-dashoffset:(-?\d+)px"/></g>',
+            inner,
         )
         assert g, inner
         assert attrs(g.group(1)) == {
@@ -192,8 +213,9 @@ def test_a_flowing_line_is_its_glow_and_four_phases(motion: dict[str, Any]) -> N
             "data-child": "c-b",
             "data-state": "flow",
         }
-        assert g.group(2) == CURVE
+        assert g.group(2) == g.group(4) == CURVE
         assert int(g.group(3)) == motion["offsets"][i]
+        assert int(g.group(5)) == motion["offsets"][i] + motion["MOTION"]["tail"]
 
 
 def test_a_waiting_or_done_line_is_one_still_picture(motion: dict[str, Any]) -> None:
@@ -212,7 +234,7 @@ def test_a_waiting_or_done_line_is_one_still_picture(motion: dict[str, Any]) -> 
 
 def test_the_ends_of_a_flowing_line_with_stubs(motion: dict[str, Any]) -> None:
     ends = svgs(motion["links"][1]["ends"])
-    assert len(ends) == 5
+    assert len(ends) == 13  # the stubs keep one cl-stub a picture (iss-00657 D-01)
     (first, inner), phases = ends[0], ends[1:]
     assert re.fullmatch(
         rf'<g class="cl" data-id="p-a\nc-b" data-state="flow"><path class="cl-arrow" d="{re.escape(ARROW)}"/></g>',
