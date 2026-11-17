@@ -14,7 +14,8 @@ ID: "iss-00621"
 
 - 仕様のレビュー（spec-reviewer opus / high、standard、同じレビュアー、2人目なし）：round-1 合格（P0 0、P1 0、P2 3、P3 2）。5件とも直した（`.workbench/spec-review/iss-00621/review-response.md`：iss-00616 への `markIds` の口、0人の worktree の札の高さの受入、Epic R-14 の実データの親子の順、S-03 の直してよい理由、仕様のレビューの記録の位置）。round-2 **合格**（P0〜P3 すべて0）。結果はこの worktree の `.workbench/spec-review/iss-00621/round-{1,2}.json` と `.check.json`（reviewed_sha `edfabc759`）。
 - **合格した文書の sha256**：requirement.cue `07a0c0733908444f533302c9cb16a1d8e0e428b219dfadb1a3568114fcf4df6b`、design.cue `ab4dc444699c87032298221c44f820073fb417319044bf57bcd8842182f3dcde`、plan.cue `9c3773cb2405ac311a605ae322122ffe4133e99ebe705baeb7ec96b3c2827877`、explanation.html `d686e24d2dbf732e4c1a9ec9821d8456e1616a2b0004fac9ce3e4d56cd1bce42`。
-- 合格の後の変更は、plan.cue の手順の status だけにする。
+- **仕様の変更（実機の確かめから、2026-11-17）**：枠の見出しの worktree の印が見出しの右の端（幅の広い枠では画面の外）に出たので、題名の広がりを自分の幅までにして印を題名のすぐ後に続ける（requirement.cue の decisions と R-01 の受入4、design.cue D-04、plan.cue T-04）。round-3 **合格**（P0 0、P1 0、P2 1：直しの手順が台帳にない → S-02 を doing、S-03 を todo に開き直した。P3 0）。結果 `.workbench/spec-review/iss-00621/round-3.json`（reviewed_sha `ce999075e`）。
+- **今の合格した文書の sha256**（round-3、S-02・S-03 の status の開き直しの前）：requirement.cue `8703d689ccec242a9cc6f1cd704c976197c57d07f9ca8b66ee9e40a0502f6dc5`、design.cue `e9edb9e92b162c813656f4eebba4b605262fa6b410ae95d5eb7b9ab134225c4a`、plan.cue `5a936266977ec84859305278992ae32e44f614d7036d5cac93b5782951810e7a`。その後の変更は plan.cue の手順の status だけ。
 
 ## 実装の記録
 
