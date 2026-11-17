@@ -22,6 +22,11 @@ ID: "iss-00621"
 
 ## 逸脱と判断
 
+- 2026-11-17 S-01 の担当：plan.cue では impl-sol（Codex GPT-6.1 Sol / medium）だが、Codex が chat-scratch の symlink の拒否で止まったので、統括が了承済みの取り決めどおり、Claude Opus 5.5 / medium（impl-claude）が S-01 から S-03 まで引き継いだ。
+- 2026-11-17 実装の判断（D-01 の足し）：`buildMarks` の結果に `marks` の配列がないとき（結合テストの偽の部品 `tests/js/fake_dom.mjs` の `fakeOrca` がそうだった）は、`built.marks.map` が例外を出して置き場を空にしていたので、印はそのまま描き、記録は空の並びにする（押しても F-01 でタブを開くだけ）。印の表示を落とさないための守り。
+- 2026-11-17 実装の判断（D-04）：`.gx .gx-fh > .wt { flex: none; }` を足した（設計の「足りなければ」の規則）。題名だけが縮み、worktree の印が縮まず題名の行に残ることを CSS で固める。実機の確かめは S-04。
+- 2026-11-17 実装の判断（D-05）：`.sd-card__meta:not(:has(> :not(.sd-orca:empty))) { display: none; }` は残した（置き場が meta の外へ出て効かなくなるが、消しても HTML は同じで、既存の静的な検査を変えずに済む）。T-03 の node のテストは、計画のとおり `test_dashboard_orca_views_js.py` の `run_panel` に、エージェントのいる構造を足して書いた（`El.prototype.querySelector` をその中だけ足した）。
+
 ## 実機の確かめ
 
 ## Residual Risks / Follow-ups
