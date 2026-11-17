@@ -11,6 +11,8 @@
 // iss-00655: wheel also takes {mode (deltaMode), wy (wheelDeltaY), shift, ctrl, x, y}; key takes shift, and on: "main"
 // (the screen's container) or "input" (an input in the graph area); {viewHidden: bool} hides the graph area.
 // run.io: the page has an IntersectionObserver (the fake one of fake_motion.mjs); without it, none (F-01).
+// run.styled: the screen's CSS is in effect (.gx is position: absolute), as in a browser: the first view is placed at the
+// first draw, not by the page's wait for its CSS, whose limit is the real clock's (iss-00664).
 // Prints {runs: {name: [snapshot after the first render, after each step]}}.
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
@@ -32,6 +34,8 @@ const page = install({
   },
 });
 const motion = installMotion(page);
+const plainStyle = globalThis.getComputedStyle;
+const styledStyle = (el) => ({ ...plainStyle(el), position: el?.classList?.contains("gx") ? "absolute" : "" });
 // the page's clock moves with the motion's clock too: wheels an advance apart are not one stroke (iss-00655 D-02)
 const realNow = performance.now.bind(performance);
 let skew = 0;
@@ -222,6 +226,7 @@ for (const r of request.runs) {
   page.store.clear();
   motion.reset();
   motion.useObserver(!!run.io);
+  globalThis.getComputedStyle = run.styled ? styledStyle : plainStyle;
   if (run.range) page.store.set("specdock.allgraph.v1", JSON.stringify({ range: run.range }));
   const root = new Element("main");
   root.setAttribute("data-view", "allgraph");
