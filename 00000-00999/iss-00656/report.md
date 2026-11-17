@@ -34,6 +34,7 @@ ID: "iss-00656"
   - `test_dashboard_scope_tabs_js.py`：説明資料の中身が枠だけ（`sd-framebar` と印がない）、文書の帯に印がなく新しいタブの行き先は `open(env)`。
   - `test_dashboard_state_marks.py`：帯（`.pn-why`）に状態の印（`stateMark`）がない（R-03）。札（`stateChip` の motion）は今のまま。
   - `tests/js/fake_dom.mjs`：`scrollWidth`（`sizes` の鉤、なければ `clientWidth`）を足した。
+- S-03（`ebbca611f` で、コードの変更なし）：`make lint` 合格、全体の `uv run pytest` 4283 passed・7 skipped（2039.52s。記録は worktree の `.workbench/implement/iss-00656/full-pytest-ebbca611f.log`）。落ちたテストがないので、開始のコミットでの全体の基準は取っていない。`static-inventory.json` は dashboard の資産を載せないので変えない。直したテストの期待は上の一覧のとおりで、すべて見出しとタブの行の形（と D-08 の `isShown()` を読むための偽の aside）の変化による。
 
 
 ## 逸脱と判断
