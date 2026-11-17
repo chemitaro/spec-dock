@@ -27,6 +27,8 @@ ID: "iss-00616"
 - **最終品質ゲート（2026-11-17、合格）**：合格のコミット `f95e2d19c`（origin/main の #638・#639・#641 を取り込んだマージ。base `3f5f8d8e9`）。レビュー（quality-gate-reviewer opus / medium）P0〜P3 すべて0、網羅は完全。`make lint` exit 0、`uv run pytest` 4163 passed・7 skipped。この worktree の `.workbench/final-quality-gate/iss-00616-r2/closure.md`。前のキャンペーン iss-00616（`382762e45`）はレビュー合格（P2 1：帯の親の波紋が隠れる、P3 1：再訪の初めの見え方）だったが、写しで見つけた題名の切れとあわせて S-05 で直し、仕様の round-3 の合格の後に、新しいキャンペーンでやり直した。記録だけのコミットはない（記録は Git の外）。
 - 実機の3回目（`f95e2d19c`、`.workbench/iss-00616/shots-r3/`）：18通りで依存の線の違反0、`boxOverlaps`・`edgeOverlaps` 0、`spotDrift` 0、エラー0、横のスクロールなし、『収める』で収まる、帯の押しとEsc、減らす設定の動き0（その時点の組は1つ）。
 
+- **PR**：https://github.com/chemitaro/spec-dock/pull/642（head `f95e2d19c`、`Refs #616`）。CI（Provider CI の provider-tests・配布の一致 macOS と ubuntu・route、check、spec-dock-check）すべて合格、MERGEABLE・CLEAN（2026-11-17）。マージは統括。
+
 ## 実装の記録
 
 - 開始のコミット `3f5f8d8e9`（origin/main、iss-00621 の PR #637 の後）。
@@ -71,3 +73,7 @@ ID: "iss-00616"
 - 本人が見る試しの URL：tailnet の 18616 の `/r/github.com/chemitaro/spec-dock/graph`（`496a7b245`）。止め方：`.workbench/iss-00616/state/dashboard/server.json` の pid と、`relay_orca.py` の2つ（127.0.0.1 と tailnet の 18816）を止める。
 
 ## Residual Risks / Follow-ups
+
+- 仕様の文面の残り（round-3 の P2 2・P3 1。実装は直っている）：MARK_LEAD の例外を R-02 の受け入れと design の互換・goals に、帯の親の波紋の置き場（帯の中）を R-03・D-04・D-05 に、stubs の `--cl-len` を D-04 に書き足す。iss-00617 の仕様を書くときに合わせて直すのがよい。
+- 写せなかったもの：同じ箱の弧の拡大（数えでは1440 の4通りで弧が出て重なり0）、題名が1行の箱の印の行の前後（エージェントのいる箱がどれも題名2行だった）。本人の試しの URL で、同じ worktree に親子がいるときに見られる。
+- 帯は世界の負の y に置くので、要約が初めの見え方の後に届くと、帯の上の一部が道具の帯の下にかかりうる（『収める』で全体が見える）。
