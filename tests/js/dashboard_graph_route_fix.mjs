@@ -1,7 +1,9 @@
 // The routing's fixes of iss-00627 (D-04, D-05), run by tests/unit/presentation/test_dashboard_graph_route_fix.py:
 //   node dashboard_graph_route_fix.mjs <assets/dashboard directory> <request.json>
 // request.json = {inputs: <tests/fixtures/issue627/route_inputs.json>} for the fixed inputs (T-01), and/or
-// {graphs: {name: G}} for route(G) on small inputs given directly (T-02). Prints one JSON object.
+// {graphs: {name: G}} for route(G) on small inputs given directly (T-02). A case may name its `mode` ("nest" when
+// absent) and `marks: false` (no agents' marks; iss-00633). Prints one JSON object: a case also gives routeLayout's
+// `problems`, a graph the largest widening it asks for (`maxWiden`).
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import path from "node:path";
@@ -20,12 +22,17 @@ const out = { cases: {}, graphs: {} };
 if (request.inputs) {
   for (const c of request.inputs.cases) {
     const s = request.inputs.structures[c.structure];
-    const x = routeLayout(s.scopes, s.cleanup, { mode: "nest", range: c.range, focus: null, width: c.width, marks: s.marks });
-    out.cases[c.name] = counts(x.routes, x.G);
+    const marks = c.marks === false ? undefined : s.marks;
+    const x = routeLayout(s.scopes, s.cleanup, { mode: c.mode || "nest", range: c.range, focus: null, width: c.width, marks });
+    out.cases[c.name] = { ...counts(x.routes, x.G), problems: x.problems };
   }
 }
 for (const [name, G] of Object.entries(request.graphs || {})) {
   const res = route(G);
-  out.graphs[name] = { ...counts(res.routes, G), ends: res.routes.map((rt) => ({ ei: rt.ei, y1: rt.pts[0].y, y2: rt.pts.at(-1).y })) };
+  out.graphs[name] = {
+    ...counts(res.routes, G),
+    ends: res.routes.map((rt) => ({ ei: rt.ei, y1: rt.pts[0].y, y2: rt.pts.at(-1).y })),
+    maxWiden: Math.max(0, ...res.widen.map((w) => w.amount)),
+  };
 }
 console.log(JSON.stringify(out));

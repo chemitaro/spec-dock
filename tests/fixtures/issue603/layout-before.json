@@ -34,7 +34,7 @@
   "generated|all|nest|wait|None|plain": "972852907cfab90b34d0b03410ebd4723eb9f63f41a64a749d1037db9a401d84",
   "generated|all|nest|wait|None|routed": "1748ecb246f75aa0b15c20f86e539c5d5b719cb8c8a8e979d7a2c333eea2e2c7",
   "generated|all|tree|all|plain": "a1f6e251cb2db55e6934029f94ab21c1daedb42f01849af4db4cb6e8156bb99f",
-  "generated|all|tree|all|routed": "7dee6d84f90614bc85637cd2f449adf1670898fad1c4fe5a0ceebda538607a0f",
+  "generated|all|tree|all|routed": "d2603da4a5cdcd0cc8fb2cd4fc89c48c0061432385cdd6807b797947d99c6c42",
   "generated|all|tree|wait|plain": "f0fdeef009a8524f8d871432def009ed6c1943fdf014edaf3e743b0363305f23",
   "generated|all|tree|wait|routed": "37754036711f9e93e4a3be716b41e5faec92b0cab65c29a0afe2df8a6bab6615",
   "generated|now|nest|all|374|plain": "0c89a7f121592caa80ce21d1115722abe5f007fb4deffacfe702bfcadd56d3df",
@@ -46,7 +46,7 @@
   "generated|now|nest|wait|None|plain": "2a353348adf95d6ecd1787f86bad5232af9adbdf1ba58992b0a12548c6558e7c",
   "generated|now|nest|wait|None|routed": "4c24e32c2bf6188c0ae9dc6463b715999b6c19a74c3eac00f272c0179ca78750",
   "generated|now|tree|all|plain": "a1f6e251cb2db55e6934029f94ab21c1daedb42f01849af4db4cb6e8156bb99f",
-  "generated|now|tree|all|routed": "7dee6d84f90614bc85637cd2f449adf1670898fad1c4fe5a0ceebda538607a0f",
+  "generated|now|tree|all|routed": "d2603da4a5cdcd0cc8fb2cd4fc89c48c0061432385cdd6807b797947d99c6c42",
   "generated|now|tree|wait|plain": "f0fdeef009a8524f8d871432def009ed6c1943fdf014edaf3e743b0363305f23",
   "generated|now|tree|wait|routed": "37754036711f9e93e4a3be716b41e5faec92b0cab65c29a0afe2df8a6bab6615",
   "small|all|nest|all|374|plain": "3dd2dd528f88326904e2827bfd7cb69861ea881baf0bea69c189c312bd75c79c",
@@ -82,7 +82,7 @@
   "spec-dock|all|nest|wait|None|plain": "31c9a701e505f9eeba6ba98609d8f4ac630e01ca27ba427f8866db686f82ccad",
   "spec-dock|all|nest|wait|None|routed": "31c9a701e505f9eeba6ba98609d8f4ac630e01ca27ba427f8866db686f82ccad",
   "spec-dock|all|tree|all|plain": "5ee030f08e660aad41d5a00eaf363d76bcb82907bc9fb5f96c49458e82f2110c",
-  "spec-dock|all|tree|all|routed": "7ed52513e5ea78ab45180eebeec97dd72aca194ad28ba54b30f45c5050a61d52",
+  "spec-dock|all|tree|all|routed": "f23559a94c48aa9071fb97b70bde9ef0c868c077db3c629be5ae3245c7eaeabd",
   "spec-dock|all|tree|wait|plain": "b91c164a2cda49238073d7a4673a4d4fca5ef09bf3ae8acf766f2a64e5272b97",
   "spec-dock|all|tree|wait|routed": "c65bd1f1dbab7a0570e265ba95079e108a7cec51ed7c52c5ea0dc375aeb5e8ae",
   "spec-dock|now|nest|all|374|plain": "3e095e94a1a059d24afa5a31fc10fd1b1a6e9449cf00a85168f94bc82f77b732",
@@ -94,9 +94,10 @@
   "spec-dock|now|nest|wait|None|plain": "d9d6dea93e852df0cf82059e8395b089f0477b59874ccfda11e5d4bed88e45d5",
   "spec-dock|now|nest|wait|None|routed": "d9d6dea93e852df0cf82059e8395b089f0477b59874ccfda11e5d4bed88e45d5",
   "spec-dock|now|tree|all|plain": "cb9e23c8002170591c5f4c3744539010bf7a0e035f2dfd954ecf8cc1699e624c",
-  "spec-dock|now|tree|all|routed": "525cb1377996ecc6867dcb7413cfb7d752fde3b7413014f2ef13a419854973b1",
+  "spec-dock|now|tree|all|routed": "9022868aeb287cc81915d5c30b2a5f7142f0741cd79fb27c54dc2c338026c0bc",
   "spec-dock|now|tree|wait|plain": "48971296884966aba86535edac3bad29667465c231ab020c7482c31565684d39",
   "spec-dock|now|tree|wait|routed": "429fe96745b9b065367e6a860d9d9ec14bdc01eab46790d697d213b4a2cf0e4a"
  },
- "iss-00627": "spec-dock|all|nest|all|None|routed is the range all layout after the routing fixes of iss-00627 (router.js D-04, D-05: its lines moved and the world grew 6px wider); the other digests are those of 16f0cf122"
+ "iss-00627": "spec-dock|all|nest|all|None|routed is the range all layout after the routing fixes of iss-00627 (router.js D-04, D-05: its lines moved and the world grew 6px wider); the other digests are those of 16f0cf122",
+ "iss-00633": "spec-dock|{all,now}|tree|all|routed and generated|{all,now}|tree|all|routed are the tree layouts after the tree routing fixes of iss-00633 (router.js packFree, layout.js settled only without problems: their lines moved and the tree indent widened less; the audit stays 0); the nested digests are unchanged"
 }
