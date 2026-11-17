@@ -5,10 +5,11 @@ package spec
 goal: "リポジトリの構造の図に、親の印から子の印への黄色の動く指揮の線、同じ箱の弧、親の端の波紋、すべての Initiative の上の『指揮の帯』を出し、印を押すと線が目立ち、帯のエージェントのチャットが開く"
 
 steps: {
-	"S-01": {title: "T-01〜T-03 を tests/js/dashboard_graph_command.mjs と tests/unit/presentation/test_dashboard_graph_command.py に先に書いて落ちることを確かめ、D-01（command.js の commandPairs・ownWorktrees・placeAgents・bandItems）、D-02（layout.js の packMarks・markSpots と定数。markRows は packMarks から）、D-03（commandModel・labelWidth・BAND・commandKey）を入れて通す。今の tests/unit/presentation/test_dashboard_graph_marks_rows.py・test_dashboard_graph_js.py・test_dashboard_graph_fit.py を通す", realizes: ["R-01", "R-02", "R-03", "R-04", "F-01", "F-02", "F-03", "F-04"], status: "todo", session: "impl-sol"}
-	"S-02": {title: "T-04・T-05 を先に書いて落ちることを確かめ、D-04（graph.js の paintCommand、層と帯、指揮の選び、帯の詳細の欄、初めの見え方と『収める』、specdockCmdAudit）、D-05（app.css の色の札、graph.css、draw.js の renderLegend の口、fake_dom.mjs の偽の orca の足し）、D-02 の CSS（箱の印の行を底に寄せる）を入れて通す", realizes: ["R-02", "R-03", "R-04", "R-05", "R-06", "R-07", "R-08", "F-01"], status: "todo", after: ["S-01"], session: "impl-claude"}
-	"S-03": {title: "make lint と全体の uv run pytest を通す（構造の図・『横断の構造』の golden や静的な検査が変われば、変わった理由が D-02 の箱の CSS か D-05 の凡例の口だけであることを確かめて直す。static-inventory.json に載る資産の sha256 が変われば直す）", realizes: ["R-02", "R-05"], status: "todo", after: ["S-02"], session: "impl-claude"}
-	"S-04": {title: "D-06 の実機の確かめ（T-06）を report.md に残し、本人が見る試しの URL（tailnet）を立てたままにする。写しで見た目の直しが要れば、実装担当に返す", realizes: ["R-02", "R-03", "R-04", "R-06", "R-07", "R-08"], status: "todo", after: ["S-03"], session: "owner"}
+	"S-01": {title: "T-01〜T-03 を tests/js/dashboard_graph_command.mjs と tests/unit/presentation/test_dashboard_graph_command.py に先に書いて落ちることを確かめ、D-01（command.js の commandPairs・ownWorktrees・placeAgents・bandItems）、D-02（layout.js の packMarks・markSpots と定数。markRows は packMarks から）、D-03（commandModel・labelWidth・BAND・commandKey）を入れて通す。今の tests/unit/presentation/test_dashboard_graph_marks_rows.py・test_dashboard_graph_js.py・test_dashboard_graph_fit.py を通す", realizes: ["R-01", "R-02", "R-03", "R-04", "F-01", "F-02", "F-03", "F-04"], status: "done", session: "impl-sol"}
+	"S-02": {title: "T-04・T-05 を先に書いて落ちることを確かめ、D-04（graph.js の paintCommand、層と帯、指揮の選び、帯の詳細の欄、初めの見え方と『収める』、specdockCmdAudit）、D-05（app.css の色の札、graph.css、draw.js の renderLegend の口、fake_dom.mjs の偽の orca の足し）、D-02 の CSS（箱の印の行を底に寄せる）を入れて通す", realizes: ["R-02", "R-03", "R-04", "R-05", "R-06", "R-07", "R-08", "F-01"], status: "done", after: ["S-01"], session: "impl-claude"}
+	"S-03": {title: "make lint と全体の uv run pytest を通す（構造の図・『横断の構造』の golden や静的な検査が変われば、変わった理由が D-02 の箱の CSS か D-05 の凡例の口だけであることを確かめて直す。static-inventory.json に載る資産の sha256 が変われば直す）", realizes: ["R-02", "R-05"], status: "done", after: ["S-02"], session: "impl-claude"}
+	"S-04": {title: "D-06 の実機の確かめ（T-06）を report.md に残し、本人が見る試しの URL（tailnet）を立てたままにする。写しで見た目の直しが要れば、実装担当に返す", realizes: ["R-02", "R-03", "R-04", "R-06", "R-07", "R-08"], status: "doing", after: ["S-05"], session: "owner"}
+	"S-05": {title: "最終品質ゲート attempt 01 と実機の写しの直し：帯の親の波紋を帯の中に描く（FQG-001）、再訪の初めの見え方に帯を含める（FQG-002）、D-02 の MARK_LEAD と箱の中の flex-shrink: 0（題名2行の切れの退行）。テストを先に足して落ちるのを確かめてから直し、S-02 の節目のテストと make lint を通す", realizes: ["R-02", "R-03", "R-04", "R-07"], status: "doing", after: ["S-03"], session: "impl-claude"}
 }
 
 tests: {
@@ -34,7 +35,7 @@ gates: {
 		"CP-1": "なし（S-01 の後は、タスク担当が S-01 の節目のテストの合格を確かめてから S-02 の担当を起動する。レビューは最終品質ゲートでまとめる）"
 	}
 	final_quality_gate: {
-		scope:          "開始のコミット 3f5f8d8e9 から S-03 の終わりまで（S-04 は記録と、写しから返した直し）。PR の直前に origin/main を取り込んだら、その最後のコミットでやり直す"
+		scope:          "開始のコミット 3f5f8d8e9 から S-05 の終わりまで（S-04 は記録）。PR の直前に origin/main を取り込んだら、その最後のコミットでやり直す"
 		perspectives:   ["functional-correctness", "requirements-closure", "test-adequacy", "e2e-user-flow"]
 		test_commands:  ["make lint", "uv run pytest"]
 		record_paths:   ["spec-dock/initiatives/00000-00999/iss-00616/"]
@@ -54,6 +55,6 @@ execution: {
 	}
 	// 仕様のレビューは S-01 の前に、開始のコミット 3f5f8d8e9 で行う（report.md のレビュー記録。spec-reviewer opus / high）。
 	reviews: {
-		gate: {role: "最終品質ゲート", after: "S-03", model: "opus", effort: "medium"}
+		gate: {role: "最終品質ゲート", after: "S-05", model: "opus", effort: "medium"}
 	}
 }
