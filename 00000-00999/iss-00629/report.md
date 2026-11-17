@@ -23,6 +23,15 @@ ID: "iss-00629"
 - S-02 `d8d72ac82`（allgraph.js：`initialView` の PC を `s = min(1, (幅 − 16) ÷ 世界の幅)`・`tx = 8`。`A.fitted` をやめ `A.moved` を `zoomAt`・`fit`・`keepAbovePanel`・`centerOn`・ドラッグ・ピンチ・ホイールの移動で立て、動かすまで `draw()` ごとに幅に合わせ直す。偽の DOM の harness に CSS が効いた状態・rAF・構造の答えを遅らせる仕組みを足し、T-03 を4件足した。`fake_dom.mjs` は変えていない）。
 - どちらもテストが先に正しい理由で落ちることを確かめてから直した（実装担当の記録 `.workbench/implement/iss-00629/`）。基準：開始のコミットで `make lint` 合格、対象の pytest 27 passed。HEAD `d8d72ac82` で `make lint` 合格、対象 35 passed、全体の `uv run pytest` 4060 passed・7 skipped。開始のコミットでの全体の pytest の基準は、外から止められて取り終えていない（止まるまで失敗0。HEAD で失敗0なので比べは要らない）。
 - dashboard の資産は `static-inventory.json` に入っていない（sha256 の更新なし）。
+- `origin/main`（#630、iss-00627）を統括の指示（msg_749ca854a665）で取り込んだ：合流 `0fcc063b3`（衝突なし）。
+
+## 最終品質ゲート
+
+- 合格したコミット `0fcc063b3b0d67cc4bbb4b05486292d51a4396b2`（campaign の base_sha `5c0ebb916`、standard、second_opinion none、quality-gate-reviewer opus / medium）。closure：`.workbench/final-quality-gate/iss-00629/closure.md`（写し [artifacts/20261117t012506z--closure.md](artifacts/20261117t012506z--closure.md)）。
+- attempt 01（`d8d72ac82`）：レビュー合格（P0/P1 0、P3 1）。テストは #630 の取り込みのため評価の前に止めた（数えない）。
+- attempt 02（`0fcc063b3`）：レビュー合格（P0 0・P1 0・P2 0・P3 1、カバレッジ完全）、`make lint` exit 0、`uv run pytest` exit 0（4074 passed、7 skipped）。
+- P3 1：拡大以外の操作の後に最初の表示へ戻らないことが、偽の DOM のテストでは拡大でしか守られていない（情報。直さない）。
+- 記録の変更は Git の外の Scope のディレクトリだけなので、記録のコミットはない（PR の head は合格したコミット）。
 
 ## Outcome
 
