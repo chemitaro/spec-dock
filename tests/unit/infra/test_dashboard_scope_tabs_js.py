@@ -167,7 +167,7 @@ def test_the_panel_draws_its_tabs_from_the_same_list_and_the_graph_uses_it() -> 
     assert 'from "./scope_tabs.js"' in panel and "visibleTabs(first)" in panel and "pickTab(" in panel
     assert "export function createScopePanel(" in panel
     graph = (VIEWS / "graph.js").read_text()
-    assert 'import { createScopePanel } from "./_shared/panel.js";' in graph
+    assert 'import { createScopePanel, SHEET_GRAB } from "./_shared/panel.js";' in graph
     assert "V.pn.show(" in graph and "V.pn.hide()" in graph
     assert '"/assets/views/_shared/panel.css"' in graph and '"/assets/views/_shared/scope_tabs.css"' in graph
     assert ".gx .panel" not in (VIEWS / "graph.css").read_text()  # the panel's look moved to panel.css

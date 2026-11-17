@@ -17,7 +17,7 @@ import { bandShape, crossKey, crossModel, crossPlace } from "./allgraph/command.
 import { commandPairs } from "./graph/command.js";
 import * as CV from "./graph/command_view.js";
 import { splitNotices } from "./allgraph/notices.js";
-import { createScopePanel } from "./_shared/panel.js";
+import { createScopePanel, SHEET_GRAB } from "./_shared/panel.js";
 import { createOrcaWatch, markAgentAt, markIds, paintOrcaMarks } from "./_shared/orca_marks.js";
 import { overviewWarnings } from "./_shared/logic.js";
 
@@ -350,6 +350,15 @@ function pressBandAgent(id) {
   renderPanel();
 }
 
+// The panel's close, whatever it shows: its close button and the phone sheet pulled down (iss-00650 D-03).
+function closePanel() {
+  if (A.agentPanel) closeAgentPanel();
+  else if (A.cleanup) {
+    A.cleanup = false;
+    renderPanel();
+  } else select(null);
+}
+
 function closeAgentPanel() {
   A.agentPanel = null;
   A.cmdSel = null;
@@ -470,7 +479,7 @@ function mount(root) {
       select(repo, id);
       centerOn(repo, id);
     },
-    onClose: () => select(null),
+    onClose: closePanel, // the close button and the phone sheet pulled down (iss-00650 D-03)
     extraActions: (s) => (A.sel && frameOf(A.sel.repo, s) ? `<button type="button" class="ds-btn" data-act="focus" data-focus="${esc(s.id)}" aria-label="この範囲に絞る" title="この範囲に絞る">${ic("target")}この範囲に絞る</button>` : ""),
   });
   A.motion?.stop();
@@ -1000,7 +1009,7 @@ function renderPanel() {
     const ix = R.get(repo)?.ix;
     panel.dataset.st = "unknown";
     panel.innerHTML =
-      `<div class="pn-grab"></div><div class="pn-head"><b>${ic("box")} 片付けの候補 ${list.length}件</b><button type="button" class="iconbtn" data-act="close" aria-label="閉じる">${ic("x")}</button></div>` +
+      `${SHEET_GRAB}<div class="pn-head"><b>${ic("box")} 片付けの候補 ${list.length}件</b><button type="button" class="iconbtn" data-act="close" aria-label="閉じる">${ic("x")}</button></div>` +
       `<div class="pn-body"><ul class="pn-clean">${list
         .map((c) => {
           const s = ix?.byId.get(c.id);
@@ -1049,11 +1058,7 @@ function onClick(event) {
       A.legend = !A.legend;
       renderLegend();
     } else if (a === "close") {
-      if (A.agentPanel) closeAgentPanel();
-      else if (A.cleanup) {
-        A.cleanup = false;
-        renderPanel();
-      } else select(null);
+      closePanel();
     } else if (a === "focus") {
       if (A.sel) A.ctx.navigate(`/r/${A.sel.repo}/?focus=${encodeURIComponent(act.dataset.focus)}`);
     } else if (a === "range") {
