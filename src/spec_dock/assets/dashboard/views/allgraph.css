@@ -36,6 +36,13 @@
 .gx .ax-sum li[data-level="info"] { color: var(--ds-muted); }
 .gx .ax-sum li .ds-icon { flex: none; }
 .gx .ax-sum b { font-weight: 650; }
+/* iss-00640: on a PC the bar's rows are fixed: the state chips, then the tools on the same row when both fit or right-aligned
+   on the next row when not, then the summary rows across the bar. The chips' column gives its two parts to the bar's rows
+   (display: contents), so the tools follow the chips and never fall under the summary. The phone keeps its own places. */
+@container app not (max-width: 640px) {
+  .gx[data-screen="allgraph"] .gx-left { display: contents; }
+  .gx[data-screen="allgraph"] .ax-sum { order: 1; flex-basis: 100%; }
+}
 
 /* ---------- The repository's graph: the structure graph's parts placed as in .gx-world (graph.css) ---------- */
 .gx .ax-body { position: absolute; margin: 0; }
