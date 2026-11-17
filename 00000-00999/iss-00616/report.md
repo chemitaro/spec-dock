@@ -34,11 +34,23 @@ ID: "iss-00616"
   - 画面の写しは S-02 では撮っていない（S-04 の実機の確かめに任せる）。
 - S-03（impl-claude、`70be1f1d6` で）：`make lint` → ruff check・ruff format check・mypy すべて合格。`uv run pytest`（全体）→ 4141 passed、7 skipped（41分19秒）。失敗なし。『横断の構造』のテストは変更なしで通った。`static-inventory.json` は dashboard の資産を載せていないので直していない。コードの変更はなく、S-03 のコミットはない。
 
+- S-05（impl-claude、最終品質ゲート attempt 01 の FQG-001・FQG-002 と実機の写しの退行）：テストを先に足し、落ちるのを確かめてから直した。
+  - Red：T-05 に帯の親の波紋（`.gx-band` の最後の子 `.gx-band-cr` の中、中心 y = −2、目立たせで is-cmd-hl・is-cmd-off）、再訪（CSS が先にある run `again`）の初めの見え方が帯の上の縁を含む、T-04 に `.gx .gx-box > * { flex-shrink: 0 }` と `.gx-band-cr` の規則、T-02 に `MARK_LEAD = 10` と箱の高さ 118・118・138（木の枠の箱 138）。それぞれ落ちた。
+  - FQG-001：`drawCommand` が、中心が帯の項目の中にある波紋だけを `.gx-band` の最後の `<svg class="gx-band-cr">`（pointer-events: none）に、ほかは今のまま `.gx-cmd-top` に描く。`paintCmdSel` が `.gx-band-cr` の波紋と `has-cmd-sel` も切り替える。
+  - FQG-002：`whenStyled` の中で `initialView` の前に `paintCommand()` を呼び、同期で走る再訪でも `V.cmd.top` が分かる。
+  - 題名2行の切れ：`graph.css` に `.gx .gx-box > * { flex-shrink: 0; }`、`layout.js` に `MARK_LEAD = 10` と `boxHeight`（エージェントの行のある箱と木の枠の箱だけ +10）。
+  - 写し `graph_dom_golden.json` の `marks` の run を書き直した（凡例は指揮の2行を除いて保存）。差は、エージェントのいる箱（iss-00004・iss-00016・epic-00002）の高さ +10 と、その下の位置、それに続く経路の隙間の幅（これからの段で x が 4〜32px）だけであることを、箱ごとに比べて確かめた。ほかの run は変わらない。『横断の構造』のテストは直さずに通った。
+  - `uv run pytest tests/unit/presentation/ tests/unit/infra/test_dashboard_orca_marks_js.py tests/unit/infra/test_dashboard_orca_views_js.py tests/unit/infra/test_dashboard_screens_js.py tests/unit/infra/test_dashboard_allgraph_route.py -q` → 305 passed。`make lint` 合格。
+  - 実機（今の木の wheel 0.9.6 を scratch の venv に入れ、状態を写して 127.0.0.1:18626 で。タスク担当の 18616 は使っていない）：`shoot616.mjs` の 21 の写しで specdockCmdAudit の spotDrift はどれも 0.4 以下、boxOverlaps・edgeOverlaps 0、specdockEdgeAudit の markOverflow 0、エラー 0。iss-00633 の題名の2行目は切れず（題名 36px）、エージェントの行は箱の底（中身の底 = 108）。減らす設定の写しで、帯の『main のチェックアウト』の統括の印に止まった輪が見え、初めの見え方に帯が入る。
+
 ## 逸脱と判断
 
 - S-01 は plan.cue では impl-sol（Codex）だが、Codex が chat-scratch の symlink の拒否で止まったため、統括が了承済みの取り決め（plan.cue の impl-sol の rationale）どおり impl-claude（Claude Opus 5.5 / medium）が S-01 から引き継いだ。
 - S-01 の TDD の順：`layout.js` の変更を先に書き、テストを後に書いた。Red は、開始のコミットの資産（`git archive 3f5f8d8e9`）に対して新しいテストの node の部分を走らせて確かめた（`command.js` がない・`packMarks` がない）。
 
 - 2026-11-17 タスク担当：S-01 は plan.cue では impl-sol（Codex GPT-6.1 Sol / medium、dispatch `ctx_9b2613c74505`、launch.effective は計画どおり）だが、Codex が chat-scratch の symlink の拒否で何も変えずに止まったので、統括が了承済みの取り決めどおり止め（worker-stop）、Claude Opus 5.5 / medium（impl-claude、dispatch `ctx_1cbbfb48a81d`）が S-01 から S-03 まで引き継ぐ。
+
+- 2026-11-17 impl-claude（S-05、FQG-001）：D-04 の『波紋は端の層』を、帯に置かれた親の波紋だけ帯の中の最後の層（`.gx-band-cr`）に置く。帯の項目は不透明で、端の層（z 3）は帯（z 6）の下なので、端の層では隠れる。中心は D-03 のとおりエージェントの枠の中央、印と CSS（`.cr`）は同じ。
+- 2026-11-17 impl-claude（S-05、MARK_LEAD）：エージェントのいる箱が 10px 高くなったので、`graph_dom_golden.json` の `marks` の run を書き直した（requirement の『横断の構造のテストを変えない』の例外として統括が許した範囲。差は箱の高さとその下流の位置だけ）。『横断の構造』のテストは直す必要がなかった。
 
 ## Residual Risks / Follow-ups
