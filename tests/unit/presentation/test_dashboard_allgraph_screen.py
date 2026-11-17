@@ -28,6 +28,7 @@ KEY = "specdock.allgraph.v1"
 V3 = "specdock.graph.v3"
 NONE = "これから進める Scope は、どのリポジトリにもありません。全体で、終わったものを見られます。"
 EMPTY = "表示しているリポジトリがありません。`spec-dock dashboard list` で確かめてください。"
+# The second item is a 0.9.5 server's `tier`: the screen must not draw it (iss-00635 F-01).
 SHAPE = {
     "company-os": (None, []),
     "housing-lifecycle": ("company-os", ["事業"]),
@@ -223,7 +224,7 @@ def test_next_is_the_default_and_the_range_is_kept_in_its_own_key(out: dict[str,
     assert pressed_range(out["outside"]["shots"][0]) == "next"
 
 
-def test_the_frames_are_flat_in_the_world_nested_by_depth_with_names_and_tiers(out: dict[str, Any]) -> None:
+def test_the_frames_are_flat_in_the_world_nested_by_depth_with_names_only(out: dict[str, Any]) -> None:
     shot = out["plain"]["shots"][1]  # all
     assert [r["key"] for r in shot["repos"]] == [
         key(n)
@@ -243,11 +244,15 @@ def test_the_frames_are_flat_in_the_world_nested_by_depth_with_names_and_tiers(o
     assert f[key("company-os")]["depth"] == "0" and f[key("input-devices")]["depth"] == "1"
     assert f[key("yubisaki")]["depth"] == "2"
     assert "o/housing-lifecycle" in f[key("housing-lifecycle")]["head"]
-    assert "事業" in f[key("housing-lifecycle")]["head"]
-    assert "o/company-os" in f[key("company-os")]["head"] and "sd-badge" not in f[key("company-os")]["headHtml"]
-    tiers = re.findall(r'<span class="sd-badge"[^>]*>([^<]*)</span>', f[key("yubisaki")]["headHtml"])
-    assert tiers == ["プロダクト", "groups"]
-    assert " › " in f[key("yubisaki")]["head"]
+    assert "o/company-os" in f[key("company-os")]["head"]
+    # The heading is the name and the link only, though the list still carries a tier (iss-00635 R-02, F-01).
+    for name in SHAPE:
+        frame = f[key(name)]
+        assert "sd-badge" not in frame["headHtml"] and "ax-tier" not in frame["headHtml"], name
+        for word in ("事業", "プロダクト", "groups", " › "):
+            assert word not in frame["head"], (name, word)
+        assert f"o/{name}" in frame["head"], name
+        assert f'href="/r/github.com/o/{name}/"' in frame["headHtml"], name
     assert 'href="/r/github.com/o/yubisaki/"' in f[key("yubisaki")]["headHtml"]
     # every frame is placed by its own style
     assert all(re.fullmatch(r"left:\d+px;top:\d+px;width:\d+px;height:\d+px", r["style"]) for r in shot["repos"])
@@ -454,20 +459,12 @@ def test_fit_holds_a_world_that_needs_less_than_the_graphs_least_zoom(tmp_path: 
     assert ty >= top and ty + height * s <= view["height"] + 1e-6
 
 
-def test_the_tier_badges_look_like_the_shared_badges() -> None:
-    """FQG-001: parts.css draws .sd-badge only on its own screens; allgraph.css gives the tiers the same look."""
-    css = re.sub(r"/\*.*?\*/", "", CSS.read_text(encoding="utf-8"), flags=re.S)
-    rule = re.search(r"\.ax-tier \.sd-badge \{([^}]*)\}", css)
-    assert rule, "no rule for the tier badges"
-    for decl in (
-        "border: 1px solid var(--ds-border)",
-        "border-radius: 999px",
-        "background: var(--ds-surface-2)",
-        "color: var(--ds-text-2)",
-        "font-size: 11.5px",
-        "font-weight: 700",
-    ):
-        assert decl in rule.group(1), decl
+def test_the_screen_has_no_tier() -> None:
+    """iss-00635 R-02: no tier badge in the screen's style or code (the list API's parent alone nests the frames)."""
+    assert "ax-tier" not in CSS.read_text(encoding="utf-8")
+    js = (ASSETS / "views" / "allgraph.js").read_text(encoding="utf-8")
+    assert "ax-tier" not in js
+    assert re.search(r"\btier\b", js) is None
 
 
 # --- iss-00629 T-03: the first view fits the width and follows the world until the reader moves it ----------------

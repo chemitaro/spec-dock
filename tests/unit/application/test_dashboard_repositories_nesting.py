@@ -1,4 +1,4 @@
-"""The repository list returns each repository's nesting without paths (iss-00613 T-06)."""
+"""The repository list returns each repository's parent without paths and without tier (iss-00613 T-06, iss-00635 T-02)."""
 
 from __future__ import annotations
 
@@ -10,7 +10,6 @@ import pytest
 
 from spec_dock.runtime.application import dashboard_site
 from spec_dock.runtime.application.dashboard_http import DashboardHttp, Request
-from spec_dock.runtime.application.dashboard_nesting import Nesting
 from spec_dock.runtime.application.dashboard_site import DashboardSite
 from spec_dock.runtime.domain.canonical_sync_state import RegistryEntry, SyncRegistry
 from spec_dock.runtime.infra.canonical_registry import read_registry, write_registry_locked
@@ -94,8 +93,8 @@ class Env:
         loaded: dict[str, Any] = json.loads(self.raw())
         return loaded
 
-    def nesting(self) -> dict[str, tuple[str | None, list[str]]]:
-        return {item["repository"]: (item["parent"], item["tier"]) for item in self.body()["repositories"]}
+    def nesting(self) -> dict[str, str | None]:
+        return {item["repository"]: item["parent"] for item in self.body()["repositories"]}
 
 
 @pytest.fixture
@@ -104,7 +103,7 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Env:
     return Env(tmp_path)
 
 
-def test_the_list_adds_parent_and_tier_after_the_current_fields(env: Env) -> None:
+def test_the_list_adds_only_parent_after_the_current_fields(env: Env) -> None:
     hide_repository(env.state, GithubRepository("o", "housing-lifecycle"), now=NOW)
     body = env.body()
     assert body["schema"] == "specdock.dashboard/v1"
@@ -112,7 +111,8 @@ def test_the_list_adds_parent_and_tier_after_the_current_fields(env: Env) -> Non
     keys = [item["repository"] for item in items]
     assert keys == sorted({*env.rows, DUP} - {HL})  # the order (by key) is the current one; the hidden one is out
     for item in items:
-        assert list(item) == [*FIELDS, "parent", "tier"]
+        assert list(item) == [*FIELDS, "parent"]  # no tier (iss-00635 R-01)
+        assert "tier" not in item
         host, owner, name = item["repository"].split("/")
         assert [item[field] for field in FIELDS] == [
             item["repository"],
@@ -126,17 +126,17 @@ def test_the_list_adds_parent_and_tier_after_the_current_fields(env: Env) -> Non
         assert item["parent"] is None or item["parent"] in keys
     assert body["unknown_count"] == 1
     assert env.nesting() == {
-        CO: (None, []),
-        SD: (None, []),
-        OW: (None, []),
-        DUP: (None, []),  # two clones: at the top (F-02)
-        TK: (CO, ["プロダクト"]),  # inside the hidden one: the outer shown ancestor, no hidden names (F-03)
-        ID: (CO, ["事業"]),
-        GM: (ID, ["プロダクト"]),
-        TC: (ID, ["プロダクト"]),
-        YB: (ID, ["プロダクト"]),
-        IN: (CO, ["プロダクト"]),  # inside a clone: counted from the clone's checkout
-        UN_CHILD: (CO, ["groups"]),  # inside an unknown row: counted from that row
+        CO: None,
+        SD: None,
+        OW: None,
+        DUP: None,  # two clones: at the top (F-02)
+        TK: CO,  # inside the hidden one: the outer shown ancestor (F-03)
+        ID: CO,
+        GM: ID,
+        TC: ID,
+        YB: ID,
+        IN: CO,  # inside a clone: the outer shown ancestor
+        UN_CHILD: CO,  # inside an unknown row: the outer shown ancestor
     }
 
 
@@ -155,16 +155,16 @@ def test_the_response_carries_no_path(env: Env) -> None:
 
 
 def test_changing_the_marks_changes_the_nesting_on_the_next_request(env: Env) -> None:
-    assert env.nesting()[TK] == (HL, ["プロダクト"])
-    assert env.nesting()[HL] == (CO, ["事業"])
+    assert env.nesting()[TK] == HL
+    assert env.nesting()[HL] == CO
     hide_repository(env.state, GithubRepository("o", "housing-lifecycle"), now=NOW)
-    assert env.nesting()[TK] == (CO, ["プロダクト"])
+    assert env.nesting()[TK] == CO
     hide_repository(env.state, GithubRepository("o", "company-os"), now=NOW)
     nesting = env.nesting()
-    assert nesting[TK] == (None, []) and nesting[ID] == (None, []) and nesting[GM] == (ID, ["プロダクト"])
+    assert nesting[TK] is None and nesting[ID] is None and nesting[GM] == ID
     show_repository(env.state, GithubRepository("o", "housing-lifecycle"))
     show_repository(env.state, GithubRepository("o", "company-os"))
-    assert env.nesting()[TK] == (HL, ["プロダクト"])
+    assert env.nesting()[TK] == HL
 
 
 def test_a_repository_hidden_by_its_settings_parents_nothing(env: Env) -> None:
@@ -172,13 +172,13 @@ def test_a_repository_hidden_by_its_settings_parents_nothing(env: Env) -> None:
     (catalog / "dashboard.json").write_text(json.dumps({"schema": "specdock.dashboard-settings/v1", "visible": False}))
     nesting = env.nesting()
     assert ID not in nesting
-    assert nesting[GM] == (CO, ["プロダクト"])
+    assert nesting[GM] == CO
 
 
-def test_the_site_pairs_each_listed_repository_with_its_nesting(env: Env) -> None:
+def test_the_site_pairs_each_listed_repository_with_its_parent(env: Env) -> None:
     pairs = env.site.nested_repositories()
-    assert [site.key for site, _nesting in pairs] == [site.key for site in env.site.repositories()]
-    assert {site.key: nesting for site, nesting in pairs}[TK] == Nesting(HL, ("プロダクト",))
+    assert [site.key for site, _parent in pairs] == [site.key for site in env.site.repositories()]
+    assert {site.key: parent for site, parent in pairs}[TK] == HL
 
 
 def test_paths_are_resolved_once_per_listing_read(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -208,5 +208,5 @@ def test_a_main_checkout_that_is_not_absolute_is_at_the_top(env: Env) -> None:
     )
     write_registry_locked(env.state, SyncRegistry(current.scheduler, entries))
     nesting = env.nesting()
-    assert nesting[ID] == (None, [])
-    assert nesting[GM] == (CO, ["事業", "input-devices", "プロダクト"])
+    assert nesting[ID] is None
+    assert nesting[GM] == CO
