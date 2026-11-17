@@ -8,7 +8,7 @@ steps: {
 	"S-01": {title: "T-01 を tests/unit/infra/test_dashboard_panel_logic_js.py に先に書いて落ちることを確かめ、D-01（panel_logic.js の headerBand）を入れて通す。ほかのファイルは変えない", realizes: ["R-03", "R-04", "F-01"], status: "done", session: "impl-claude"}
 	"S-02": {title: "T-02・T-03 を先に書いて（今の欄・タブ・詳しい画面・CSS のテストのうち、見出しとタブの行の形を固定している期待を、この設計に合わせて直すことを含む）落ちることを確かめ、D-02（panel.js の見出し）、D-03（SCOPE_TABS の open、frameBar、tabOpenLink、欄と詳しい画面のタブの行）、D-07（headOverflows と fitHead）、D-08（hide() で段を保つ。T-05 を先に書く）、D-04（panel.css・scope_tabs.css・scope.css）を入れて通す", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06", "R-08", "R-09", "F-01", "F-02"], status: "done", after: ["S-01"], session: "impl-claude"}
 	"S-03": {title: "make lint と全体の uv run pytest を通す（直したテストの期待が、見出しとタブの行の形の変化だけによることを確かめる。static-inventory.json に載る資産の sha256 が変われば直す）", realizes: ["R-08"], status: "done", after: ["S-02"], session: "impl-claude"}
-	"S-04": {title: "D-06 の測りと実機の確かめ（T-04）を report.md に残し、本人が見る試しの URL（tailnet）を立てたままにする。受入の数に届かないか、写しで崩れがあれば、実装担当に返す", realizes: ["R-01", "R-06", "R-07"], status: "todo", after: ["S-03"], session: "owner"}
+	"S-04": {title: "D-06 の測りと実機の確かめ（T-04）を report.md に残し、本人が見る試しの URL（tailnet）を立てたままにする。受入の数に届かないか、写しで崩れがあれば、実装担当に返す", realizes: ["R-01", "R-06", "R-07"], status: "done", after: ["S-03"], session: "owner"}
 }
 
 tests: {
