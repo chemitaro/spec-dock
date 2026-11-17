@@ -10,6 +10,10 @@ ID: "iss-00640"
 
 詳細: [Report Guide](../../../docs/authoring/report.md)
 
+## PR
+
+- https://github.com/chemitaro/spec-dock/pull/643（head `c8d2679f8`）。CI はすべて pass（provider-tests・Provider distribution parity（macOS・ubuntu）・check・spec-dock-check・route）、mergeable CLEAN（2026-11-17）。マージは統括が行う。
+
 ## Outcome
 
 幅 1000 前後では、状態の札と道具の列は1行に入らない（帯 976px に対し、札 779 + 道具 428、構造の図は 748 + 519）。1行にするには札か道具の文字を消すほかないので、決まった形（札を1行目、道具を2行目の右寄せ）を選んだ（requirement.cue の decisions）。
