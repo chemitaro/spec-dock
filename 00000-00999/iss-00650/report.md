@@ -20,6 +20,8 @@ ID: "iss-00650"
 
 - **最終品質ゲート（2026-11-18、合格）**：キャンペーン iss-00650-r2、合格のコミット `85930f177`（base `92e26aff7`、attempt 01）。レビュー（quality-gate-reviewer opus / medium）P0〜P3 すべて0、網羅は完全。`make lint` exit 0、`uv run pytest` 4239 passed・7 skipped。closure：この worktree の `.workbench/final-quality-gate/iss-00650-r2/closure.md`。記録だけのコミットはない（記録は Git の外）。PR の直前に origin/main を取り込み直す必要はなかった（`92e26aff7` のまま）。
 
+- **PR と CI（2026-11-18）**：PR #659（https://github.com/chemitaro/spec-dock/pull/659）、head `85930f177`。github-pr-checks の見張り：1回目は provider-tests の pending で IDLE_TIMEOUT（exit 4）、`resume_argv` で idle の期限を 3000 秒にして続け、OBSERVED_CI_PASS・merge readiness READY（provider-tests 16分40秒を含む7件すべて pass）。マージは統括。
+
 ## Outcome
 
 - 原因：帯の欄（`views/graph/command_view.js` の `renderAgentPanel`）の本文 `.pn-body` に `data-tab` がなく、`panel.css` の縦の flex の規則（`.pn-body:is([data-tab="docs"], [data-tab="explanation"], [data-tab="agents"])`）に乗らないため、`.sd-agent` の `flex: 1` が効かず、iframe は `min-height: 240px` のままだった。
