@@ -146,3 +146,113 @@ def test_release_closes_only_more_than_48_pixels_below_peek_regardless_of_veloci
 def test_grab_tap_toggles_full_and_half_and_expands_peek(tmp_path: Path) -> None:
     out = _run('out.snaps = ["peek", "half", "full"].map(logic.nextOnTap);', tmp_path)
     assert out["snaps"] == ["full", "full", "half"]
+
+
+BAND = """
+const scope = (state, code, text, extra = {}) => ({state, reason: code === undefined && text === undefined
+  ? undefined : {code, text}, ...extra});
+const band = (value, options) => logic.headerBand(value, options);
+"""
+
+
+def test_header_band_is_null_when_reason_adds_nothing_and_no_idle(tmp_path: Path) -> None:
+    out = _run(
+        BAND
+        + """
+        out.bands = [
+          band(scope("in_progress", "in_progress", "作業中"), {label: "作業中"}),
+          band(scope("closed", "closed", "終わった"), {label: "終わった"}),
+          band(scope("ready", "no_waits", "待っているものはない"), {label: "着手できる"}),
+          band(scope("blocked", "waiting", ""), {label: "止められている"}),
+          band(scope("blocked", "waiting", "   "), {label: "止められている"}),
+          band(scope("blocked", "something_new", "止められている"), {label: "止められている"}),
+          band(scope("blocked", "something_new", "  止められている \\n"), {label: "止められている"}),
+          band(scope("blocked"), {label: "止められている"}),
+          band({state: "blocked", reason: null}, {label: "止められている"}),
+          band({state: "blocked", reason: {text: "止められている"}}, {label: "止められている"}),
+          band(scope("in_progress", "in_progress", "作業中")),
+          band(scope("in_progress", "in_progress", "作業中"), {idle: "", label: "作業中"}),
+        ];
+        """,
+        tmp_path,
+    )
+    assert out["bands"] == [None] * 12
+
+
+def test_header_band_keeps_reasons_that_add_information(tmp_path: Path) -> None:
+    out = _run(
+        BAND
+        + """
+        const cases = [
+          ["blocked", "waiting", "#12・#13 を待つ"],
+          ["in_progress", "descendant_in_progress", "配下の 2件が作業中"],
+          ["blocked", "parent_closed", "親 epic-00001 が閉じている"],
+          ["blocked", "inherited_waiting", "親が #7 を待つ"],
+          ["unknown", "unknown", "構造が分からない（依存の循環）"],
+          ["in_progress", "pr_mergeable", "PR #5 をマージできる"],
+          ["in_progress", "pr_needs_fix", "PR #5 を直す必要がある（CI が失敗）"],
+          ["ready", "brand_new_code", "新しい理由の文"],
+          [undefined, "brand_new_code", " 前後の空白 "],
+        ];
+        out.bands = cases.map(([state, code, text]) => band(scope(state, code, text), {label: "作業中"}));
+        """,
+        tmp_path,
+    )
+    texts = [
+        "#12・#13 を待つ",
+        "配下の 2件が作業中",
+        "親 epic-00001 が閉じている",
+        "親が #7 を待つ",
+        "構造が分からない（依存の循環）",
+        "PR #5 をマージできる",
+        "PR #5 を直す必要がある（CI が失敗）",
+        "新しい理由の文",
+        "前後の空白",
+    ]
+    assert out["bands"] == [{"reason": text, "idle": "", "merge": None} for text in texts]
+
+
+def test_header_band_shows_idle_alone_when_reason_adds_nothing(tmp_path: Path) -> None:
+    out = _run(
+        BAND
+        + """
+        out.idle = band(scope("in_progress", "in_progress", "作業中"), {idle: "45分動きなし", label: "作業中"});
+        out.both = band(scope("in_progress", "descendant_in_progress", "配下の 1件が作業中"),
+          {idle: "45分動きなし", label: "作業中"});
+        out.none = band(undefined, {idle: "45分動きなし"});
+        """,
+        tmp_path,
+    )
+    assert out["idle"] == {"reason": "", "idle": "45分動きなし", "merge": None}
+    assert out["both"] == {"reason": "配下の 1件が作業中", "idle": "45分動きなし", "merge": None}
+    assert out["none"] == {"reason": "", "idle": "45分動きなし", "merge": None}
+
+
+def test_header_band_always_carries_merge_state(tmp_path: Path) -> None:
+    out = _run(
+        BAND
+        + """
+        out.fix = band(scope("in_progress", "pr_needs_fix", "PR #5 を直す必要がある（CI が失敗）", {merge: "needs_fix"}),
+          {label: "作業中"});
+        out.ok = band(scope("in_progress", "pr_mergeable", "PR #5 をマージできる", {merge: "mergeable"}),
+          {label: "作業中"});
+        out.plainFix = band(scope("in_progress", "in_progress", "作業中", {merge: "needs_fix"}), {label: "作業中"});
+        out.plainOk = band(scope("closed", "closed", "終わった", {merge: "mergeable"}), {label: "終わった"});
+        out.noReason = band({state: "in_progress", merge: "mergeable"}, {label: "作業中"});
+        out.idleOk = band(scope("in_progress", "in_progress", "作業中", {merge: "mergeable"}),
+          {idle: "45分動きなし", label: "作業中"});
+        out.others = [null, undefined, "", "merged", "unknown"].map((merge) =>
+          band(scope("in_progress", "in_progress", "作業中", {merge}), {label: "作業中"}));
+        out.otherWithReason = band(scope("blocked", "waiting", "#12 を待つ", {merge: "merged"}),
+          {label: "止められている"});
+        """,
+        tmp_path,
+    )
+    assert out["fix"] == {"reason": "PR #5 を直す必要がある（CI が失敗）", "idle": "", "merge": "needs_fix"}
+    assert out["ok"] == {"reason": "PR #5 をマージできる", "idle": "", "merge": "mergeable"}
+    assert out["plainFix"] == {"reason": "マージ待ち・直す必要あり", "idle": "", "merge": "needs_fix"}
+    assert out["plainOk"] == {"reason": "マージ待ち・マージできる", "idle": "", "merge": "mergeable"}
+    assert out["noReason"] == {"reason": "マージ待ち・マージできる", "idle": "", "merge": "mergeable"}
+    assert out["idleOk"] == {"reason": "マージ待ち・マージできる", "idle": "45分動きなし", "merge": "mergeable"}
+    assert out["others"] == [None] * 5
+    assert out["otherWithReason"] == {"reason": "#12 を待つ", "idle": "", "merge": None}
