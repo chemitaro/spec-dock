@@ -31,6 +31,11 @@ ID: "iss-00632"
 - 仕様レビュー round-2 の P3（R-01 と判断A の文に failed の例外がない）は、R-02・F-01・D-02 が決めているので文書を変えていない。
 - 計画の S-01 の impl-sol は上の逸脱のとおり。
 
+## 最終品質ゲート
+
+- キャンペーン iss-00632-fqg-1（quality-gate-reviewer opus / medium、second opinion なし、範囲 `3f5f8d8e9..6f0ad7f84`、観点 functional-correctness・requirements-closure・test-adequacy・compatibility-regression、test_commands `make lint`・`uv run pytest`）：attempt 01（`6f0ad7f84`）で **合格**。review lane P0〜P3 0、coverage complete。`make lint` exit 0、`uv run pytest` exit 0（4101 passed、7 skipped）。closure は worktree の `.workbench/final-quality-gate/iss-00632-fqg-1/closure.md`。
+- PR の直前に origin/main を fetch し、新しいコミットがないことを確かめた（合格のコミットが PR の head）。
+
 ## 実機の確かめ（S-04、タスク担当）
 
 - 試しのサーバー：直した後は `2d4b52ed9` の資産（`6f0ad7f84` と同じ。後はテストの書式だけ）の wheel を隔離した venv（`.workbench/iss-00632/venv-after`）に入れ、この PC の状態の置き場の写し（iss-00629 の写し、`.workbench/iss-00632/state-after`）と `XDG_CONFIG_HOME` の試しの設定（`orca_web.port` 18832）で `spec-dock dashboard serve --offline --tailscale --port 18632`。直す前は開始のコミット `3f5f8d8e9` の wheel を 127.0.0.1 の 18631 に。試しの orca は `relay_orca.py`（GET だけで常駐の orca-web を中継し CORS の頭を足す）を 127.0.0.1 と tailnet の 18832 に。常駐の 47800 と 8791、道具の環境には触れていない。
@@ -50,8 +55,22 @@ ID: "iss-00632"
 - 写し（最初の表示）：直す前 [1440 明 これから](artifacts/20261117t050604z--before-allgraph-1440-light-next.png)（各枠の見出しの下に「6時間前から更新されていません…」「PR の状態が分かりません。」が繰り返す）→ 直した後 [1440 明 これから](artifacts/20261117t050605z--after-allgraph-1440-light-next.png)、[1440 暗 全体](artifacts/20261117t050605z-01--after-allgraph-1440-dark-all.png)、[390 明 これから](artifacts/20261117t050605z-02--after-allgraph-390-light-next.png)、[390 暗 いま](artifacts/20261117t050606z--after-allgraph-390-dark-now.png)。まとめの行は状態のチップの下に2行で、長い行は省略（…）される。枠の見出しのすぐ下から図が始まり、1つの枠で 48px（知らせ2行）詰まった。
 - 試しの URL（本人の確かめ用、確かめまで残す）：tailnet の 18632 番の `/graph`（URL は統括への報告で伝える）。止め方：`kill $(lsof -tnP -iTCP:18632 -sTCP:LISTEN) $(lsof -tnP -iTCP:18832 -sTCP:LISTEN)`（またはタスク担当・統括に頼む）。直す前の 18631 は確かめの後に止めた。
 
+## 次の提案
+
+- 1000 の幅では、直す前から道具の列がチップの下の行に落ちる（チップの列と道具の列が1行に入らない）。まとめの行はその下に出るので、最初の表示の上端が少し下がる。チップの文字を詰めるか、道具の列をまとめるかは別の Issue で検討するとよい。
+- iss-00629 の report の「allgraph.js は #630 の測り直しを使っていない」は誤り（`10610ce89` で入っていた）。統括の了解の記録はこの Issue の requirement.cue の background と decisions にある。
+
 ## Outcome
+
+『横断の構造』で、文の決まった種類の知らせ（構造が古い、スナップショットの異常、構造の異常、PR の状態が分からない）を、状態のチップの下に種類ごとに1行でまとめ、当てはまるリポジトリの名前を並べた。リポジトリの枠には、読めなかった理由など、そのリポジトリにだけある知らせだけが残る（図を描けないリポジトリは知らせのすべてが残る）。縮めた枠の測り直しは iss-00627 で既に入っており、実機で働いていることを確かめた。
 
 ## Verification
 
+- 仕様のレビュー合格（round-2）。最終品質ゲート合格（`6f0ad7f84`、review P0〜P3 0、`make lint`・`uv run pytest` 4101 passed）。
+- 実機：18組すべてで edgeAudit の違反0・縮めた枠のはみ出し0、まとめの行2行、知らせの行のある枠 9 → 0、最初の表示がまとめの行の下、帯の空きが図に届く。
+- PR https://github.com/chemitaro/spec-dock/pull/639（head `6f0ad7f84`）。マージは統括が行う。
+
 ## Residual Risks / Follow-ups
+
+- まとめの行の種類が多いと上の帯が高くなる（最大6行。ふつうは1〜2行）。
+- 試しのサーバー 18632・18832 は本人の確かめまで残す。
