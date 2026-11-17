@@ -38,6 +38,43 @@ taikyohiyou_project の overlaps は、DOM なしで、ページで測った稼�
 
 試作（`.workbench/iss-00627/dbg/`）で 1〜3 を直すと、6つの入力で違反0、240 組の node の比べで悪化0。
 
+## レビュー記録
+
+- 仕様のレビュー（spec-reviewer opus / high、standard、同じレビュアー）：round-1 不合格（P1 1：R-01 の受入が線の口の伸び grow のある枠で満たせない、P2 1：縮めた枠の測りの切り上げで1行の枠も 1px 高くなりうる、P3 5）→ 直した（`.workbench/spec-review/iss-00627/review-response.md`）。round-2 **合格**（P0〜P3 すべて0）。結果 `.workbench/spec-review/iss-00627/round-{1,2}.json` と `.check.json`（reviewed_sha `cc40aa708`）。
+- **合格した文書の sha256**：requirement.cue `7d410cf6e28c9a5f0b2076af31eceb895a761e979fde2ca396dd8306e4e73c87`、design.cue `755e247a4b04b68fb9e9d2da595a4a2328f25d4b38f10e0dfc2d59e93c218d33`、plan.cue `0369b05ef4b513530390cdde04bcd8500570b0cfe1079ccf3e55a6c2764dcf84`。
+- 合格の後の変更：plan.cue の手順の status、design.cue D-03 に `tallNeeds`（compactHeight より高い測りの値だけを heads に残す）を足した（実装で、allgraph.js のリポジトリの印が測るたびに変わり配置をやり直すのを避けるため。判断の意味は同じ）。
+
+## 実装の記録
+
+- 開始のコミット `5c0ebb916`（origin/main）。基準の `uv run pytest tests/unit/presentation/test_dashboard_graph_js.py` 合格。
+- S-01 `cc40aa708`（タスク担当）：`tests/fixtures/issue627/route_inputs.json`。この PC の状態の置き場の写しから、受入の組の routeLayout の入力（構造・稼働の印の測った幅・見える幅・範囲）を取り、title を Scope の ID、cleanup の text を code に置き換え、配置に使わない項目を落とした（2つの構造、6つの case）。伏せる前と同じ違反の数（product の5 case：8・1・1・2・2、business 0）を node で確かめた。
+- 逸脱 codex-symlink-refusal：S-02 の impl-sol（codex gpt-6.1-sol / medium、dispatch ctx_0af00414f153、launch codex / gpt-6.1-sol / medium）は chat-scratch の writable root の symlink（UnsupportedOperation）で手元のコマンドを起動できず、変更なしで止まった（worker_done failed）。plan の rationale と統括の了承どおり Claude Opus 5.5 / medium に切り替え、同じ値のタスク担当のこのセッションが S-02 を行った（別のセッションは起こしていない）。
+- S-02（Claude Opus 5.5 / medium、このセッション）：Red `b909221b1`（`tests/js/dashboard_graph_route_fix.mjs`・`test_dashboard_graph_route_fix.py`、T-01・T-02 の6件が落ちる）→ Green `fe50a2dc8`（router.js の D-04・D-05、8 passed）。経路が変わった stored の『全体』の1組（世界が 6px 広い、違反は前後とも0）について、iss-00614 の写し（`graph_dom_golden.json`、docstring の手順で書き直し、ほかの run は同じ）と iss-00603 の digest（`layout-before.json` の `spec-dock|all|nest|all|None|routed` の1つ、注記の鍵 `iss-00627` を足した）を記録し直した。
+- S-03（Claude Opus 5.5 / medium、このセッション）：Red `44c7973d5`（`tests/js/dashboard_graph_fit.mjs`・`test_dashboard_graph_fit.py`、6件が落ちる）→ Green `10610ce89`（graph.css D-01、layout.js D-02 の `compactHeight` と `heads`、measure.js D-03 の `compactNeeds`・`tallNeeds`・`headsDiffer`、graph.js と allgraph.js の checkRows）。iss-00620 の静的な検査（`test_the_graph_measures_the_marks_and_lays_out_again_only_when_the_rows_change`）の `if (!M) return;`・`V.marks = M;` を、測れないときは何もしない同じ契約の新しい文（`if (!M && !H) return;`・`if (M) V.marks = M;`）に直した。
+- 節目の検証：`uv run pytest tests/unit/presentation/ -k "graph or allgraph" tests/unit/infra -k dashboard`（317 passed の後、上の1件を直して全部合格）、`make lint` pass。static-inventory.json は dashboard の資産を持たないので変わらない。
+
+## 実機の確かめ（S-05、タスク担当）
+
+- 試しのサーバー：この worktree の `10610ce89` の wheel を隔離した venv（`.workbench/iss-00627/venv`）に入れ、この PC の状態の置き場の写し（`.workbench/iss-00627/state`、iss-00614 の写しから）と `XDG_CONFIG_HOME` の試しの設定（`orca_web.port` 18727）で `spec-dock dashboard serve --offline --tailscale --port 18627`。試しの orca は `relay_orca.py`（GET だけで常駐の orca-web を中継し CORS の頭を足す）を 127.0.0.1 と tailnet の 18727 に。常駐の 47800 と 8791、道具の環境には触れていない。
+- headless Chrome（`--disable-features=MacAppCodeSignClone`、CDP `Browser.close`）、倍率 100%、稼働の印の後（`.workbench/iss-00627/tools/fitscan.mjs`、数字は [accept.json](artifacts/20261116t235826z-02--accept.json)）。
+
+| 画面 | 組 | edgeAudit の違反 | 縮めた枠のはみ出し | 見出しの差の最大 |
+|---|---|---|---|---|
+| housing-lifecycle 単体 | 1440・1000・390 × 全体・いま・これから × 明・暗（18） | すべて0 | 0 | 0px |
+| taikyohiyou_project 単体 | 同じ 18 組 | すべて0 | 0 | 0px |
+| 横断の構造 `/graph` | 同じ 18 組 | すべて0（total） | 0 | 0px |
+
+  違反は boxHits・ownHits・overlaps・diagonal・portShare・failed・missing・markOverflow・trunkOverlaps。直す前（iss-00614 の試しのサーバー 18614、同じ状態の写し）は、housing-lifecycle『全体』1440 で boxHits 6、taikyohiyou の『全体』で overlaps 1〜2、縮めた枠のはみ出し 2〜37、見出しの差 4.78px。
+- 再現の組（taikyohiyou_project、窓 376・見える幅 360、『いま』、稼働の印 26）：直す前 overlaps 8 → 直した後 0（`.workbench/iss-00627/probe/repro-after.json`）。
+- R-05：直す前（`5c0ebb916` の資産）と後の node の比べ、Scope のある 8 つのリポジトリ × 入れ子 27 ＋ 木 3 = 240 組：違反の増えた組 0、減った組 7、経路が同じ組 199、変わった組 41（違反なしのまま経路だけ変わったものを含む）、直した後に違反が残るのは木の表示の taikyohiyou『全体』（9 → 9、範囲の外）だけ（[sweep-240.txt](artifacts/20261116t235826z-03--sweep-240.txt)）。
+- 写し（倍率 100%、題名の行と2行の縮めた枠）：直す前 [縮めた枠 1440 明](artifacts/20261116t235824z--before-compact2-1440-light.png)（2行の題名の枠で要約の行が下の縁に重なる）→ 直した後 [縮めた枠 1440 明](artifacts/20261116t235824z-01--after-compact2-1440-light.png)（枠が中身の高さに伸びる）。題名の行：直す前 [Initiative 1440 明](artifacts/20261116t235825z--before-initiative-1440-light.png) → 直した後 [1440 明](artifacts/20261116t235825z-01--after-initiative-1440-light.png)、[1440 暗](artifacts/20261116t235825z-02--after-initiative-1440-dark.png)、[390 明](artifacts/20261116t235825z-03--after-initiative-390-light.png)、[390 暗](artifacts/20261116t235826z--after-initiative-390-dark.png)、[縮めた枠 390 暗](artifacts/20261116t235826z-01--after-compact2-390-dark.png)。Initiative の題名（16px、行 22px）と Epic の日本語の題名（例『CI の実行時間の短縮』）は、明暗・1440・390 で上下が切れない。見た目の変化：Initiative の題名の行が 3.6px、要約の行が 1.2px 詰まり、Epic の見出しが 1px 上がる。2行の縮めた枠は中身の高さまで伸びる。
+- 試しの URL（本人の確かめ用、確かめまで残す）：tailnet の 18627 番（`/graph` と `/r/<repo>/`。URL は統括への報告で伝える）。止め方：`kill $(lsof -tnP -iTCP:18627 -sTCP:LISTEN) $(lsof -tnP -iTCP:18727 -sTCP:LISTEN)`（またはタスク担当・統括に頼む）。
+
+## 次の提案
+
+- 木の表示（mode tree）の taikyohiyou_project『全体』の線の違反 9（overlaps。直す前から同じ数で、曲がりの多い長い線どうし）：統括が別の Issue にする（統括の決定 msg_61e7c3c8f34f）。
+- 計画の観点 ui-behavior は最終品質ゲートの観点の一覧にないので、compatibility-regression に置き換えた（iss-00620 の計画も同じ名を使っている。方針の観点の名をそろえるとよい）。
+
 ## Outcome
 
 ## Verification
