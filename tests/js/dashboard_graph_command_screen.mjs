@@ -75,6 +75,7 @@ function snap(root) {
       cls: sv.getAttribute("class"),
       id: sv.querySelector(".cl")?.dataset.id ?? null,
       ph: sv.getAttribute("data-ph"),
+      paths: sv.querySelectorAll("path").map((pa) => pa.getAttribute("class")),
       style: sv.getAttribute("style"),
       width: sv.getAttribute("width"),
       height: sv.getAttribute("height"),

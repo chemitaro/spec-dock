@@ -142,21 +142,23 @@ def test_the_layers_stack_and_never_take_a_press() -> None:
 
 
 def test_the_dots_flow_and_the_ripples_grow() -> None:
-    """T-04 / R-04, iss-00646 T-02 / R-01: the flowing dots are four still pictures switched by opacity alone (0.05s
-    each, steps); waiting stands still; done is faint; the ripples are HTML rings that scale on the compositor."""
+    """T-04 / R-04, iss-00646 T-02 / R-01, iss-00657 T-02 / R-01–R-03: the flowing dots are pairs 24px apart in twelve
+    still pictures switched by opacity alone (0.1s each, steps); waiting stands still; done is faint; the ripples are
+    HTML rings that scale on the compositor (3.6s, the second 1.8s behind)."""
     flow = _rule('.gx .cl[data-state="flow"] :is(.cl-line, .cl-stub)')
-    assert "stroke-dasharray: 0.1 7.9" in flow and "animation" not in flow
+    assert "stroke-dasharray: 0.1 23.9" in flow and "animation" not in flow
     wait = _rule('.gx .cl[data-state="wait"] :is(.cl-line, .cl-stub)')
     assert "stroke-dasharray: 0.1 7.9" in wait and "animation: none" in wait
     done = _rule('.gx .cl[data-state="done"] :is(.cl-line, .cl-stub)')
     assert "opacity: .35" in done and "animation: none" in done and "dasharray" not in done
     assert "@keyframes sd-cmd-flow" not in GRAPH_CSS and "stroke-dashoffset" not in GRAPH_CSS
-    assert "animation: sd-cmd-phase .2s steps(1, end) infinite" in _rule(".gx .cl-ph")
+    assert "animation: sd-cmd-phase 1.2s steps(1, end) infinite" in _rule(".gx .cl-ph")
     phase = re.search(r"@keyframes sd-cmd-phase \{(.*?)\}\s*\}", GRAPH_CSS, re.S)
     assert phase
+    assert set(re.findall(r"([a-z-]+):", phase.group(1))) == {"opacity"}
     assert re.findall(r"([\d.]+%) \{ ([a-z-]+): ([\d.]+);", phase.group(1)) == [
         ("0%", "opacity", "1"),
-        ("25%", "opacity", "0"),
+        ("8.334%", "opacity", "0"),
         ("100%", "opacity", "0"),
     ]
     ripple = re.search(r"@keyframes sd-cmd-ripple \{(.*?)\}\s*\}", GRAPH_CSS, re.S)
@@ -173,15 +175,61 @@ def test_the_dots_flow_and_the_ripples_grow() -> None:
         "box-sizing: border-box",
         "border: 1.5px solid var(--sd-cmd)",
         "border-radius: 50%",
-        "animation: sd-cmd-ripple 2.4s ease-out infinite",
+        "animation: sd-cmd-ripple 3.6s ease-out infinite",
     ):
         assert part in ring, part
     # today's circle of radius 7 and stroke 1.5: 15.5 across outside, centred at its place
     centre = _rule(".gx .cr")
     assert "position: absolute" in centre and "width: 15.5px" in centre and "height: 15.5px" in centre
     assert "margin: -7.75px 0 0 -7.75px" in centre
-    assert "animation-delay: 1.2s" in _rule(".gx .cr .cr-b")
+    assert "animation-delay: 1.8s" in _rule(".gx .cr .cr-b")
     assert "position: absolute" in _rule(".gx .cl-svg") and "overflow: visible" in _rule(".gx .cl-svg")
+
+
+def test_a_pair_is_a_large_head_and_a_small_faint_tail() -> None:
+    """iss-00657 T-02 / R-01: the head 3.5 and opaque, the tail 2 and .45, both round and --sd-cmd (the .cl-line rule);
+    a chosen line's 4.5 and 3, after the chosen line's 3 so they win at the same specificity."""
+    line = _rule(".gx .cl-line, .gx .cl-stub")
+    assert "stroke: var(--sd-cmd)" in line and "stroke-linecap: round" in line and "stroke-width: 2" in line
+    head, tail = _rule(".gx .cl-hd"), _rule(".gx .cl-tl")
+    assert "stroke-width: 3.5" in head and "opacity" not in head
+    assert "stroke-width: 2" in tail and "opacity: .45" in tail
+    assert "stroke-width: 4.5" in _rule(".gx .cl.is-cmd-hl .cl-hd")
+    assert "stroke-width: 3" in _rule(".gx .cl.is-cmd-hl .cl-tl")
+    order = [sel for sel, _ in _rules(GRAPH_CSS)]
+    at = order.index
+    assert at(".gx .cl-line, .gx .cl-stub") < at(".gx .cl-hd") and at(".gx .cl-line, .gx .cl-stub") < at(".gx .cl-tl")
+    assert at(".gx .cl.is-cmd-hl .cl-line") < at(".gx .cl.is-cmd-hl .cl-hd")
+    assert at(".gx .cl.is-cmd-hl .cl-line") < at(".gx .cl.is-cmd-hl .cl-tl")
+    assert "stroke-width: 3" in _rule(".gx .cl.is-cmd-hl .cl-line")  # the stubs' chosen width, unchanged
+
+
+def _motion() -> dict[str, Any]:
+    """MOTION as command_motion.js exports it, read in node."""
+    url = (ASSETS / "views" / "graph" / "command_motion.js").as_uri()
+    script = f"const M = await import({json.dumps(url)}); process.stdout.write(JSON.stringify(M.MOTION));"
+    result = subprocess.run(
+        [_node(), "--input-type=module", "-e", script], capture_output=True, text=True, timeout=600, check=False
+    )
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout)
+
+
+def test_the_css_copies_the_motion() -> None:
+    """iss-00657 T-02 / R-02: one round's seconds = phases·tick, the dash period = gap, the shown part ≈ 100/phases %
+    (rounded up, so no gap between two pictures), the tail's offset of MOTION.tail stays inside a period."""
+    m = _motion()
+    seconds = re.search(r"animation: sd-cmd-phase ([\d.]+)s steps\(1, end\) infinite", _rule(".gx .cl-ph"))
+    assert seconds and float(seconds.group(1)) == pytest.approx(m["phases"] * m["tick"])
+    dash = re.search(r"stroke-dasharray: ([\d.]+) ([\d.]+);", _rule('.gx .cl[data-state="flow"] :is(.cl-line, .cl-stub)'))
+    assert dash and float(dash.group(1)) + float(dash.group(2)) == pytest.approx(m["gap"])
+    assert m["phases"] * m["step"] == m["gap"] and 0 < m["tail"] < m["gap"]
+    phase = re.search(r"@keyframes sd-cmd-phase \{(.*?)\}\s*\}", GRAPH_CSS, re.S)
+    assert phase
+    shown = float(re.findall(r"([\d.]+)% \{ opacity: 0;", phase.group(1))[0])
+    assert 100 / m["phases"] <= shown < 100 / m["phases"] + 0.001
+    ripple = re.search(r"sd-cmd-ripple ([\d.]+)s", _rule(".gx .cr > i"))
+    assert ripple and float(ripple.group(1)) == pytest.approx(3 * m["phases"] * m["tick"])  # three rounds of the dots
 
 
 def test_the_arrowhead_and_the_ring_take_the_command_colour() -> None:
@@ -653,10 +701,14 @@ def test_the_layers_hold_one_svg_per_picture_and_none_is_as_big_as_the_world(
     for svg in shot["svgs"]:
         if svg["layer"] == "gx-cmd":
             body[svg["id"]] = body.get(svg["id"], 0) + 1
-    assert body == {k: 5 if v == "flow" else 1 for k, v in shot["states"].items()}
+    assert body == {k: 13 if v == "flow" else 1 for k, v in shot["states"].items()}  # still 1 + pictures 12
     assert set(shot["states"].values()) >= {"flow", "wait"}
     phases = [svg for svg in shot["svgs"] if svg["cls"] == "cl-svg cl-ph"]
-    assert len(phases) == shot["phases"] and all(svg["ph"] in "0123" for svg in phases)
+    flowing = sum(v == "flow" for v in shot["states"].values())
+    assert len(phases) == shot["phases"] == 12 * flowing  # iss-00657 T-03: twelve pictures a flowing line
+    assert sorted({svg["ph"] for svg in phases}, key=int) == [str(i) for i in range(12)]
+    body_phases = [svg for svg in phases if svg["layer"] == "gx-cmd"]
+    assert body_phases and all(svg["paths"] == ["cl-line cl-hd", "cl-line cl-tl"] for svg in body_phases)
     assert all(r == "span:i.cr-a,i.cr-b" for r in shot["rings"])
     assert len(shot["rings"]) == 3
 
