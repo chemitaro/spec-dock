@@ -44,9 +44,10 @@ design: {
 			`boxArc`・`frameArc`・`bandArc` を1つの `sameHop(a, b, self)`（`self` は箱・枠のノード、または帯の項目）に置き換える。
 			1. 端は `a.p`、`b.p`（どちらも `self` の上の縁、D-01）。`|b.p.x − a.p.x| < HOP.chord` なら、今の `widen` と同じ考え方で、2点の中点を中心に `HOP.chord` 離し（`self` の左右の縁の内側に収め）、親を左に置く順序は今の `widen` に従う。
 			2. 上の余白 `room`：`self` の上の縁から上へ、`[lo, hi]`（2つの端の x の範囲）に重なる、最も近いほかのノード・塊・帯の項目の下の縁まで、`self` を含む枠の内側の上の縁（`y1 + 1`）まで、世界の範囲（`boundsOf` か `{0, 0, width, height}`。ただし帯の項目には世界の上の縁を使わない）までの最小。今の `roomOf` に `top` の向きを足し、`bottom`・`right` を消す。`self` を含む枠は障害に数えない（今と同じ）。
-			3. 高さ `d = min(HOP.min, room − HOP.room)`。`d < HOP.min` なら `audit.crowded++`。`d < HOP.low` なら `d = HOP.low`。
+			3. 上限 `u = min(HOP.min, room − HOP.room)`。`u < HOP.min` なら `audit.crowded++`。`u < HOP.low` なら `u = HOP.low`。
+			   高さ `d`：`u`、`u − 1`、`u − 2`、…と `HOP.low` 以上の値を順に試し、頂点の y（`self.y1 − d`）と、弧の幅の中央の半分 `[lo + (hi − lo)/4, hi − (hi − lo)/4]` に x が重なる（重なりの長さ > 0）依存の線の水平な区間の y との差が、どれも `HOP.room`（3px）以上になる最初の値にする（平行に重ならない最も高い値）。どれも当たらなければ `d = u` で描き、`audit.edgeOverlaps++`。
 			4. 道は、両端を上向きに `4d/3` の制御点で結ぶ三次ベジェ（今の `arcOut(e1, e2, UP, d)`）。
-			5. 検査：ふくらみの四角（`bulgeBox(e1, e2, UP, d)`）が `self` を除く障害と重なれば `boxOverlaps++`、依存の線の水平な区間と重なれば `edgeOverlaps++`（今の `overlapsBox`・`overlapsRoute`）。`audit.arcs` と `audit.links` を数える（今と同じ）。
+			5. 検査：ふくらみの四角（`bulgeBox(e1, e2, UP, d)`）が `self` を除く障害と重なれば `boxOverlaps++`（今の `overlapsBox`）。依存の線の重なりは手順3だけで数える（ふくらみの四角に横の区間が入るだけでは数えない。脚が縦に横切るのは、ほかの指揮の線と依存の線の交差と同じ）。今の `overlapsRoute`（外接の四角の判定）は使わなくなる。`audit.arcs` と `audit.links` を数える（今と同じ）。
 			返す線は今と同じ `{kind: "arc", d, len, stubs: [], bulge: d, from, to}` に、D-04 の `mark` と `peak`（`self` の上の縁の y − d。両端を同じ高さで 4d/3 の制御点で結ぶ三次ベジェの頂点は、ちょうど縁から d 上）を足したもの。`ARC_D`・`FRAME_ARC_D`・`CHORD`・`ARC_MIN` は `HOP` に置き換える。
 			"""
 		satisfies: ["R-03"]
