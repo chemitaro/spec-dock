@@ -56,7 +56,7 @@ export function ownWorktrees(structure, summary) {
 }
 
 /** The band's key of each worktree: its id, with the path when two worktrees share the id. */
-function bandKeys(summary) {
+export function bandKeys(summary) {
   const list = summary.worktrees.filter(isObject);
   const count = new Map();
   for (const w of list) count.set(w.id, (count.get(w.id) || 0) + 1);
@@ -67,14 +67,13 @@ function bandKeys(summary) {
 }
 
 /**
- * Where each end of the pairs sits. Drops the pairs whose two ends are both in other repositories (R-01).
+ * The place of an agent of the summary in one repository's layout (iss-00617 D-01): its worktree's Scope's mark, the
+ * folded group holding it, the nearest drawn ancestor frame, or the band. placeAgents and the cross-repository
+ * structure (allgraph/command.js) use the same rule.
  * Place: {kind: "mark", node, scope} | {kind: "group", group} | {kind: "frame", node} | {kind: "band", key}.
- * @returns {pairs, places: Map<agent id, Place>, own: Set<worktree>} or null when own is null (F-01)
+ * @returns (ref) => Place
  */
-export function placeAgents(pairs, { structure, summary, layout, ix }) {
-  const own = ownWorktrees(structure, summary);
-  if (!own) return null;
-  const kept = pairs.filter((p) => own.has(p.parent.worktree) || own.has(p.child.worktree));
+export function placer({ structure, summary, layout, ix }) {
   const scopeOf = new Map();
   for (const [scope, list] of matchWorktrees(structure, summary).byScope)
     for (const w of list) if (!scopeOf.has(w)) scopeOf.set(w, scope);
@@ -93,8 +92,8 @@ export function placeAgents(pairs, { structure, summary, layout, ix }) {
       }
     }
   }
-  const keys = bandKeys(summary);
-  const placeOf = (ref) => {
+  const keys = summaryValid(summary) ? bandKeys(summary) : new Map();
+  return (ref) => {
     const scope = scopeOf.get(ref.worktree);
     if (scope !== undefined) {
       if (nodes.has(scope)) return { kind: "mark", node: nodes.get(scope), scope };
@@ -103,6 +102,17 @@ export function placeAgents(pairs, { structure, summary, layout, ix }) {
     }
     return { kind: "band", key: keys.get(ref.worktree) };
   };
+}
+
+/**
+ * Where each end of the pairs sits. Drops the pairs whose two ends are both in other repositories (R-01).
+ * @returns {pairs, places: Map<agent id, Place>, own: Set<worktree>} or null when own is null (F-01)
+ */
+export function placeAgents(pairs, { structure, summary, layout, ix }) {
+  const own = ownWorktrees(structure, summary);
+  if (!own) return null;
+  const kept = pairs.filter((p) => own.has(p.parent.worktree) || own.has(p.child.worktree));
+  const placeOf = placer({ structure, summary, layout, ix });
   const places = new Map();
   for (const p of kept) for (const ref of [p.parent, p.child]) if (!places.has(ref.id)) places.set(ref.id, placeOf(ref));
   return { pairs: kept, places, own };
@@ -168,22 +178,41 @@ export function labelWidth(text) {
   return Math.min(200, Math.max(24, Math.ceil(w)));
 }
 
-function bandModel(items) {
-  if (!items.length) return null;
-  let x = BAND.left;
-  const out = items.map((it) => {
-    const lw = labelWidth(it.label);
-    const w = 2 * BAND.border + 2 * BAND.pad + lw + BAND.labelGap + BAND.slot * it.agents.length;
-    const left = x + BAND.border + BAND.pad + lw + BAND.labelGap;
-    const item = {
-      ...it,
-      x, y: BAND.top, w, h: BAND.h, labelWidth: lw,
-      agents: it.agents.map((ref, i) => ({ id: ref.id, ref, x: left + BAND.slot * i, y: BAND.top, w: BAND.slot, h: BAND.h })),
-    };
-    x += w + BAND.gap;
-    return item;
-  });
-  return { top: BAND.top, h: BAND.h, items: out, right: x - BAND.gap };
+const itemWidth = (it) => 2 * BAND.border + 2 * BAND.pad + labelWidth(it.label) + BAND.labelGap + BAND.slot * it.agents.length;
+const leadWidth = (lead) => (lead ? labelWidth(lead) + BAND.labelGap : 0);
+
+/** The width of a band's row of items (iss-00617 D-01): the items and the gaps between them, after the lead's text. */
+export function bandRowWidth(items, lead = null) {
+  if (!items.length) return 0;
+  return leadWidth(lead) + items.reduce((w, it) => w + itemWidth(it), 0) + BAND.gap * (items.length - 1);
+}
+
+// Each row's items from its left (after its lead), on its top; the rows without an item are left out.
+function bandModel(rows) {
+  const outRows = [];
+  const all = [];
+  let right = -Infinity;
+  for (const row of rows) {
+    if (!row.items.length) continue;
+    let x = row.left + leadWidth(row.lead);
+    const items = row.items.map((it) => {
+      const lw = labelWidth(it.label);
+      const w = itemWidth(it);
+      const left = x + BAND.border + BAND.pad + lw + BAND.labelGap;
+      const item = {
+        ...it,
+        x, y: row.top, w, h: BAND.h, labelWidth: lw,
+        agents: it.agents.map((ref, i) => ({ id: ref.id, ref, x: left + BAND.slot * i, y: row.top, w: BAND.slot, h: BAND.h })),
+      };
+      x += w + BAND.gap;
+      return item;
+    });
+    right = Math.max(right, x - BAND.gap);
+    all.push(...items);
+    outRows.push({ key: row.key, left: row.left, top: row.top, lead: row.lead ?? null, leadWidth: row.lead ? labelWidth(row.lead) : 0, items });
+  }
+  if (!all.length) return null;
+  return { top: Math.min(...outRows.map((r) => r.top)), h: BAND.h, items: all, right, rows: outRows };
 }
 
 const r1 = (v) => Math.round(v * 10) / 10;
@@ -234,10 +263,13 @@ const DOWN = { x: 0, y: 1 };
  * @param layout  the layout (nodes, groups, width, height)
  * @param spotsOf node -> markSpots(node, …) or null
  * @param routes  the dependency lines' routes ([{pts: [{x, y}]}]), for the arcs' check
+ * @param rows    iss-00617 D-01: the band's rows [{key, left, top, lead, items}] in place of `items` (one row of `items`
+ *                at BAND.left, BAND.top without it)
+ * @param boundsOf node -> the rectangle an arc's bulge stays in (the world {0, 0, layout.width, layout.height} without it)
  * @returns {band, links, ripples, audit, top, width}
  */
-export function commandModel({ pairs = [], places = new Map(), items = [], layout = {}, spotsOf = () => null, routes = [] }) {
-  const band = bandModel(items);
+export function commandModel({ pairs = [], places = new Map(), items = [], layout = {}, spotsOf = () => null, routes = [], rows = null, boundsOf = null }) {
+  const band = bandModel(rows || [{ key: "", left: BAND.left, top: BAND.top, lead: null, items }]);
   const nodes = layout.nodes || [];
   const groups = layout.groups || [];
   const bandAgent = new Map();
@@ -272,7 +304,7 @@ export function commandModel({ pairs = [], places = new Map(), items = [], layou
     const r = rectOf(self);
     const own = isBox(self) || self.type === "frame" ? r : null;
     let room = Infinity;
-    const world = { x1: 0, y1: 0, x2: layout.width ?? Infinity, y2: layout.height ?? Infinity };
+    const world = (boundsOf && boundsOf(self)) || { x1: 0, y1: 0, x2: layout.width ?? Infinity, y2: layout.height ?? Infinity };
     const holders = [world, ...nodes.filter((n) => n !== self && n.type === "frame" && own && holds(n, own)).map((n) => ({ x1: n.x1 + 1, y1: n.y1 + 1, x2: n.x2 - 1, y2: n.y2 - 1 }))];
     for (const h of holders) {
       if (side === "bottom") room = Math.min(room, h.y2 - r.y2);
@@ -294,7 +326,7 @@ export function commandModel({ pairs = [], places = new Map(), items = [], layou
       const hit = bandAgent.get(`${place.key}\n${ref.id}`);
       if (!hit) return null;
       const cx = hit.slot.x + hit.slot.w / 2;
-      return { kind: "band", item: hit.item, slot: hit.slot, p: { x: cx, y: BAND.top + BAND.h }, n: DOWN, spot: { x: hit.slot.x, y: hit.slot.y, w: hit.slot.w, h: hit.slot.h } };
+      return { kind: "band", item: hit.item, slot: hit.slot, p: { x: cx, y: hit.item.y + BAND.h }, n: DOWN, spot: { x: hit.slot.x, y: hit.slot.y, w: hit.slot.w, h: hit.slot.h } };
     }
     if (place.kind === "mark") {
       const node = place.node;
@@ -444,7 +476,7 @@ export function commandModel({ pairs = [], places = new Map(), items = [], layou
   }
   function bandArc(a, b) {
     const up = SIDES.top.n;
-    const e1 = { x: a.p.x, y: BAND.top }, e2 = { x: b.p.x, y: BAND.top };
+    const e1 = { x: a.p.x, y: a.item.y }, e2 = { x: b.p.x, y: b.item.y };
     const bb = bulgeBox(e1, e2, up, ARC_D);
     if (overlapsBox(bb, a.item)) audit.boxOverlaps++;
     return arcOut(e1, e2, up, ARC_D, []);
@@ -456,7 +488,7 @@ export function commandModel({ pairs = [], places = new Map(), items = [], layou
     links: out,
     ripples: [...ripples.values()],
     audit,
-    top: band ? BAND.top - 16 : 0,
+    top: band ? band.top - 16 : 0,
     width: Math.max(layout.width || 0, right),
   };
 }

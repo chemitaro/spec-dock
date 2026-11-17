@@ -18,7 +18,21 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 HARNESS = ROOT / "tests" / "js" / "dashboard_allgraph_compose.mjs"
-REPO = {"head": 40, "warn": 24, "line": 28, "pad": 16, "gap": 16, "minW": 360, "headW": 280, "margin": 8}
+REPO = {
+    "head": 40,
+    "warn": 24,
+    "line": 28,
+    "pad": 16,
+    "gap": 16,
+    "minW": 360,
+    "headW": 280,
+    "margin": 8,
+    # iss-00617 D-03: the command band of a frame and the band "ほかの場所" above every frame
+    "band": 48,
+    "bandTop": 16,
+    "other": 56,
+    "otherTop": 16,
+}
 
 SHAPE = {
     "company-os": None,
@@ -69,9 +83,16 @@ def all_ok() -> dict[str, dict]:
     return {key(n): ok(500 + 40 * i, 200 + 30 * i) for i, n in enumerate(SHAPE)}
 
 
-def run(tmp_path: Path, cases: dict[str, Any], body_width: list[list[int]] | None = None) -> dict[str, Any]:
+def run(
+    tmp_path: Path,
+    cases: dict[str, Any],
+    body_width: list[list[int]] | None = None,
+    anchor: list[list[Any]] | None = None,
+) -> dict[str, Any]:
     path = tmp_path / "request.json"
-    path.write_text(json.dumps({"cases": cases, "bodyWidth": body_width or []}), encoding="utf-8")
+    path.write_text(
+        json.dumps({"cases": cases, "bodyWidth": body_width or [], "anchor": anchor or []}), encoding="utf-8"
+    )
     result = subprocess.run(
         [_node(), str(HARNESS), str(ASSETS), str(path)], capture_output=True, text=True, timeout=120, check=False
     )
@@ -458,3 +479,153 @@ def test_a_band_moves_the_graph_the_children_beside_it_and_their_children_down(t
         assert pb[key(n)]["x1"] == pa[key(n)]["x1"], n
     check_no_overlap(out["band"], shape)
     check_rows(out["band"], 1400, shape)
+
+
+# --- iss-00617 T-02: the band's width, the frames kept, the band above every frame, and the anchor ------------------
+
+
+def test_without_the_new_options_the_result_is_todays_with_no_other(tmp_path: Path) -> None:
+    plain: dict[str, Any] = {"range": "all", "width": 1400}
+    cases = {
+        "plain": {"repos": repos(SIDE), "sizes": {key(n): ok(300, 100) for n in SIDE}, "options": plain},
+        "empty": {
+            "repos": repos(SIDE),
+            "sizes": {key(n): ok(300, 100) for n in SIDE},
+            "options": {**plain, "bands": {}, "keep": [], "other": None},
+        },
+    }
+    out = run(tmp_path, cases)["cases"]
+    assert out["plain"]["other"] is None
+    assert out["plain"] == out["empty"]
+
+
+def test_a_band_with_a_width_widens_its_frame_only_when_wider(tmp_path: Path) -> None:
+    sizes = {key(n): ok(300, 100) for n in SIDE}
+    opts: dict[str, Any] = {"range": "all", "width": 1400}
+    cases = {
+        "plain": {"repos": repos(SIDE), "sizes": sizes, "options": opts},
+        "narrow": {"repos": repos(SIDE), "sizes": sizes, "options": {**opts, "bands": {key("a"): {"h": 48, "w": 100}}}},
+        "wide": {"repos": repos(SIDE), "sizes": sizes, "options": {**opts, "bands": {key("a"): {"h": 48, "w": 700}}}},
+        "number": {"repos": repos(SIDE), "sizes": sizes, "options": {**opts, "bands": {key("a"): 48}}},
+    }
+    out = run(tmp_path, cases)["cases"]
+    a0, an, aw = (out[c]["frames"][key("a")] for c in ("plain", "narrow", "wide"))
+    assert an["x2"] - an["x1"] == a0["x2"] - a0["x1"]
+    assert out["narrow"] == out["number"]
+    assert aw["x2"] - aw["x1"] == 700
+    assert aw["band"] == {
+        "x1": aw["x1"],
+        "y1": aw["y1"] + REPO["head"],
+        "x2": aw["x2"],
+        "y2": aw["y1"] + REPO["head"] + 48,
+    }
+    assert aw["body"]["y"] == a0["body"]["y"] + 48 and aw["body"]["w"] == 300
+    check_no_overlap(out["wide"], SIDE)
+
+
+def test_keep_shows_a_frame_with_nothing_in_next_and_its_parent(tmp_path: Path) -> None:
+    shape = {"p": None, "a": "p", "b": None}
+    sizes = {key("p"): quiet(), key("a"): quiet(), key("b"): ok(300, 100)}
+    opts: dict[str, Any] = {"range": "next", "width": 1400}
+    cases = {
+        "plain": {"repos": repos(shape), "sizes": sizes, "options": opts},
+        "keep": {
+            "repos": repos(shape),
+            "sizes": sizes,
+            "options": {**opts, "keep": [key("a")], "bands": {key("a"): 48}},
+        },
+        "keepB": {"repos": repos(shape), "sizes": sizes, "options": {**opts, "keep": [key("b")]}},
+    }
+    out = run(tmp_path, cases)["cases"]
+    assert out["plain"]["order"] == [key("b")]
+    assert out["keep"]["order"] == [key("b"), key("p"), key("a")]
+    a = out["keep"]["frames"][key("a")]
+    assert a["body"]["kind"] == "quiet" and a["body"]["h"] == 0
+    assert a["y2"] - a["y1"] == REPO["head"] + 48 + REPO["pad"]
+    assert out["keepB"] == out["plain"]  # keeping a frame already shown changes nothing
+
+
+def test_other_moves_every_frame_down_and_can_widen_the_world(tmp_path: Path) -> None:
+    sizes = {key(n): ok(300, 100) for n in SIDE}
+    opts: dict[str, Any] = {"range": "all", "width": 1400}
+    cases = {
+        "plain": {"repos": repos(SIDE), "sizes": sizes, "options": opts},
+        "other": {"repos": repos(SIDE), "sizes": sizes, "options": {**opts, "other": {"h": 56, "w": 200}}},
+        "wide": {"repos": repos(SIDE), "sizes": sizes, "options": {**opts, "other": {"h": 56, "w": 3000}}},
+    }
+    out = run(tmp_path, cases)["cases"]
+    p, o, w = out["plain"], out["other"], out["wide"]
+    for k in p["frames"]:
+        assert o["frames"][k]["y1"] == p["frames"][k]["y1"] + 56
+        assert o["frames"][k]["x1"] == p["frames"][k]["x1"]
+    assert o["height"] == p["height"] + 56 and o["width"] == p["width"]
+    m = REPO["margin"]
+    assert o["other"] == {"x1": m, "y1": m, "x2": m + p["width"] - 2 * m, "y2": m + 56}
+    assert w["width"] == 3000 + 2 * m and w["other"]["x2"] == m + 3000
+
+
+def _view(f: dict[str, Any], dy: float = 0) -> dict[str, float]:
+    return {"x1": 0, "y1": f["body"]["y"] + dy, "x2": 1400, "y2": f["body"]["y"] + dy + 400}
+
+
+def test_anchor_shift_keeps_the_top_most_visible_graph_frame(tmp_path: Path) -> None:
+    # p's graph with a beside it, z beside p (after it in the list); a band appears in z and above every frame
+    shape = {"p": None, "a": "p", "z": None}
+    sizes = {key("p"): ok(500, 600), key("a"): ok(300, 100), key("z"): ok(300, 100)}
+    opts: dict[str, Any] = {"range": "all", "width": 1400}
+    cases = {
+        "prev": {"repos": repos(shape), "sizes": sizes, "options": opts},
+        "next": {
+            "repos": repos(shape),
+            "sizes": sizes,
+            "options": {**opts, "bands": {key("z"): 48}, "other": {"h": 56, "w": 200}},
+        },
+        "aband": {"repos": repos(shape), "sizes": sizes, "options": {**opts, "bands": {key("p"): 48}}},
+    }
+    first = one(tmp_path, cases["prev"])
+    pa = first["frames"][key("a")]
+    pp = first["frames"][key("p")]
+    view_a = {"x1": pa["x1"], "y1": pa["body"]["y"] + 10, "x2": pa["x2"], "y2": pa["body"]["y"] + 50}
+    out = run(
+        tmp_path,
+        cases,
+        anchor=[
+            ["prev", "next", _view(pp, 20)],  # p's body is the top-most visible: it moves by the band above
+            ["prev", "aband", view_a],  # only a's body is in view: a band in p moves it 48 down
+            ["prev", "next", {"x1": -500, "y1": -500, "x2": -400, "y2": -400}],  # nothing in view
+            ["prev", "prev", _view(pp)],  # nothing changed
+        ],
+    )
+    assert out["anchor"][0] == {"dx": 0, "dy": 56}
+    assert out["anchor"][1] == {"dx": 0, "dy": 48}
+    assert out["anchor"][2] == {"dx": 0, "dy": 0}
+    assert out["anchor"][3] == {"dx": 0, "dy": 0}
+    # after the shift the anchored body's origin is where it was on the screen
+    s, tx, ty = 0.5, 30.0, 70.0
+    nxt = out["cases"]["next"]["frames"][key("p")]["body"]
+    d = out["anchor"][0]
+    assert (tx - d["dx"] * s + nxt["x"] * s, ty - d["dy"] * s + nxt["y"] * s) == (
+        tx + pp["body"]["x"] * s,
+        ty + pp["body"]["y"] * s,
+    )
+
+
+def test_anchor_shift_ignores_a_frame_missing_from_the_next_frames(tmp_path: Path) -> None:
+    shape: dict[str, str | None] = {"p": None, "b": None}
+    alone: dict[str, str | None] = {"b": None}
+    cases = {
+        "prev": {
+            "repos": repos(shape),
+            "sizes": {key("p"): ok(300, 100), key("b"): ok(300, 100)},
+            "options": {"range": "all", "width": 1400},
+        },
+        "next": {
+            "repos": repos(alone),
+            "sizes": {key("b"): ok(300, 100)},
+            "options": {"range": "all", "width": 1400},
+        },
+    }
+    first = one(tmp_path, cases["prev"])
+    out = run(tmp_path, cases, anchor=[["prev", "next", _view(first["frames"][key("p")])]])
+    assert key("p") not in out["cases"]["next"]["frames"]
+    assert out["anchor"][0] == {"dx": 0, "dy": 0}
