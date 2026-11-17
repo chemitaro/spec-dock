@@ -227,8 +227,31 @@ RUNS = [
 ]
 
 
+RUNS += [
+    {
+        # iss-00646 T-03: the still mark and the watching on the cross-repository structure
+        "name": "motion",
+        "io": True,
+        "orca": {"summary": CROSS},
+        "repos": REPOS,
+        "docs": DOCS,
+        "steps": [
+            {"advance": 400},  # 1
+            {"wheel": {"dx": 0, "dy": 30}},  # 2
+            {"advance": 200},  # 3
+            {"advance": 150},  # 4
+            {"tell": {"sel": ".cl-ph, .cr", "hit": False}},  # 5
+            {"hidden": True},  # 6
+            {"hidden": False},  # 7
+            {"wheel": {"dx": 0, "dy": 30}},  # 8
+            {"summary": FLAT},  # 9: the layers gone
+        ],
+    },
+]
+
+
 @pytest.fixture(scope="module")
-def runs(tmp_path_factory: pytest.TempPathFactory) -> dict[str, list[dict[str, Any]]]:
+def drawn(tmp_path_factory: pytest.TempPathFactory) -> dict[str, list[dict[str, Any]]]:
     path = tmp_path_factory.mktemp("allcmdscreen") / "request.json"
     path.write_text(json.dumps({"runs": RUNS}), encoding="utf-8")
     result = subprocess.run(
@@ -237,7 +260,12 @@ def runs(tmp_path_factory: pytest.TempPathFactory) -> dict[str, list[dict[str, A
     assert result.returncode == 0, result.stderr
     out = json.loads(result.stdout)["runs"]
     assert all(r["audit"] == "gone" for r in out.values())
-    return {name: r["shots"] for name, r in out.items()}
+    return out
+
+
+@pytest.fixture(scope="module")
+def runs(drawn: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    return {name: r["shots"] for name, r in drawn.items()}
 
 
 def _sec(shot: dict[str, Any], name: str) -> dict[str, Any]:
@@ -264,7 +292,10 @@ def test_a_pair_draws_one_of_each_layer_and_a_band_in_its_frame(runs: dict[str, 
     assert item["label"] == "main のチェックアウト"
     assert item["y"] == a1["y"] + 40 + BAND_TOP and item["x"] == a1["x"] + 16
     assert a1["y"] + 40 <= item["y"] and item["y"] + ITEM_H <= a1["body"]["y"]
-    assert shot["cmdSize"] == [shot["size"][0].removesuffix("px"), shot["size"][1].removesuffix("px")]
+    # iss-00646 R-02: the layers are not SVGs; each line has SVGs of its own box, none as big as the world
+    assert len(shot["layerTags"]) >= 2 and set(shot["layerTags"]) == {"div"} and shot["svgSizes"]
+    world = [shot["size"][0].removesuffix("px"), shot["size"][1].removesuffix("px")]
+    assert all(size != world for size in shot["svgSizes"])
 
 
 def test_the_line_runs_from_the_band_to_the_mark_in_the_other_repository(runs: dict[str, Any]) -> None:
@@ -373,3 +404,20 @@ def test_the_cmd_audit(runs: dict[str, Any]) -> None:
     assert len(audit["pointer"]) == 2
     flat = runs["flat"][0]["audit"]
     assert flat["links"] == 0 and flat["layers"] == ["ax-repo", "ax-repo"]
+
+
+def test_the_motion_stills_and_watches_on_the_cross_repository_structure(drawn: dict[str, Any]) -> None:
+    """iss-00646 T-03 / R-03, R-04, F-02: the same part as the structure graph's, on this screen."""
+    shots = drawn["motion"]["shots"]
+    assert [s["still"] for s in shots] == [True, False, True, True, False, False, True, False, True, False]
+    first = shots[1]
+    assert first["phases"] > 0
+    assert first["observed"]["live"] == 1 and first["observed"]["count"] == first["phases"] + 1
+    assert first["observed"]["roots"][0].split()[0] == "gx-view"
+    assert first["motion"] == {"phases": first["phases"], "ripples": 1, "off": 0, "still": False}
+    assert shots[5]["off"] == first["phases"] + 1 and shots[5]["motion"]["off"] == first["phases"] + 1
+    gone = shots[9]
+    assert gone["layers"] == [] and gone["observed"]["live"] == 0 and not gone["still"]
+    assert drawn["motion"]["left"] == {"observed": 0, "timers": 0, "listeners": 0, "still": False}
+    for name, run in drawn.items():
+        assert run["left"]["observed"] == 0 and run["left"]["timers"] == 0, name

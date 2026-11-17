@@ -5,16 +5,21 @@
 // step: {summary, order?} (orca-web's news with this summary), {news: true} (news with the same summary),
 //       {render: true} (the shell renders again), {revision: "r2"} (a new structure revision rendered),
 //       {styled: true} (the screen's CSS applies: the first view is placed), {act: "fit"} (a toolbar button),
-//       {tap: selector} (a pointer tap), {key: "Enter" | " " | "Escape", on: selector?}, {click: selector}
-// Prints {runs: {name: [snapshot after the first render, snapshot after each step]}, legend: the legend's HTML by
-// renderLegend's options (legend: true)}.
+//       {tap: selector} (a pointer tap), {key: "Enter" | " " | "Escape", on: selector?}, {click: selector},
+//       {drag: true} (a drag on the graph area), {wheel: {dx, dy}}, {advance: ms} (the motion's clock, iss-00646),
+//       {hidden: bool} (the page goes to the back or comes back), {tell: {sel, hit}} (IntersectionObserver's answer)
+// run.io: the page has an IntersectionObserver (the fake one of fake_motion.mjs); without it, none (F-01).
+// Prints {runs: {name: [snapshot after the first render, snapshot after each step]}, after: {name: what is left after
+// leaving the screen}, legend: the legend's HTML by renderLegend's options (legend: true)}.
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { Element, fakeOrca, hooks, install, json, settle } from "./fake_dom.mjs";
+import { installMotion } from "./fake_motion.mjs";
 
 const [assets, requestPath] = process.argv.slice(2);
 const request = JSON.parse(readFileSync(requestPath, "utf8"));
 const page = install({ fetch: async () => json({ error: { message: "not found" } }, 404) });
+const motion = installMotion(page);
 let styled = false;
 const computed = globalThis.getComputedStyle;
 globalThis.getComputedStyle = (el) => ({ ...computed(el), position: styled && el?.classList?.contains("gx") ? "absolute" : "" });
@@ -51,12 +56,33 @@ function snap(root) {
     ripples: classes(".cr", "agent"),
     topRipples: world.querySelectorAll(".gx-cmd-top .cr").map((g) => g.dataset.agent),
     bandRipples: world.querySelectorAll(".gx-band .cr").map((g) => g.dataset.agent),
-    bandRippleAt: world.querySelectorAll(".gx-band .cr .cr-a").map((c) => [Number(c.getAttribute("cx")), Number(c.getAttribute("cy"))]),
+    bandRippleAt: world.querySelectorAll(".gx-band .cr").map((c) => {
+      const m = /^left:(-?[\d.]+)px;top:(-?[\d.]+)px$/.exec(c.getAttribute("style") || "");
+      return m ? [Number(m[1]), Number(m[2])] : null;
+    }),
     bandLast: (() => {
       const kids = q(".gx-band")?.children.filter((c) => c instanceof Element) ?? [];
       return kids.length ? kids[kids.length - 1].getAttribute("class") : null;
     })(),
-    bandSel: world.querySelectorAll(".gx-band > svg").map((s) => s.classList.contains("has-cmd-sel")),
+    bandSel: world.querySelectorAll(".gx-band > .gx-band-cr").map((s) => s.classList.contains("has-cmd-sel")),
+    layerTags: world.querySelectorAll(".gx-cmd, .gx-cmd-top, .gx-band-cr").map((el) => el.tag),
+    svgs: world.querySelectorAll(".gx-cmd svg, .gx-cmd-top svg, .gx-band-cr svg").map((sv) => ({
+      layer: sv.closest(".gx-cmd, .gx-cmd-top, .gx-band-cr").getAttribute("class").split(" ")[0],
+      cls: sv.getAttribute("class"),
+      id: sv.querySelector(".cl")?.dataset.id ?? null,
+      ph: sv.getAttribute("data-ph"),
+      style: sv.getAttribute("style"),
+      width: sv.getAttribute("width"),
+      height: sv.getAttribute("height"),
+      viewBox: sv.getAttribute("viewBox"),
+    })),
+    every: world.querySelectorAll(".cl").map((g) => [g.dataset.id, g.classes().filter((c) => c.startsWith("is-")).join(" ")]),
+    worldSvgs: world.children.filter((c) => c instanceof Element && c.tag === "svg").map((c) => c.getAttribute("class")),
+    rings: world.querySelectorAll(".cr").map((c) => c.tag + ":" + c.children.filter((i) => i instanceof Element).map((i) => `${i.tag}.${i.getAttribute("class")}`).join(",")),
+    still: q(".gx-view").classList.contains("is-still"),
+    off: world.querySelectorAll(".is-off").map((el) => (el.classList.contains("cr") ? "cr" : "ph")),
+    phases: world.querySelectorAll(".cl-ph").length,
+    observed: motion.observed(world),
     states: Object.fromEntries(world.querySelectorAll(".gx-cmd .cl").map((g) => [g.dataset.id, g.dataset.state])),
     pressed: Object.fromEntries(world.querySelectorAll("[data-cmd-agent]").map((b) => [b.dataset.cmdAgent, b.getAttribute("aria-pressed")])),
     bandLabels: world.querySelectorAll("[data-cmd-agent]").map((b) => b.getAttribute("aria-label")),
@@ -73,7 +99,7 @@ function snap(root) {
     legend: q(".legend").innerHTML.includes("指揮（親 → 子）"),
     transform: world.style.transform,
     size: [world.style.width, world.style.height],
-    audit: audit && { links: audit.links, arcs: audit.arcs, boxOverlaps: audit.boxOverlaps, edgeOverlaps: audit.edgeOverlaps, layers: audit.layers },
+    audit: audit && { links: audit.links, arcs: audit.arcs, boxOverlaps: audit.boxOverlaps, edgeOverlaps: audit.edgeOverlaps, layers: audit.layers, motion: audit.motion ?? null },
   };
 }
 
@@ -103,7 +129,19 @@ async function step(root, s, orca, ctx) {
     const ev = { pointerId: 1, pointerType: "mouse", button: 0, clientX: 10, clientY: 10, target: el };
     for (const fn of view.listeners.pointerdown || []) fn(ev);
     for (const fn of view.listeners.pointerup || []) fn({ ...ev, type: "pointerup" });
-  } else if (s.key) {
+  } else if (s.drag) {
+    const view = target(root, ".gx-view");
+    const ev = { pointerId: 2, pointerType: "mouse", button: 0, target: view };
+    for (const fn of view.listeners.pointerdown || []) fn({ ...ev, clientX: 100, clientY: 100 });
+    for (const x of [110, 130, 150]) for (const fn of view.listeners.pointermove || []) fn({ ...ev, clientX: x, clientY: 100 });
+    for (const fn of view.listeners.pointerup || []) fn({ ...ev, type: "pointerup", clientX: 150, clientY: 100 });
+  } else if (s.wheel) {
+    const view = target(root, ".gx-view");
+    for (const fn of view.listeners.wheel || []) fn({ deltaX: s.wheel.dx, deltaY: s.wheel.dy, ctrlKey: false, metaKey: false, clientX: 0, clientY: 0, preventDefault() {} });
+  } else if (s.advance) motion.advance(s.advance);
+  else if (s.hidden !== undefined) motion.setHidden(s.hidden);
+  else if (s.tell) motion.tell(s.tell.sel, s.tell.hit);
+  else if (s.key) {
     const el = s.on ? target(root, s.on) : target(root, ".gx-view");
     const ev = { key: s.key, target: el, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
     for (const fn of page.docListeners.keydown || []) fn(ev);
@@ -113,6 +151,7 @@ async function step(root, s, orca, ctx) {
 
 const out = {};
 const runs = {};
+const after = {};
 if (request.legend) {
   const D = await import(pathToFileURL(`${assets}/views/graph/draw.js`).href);
   const html = (open, opts) => {
@@ -126,6 +165,8 @@ if (request.legend) {
 for (const run of request.runs || []) {
   styled = !!run.styled;
   page.store.clear();
+  motion.reset();
+  motion.useObserver(!!run.io);
   const root = new Element("main");
   const orca = run.orca === false ? null : fakeOrca({});
   if (orca && run.orca?.summary) orca.set({ summary: run.orca.summary, order: run.orca.order });
@@ -147,7 +188,14 @@ for (const run of request.runs || []) {
     await step(root, s, orca, ctx);
     shots.push(snap(root));
   }
+  const view = root.querySelector(".gx-view");
   graph.dispose();
+  after[run.name] = {
+    observed: motion.observed(null),
+    timers: motion.pending(),
+    listeners: (page.docListeners.visibilitychange || []).length,
+    still: view.classList.contains("is-still"),
+  };
   runs[run.name] = shots;
 }
-process.stdout.write(JSON.stringify({ runs, legend: out.legend ?? null }));
+process.stdout.write(JSON.stringify({ runs, after, legend: out.legend ?? null }));

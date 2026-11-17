@@ -310,25 +310,33 @@
 /* ============================================================
    8. 指揮の線と帯（iss-00616 D-04・D-05）。線の本体と下地の光は枠の上・箱の下の .gx-cmd、箱の中の短い線・端の点・波紋は
    塊の上・依存の線の下の .gx-cmd-top、帯は依存の線の上の .gx-band。どれも押せない（帯のボタンだけが押せる）。
-   色は指揮の札（app.css の --sd-cmd、--sd-cmd-glow）と今の変数だけ。動きは stroke-dashoffset と transform・opacity だけ
+   色は指揮の札（app.css の --sd-cmd、--sd-cmd-glow）と今の変数だけ。層は入れ物の div で、中は線ごとの外接の四角の SVG と
+   波紋の HTML の輪（iss-00646 D-01・D-02）。動きは合成スレッドで動く opacity と transform だけ（主スレッドで描き直さない）
    ============================================================ */
 .gx .gx-world > .gx-cmd, .gx .gx-world > .gx-cmd-top { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
 .gx .gx-world > .gx-cmd { z-index: 1; }
 .gx .gx-world > .gx-cmd-top { z-index: 3; }
+.gx .cl-svg { position: absolute; overflow: visible; }
 .gx .cl-glow { fill: none; stroke: var(--sd-cmd-glow); stroke-width: 6; stroke-linecap: round; }
 .gx .cl-line, .gx .cl-stub { fill: none; stroke: var(--sd-cmd); stroke-width: 2; stroke-linecap: round; }
-/* 点の1周は 8px（command.js の len は 8 の倍数）。どの線でも端から端まで 2.5 秒。道は親から子へ描くので点は子へ流れる */
-.gx .cl[data-state="flow"] :is(.cl-line, .cl-stub) { stroke-dasharray: 0.1 7.9; animation: sd-cmd-flow 2.5s linear infinite; }
+/* 点の1周は 8px。流れる線は、点を 2px ずつずらした止めた絵4枚（.cl-ph、data-ph 0〜3）を 0.05秒ずつ1枚だけ見せて流す
+   （40px/秒。command_motion.js の MOTION の写し。一緒に直す）。道は親から子へ描くので点は子へ流れる */
+.gx .cl[data-state="flow"] :is(.cl-line, .cl-stub) { stroke-dasharray: 0.1 7.9; }
 .gx .cl[data-state="wait"] :is(.cl-line, .cl-stub) { stroke-dasharray: 0.1 7.9; animation: none; }
 .gx .cl[data-state="done"] :is(.cl-line, .cl-stub) { opacity: .35; animation: none; }
 .gx .cl[data-state="done"] .cl-glow { display: none; }
-@keyframes sd-cmd-flow { from { stroke-dashoffset: 0; } to { stroke-dashoffset: calc(-1 * var(--cl-len)); } }
+.gx .cl-ph { animation: sd-cmd-phase .2s steps(1, end) infinite; }
+@keyframes sd-cmd-phase { 0% { opacity: 1; } 25% { opacity: 0; } 100% { opacity: 0; } }
 .gx .cl-dot { fill: var(--sd-cmd); }
-.gx .cr circle { fill: none; stroke: var(--sd-cmd); stroke-width: 1.5; transform-box: fill-box; transform-origin: center; animation: sd-cmd-ripple 2.4s ease-out infinite; }
+/* 波紋は中心に置いた輪の組。外径 15.5・内径 12.5 は今の半径 7・縁 1.5 の円と同じ */
+.gx .cr { position: absolute; width: 15.5px; height: 15.5px; margin: -7.75px 0 0 -7.75px; }
+.gx .cr > i { position: absolute; inset: 0; box-sizing: border-box; border: 1.5px solid var(--sd-cmd); border-radius: 50%; animation: sd-cmd-ripple 2.4s ease-out infinite; }
 .gx .cr .cr-b { animation-delay: 1.2s; }
 @keyframes sd-cmd-ripple { from { transform: scale(.4); opacity: .9; } to { transform: scale(2.2); opacity: 0; } }
 .gx .has-cmd-sel .cl.is-cmd-off, .gx .has-cmd-sel .cr.is-cmd-off { opacity: .15; }
 .gx .cl.is-cmd-hl .cl-line { stroke-width: 3; }
+/* 図を動かす間とその後 0.3秒・ページが裏（.gx-view の is-still）、図の領域の外（is-off）は、その場で止める（iss-00646 D-03） */
+.gx .gx-view.is-still :is(.cl-ph, .cr > i), .gx .cl-ph.is-off, .gx .cr.is-off > i { animation-play-state: paused; }
 /* 帯：寸法は command.js の BAND の写し（縁 1 = border、左右の余白 6 = pad、札の後ろ 6 = labelGap、ボタン 52 = slot）。一緒に直す。
    行の頭の文字（『横断の構造』の『ほかの場所』、iss-00617）の高さ 28 は BAND.h、文字の大きさは labelWidth の見積もりの写し */
 .gx .gx-world > .gx-band { position: absolute; left: 0; top: 0; z-index: 6; }
@@ -344,8 +352,9 @@
 .gx .lg-cmd { width: 26px; height: 0; border-top: 2px dotted var(--sd-cmd); }
 .gx .lg-cr { width: 10px; height: 10px; box-sizing: border-box; border: 1.5px solid var(--sd-cmd); border-radius: 50%; }
 @media (prefers-reduced-motion: reduce) {
-  .gx .cl-line, .gx .cl-stub, .gx .cl[data-state] :is(.cl-line, .cl-stub) { animation: none; }
-  .gx .cr circle { animation: none; transform: scale(1.4); opacity: .6; }
+  .gx .cl-ph { animation: none; opacity: 0; }
+  .gx .cl-ph[data-ph="0"] { opacity: 1; }
+  .gx .cr > i { animation: none; transform: scale(1.4); opacity: .6; }
   .gx .cr-b { display: none; }
 }
 @container app (max-width: 640px) {
