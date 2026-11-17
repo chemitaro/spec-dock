@@ -76,6 +76,10 @@ ID: "iss-00648"
   受入（横断 0.11 秒以下、単体 0.07 秒以下／10秒）を満たし、重さは戻っていない。
 - 本人が見る試しの URL：tailnet の 18648 の `/graph`（横断の構造）と `/r/github.com/chemitaro/spec-dock/graph`。止め方：`.workbench/iss-00648/state/dashboard/server.json` の pid（または `pkill -f "port 18648 --state-root"`）、直す前の `pkill -f "port 18649 --state-root"`、中継 `pkill -f "relay_orca.py .* 18848"`（127.0.0.1 と tailnet の2つ）、Chrome は CDP の `Browser.close`（ポート 9648）。
 
+- **最終品質ゲート（2026-11-18、合格）**：合格のコミット `9d2afa266`（base `92e26aff7`、origin/main は進んでいない）。レビュー（quality-gate-reviewer opus / medium、4観点）P0〜P2 0、P3 1（spotDrift ≤ 0.4 が 0.5 の組がある。直す前と同じ揺れ）、網羅は完全。`make lint` exit 0、`uv run pytest` 4255 passed・7 skipped。この worktree の `.workbench/final-quality-gate/iss-00648-b/closure.md`。記録だけのコミットはない（記録は Git の外）。
+- 実装担当の起動：impl-sol（Codex、dispatch `ctx_17c1d5a4151a`、launch.effective codex gpt-6.1-sol / medium）は chat-scratch の symlink の拒否で何も変えずに止まった（worker-stop）。impl-claude（dispatch `ctx_aec9f6b0309e`、launch.effective claude opus / medium）が S-02〜S-04 を行った。
+- **PR**：https://github.com/chemitaro/spec-dock/pull/658（head `9d2afa266`、`Refs #648`）。マージは統括。
+
 ## Residual Risks / Follow-ups
 
 - 箱の上の余白が狭い所（同じ箱の弧が 8〜17px に下がる）は、実データの写しでは確かめていない（node のテストだけ）。
