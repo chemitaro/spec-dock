@@ -181,34 +181,40 @@ export function agoText(seconds) {
 }
 
 // The overview card's warnings (Epic R-09, D-16): missing, unreadable, unknown version, stale, anomalies,
-// unknown pull requests, two clones, or an API failure.
+// unknown pull requests, two clones, or an API failure. Each tells its kind and, for some kinds, the value its text
+// carries (detail), so the cross-repository structure can gather the same kind once (iss-00632 D-01).
 export function overviewWarnings(structure, failure) {
   if (failure) {
-    return [{ level: "error", text: `このリポジトリを読めませんでした（${failure}）。`, next: ["spec-dock dashboard list"] }];
+    return [{ level: "error", text: `このリポジトリを読めませんでした（${failure}）。`, next: ["spec-dock dashboard list"], kind: "failure" }];
   }
   const found = [];
   const snapshot = structure?.snapshot || {};
   const age = agoText(snapshot.age_seconds);
+  const aged = age ? { detail: age } : {};
   const notices = new Map((structure?.notices || []).map((item) => [item.code, item]));
   if (snapshot.status === "missing") {
-    found.push({ level: "error", text: "構造のスナップショットがありません。", next: ["spec-dock canonical link", "spec-dock canonical status"] });
+    found.push({ level: "error", text: "構造のスナップショットがありません。", next: ["spec-dock canonical link", "spec-dock canonical status"], kind: "snapshot-missing" });
   } else if (snapshot.status === "unsupported") {
-    found.push({ level: "error", text: "構造のスナップショットが知らない版です。SpecDock を更新してください。", next: ["spec-dock --version"] });
+    found.push({ level: "error", text: "構造のスナップショットが知らない版です。SpecDock を更新してください。", next: ["spec-dock --version"], kind: "snapshot-unsupported" });
   } else if (snapshot.status === "unreadable") {
     found.push({
       level: "error",
       text: `構造のスナップショットが読めません${age ? `（最後に読めたのは${age}前の取得）` : ""}。`,
       next: ["spec-dock canonical status"],
+      kind: "snapshot-unreadable",
+      ...aged,
     });
   }
   const stale = snapshot.status !== "missing" && (snapshot.stale || notices.has("SNAPSHOT_STALE"));
   if (stale) {
-    found.push({ level: "warning", text: `${age ?? "長い間"}前から更新されていません（定期の同期を確かめてください）。`, next: ["spec-dock canonical status"] });
+    found.push({ level: "warning", text: `${age ?? "長い間"}前から更新されていません（定期の同期を確かめてください）。`, next: ["spec-dock canonical status"], kind: "stale", ...aged });
   }
   const anomalies = structure?.anomalies?.length || 0;
-  if (anomalies) found.push({ level: "warning", text: `構造の異常が ${anomalies}件あります。`, next: ["spec-dock workspace validate"] });
-  if (structure?.pull_requests?.status === "unknown") found.push({ level: "info", text: "PR の状態が分かりません。", next: [] });
-  if (notices.has("REPOSITORY_AMBIGUOUS")) found.push({ level: "warning", text: notices.get("REPOSITORY_AMBIGUOUS").text, next: notices.get("REPOSITORY_AMBIGUOUS").next_steps || [] });
+  if (anomalies) found.push({ level: "warning", text: `構造の異常が ${anomalies}件あります。`, next: ["spec-dock workspace validate"], kind: "anomalies", detail: `${anomalies}件` });
+  if (structure?.pull_requests?.status === "unknown") found.push({ level: "info", text: "PR の状態が分かりません。", next: [], kind: "pr-unknown" });
+  if (notices.has("REPOSITORY_AMBIGUOUS")) {
+    found.push({ level: "warning", text: notices.get("REPOSITORY_AMBIGUOUS").text, next: notices.get("REPOSITORY_AMBIGUOUS").next_steps || [], kind: "ambiguous" });
+  }
   return found;
 }
 
