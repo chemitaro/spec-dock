@@ -57,4 +57,14 @@ ID: "iss-00616"
 - 2026-11-17 impl-claude（S-05、FQG-001）：D-04 の『波紋は端の層』を、帯に置かれた親の波紋だけ帯の中の最後の層（`.gx-band-cr`）に置く。帯の項目は不透明で、端の層（z 3）は帯（z 6）の下なので、端の層では隠れる。中心は D-03 のとおりエージェントの枠の中央、印と CSS（`.cr`）は同じ。
 - 2026-11-17 impl-claude（S-05、MARK_LEAD）：エージェントのいる箱が 10px 高くなったので、`graph_dom_golden.json` の `marks` の run を書き直した（requirement の『横断の構造のテストを変えない』の例外として統括が許した範囲。差は箱の高さとその下流の位置だけ）。『横断の構造』のテストは直す必要がなかった。
 
+## 実機の確かめ（S-04、2026-11-17）
+
+- 試しのサーバー：この worktree の候補のコミットの wheel を隔離した venv（`.workbench/iss-00616/venv`）に入れ、この PC の状態の置き場の写し（`.workbench/iss-00616/state`）と試しの `XDG_CONFIG_HOME`（`orca_web.port` 18816）で、`spec-dock dashboard serve --offline --tailscale --port 18616`。試しの orca の口は、iss-00629 の `relay_orca.py`（常駐の orca-web を GET で読むだけの中継）を写して 18816 に。常駐の 47800・8791 の設定、道具の環境には触れていない。エージェントには何も送っていない。
+- 実データ：今の Run の統括（spec-dock の main のチェックアウト）→ タスク担当・実装担当（iss-00616・iss-00632・iss-00633・iss-00634 の worktree）。帯に「main のチェックアウト」の項目が1つ出て、統括から各 Issue の箱の印へ線が出た。
+- 1回目（`70be1f1d6`、直しの前、`.workbench/iss-00616/shots/`）：1440・1000・390 × 明・暗 × 全体・いま・これから の18通りで、`specdockEdgeAudit` の違反0、`specdockCmdAudit` の `boxOverlaps`・`edgeOverlaps` 0、`spotDrift` 最大 0.4、ブラウザーのエラー0、横のスクロールなし、『収める』の後に帯と全部の箱と枠が図の領域に収まる、凡例に「指揮（親 → 子）」。子の状態は flow と done が出た（done は薄い線）。減らす設定：動き0。帯の統括を押すと欄に `/embed/agent?id=<統括>` の iframe、`aria-pressed`、その統括の線だけが目立ち、Esc で解けて欄が閉じた。
+  - この写しで見つけた退行：箱を縦の flex にしたことで、題名2行の2行目が切れた（`.workbench/iss-00616/boxes/box-iss-00633-{before,after}.png`）。最終品質ゲート attempt 01 の P2（帯の親の波紋が帯の下に隠れる）も写しで確かめた。どちらも S-05 で直した。
+- 2回目（`496a7b245`、直しの後、`.workbench/iss-00616/shots-r2/`）：同じ18通りで、違反0、`boxOverlaps`・`edgeOverlaps` 0、`spotDrift` 最大 0.5、エラー0、横のスクロールなし、『収める』で収まる。同じ worktree の親子の弧が 1440 の4通りで1つずつ出た（重なり0）。帯の統括の印に波紋が見え、題名2行は切れない。減らす設定：動き0。帯の押しとEsc は1回目と同じ。
+- 同じ箱の弧の拡大の写しは、撮る時点で同じ worktree の親子が要約からいなくなり、撮れなかった（数えは上のとおり。node のテスト T-03 が形を確かめる）。題名が1行の箱の印の行の前後の写しは、エージェントのいる箱がどれも題名2行だったので撮れていない（題名2行の箱の前後は上の boxes の写し）。
+- 本人が見る試しの URL：tailnet の 18616 の `/r/github.com/chemitaro/spec-dock/graph`（`496a7b245`）。止め方：`.workbench/iss-00616/state/dashboard/server.json` の pid と、`relay_orca.py` の2つ（127.0.0.1 と tailnet の 18816）を止める。
+
 ## Residual Risks / Follow-ups
