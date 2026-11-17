@@ -121,7 +121,7 @@ export function agentsTab(env) {
   } else {
     main = callout("note", "orca-agent-choose", "エージェントを選ぶ");
   }
-  return `<div class="sd-framebox" data-frame="agents">${frameBar(`<div class="sd-agents" data-orca-agents="${esc(scope.id)}"></div>`, null)}${main}</div>`;
+  return `<div class="sd-framebox" data-frame="agents">${frameBar(`<div class="sd-agents" data-orca-agents="${esc(scope.id)}"></div>`)}${main}</div>`;
 }
 
 function stripHtml(env, state, pick) {

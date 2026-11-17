@@ -201,12 +201,17 @@ function documentEntries(details) {
   return entries;
 }
 
-// One thin bar over a frame (iss-00589 D-02, D-05): the left part, and an icon link opening the frame in a new tab.
-export function frameBar(left, href) {
-  const open = href
-    ? `<a class="sd-framebar__open" href="${esc(href)}" target="_blank" rel="noopener" aria-label="新しいタブで開く" title="新しいタブで開く">${icon("external")}</a>`
-    : "";
-  return `<div class="sd-framebar">${left}${open}</div>`;
+// One thin bar over a frame (iss-00589 D-02): the choices only. The link that opens the frame in a new tab sits in
+// the tab row (tabOpenLink, iss-00656 D-03).
+export function frameBar(left) {
+  return `<div class="sd-framebar">${left}</div>`;
+}
+
+// The tab row's link to the shown frame (iss-00656 D-03): open is a tab's open(env), {href, label} or null.
+export function tabOpenLink(open) {
+  if (!open?.href) return "";
+  const name = `${open.label}を新しいタブで開く`;
+  return `<a class="sd-tabopen" href="${esc(open.href)}" target="_blank" rel="noopener" aria-label="${esc(name)}" title="${esc(name)}">${icon("external")}</a>`;
 }
 
 function checkResults(check, scopeId) {
@@ -225,15 +230,30 @@ function checkResults(check, scopeId) {
   );
 }
 
-function docsTab(env) {
-  const { doc } = env;
-  const details = doc.details;
-  if (!details || details.catalog !== "ok") return catalogProblem(details);
+// The docs tab's choice (iss-00656 D-03): the documents, the chosen one and the check, or null without a catalog.
+function selectedDoc(env) {
+  const details = env.doc.details;
+  if (!details || details.catalog !== "ok") return null;
   const entries = documentEntries(details);
   const shown = entries.filter((item) => item.view);
   const wanted = env.param("doc");
   const selected = shown.find((item) => item.id === wanted) || shown[0] || null;
-  const check = details.check;
+  return { details, entries, wanted, selected, check: details.check };
+}
+
+// The chosen document is framed unless it is the spec and its drawing failed.
+const docFramed = ({ selected, check }) => !!selected && !(selected.id === "spec" && check?.status === "failed");
+
+function docsOpen(env) {
+  const pick = selectedDoc(env);
+  return pick && docFramed(pick) ? { href: pick.selected.view, label: pick.selected.label } : null;
+}
+
+function docsTab(env) {
+  const { doc } = env;
+  const pick = selectedDoc(env);
+  if (!pick) return catalogProblem(doc.details);
+  const { entries, wanted, selected, check } = pick;
   if (!selected) return checkResults(check, doc.scope.id) + emptyState("画面の中で読める文書はまだない。");
   const items = entries
     .map((item) => {
@@ -242,13 +262,12 @@ function docsTab(env) {
       return `<a ${env.paramLink("doc", item.id === "spec" && !wanted ? null : item.id)}${current} title="${esc(item.name)}">${esc(item.label)}</a>`;
     })
     .join("");
-  const frame =
-    selected.id === "spec" && check?.status === "failed"
-      ? ""
-      : `<iframe class="sd-docframe" src="${esc(selected.view)}" sandbox="${FRAME_SANDBOX}" referrerpolicy="no-referrer" loading="lazy" title="${esc(selected.label)}：${esc(selected.name)}"></iframe>`;
+  const frame = !docFramed(pick)
+    ? ""
+    : `<iframe class="sd-docframe" src="${esc(selected.view)}" sandbox="${FRAME_SANDBOX}" referrerpolicy="no-referrer" loading="lazy" title="${esc(selected.label)}：${esc(selected.name)}"></iframe>`;
   return (
     checkResults(check, doc.scope.id) +
-    `<div class="sd-framebox" data-frame="docs">${frameBar(`<nav class="sd-seg" aria-label="文書">${items}</nav>`, selected.view)}${frame}</div>`
+    `<div class="sd-framebox" data-frame="docs">${frameBar(`<nav class="sd-seg" aria-label="文書">${items}</nav>`)}${frame}</div>`
   );
 }
 
@@ -296,17 +315,25 @@ function todosTab({ ctx, scope, doc }) {
 
 const AUTHORING = "spec-dock/docs/authoring/explanation.md";
 
+const explanationHref = (details) => details?.documents?.find((item) => item.key === "explanation")?.href;
+
+function explanationOpen({ doc }) {
+  const href = explanationState(doc.details) === "written" ? explanationHref(doc.details) : null;
+  return href ? { href, label: "説明資料" } : null;
+}
+
 // The explanation tab (D-04). Its HTML depends only on the ID, the href and the state, so a redraw after a new
 // revision yields the same string and the panel leaves the frame alone (R-08).
 function explanationTab({ scope, doc }) {
   const details = doc.details;
   const state = explanationState(details);
   if (state === "unreadable") return catalogProblem(details);
-  const href = details.documents.find((item) => item.key === "explanation")?.href;
+  const href = explanationHref(details);
   const open = (label) => `<a href="${esc(href)}" target="_blank" rel="noopener">${icon("external")}${label}</a>`;
   if (state === "written") {
+    // Only the frame: the tab's name is not repeated over it (iss-00656 R-05), and its new-tab link is in the tab row.
     return (
-      `<div class="sd-framebox" data-frame="explanation">${frameBar(`<span class="sd-framebar__name">${icon("book")}説明資料</span>`, href)}` +
+      `<div class="sd-framebox" data-frame="explanation">` +
       `<iframe class="sd-explain" src="${esc(href)}" sandbox="${FRAME_SANDBOX}" referrerpolicy="no-referrer" title="説明資料：${esc(scope.id)}"></iframe></div>`
     );
   }
@@ -323,12 +350,13 @@ function todoCount(doc) {
 }
 
 export const SCOPE_TABS = [
-  { key: "explanation", label: "説明資料", count: () => null, render: explanationTab },
+  // open(env): the frame the tab shows, for the tab row's new-tab link (iss-00656 D-03); only the framed tabs have it.
+  { key: "explanation", label: "説明資料", count: () => null, render: explanationTab, open: explanationOpen },
   { key: "agents", label: "エージェント", visible: agentsVisible, count: agentsCount, render: agentsTab }, // iss-00593 D-02
   { key: "summary", label: "概要", count: () => null, render: summaryTab },
   { key: "deps", label: "依存", count: ({ doc }) => (doc.dependencies?.waits_for?.length || 0) + (doc.dependencies?.waited_by?.length || 0), render: depsTab },
   { key: "children", label: "配下", count: ({ scope }) => (scope.children || []).length, render: childrenTab },
-  { key: "docs", label: "文書", count: () => null, render: docsTab },
+  { key: "docs", label: "文書", count: () => null, render: docsTab, open: docsOpen },
   { key: "artifacts", label: "Artifact", count: ({ doc }) => doc.details?.artifacts?.length ?? null, render: artifactsTab },
   { key: "todos", label: "人のタスク", count: ({ doc }) => todoCount(doc), render: todosTab }, // iss-00554 D-06
 ];

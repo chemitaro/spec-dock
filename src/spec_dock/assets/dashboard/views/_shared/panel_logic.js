@@ -43,3 +43,8 @@ export function headerBand(scope, {idle = "", label = ""} = {}) {
   if (!reason && !idle && !merge) return null;
   return {reason, idle, merge};
 }
+
+// The heading's first row does not fit once its crumb is cut by more than a rounding pixel (iss-00656 D-07).
+export function headOverflows({scrollWidth, clientWidth}) {
+  return scrollWidth > clientWidth + 1;
+}

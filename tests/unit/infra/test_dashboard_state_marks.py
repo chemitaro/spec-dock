@@ -165,8 +165,8 @@ def test_list_screens_never_ask_for_motion_and_every_screen_draws_with_state_mar
     place = '<div class="gx-r1">'  # the box
     assert re.search(re.escape(place) + r"\$\{M\.stateMark\(s, V\.ix\.byId, \{ motion: true", graph), place
     panel = (ASSETS / "views" / "_shared" / "panel.js").read_text()  # the shared panel (iss-00587 D-05)
-    place = '<p class="pn-why" data-st="${esc(scope.state)}">'  # the panel's reason
-    assert re.search(re.escape(place) + r"\$\{stateMark\(scope, byId, \{ motion: true", panel), place
+    # iss-00656 R-03: the panel's band keeps the state's color but no state mark (the chip shows the state)
+    assert '<p class="pn-why" data-st="${esc(scope.state)}"' in panel and "stateMark(" not in panel
     assert "${stateChip(scope, byId, { motion: true })}" in panel  # the panel's chip
 
 

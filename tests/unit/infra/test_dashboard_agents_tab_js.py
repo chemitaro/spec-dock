@@ -1016,7 +1016,7 @@ def test_the_marks_compare_and_draw_with_the_same_now(tmp_path: Path) -> None:
 # --- With iss-00592 in the same panel (the merge of origin/main) ------------------------------------------------
 
 PANEL = """
-const PARTS = [".pn-grab", ".pn-top", ".pn-tabs", ".pn-body", ".pn-foot", ".pn-hl", ".pn-orca", ".pn-cover"];
+const PARTS = [".pn-grab", ".pn-top", ".pn-tabs", ".pn-tabopen", ".pn-body", ".pn-foot", ".pn-crumb", ".pn-hl", ".pn-orca", ".pn-cover"];
 class El {
   constructor(name) { this.name = name; this.dataset = {}; this.children = []; this.writes = 0; this.html = ""; this.scrollTop = 0; }
   set innerHTML(value) { this.html = value; this.writes++; }
@@ -1032,7 +1032,7 @@ globalThis.matchMedia = () => ({matches: dark, addEventListener() {}, removeEven
 globalThis.document.createElement = (tag) => ({tag, dataset: {}});
 globalThis.document.documentElement.clientWidth = 1440;
 const aside = {
-  classList: {add() {}, remove() {}}, dataset: {}, style: {setProperty() {}, removeProperty() {}},
+  classList: {add() {}, remove() {}, contains() {return false;}}, dataset: {}, style: {setProperty() {}, removeProperty() {}},
   setAttribute() {}, addEventListener(type, fn) { if (type === "click") this.click = fn; }, closest() { return null; },
   set innerHTML(value) { this.parts = new Map(PARTS.map((s) => [s, new El(s)])); },
   querySelector(sel) { return this.parts?.get(sel) ?? null; },
