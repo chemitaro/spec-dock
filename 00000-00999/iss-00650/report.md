@@ -22,6 +22,8 @@ ID: "iss-00650"
 
 - **PR と CI（2026-11-18）**：PR #659（https://github.com/chemitaro/spec-dock/pull/659）、head `85930f177`。github-pr-checks の見張り：1回目は provider-tests の pending で IDLE_TIMEOUT（exit 4）、`resume_argv` で idle の期限を 3000 秒にして続け、OBSERVED_CI_PASS・merge readiness READY（provider-tests 16分40秒を含む7件すべて pass）。マージは統括。
 
+- **origin/main の取り込みとやり直し（統括の依頼、2026-11-18）**：PR #658（iss-00648、`106f214e8`）が `command_view.js` と `tests/js/dashboard_{graph,allgraph}_command_screen.mjs` を変えたので、origin/main を merge した（`05bc6c5a8`、衝突なし、force push なし）。キャンペーン iss-00650-r3 で attempt 01 合格：レビュー P0 0・P1 0・P2 1・P3 0（P2 は参考：片付けの候補の欄を全面にしていても、構造の更新や画面の大きさの変化での描き直しで半分に戻る）、`make lint` exit 0、`uv run pytest` 4261 passed・7 skipped。closure：`.workbench/final-quality-gate/iss-00650-r3/closure.md`。CI は `05bc6c5a8` で OBSERVED_CI_PASS・READY。試しの 18650 は取り込んだ後のコードで立て直し、実機の数を測り直した（構造の図 1440：iframe 660 = 本文の内側 660、390：430 = 430、『横断の構造』1440：761 = 761、390：430 = 430、線の検査の違反0、`specdockCmdAudit` 0、エラー0。下からの欄は3つの欄とも 490 → 844 → 490 → 844 → 閉じる、pointercancel 0。`.workbench/iss-00650/measure-merged.jsonl`・`sheet-merged.jsonl`・`shots-merged/`）。
+
 ## Outcome
 
 - 原因：帯の欄（`views/graph/command_view.js` の `renderAgentPanel`）の本文 `.pn-body` に `data-tab` がなく、`panel.css` の縦の flex の規則（`.pn-body:is([data-tab="docs"], [data-tab="explanation"], [data-tab="agents"])`）に乗らないため、`.sd-agent` の `flex: 1` が効かず、iframe は `min-height: 240px` のままだった。
