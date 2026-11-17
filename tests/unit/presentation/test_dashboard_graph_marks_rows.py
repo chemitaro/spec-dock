@@ -131,12 +131,13 @@ def test_without_an_agent_the_layout_is_the_same(laid: dict[str, Any]) -> None:
 
 
 def test_a_box_grows_by_its_rows_of_agents(laid: dict[str, Any]) -> None:
-    """T-02: a box with one, three and six agents is 108, 108 and 128 tall, nested and in the tree; widths stay."""
+    """T-02: a box with one, three and six agents is 118, 118 and 138 tall (88 + MARK_LEAD 10 + MARK_ROW a row past the
+    first; iss-00616 D-02), nested and in the tree; a box without one stays 88; widths stay."""
     for way in ("nest|all", "tree|all"):
         plain = _nodes(laid[f"{way}|none|plain"])
         nodes = _nodes(laid[f"{way}|marks|plain"])
         height = {sid: nodes[sid]["y2"] - nodes[sid]["y1"] for sid in ("iss-00021", "iss-00022", "iss-00023")}
-        assert height == {"iss-00021": 108, "iss-00022": 108, "iss-00023": 128}, way
+        assert height == {"iss-00021": 118, "iss-00022": 118, "iss-00023": 138}, way
         assert [nodes[sid]["rows"] for sid in ("iss-00021", "iss-00022", "iss-00023")] == [2, 2, 3]
         assert "rows" not in nodes["iss-00024"] and nodes["iss-00024"]["y2"] - nodes["iss-00024"]["y1"] == 88
         assert {sid: n["x2"] - n["x1"] for sid, n in nodes.items()} == {
@@ -145,11 +146,11 @@ def test_a_box_grows_by_its_rows_of_agents(laid: dict[str, Any]) -> None:
 
 
 def test_a_tree_frame_box_grows_too(laid: dict[str, Any]) -> None:
-    """T-02: the tree's frame box (236 wide, 210 inside) with six agents holds five a row: 1 + 2 rows."""
+    """T-02: the tree's frame box (236 wide, 210 inside) with six agents holds five a row: 1 + 2 rows, + MARK_LEAD."""
     nodes = _nodes(laid["tree|all|marks|plain"])
     frame = nodes["epic-00010"]
     assert frame["type"] == "tframe"
-    assert (frame["rows"], frame["y2"] - frame["y1"]) == (3, 128)
+    assert (frame["rows"], frame["y2"] - frame["y1"]) == (3, 138)
 
 
 def test_a_nested_frame_heading_grows_and_its_body_moves_down(laid: dict[str, Any]) -> None:

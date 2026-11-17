@@ -1,6 +1,7 @@
 // The structure graph's command lines and band on the page (iss-00616 T-05), with the fake DOM and the fake orca.
 //   node dashboard_graph_command_screen.mjs <dashboard assets dir> <request.json>
-// request: {doc: structure document, runs: [{name, orca: false | {summary, order}, steps: [step]}], legend: bool}
+// request: {doc: structure document, runs: [{name, orca: false | {summary, order}, styled?, steps: [step]}], legend: bool}
+// styled: the screen's CSS is already there at the first render (a return to the screen: the first view at once)
 // step: {summary, order?} (orca-web's news with this summary), {news: true} (news with the same summary),
 //       {render: true} (the shell renders again), {revision: "r2"} (a new structure revision rendered),
 //       {styled: true} (the screen's CSS applies: the first view is placed), {act: "fit"} (a toolbar button),
@@ -47,7 +48,15 @@ function snap(root) {
     cmdSel: [...world.querySelectorAll(".gx-cmd, .gx-cmd-top")].map((s) => s.classList.contains("has-cmd-sel")),
     lines: classes(".gx-cmd .cl", "id"),
     ends: classes(".gx-cmd-top .cl", "id"),
-    ripples: classes(".gx-cmd-top .cr", "agent"),
+    ripples: classes(".cr", "agent"),
+    topRipples: world.querySelectorAll(".gx-cmd-top .cr").map((g) => g.dataset.agent),
+    bandRipples: world.querySelectorAll(".gx-band .cr").map((g) => g.dataset.agent),
+    bandRippleAt: world.querySelectorAll(".gx-band .cr .cr-a").map((c) => [Number(c.getAttribute("cx")), Number(c.getAttribute("cy"))]),
+    bandLast: (() => {
+      const kids = q(".gx-band")?.children.filter((c) => c instanceof Element) ?? [];
+      return kids.length ? kids[kids.length - 1].getAttribute("class") : null;
+    })(),
+    bandSel: world.querySelectorAll(".gx-band > svg").map((s) => s.classList.contains("has-cmd-sel")),
     states: Object.fromEntries(world.querySelectorAll(".gx-cmd .cl").map((g) => [g.dataset.id, g.dataset.state])),
     pressed: Object.fromEntries(world.querySelectorAll("[data-cmd-agent]").map((b) => [b.dataset.cmdAgent, b.getAttribute("aria-pressed")])),
     bandLabels: world.querySelectorAll("[data-cmd-agent]").map((b) => b.getAttribute("aria-label")),
@@ -115,7 +124,7 @@ if (request.legend) {
   out.legend = { plain: html(true), off: html(true, { cmd: false }), on: html(true, { cmd: true }), closed: html(false), closedOn: html(false, { cmd: true }) };
 }
 for (const run of request.runs || []) {
-  styled = false;
+  styled = !!run.styled;
   page.store.clear();
   const root = new Element("main");
   const orca = run.orca === false ? null : fakeOrca({});

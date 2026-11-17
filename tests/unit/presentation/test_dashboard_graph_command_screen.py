@@ -167,6 +167,17 @@ def test_reduced_motion_stops_the_dots_and_the_ripples() -> None:
     assert "display: none" in rules[".gx .cr-b"]
 
 
+def test_a_box_never_shrinks_its_rows() -> None:
+    """T-04 / D-02: in the column a two-line title (and every row) keeps its height; the rest goes to the agents' margin."""
+    assert "flex-shrink: 0" in _rule(".gx .gx-box > *")
+
+
+def test_the_band_ripples_rule() -> None:
+    """T-04 / R-04: the band's own ripple layer lies over its items and takes no press."""
+    rule = _rule(".gx .gx-band > .gx-band-cr")
+    assert "position: absolute" in rule and "pointer-events: none" in rule and "overflow: visible" in rule
+
+
 def test_a_box_puts_its_agents_on_its_lower_edge() -> None:
     """T-04 / D-02: the box is a column and its row of agents takes the rest (the coordinator's decision)."""
     box = _rule(".gx .gx-box")
@@ -275,6 +286,7 @@ RUNS: list[dict[str, Any]] = [
         "steps": [{"styled": True}, {"summary": FIVE}, {"act": "fit"}, {"summary": NO_PARENT}, {"act": "fit"}],
     },
     {"name": "first", "orca": {"summary": FIVE}, "steps": [{"styled": True}]},
+    {"name": "again", "orca": {"summary": FIVE}, "styled": True},
     {
         "name": "order",
         "orca": {
@@ -432,6 +444,28 @@ def test_a_mark_in_a_box_highlights_its_agent(runs: dict[str, list[dict[str, Any
     assert mark["ripples"]["a-own21"] == "is-cmd-hl" and mark["ripples"]["a-coord"] == "is-cmd-hl"
     assert mark["panel"]["open"] and mark["panel"]["agent"] is None
     assert other["selected"] == ["iss-00024"] and _hl(other) == OFF_ALL
+
+
+def test_a_band_parent_ripples_inside_the_band_over_its_items(runs: dict[str, list[dict[str, Any]]]) -> None:
+    """T-05 / R-04, D-03: a parent in the band ripples in the band's last child, at its button's middle; a box's
+    parent still ripples in .gx-cmd-top. The highlight changes the band's ripples too."""
+    shot = runs["news"][0]
+    assert sorted(shot["bandRipples"]) == ["a-coord", "x-coord"]
+    assert shot["topRipples"] == ["a-own21"]
+    assert shot["bandLast"] == "gx-band-cr"
+    for x, y in shot["bandRippleAt"]:
+        assert y == -2  # the band's slot middle: top -16 + 28 / 2
+        assert 24 < x < 273 or 283 < x < 440
+    opened = runs["band"][1]
+    assert opened["ripples"]["a-coord"] == "is-cmd-hl" and opened["ripples"]["x-coord"] == "is-cmd-off"
+    assert opened["bandSel"] == [True]
+    assert runs["band"][4]["bandSel"] == [False]
+
+
+def test_the_first_view_on_a_return_holds_the_band(runs: dict[str, list[dict[str, Any]]]) -> None:
+    """T-05 / R-07: the screen's CSS already there (the first view placed at once) still starts above the band."""
+    _, ty, s = _transform(runs["again"][0])
+    assert ty == pytest.approx(48 + 32 * s)
 
 
 def test_the_legend_row_only_with_orca(runs: dict[str, list[dict[str, Any]]]) -> None:

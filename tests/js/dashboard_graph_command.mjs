@@ -22,7 +22,7 @@ const request = JSON.parse(readFileSync(requestPath, "utf8"));
 const out = {};
 
 out.consts = {
-  MARK_H: L.MARK_H ?? null, MARK_LEFT: L.MARK_LEFT ?? null, MARK_BOTTOM: L.MARK_BOTTOM ?? null,
+  MARK_H: L.MARK_H ?? null, MARK_LEAD: L.MARK_LEAD ?? null, MARK_LEFT: L.MARK_LEFT ?? null, MARK_BOTTOM: L.MARK_BOTTOM ?? null,
   FRAME_TITLE: L.FRAME_TITLE ?? null, FRAME_GAP: L.FRAME_GAP ?? null, BAND: C.BAND ?? null,
 };
 if (request.packMarks) out.packMarks = request.packMarks.map(([m, avail]) => ({ packed: L.packMarks(m, avail), rows: L.markRows(m, avail) }));

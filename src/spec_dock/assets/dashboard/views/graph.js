@@ -254,6 +254,10 @@ function element(html) {
   return holder.children[0];
 }
 
+const ripple = (r) => `<g class="cr" data-agent="${esc(r.agent)}"><circle class="cr-a" cx="${r.x}" cy="${r.y}" r="7"/><circle class="cr-b" cx="${r.x}" cy="${r.y}" r="7"/></g>`;
+// A ripple centred in a band item: its parent is placed in the band (D-03).
+const inBand = (model, r) => !!model.band?.items.some((it) => r.x >= it.x && r.x <= it.x + it.w && r.y >= it.y && r.y <= it.y + it.h);
+
 function drawCommand(model) {
   const w = V.el.world;
   const L = V.EG.layout;
@@ -268,7 +272,7 @@ function drawCommand(model) {
     model.links
       .map((l) => `<g class="cl" data-id="${esc(l.id)}" data-state="${l.state}">${l.stubs.map((d) => `<path class="cl-stub" d="${d}" style="--cl-len:${l.len}px"/>`).join("")}<circle class="cl-dot" cx="${l.to.x}" cy="${l.to.y}" r="2.5"/></g>`)
       .join("") +
-    model.ripples.map((r) => `<g class="cr" data-agent="${esc(r.agent)}"><circle class="cr-a" cx="${r.x}" cy="${r.y}" r="7"/><circle class="cr-b" cx="${r.x}" cy="${r.y}" r="7"/></g>`).join("");
+    model.ripples.filter((r) => !inBand(model, r)).map(ripple).join("");
   const cmd = element(`<svg class="gx-cmd" ${size} aria-hidden="true">${lines}</svg>`);
   const top = element(`<svg class="gx-cmd-top" ${size} aria-hidden="true">${ends}</svg>`);
   const kids = Array.from(w.children);
@@ -282,7 +286,10 @@ function drawCommand(model) {
         it.agents.map((a) => `<button type="button" class="gx-band-agent" data-cmd-agent="${esc(a.id)}" data-cmd-item="${esc(it.key)}" aria-pressed="false" aria-label="${esc(`${it.label}：${a.id}`)}"><span class="gx-band-slot"></span></button>`).join("") +
         `</div>`,
     );
-    w.appendChild(element(`<div class="gx-band">${items.join("")}</div>`));
+    // a band parent's ripples over its items (the items are opaque and the band lies over .gx-cmd-top)
+    const rings = model.ripples.filter((r) => inBand(model, r)).map(ripple).join("");
+    const over = rings ? `<svg class="gx-band-cr" width="1" height="1" aria-hidden="true">${rings}</svg>` : "";
+    w.appendChild(element(`<div class="gx-band">${items.join("")}${over}</div>`));
   }
 }
 
@@ -331,14 +338,14 @@ function paintCmdSel() {
   const links = new Map((V.cmdModel?.links || []).map((l) => [l.id, l]));
   const parents = new Set();
   if (sel) for (const l of links.values()) if (l.child === sel) parents.add(l.parent);
-  for (const svg of w.querySelectorAll(".gx-cmd, .gx-cmd-top")) svg.classList.toggle("has-cmd-sel", !!sel);
+  for (const svg of w.querySelectorAll(".gx-cmd, .gx-cmd-top, .gx-band-cr")) svg.classList.toggle("has-cmd-sel", !!sel);
   for (const g of w.querySelectorAll(".gx-cmd .cl, .gx-cmd-top .cl")) {
     const l = links.get(g.dataset.id);
     const on = !!sel && !!l && (l.parent === sel || l.child === sel);
     g.classList.toggle("is-cmd-hl", on);
     g.classList.toggle("is-cmd-off", !!sel && !on);
   }
-  for (const g of w.querySelectorAll(".gx-cmd-top .cr")) {
+  for (const g of w.querySelectorAll(".gx-cmd-top .cr, .gx-band-cr .cr")) {
     const on = !!sel && (g.dataset.agent === sel || parents.has(g.dataset.agent));
     g.classList.toggle("is-cmd-hl", on);
     g.classList.toggle("is-cmd-off", !!sel && !on);
@@ -580,6 +587,7 @@ function render(root, ctx) {
       V.fitted = true;
       whenStyled(() => {
         relayout(); // the screen's CSS can change the width the first layout used
+        paintCommand(); // the band's top for the first view: on a return the CSS is there and this runs at once
         initialView();
         applyT();
       });

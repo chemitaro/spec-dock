@@ -433,6 +433,7 @@ def spots(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
 def test_the_constants_of_the_marks_and_the_band(spots: dict[str, Any]) -> None:
     assert spots["consts"] == {
         "MARK_H": 16,
+        "MARK_LEAD": 10,
         "MARK_LEFT": {"box": 15},
         "MARK_BOTTOM": {"box": 9},
         "FRAME_TITLE": 22,

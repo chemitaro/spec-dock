@@ -31,6 +31,9 @@ export const MARK_INSET = { box: 26 }; // a box's width less its inner width: le
 
 // iss-00616 D-02: where the agents' marks sit in a box or a nested frame (markSpots). Copies of graph.css too.
 export const MARK_H = 16; // the component's sm mark (.orca-mark)
+// A box (or the tree's frame box) with a row of agents is this much taller: room for a two-line title and a 17px row of
+// marks above the agents' row, which the box's column never shrinks (.gx .gx-box > * { flex-shrink: 0 } in graph.css).
+export const MARK_LEAD = 10;
 export const MARK_LEFT = { box: 15 }; // a box's left edge 4 + left padding 11 (.gx-box)
 export const MARK_BOTTOM = { box: 9 }; // a box's bottom edge 1 + bottom padding 8: the row of agents ends here (.gx-box > .gx-agents)
 export const FRAME_TITLE = 22; // a nested frame's title row (.gx-fhead)
@@ -258,9 +261,12 @@ const byStageActivity = (all, ix) => {
 // A side with many lines gets taller so that its ports stay a lane apart (gaps["grow:<id>"], from routeLayout).
 const grow = (ctx, s) => ctx.gaps[`grow:n:${s.id}`] || 0;
 
+// A box's height: its rows of agents MARK_ROW each past the first, and MARK_LEAD with any (iss-00616 D-02).
+const boxHeight = (ctx, s, rows) => SIZE.boxH + grow(ctx, s) + (rows > 1 ? MARK_LEAD + (rows - 1) * MARK_ROW : 0);
+
 function boxBlock(s, ctx) {
   const rows = markRows(markOf(ctx, s), SIZE.boxW - MARK_INSET.box);
-  return { t: "box", s, w: SIZE.boxW, h: SIZE.boxH + grow(ctx, s) + (rows - 1) * MARK_ROW, rows };
+  return { t: "box", s, w: SIZE.boxW, h: boxHeight(ctx, s, rows), rows };
 }
 
 function chipBlock(key, list, ctx) {
@@ -682,7 +688,7 @@ function tree(roots, ctx) {
   const items = rows.map((r, i) => {
     const w = r.frame ? SIZE.treeFrameW : SIZE.boxW;
     const marked = markRows(markOf(ctx, r.s), w - MARK_INSET.box);
-    const it = { t: "tbox", s: r.s, depth: r.depth, frame: r.frame, x: r.depth * indent, y, w, h: SIZE.boxH + grow(ctx, r.s) + (marked - 1) * MARK_ROW, rows: marked };
+    const it = { t: "tbox", s: r.s, depth: r.depth, frame: r.frame, x: r.depth * indent, y, w, h: boxHeight(ctx, r.s, marked), rows: marked };
     y += it.h + (i < rows.length - 1 ? gap(ctx.gaps, `tree.row.${i}`, BASE.treeRow) : 0);
     return it;
   });
