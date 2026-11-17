@@ -6,8 +6,8 @@ goal: "木の表示の『全体』の線の違反を0にし、入れ子の表示
 
 steps: {
 	"S-01": {title: "T-01〜T-03 を tests/unit/presentation/test_dashboard_graph_tree_route.py（と tests/js/dashboard_graph_route_fix.mjs の mode・marks・problems・maxWiden）に先に書いて落ちることを確かめ、router.js に D-01、layout.js に D-02 を入れて通す。既存の構造の図のテストを通す", realizes: ["R-01", "R-02", "R-03", "F-01", "F-02"], status: "done", session: "impl-sol"}
-	"S-02": {title: "make lint と全体の uv run pytest を通す（static-inventory.json に dashboard の資産はないので、変われば直す）", realizes: ["R-04"], status: "doing", after: ["S-01"], session: "impl-sol"}
-	"S-03": {title: "D-04 の比べ（240 組と固定した入力の 60 組、稼働の印あり）と実機の確かめ（taikyohiyou の木の『全体』の edgeAudit と前後の写し）を report.md に残し、試しの URL を立てる", realizes: ["R-03", "R-04", "R-05"], status: "todo", after: ["S-02"], session: "owner"}
+	"S-02": {title: "make lint と全体の uv run pytest を通す（static-inventory.json に dashboard の資産はないので、変われば直す）", realizes: ["R-04"], status: "done", after: ["S-01"], session: "impl-sol"}
+	"S-03": {title: "D-04 の比べ（240 組と固定した入力の 60 組、稼働の印あり）と実機の確かめ（taikyohiyou の木の『全体』の edgeAudit と前後の写し）を report.md に残し、試しの URL を立てる", realizes: ["R-03", "R-04", "R-05"], status: "done", after: ["S-02"], session: "owner"}
 }
 
 tests: {
