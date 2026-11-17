@@ -17,7 +17,7 @@ ID: "iss-00621"
 - **仕様の変更（実機の確かめから、2026-11-17）**：枠の見出しの worktree の印が見出しの右の端（幅の広い枠では画面の外）に出たので、題名の広がりを自分の幅までにして印を題名のすぐ後に続ける（requirement.cue の decisions と R-01 の受入4、design.cue D-04、plan.cue T-04）。round-3 **合格**（P0 0、P1 0、P2 1：直しの手順が台帳にない → S-02 を doing、S-03 を todo に開き直した。P3 0）。結果 `.workbench/spec-review/iss-00621/round-3.json`（reviewed_sha `ce999075e`）。
 - **今の合格した文書の sha256**（round-3、S-02・S-03 の status の開き直しの前）：requirement.cue `8703d689ccec242a9cc6f1cd704c976197c57d07f9ca8b66ee9e40a0502f6dc5`、design.cue `e9edb9e92b162c813656f4eebba4b605262fa6b410ae95d5eb7b9ab134225c4a`、plan.cue `5a936266977ec84859305278992ae32e44f614d7036d5cac93b5782951810e7a`。その後の変更は plan.cue の手順の status だけ。
 
-- **最終品質ゲート（2026-11-17、合格）**：合格のコミット `797690b4f`（base `edfabc759`、試み1回）。レビュー（quality-gate-reviewer opus / medium）P0〜P3 すべて0、網羅は完全。`make lint` exit 0、`uv run pytest` 4081 passed・7 skipped。この worktree の `.workbench/final-quality-gate/iss-00621/closure.md`。観点の `ui-behavior` は契約にないので `e2e-user-flow` に置き換えた。
+- **最終品質ゲート（2026-11-17、合格）**：合格のコミット `ac3bad681`（origin/main の #636 を取り込んだマージ、PR #637 の head。base `edfabc759`、試み2回）。attempt 1（`797690b4f`）も合格だったが、取り込みで候補が変わったのでやり直した。attempt 2 のレビュー（quality-gate-reviewer opus / medium）P0〜P3 すべて0、網羅は完全。`make lint` exit 0、`uv run pytest` 4090 passed・7 skipped。この worktree の `.workbench/final-quality-gate/iss-00621/closure.md`。観点の `ui-behavior` は契約にないので `e2e-user-flow` に置き換えた。記録だけのコミットはない（記録は Git の外）。
 
 ## 実装の記録
 
@@ -64,4 +64,10 @@ ID: "iss-00621"
 - 『+N』の押し（選びを変えない）は、5人以上のいる worktree がないので実機では写していない。node のテスト（T-01・T-03）で確かめた。
 - 直す前（`ce999075e`）の写し（`.workbench/iss-00621/shots/`）で、枠の見出しの `.wt` が見出しの右の端（1440 で x=1614、画面の外）に出ていたので、仕様を直して（round-3）`797690b4f` で直した。
 
+- 取り込みの後（`ac3bad681`）の wheel でも同じ確かめをやり直し（`.workbench/iss-00621/shots3/`）、枠の印・並び・押し・札・『横断の構造』の違反0・エラー0が同じだった。spec-dock の iss-00621 の箱は、実装担当が終わってエージェントがいなくなったので、この回は写していない（上の表は `797690b4f`）。
+- 試しの URL（本人の確かめ用、確かめまで残す）：tailnet の 18621 番（`/graph`、`/r/github.com/chemitaro/taikyohiyou_project/`、`…/board`）。止め方：`kill $(lsof -tnP -iTCP:18621 -sTCP:LISTEN) $(lsof -tnP -iTCP:18821 -sTCP:LISTEN)`。
+
 ## Residual Risks / Follow-ups
+
+- iss-00616 は `markIds(slot)`（置き場ごとの描いた並び）と `openAgent` を使う。graph.js の測り（`{Scope id: {items, gap}}`）に `ids` を足すのは iss-00616。
+- 『+N』の押しは実機で写していない（5人以上の worktree がない）。node のテストで確かめた。
