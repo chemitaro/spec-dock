@@ -873,8 +873,11 @@ export function routeLayout(scopes, cleanup, options = {}, start = {}) {
     const G = graphInput(L);
     const res = route(G);
     const add = portRoom(G);
-    const settled = !res.widen.length && !Object.keys(add).length;
-    const round = { layout: L, G, routes: res.routes, widen: res.widen, unmapped: 0, gaps: { ...gaps }, problems: settled ? 0 : problems(G, res) };
+    // A round settles only when nothing asks to be widened and the routing check finds no problem (iss-00633): the last
+    // horizontal nudging can leave vertical runs closer than a lane without any widening request. Such a round is
+    // compared like the others (the fewest problems, the earliest of equals) and ends the loop.
+    const round = { layout: L, G, routes: res.routes, widen: res.widen, unmapped: 0, gaps: { ...gaps }, problems: problems(G, res) };
+    const settled = !res.widen.length && !Object.keys(add).length && !round.problems;
     if (settled) {
       best = round;
       break;

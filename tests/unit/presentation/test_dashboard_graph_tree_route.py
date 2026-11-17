@@ -83,7 +83,7 @@ def test_a_corridor_of_chained_runs_fits_its_lanes(checked: dict[str, Any]) -> N
 
 def test_the_packing_is_for_the_tree_only_and_a_settled_round_is_clean() -> None:
     router = (GRAPH / "router.js").read_text(encoding="utf-8")
-    calls = [m.start() for m in re.finditer(r"packFree\(gr", router)]
+    calls = [m.start() for m in re.finditer(r"= packFree\(gr", router)]
     assert len(calls) == 1
     assert re.search(r"if \(!G\.nested && res\.over > 0\.5\) \{\s*const alt = packFree\(gr", router)
     layout = (GRAPH / "layout.js").read_text(encoding="utf-8")
