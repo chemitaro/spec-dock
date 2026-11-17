@@ -23,8 +23,15 @@ ID: "iss-00616"
 ## 実装の記録
 
 - 開始のコミット `3f5f8d8e9`（origin/main、iss-00621 の PR #637 の後）。
+- 基準（impl-claude、最初のセッション）：`3f5f8d8e9` で S-01 の節目のテストのうち既存の3つ（marks_rows・graph_js・graph_fit）が 52 passed。既存の失敗なし（`.workbench/implement/iss-00616/start.md`）。
+- S-01（impl-claude）：`layout.js` に `packMarks`・`markSpots` と定数 `MARK_H`・`MARK_LEFT`・`MARK_BOTTOM`・`FRAME_TITLE`・`FRAME_GAP`（`markRows` は `packMarks` から）、新しい `views/graph/command.js`（`commandPairs`・`ownWorktrees`・`placeAgents`・`bandLabel`・`bandItems`・`BAND`・`labelWidth`・`commandModel`・`commandKey`）。`link.len` は 8 の倍数に切り上げ、stubs も同じ `len` で流せる（round-2 P3 の申し送り）。テスト `tests/js/dashboard_graph_command.mjs` と `tests/unit/presentation/test_dashboard_graph_command.py`（T-01〜T-03、30件）。Red は開始のコミットの資産で確かめた（`command.js` がない・`packMarks` がない）。
+  - `uv run pytest tests/unit/presentation/test_dashboard_graph_command.py tests/unit/presentation/test_dashboard_graph_marks_rows.py tests/unit/presentation/test_dashboard_graph_js.py tests/unit/presentation/test_dashboard_graph_fit.py -q` → 82 passed。
+  - `uv run ruff check`・`ruff format --check`・`mypy`（新しいテスト）→ 合格。
 
 ## 逸脱と判断
+
+- S-01 は plan.cue では impl-sol（Codex）だが、Codex が chat-scratch の symlink の拒否で止まったため、統括が了承済みの取り決め（plan.cue の impl-sol の rationale）どおり impl-claude（Claude Opus 5.5 / medium）が S-01 から引き継いだ。
+- S-01 の TDD の順：`layout.js` の変更を先に書き、テストを後に書いた。Red は、開始のコミットの資産（`git archive 3f5f8d8e9`）に対して新しいテストの node の部分を走らせて確かめた（`command.js` がない・`packMarks` がない）。
 
 - 2026-11-17 タスク担当：S-01 は plan.cue では impl-sol（Codex GPT-6.1 Sol / medium、dispatch `ctx_9b2613c74505`、launch.effective は計画どおり）だが、Codex が chat-scratch の symlink の拒否で何も変えずに止まったので、統括が了承済みの取り決めどおり止め（worker-stop）、Claude Opus 5.5 / medium（impl-claude、dispatch `ctx_1cbbfb48a81d`）が S-01 から S-03 まで引き継ぐ。
 
