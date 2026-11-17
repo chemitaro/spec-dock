@@ -73,6 +73,8 @@ ID: "iss-00655"
 - **取り込み直し（2026-11-18、統括の依頼）**：origin/main `3f0e1e9e0`（#660 iss-00657）を取り込んだ `d3c9eecf5`（競合なし）で、最終品質ゲートをやり直して**合格**（キャンペーン iss-00655-r2。report.md を authority から外した理由は closure にある）。レビュー P0〜P3 0、網羅は完全、`make lint` exit 0、`uv run pytest` 4284 passed・7 skipped。この worktree の `.workbench/final-quality-gate/iss-00655-r2/closure.md`。試しの 18655 を取り込んだ後のコードで立て直し、同じ台本で両方の画面の数・線の検査の違反0・cmdAudit 0・エラー0・is-still を確かめた（`.workbench/iss-00655/final2/`）。
 - **PR**：https://github.com/chemitaro/spec-dock/pull/661（最初の head `b50c11ddb`、今の head `d3c9eecf5`、`Refs #655`）。CI（Commit identity の check、SpecDock check、Provider CI の route・provider-tests・Provider distribution parity の ubuntu と macos）すべて合格、merge_readiness READY、mergeable（2026-11-18）。マージは統括。
 
+- head `d3c9eecf5` の CI もすべて合格、merge_readiness READY、mergeable（2026-11-18）。
+
 ## Residual Risks / Follow-ups
 
 - 本物のマウス・トラックパッドの値は手元で測れていない（CDP の合成の値は `wheelDeltaY` ±120 に固定）。マウスのホイールが 120 の倍数にならない環境では動かすに倒れ（今と同じ動き）、トラックパッドの一続きの初めの1つがちょうど deltaY 40（`wheelDeltaY` 120）で deltaX 0 だと、その一続きが拡大・縮小になる。本人の確かめで食い違えば、見分けの決まりを直す別の Issue にする。
