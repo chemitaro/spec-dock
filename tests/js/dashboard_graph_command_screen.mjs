@@ -22,6 +22,10 @@ const [assets, requestPath] = process.argv.slice(2);
 const request = JSON.parse(readFileSync(requestPath, "utf8"));
 const page = install({ fetch: async () => json({ error: { message: "not found" } }, 404) });
 const motion = installMotion(page);
+// the page's clock moves with the motion's clock too: wheels an advance apart are not one stroke (iss-00655 D-02)
+const realNow = performance.now.bind(performance);
+let skew = 0;
+performance.now = () => realNow() + skew;
 let styled = false;
 const computed = globalThis.getComputedStyle;
 globalThis.getComputedStyle = (el) => ({ ...computed(el), position: styled && el?.classList?.contains("gx") ? "absolute" : "" });
@@ -149,7 +153,10 @@ async function step(root, s, orca, ctx) {
     if (w.wy !== undefined) ev.wheelDeltaY = w.wy;
     for (const fn of view.listeners.wheel || []) fn(ev);
   } else if (s.viewHidden !== undefined) target(root, ".gx-view").hidden = s.viewHidden;
-  else if (s.advance) motion.advance(s.advance);
+  else if (s.advance) {
+    skew += s.advance;
+    motion.advance(s.advance);
+  }
   else if (s.hidden !== undefined) motion.setHidden(s.hidden);
   else if (s.tell) motion.tell(s.tell.sel, s.tell.hit);
   else if (s.key) {

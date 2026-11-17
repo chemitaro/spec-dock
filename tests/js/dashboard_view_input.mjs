@@ -5,6 +5,7 @@
 //   kinds: [event, …]                   -> wheelKind of each
 //   actions: [[event, last, now, page]]  -> wheelAction of each
 //   keys: [event, …]                    -> keyAction of each
+//   chains: [[[event, now], …], …]       -> wheelAction of each event in turn, each given the one before as `last`
 //   order: [event, …]                   -> the names wheelKind and wheelAction read from each, in order
 //   owns: [target name, …]              -> ownsKey of a keydown whose target is that element of a fixed page
 // Always: WHEEL and KEYS. Prints one JSON object; the Python test asserts on it.
@@ -20,6 +21,15 @@ const out = { WHEEL: M.WHEEL, KEYS: M.KEYS };
 
 if (request.kinds) out.kinds = request.kinds.map((e) => M.wheelKind(e));
 if (request.actions) out.actions = request.actions.map(([e, last, now, page]) => M.wheelAction(e, last, now, page));
+if (request.chains)
+  out.chains = request.chains.map((chain) => {
+    let last = null;
+    return chain.map(([e, now]) => {
+      const r = M.wheelAction(e, last, now, 1000);
+      last = { kind: r.kind, at: r.at };
+      return r;
+    });
+  });
 if (request.keys) out.keys = request.keys.map((e) => M.keyAction(e));
 
 // a wheel event that records the names read from it (Firefox turns deltaMode to pixels once wheelDelta* is read)

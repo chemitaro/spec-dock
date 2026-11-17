@@ -19,6 +19,8 @@ function kindOf(e, mode) {
   return "pan";
 }
 
+const WEAK = new Set(["pan", "wheel?"]); // the kinds told from the values alone
+
 // "pinch" | "hpan" | "wheel" (sure) | "wheel?" (likely) | "pan"
 export function wheelKind(e) {
   return kindOf(e, modeOf(e));
@@ -29,8 +31,9 @@ export function wheelKind(e) {
 export function wheelAction(e, last, now, page) {
   const mode = modeOf(e);
   let kind = kindOf(e, mode);
-  // a notch-like value in the middle of a trackpad's stroke keeps panning
-  if (kind === "wheel?" && last?.kind === "pan" && now - last.at < WHEEL.stick) kind = "pan";
+  // a stroke (each event within `stick` of the one before) keeps the kind it started with while that kind came from
+  // the values alone: a notch-like value in a trackpad's stroke keeps panning, a pan-like value in a wheel's keeps zooming
+  if (WEAK.has(kind) && WEAK.has(last?.kind) && now - last.at < WHEEL.stick) kind = last.kind;
   const dx = e.deltaX || 0;
   const dy = e.deltaY || 0;
   const u = mode === 1 ? 16 : mode === 2 ? page : 1;

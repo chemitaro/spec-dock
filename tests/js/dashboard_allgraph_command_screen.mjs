@@ -32,6 +32,10 @@ const page = install({
   },
 });
 const motion = installMotion(page);
+// the page's clock moves with the motion's clock too: wheels an advance apart are not one stroke (iss-00655 D-02)
+const realNow = performance.now.bind(performance);
+let skew = 0;
+performance.now = () => realNow() + skew;
 // the bar above the graph is 40px tall; the graph area is the fake's 1200 × 800
 hooks.rect = (el) =>
   ["gx-next", "gx-tools", "ax-sum"].some((c) => el.classList?.contains(c)) ? { left: 0, top: 0, right: 100, bottom: 40, width: 100, height: 40 } : null;
@@ -169,7 +173,10 @@ async function step(root, s, orca) {
     for (const fn of view.listeners.wheel || []) fn(ev);
   } else if (s.range) target(root, `[data-act="range"][data-range="${s.range}"]`).dispatch("click");
   else if (s.viewHidden !== undefined) target(root, ".gx-view").hidden = s.viewHidden;
-  else if (s.advance) motion.advance(s.advance);
+  else if (s.advance) {
+    skew += s.advance;
+    motion.advance(s.advance);
+  }
   else if (s.hidden !== undefined) motion.setHidden(s.hidden);
   else if (s.tell) motion.tell(s.tell.sel, s.tell.hit);
   await settle();

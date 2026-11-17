@@ -77,6 +77,7 @@ def result(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
             "kinds": [e for _, e, _ in KINDS],
             "actions": [[e, last, now, page] for _, e, last, now, page in ACTIONS],
             "keys": [e for _, e, _ in KEYS],
+            "chains": [[[e, now] for e, now in chain] for chain in CHAINS.values()],
             "order": [
                 wheel(deltaMode=0, deltaY=-100, deltaX=0, wheelDeltaY=120),
                 wheel(deltaMode=1, deltaY=3, deltaX=0),
@@ -276,3 +277,49 @@ OWNS: dict[str, bool] = {
 
 def test_owns_key_leaves_other_inputs_alone(result: dict[str, Any]) -> None:
     assert result["owns"] == OWNS
+
+
+# A stroke of wheel events (each within WHEEL.stick of the one before) keeps the kind it started with when that kind
+# came from the values alone (pan, wheel?); a sure kind (wheel by lines, pinch, hpan) starts a stroke of its own.
+STROKE_PAN = wheel(deltaMode=0, deltaY=6, deltaX=1, wheelDeltaY=-18)
+FLING = wheel(deltaMode=0, deltaY=40, deltaX=0, wheelDeltaY=-120)  # a fast stroke's notch-like value
+PAN_VALUES = wheel(deltaMode=0, deltaY=-6, deltaX=2, wheelDeltaY=18)
+LINES = wheel(deltaMode=1, deltaY=3, deltaX=0)
+PINCH = wheel(deltaMode=0, deltaY=3, deltaX=0, ctrlKey=True)
+SHIFT = wheel(deltaMode=0, deltaY=-100, deltaX=0, shiftKey=True)
+CHAINS: dict[str, list[tuple[dict[str, Any], float]]] = {
+    "trackpad stroke": [(STROKE_PAN, 1000), *[(FLING, 1000 + 150 * i) for i in range(1, 6)]],
+    "wheel stroke": [(NOTCH_UP, 1000), (PAN_VALUES, 1150)],
+    "after lines": [(STROKE_PAN, 1000), (LINES, 1050), (NOTCH_UP, 1100)],
+    "after pinch": [(STROKE_PAN, 1000), (PINCH, 1050), (NOTCH_UP, 1100)],
+    "after shift": [(STROKE_PAN, 1000), (SHIFT, 1050), (NOTCH_UP, 1100)],
+    "pinch then pan values": [(NOTCH_UP, 1000), (PINCH, 1050), (PAN_VALUES, 1100)],
+}
+
+
+def _chains(result: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    return dict(zip(CHAINS, result["chains"], strict=True))
+
+
+def test_a_trackpad_stroke_keeps_panning_past_the_stick_time(result: dict[str, Any]) -> None:
+    got = _chains(result)["trackpad stroke"]
+    assert [r["kind"] for r in got] == ["pan"] * 6  # 750ms in all, 150ms between each
+    assert [r["at"] for r in got] == [1000 + 150 * i for i in range(6)]
+    for r in got[1:]:
+        _pan(r, 0, -40)
+
+
+def test_a_wheel_stroke_keeps_zooming(result: dict[str, Any]) -> None:
+    first, second = _chains(result)["wheel stroke"]
+    _zoom(first, S)
+    assert second["kind"] == "wheel?"
+    _zoom(second, S)  # deltaY −6: in, one step
+
+
+def test_a_sure_kind_starts_a_stroke_of_its_own(result: dict[str, Any]) -> None:
+    got = _chains(result)
+    assert [r["kind"] for r in got["after lines"]] == ["pan", "wheel", "wheel?"]
+    assert [r["kind"] for r in got["after pinch"]] == ["pan", "pinch", "wheel?"]
+    assert [r["kind"] for r in got["after shift"]] == ["pan", "hpan", "wheel?"]
+    _zoom(got["after shift"][2], S)
+    assert [r["kind"] for r in got["pinch then pan values"]] == ["wheel?", "pinch", "pan"]
