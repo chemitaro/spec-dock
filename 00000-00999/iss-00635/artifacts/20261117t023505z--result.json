@@ -1,0 +1,1402 @@
+[
+ {
+  "width": 1440,
+  "scheme": "light",
+  "range": "next",
+  "shot": "allgraph-1440-light-next.png",
+  "shot100": "allgraph-1440-light-next-100.png",
+  "heads": [
+   {
+    "repo": "github.com/chemitaro/company-os",
+    "depth": 0,
+    "parent": null,
+    "text": "chemitaro/company-os",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/housing-lifecycle",
+    "depth": 1,
+    "parent": null,
+    "text": "chemitaro/housing-lifecycle",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/taikyohiyou_project",
+    "depth": 2,
+    "parent": null,
+    "text": "chemitaro/taikyohiyou_project",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/input-devices",
+    "depth": 1,
+    "parent": null,
+    "text": "chemitaro/input-devices",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/generic-mona",
+    "depth": 2,
+    "parent": null,
+    "text": "chemitaro/generic-mona",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/tenting-cradle",
+    "depth": 2,
+    "parent": null,
+    "text": "chemitaro/tenting-cradle",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/yubisaki",
+    "depth": 2,
+    "parent": null,
+    "text": "chemitaro/yubisaki",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/orca-web",
+    "depth": 0,
+    "parent": null,
+    "text": "chemitaro/orca-web",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/spec-dock",
+    "depth": 0,
+    "parent": null,
+    "text": "chemitaro/spec-dock",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   }
+  ],
+  "box": {
+   "github.com/chemitaro/company-os": [
+    12.723051071166992,
+    112.72305297851562,
+    1427.277006149292,
+    3433.0282287597656
+   ],
+   "github.com/chemitaro/housing-lifecycle": [
+    22.16915512084961,
+    164.67662048339844,
+    1084.8556785583496,
+    2219.7945404052734
+   ],
+   "github.com/chemitaro/taikyohiyou_project": [
+    31.615257263183594,
+    1359.608642578125,
+    783.7612533569336,
+    2210.348388671875
+   ],
+   "github.com/chemitaro/input-devices": [
+    22.16915512084961,
+    2229.240478515625,
+    1417.830898284912,
+    3423.582275390625
+   ],
+   "github.com/chemitaro/generic-mona": [
+    31.615257263183594,
+    2670.845947265625,
+    551.1509628295898,
+    2912.311767578125
+   ],
+   "github.com/chemitaro/tenting-cradle": [
+    31.615257263183594,
+    2921.758056640625,
+    682.2156600952148,
+    3163.223876953125
+   ],
+   "github.com/chemitaro/yubisaki": [
+    31.615257263183594,
+    3172.670166015625,
+    326.8059616088867,
+    3414.135986328125
+   ],
+   "github.com/chemitaro/orca-web": [
+    12.723051071166992,
+    3442.474365234375,
+    307.91378593444824,
+    3683.9404296875
+   ],
+   "github.com/chemitaro/spec-dock": [
+    12.723051071166992,
+    3693.386474609375,
+    668.0464763641357,
+    4110.7861328125
+   ]
+  },
+  "hscroll": false,
+  "errors": []
+ },
+ {
+  "width": 1440,
+  "scheme": "light",
+  "range": "all",
+  "shot": "allgraph-1440-light-all.png",
+  "shot100": "allgraph-1440-light-all-100.png",
+  "heads": [
+   {
+    "repo": "github.com/chemitaro/company-os",
+    "depth": 0,
+    "parent": null,
+    "text": "chemitaro/company-os",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/housing-lifecycle",
+    "depth": 1,
+    "parent": null,
+    "text": "chemitaro/housing-lifecycle",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/taikyohiyou_project",
+    "depth": 2,
+    "parent": null,
+    "text": "chemitaro/taikyohiyou_project",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/input-devices",
+    "depth": 1,
+    "parent": null,
+    "text": "chemitaro/input-devices",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/generic-mona",
+    "depth": 2,
+    "parent": null,
+    "text": "chemitaro/generic-mona",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/tenting-cradle",
+    "depth": 2,
+    "parent": null,
+    "text": "chemitaro/tenting-cradle",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/yubisaki",
+    "depth": 2,
+    "parent": null,
+    "text": "chemitaro/yubisaki",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/orca-web",
+    "depth": 0,
+    "parent": null,
+    "text": "chemitaro/orca-web",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/spec-dock",
+    "depth": 0,
+    "parent": null,
+    "text": "chemitaro/spec-dock",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   }
+  ],
+  "box": {
+   "github.com/chemitaro/company-os": [
+    8.858865737915039,
+    108.85887145996094,
+    1431.141092300415,
+    2632.207504272461
+   ],
+   "github.com/chemitaro/housing-lifecycle": [
+    10.576598167419434,
+    123.03015899658203,
+    1429.423399925232,
+    2328.276008605957
+   ],
+   "github.com/chemitaro/taikyohiyou_project": [
+    12.294330596923828,
+    1423.99755859375,
+    1427.7057075500488,
+    2326.55859375
+   ],
+   "github.com/chemitaro/input-devices": [
+    10.576598167419434,
+    2329.993896484375,
+    362.2822561264038,
+    2630.48974609375
+   ],
+   "github.com/chemitaro/generic-mona": [
+    12.294330596923828,
+    2410.2978515625,
+    346.60795974731445,
+    2479.6513671875
+   ],
+   "github.com/chemitaro/tenting-cradle": [
+    12.294330596923828,
+    2481.369140625,
+    360.5645332336426,
+    2583.144775390625
+   ],
+   "github.com/chemitaro/yubisaki": [
+    12.294330596923828,
+    2584.862548828125,
+    66.61761474609375,
+    2628.77197265625
+   ],
+   "github.com/chemitaro/orca-web": [
+    8.858865737915039,
+    2633.92529296875,
+    318.48011207580566,
+    2706.28466796875
+   ],
+   "github.com/chemitaro/spec-dock": [
+    8.858865737915039,
+    2708.00244140625,
+    625.9541416168213,
+    3806.062744140625
+   ]
+  },
+  "hscroll": false,
+  "errors": []
+ },
+ {
+  "width": 1440,
+  "scheme": "dark",
+  "range": "next",
+  "shot": "allgraph-1440-dark-next.png",
+  "shot100": "allgraph-1440-dark-next-100.png",
+  "heads": [
+   {
+    "repo": "github.com/chemitaro/company-os",
+    "depth": 0,
+    "parent": null,
+    "text": "chemitaro/company-os",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/housing-lifecycle",
+    "depth": 1,
+    "parent": null,
+    "text": "chemitaro/housing-lifecycle",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/taikyohiyou_project",
+    "depth": 2,
+    "parent": null,
+    "text": "chemitaro/taikyohiyou_project",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/input-devices",
+    "depth": 1,
+    "parent": null,
+    "text": "chemitaro/input-devices",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/generic-mona",
+    "depth": 2,
+    "parent": null,
+    "text": "chemitaro/generic-mona",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/tenting-cradle",
+    "depth": 2,
+    "parent": null,
+    "text": "chemitaro/tenting-cradle",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/yubisaki",
+    "depth": 2,
+    "parent": null,
+    "text": "chemitaro/yubisaki",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/orca-web",
+    "depth": 0,
+    "parent": null,
+    "text": "chemitaro/orca-web",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/spec-dock",
+    "depth": 0,
+    "parent": null,
+    "text": "chemitaro/spec-dock",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   }
+  ],
+  "box": {
+   "github.com/chemitaro/company-os": [
+    12.723051071166992,
+    112.72305297851562,
+    1427.277006149292,
+    3433.0282287597656
+   ],
+   "github.com/chemitaro/housing-lifecycle": [
+    22.16915512084961,
+    164.67662048339844,
+    1084.8556785583496,
+    2219.7945404052734
+   ],
+   "github.com/chemitaro/taikyohiyou_project": [
+    31.615257263183594,
+    1359.608642578125,
+    783.7612533569336,
+    2210.348388671875
+   ],
+   "github.com/chemitaro/input-devices": [
+    22.16915512084961,
+    2229.240478515625,
+    1417.830898284912,
+    3423.582275390625
+   ],
+   "github.com/chemitaro/generic-mona": [
+    31.615257263183594,
+    2670.845947265625,
+    551.1509628295898,
+    2912.311767578125
+   ],
+   "github.com/chemitaro/tenting-cradle": [
+    31.615257263183594,
+    2921.758056640625,
+    682.2156600952148,
+    3163.223876953125
+   ],
+   "github.com/chemitaro/yubisaki": [
+    31.615257263183594,
+    3172.670166015625,
+    326.8059616088867,
+    3414.135986328125
+   ],
+   "github.com/chemitaro/orca-web": [
+    12.723051071166992,
+    3442.474365234375,
+    307.91378593444824,
+    3683.9404296875
+   ],
+   "github.com/chemitaro/spec-dock": [
+    12.723051071166992,
+    3693.386474609375,
+    668.0464763641357,
+    4110.7861328125
+   ]
+  },
+  "hscroll": false,
+  "errors": []
+ },
+ {
+  "width": 1440,
+  "scheme": "dark",
+  "range": "all",
+  "shot": "allgraph-1440-dark-all.png",
+  "shot100": "allgraph-1440-dark-all-100.png",
+  "heads": [
+   {
+    "repo": "github.com/chemitaro/company-os",
+    "depth": 0,
+    "parent": null,
+    "text": "chemitaro/company-os",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/housing-lifecycle",
+    "depth": 1,
+    "parent": null,
+    "text": "chemitaro/housing-lifecycle",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/taikyohiyou_project",
+    "depth": 2,
+    "parent": null,
+    "text": "chemitaro/taikyohiyou_project",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/input-devices",
+    "depth": 1,
+    "parent": null,
+    "text": "chemitaro/input-devices",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/generic-mona",
+    "depth": 2,
+    "parent": null,
+    "text": "chemitaro/generic-mona",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/tenting-cradle",
+    "depth": 2,
+    "parent": null,
+    "text": "chemitaro/tenting-cradle",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/yubisaki",
+    "depth": 2,
+    "parent": null,
+    "text": "chemitaro/yubisaki",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/orca-web",
+    "depth": 0,
+    "parent": null,
+    "text": "chemitaro/orca-web",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/spec-dock",
+    "depth": 0,
+    "parent": null,
+    "text": "chemitaro/spec-dock",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   }
+  ],
+  "box": {
+   "github.com/chemitaro/company-os": [
+    8.858865737915039,
+    108.85887145996094,
+    1431.141092300415,
+    2632.207504272461
+   ],
+   "github.com/chemitaro/housing-lifecycle": [
+    10.576598167419434,
+    123.03015899658203,
+    1429.423399925232,
+    2328.276008605957
+   ],
+   "github.com/chemitaro/taikyohiyou_project": [
+    12.294330596923828,
+    1423.99755859375,
+    1427.7057075500488,
+    2326.55859375
+   ],
+   "github.com/chemitaro/input-devices": [
+    10.576598167419434,
+    2329.993896484375,
+    362.2822561264038,
+    2630.48974609375
+   ],
+   "github.com/chemitaro/generic-mona": [
+    12.294330596923828,
+    2410.2978515625,
+    346.60795974731445,
+    2479.6513671875
+   ],
+   "github.com/chemitaro/tenting-cradle": [
+    12.294330596923828,
+    2481.369140625,
+    360.5645332336426,
+    2583.144775390625
+   ],
+   "github.com/chemitaro/yubisaki": [
+    12.294330596923828,
+    2584.862548828125,
+    66.61761474609375,
+    2628.77197265625
+   ],
+   "github.com/chemitaro/orca-web": [
+    8.858865737915039,
+    2633.92529296875,
+    318.48011207580566,
+    2706.28466796875
+   ],
+   "github.com/chemitaro/spec-dock": [
+    8.858865737915039,
+    2708.00244140625,
+    625.9541416168213,
+    3806.062744140625
+   ]
+  },
+  "hscroll": false,
+  "errors": []
+ },
+ {
+  "width": 390,
+  "scheme": "light",
+  "range": "next",
+  "shot": "allgraph-390-light-next.png",
+  "shot100": "allgraph-390-light-next-100.png",
+  "heads": [
+   {
+    "repo": "github.com/chemitaro/company-os",
+    "depth": 0,
+    "parent": null,
+    "text": "chemitaro/company-os",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/housing-lifecycle",
+    "depth": 1,
+    "parent": null,
+    "text": "chemitaro/housing-lifecycle",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/taikyohiyou_project",
+    "depth": 2,
+    "parent": null,
+    "text": "chemitaro/taikyohiyou_project",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/input-devices",
+    "depth": 1,
+    "parent": null,
+    "text": "chemitaro/input-devices",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/generic-mona",
+    "depth": 2,
+    "parent": null,
+    "text": "chemitaro/generic-mona",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/tenting-cradle",
+    "depth": 2,
+    "parent": null,
+    "text": "chemitaro/tenting-cradle",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/yubisaki",
+    "depth": 2,
+    "parent": null,
+    "text": "chemitaro/yubisaki",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/orca-web",
+    "depth": 0,
+    "parent": null,
+    "text": "chemitaro/orca-web",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/spec-dock",
+    "depth": 0,
+    "parent": null,
+    "text": "chemitaro/spec-dock",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   }
+  ],
+  "box": {
+   "github.com/chemitaro/company-os": [
+    9.920000076293945,
+    159.9199981689453,
+    1555.0399951934814,
+    6674.140213012695
+   ],
+   "github.com/chemitaro/housing-lifecycle": [
+    21.760000228881836,
+    225.04000854492188,
+    1543.2000637054443,
+    5009.140106201172
+   ],
+   "github.com/chemitaro/taikyohiyou_project": [
+    33.599998474121094,
+    3076.260009765625,
+    594.5200424194336,
+    4997.30029296875
+   ],
+   "github.com/chemitaro/input-devices": [
+    21.760000228881836,
+    5020.97998046875,
+    860.9199733734131,
+    6662.30029296875
+   ],
+   "github.com/chemitaro/generic-mona": [
+    33.599998474121094,
+    5718.80029296875,
+    684.8000106811523,
+    6021.4599609375
+   ],
+   "github.com/chemitaro/tenting-cradle": [
+    33.599998474121094,
+    6033.30029296875,
+    849.0800399780273,
+    6335.9599609375
+   ],
+   "github.com/chemitaro/yubisaki": [
+    33.599998474121094,
+    6347.80029296875,
+    403.5999984741211,
+    6650.4599609375
+   ],
+   "github.com/chemitaro/orca-web": [
+    9.920000076293945,
+    6685.97998046875,
+    379.92000007629395,
+    6988.64013671875
+   ],
+   "github.com/chemitaro/spec-dock": [
+    9.920000076293945,
+    7000.47998046875,
+    831.3200244903564,
+    7825.580078125
+   ]
+  },
+  "hscroll": false,
+  "errors": []
+ },
+ {
+  "width": 390,
+  "scheme": "light",
+  "range": "all",
+  "shot": "allgraph-390-light-all.png",
+  "shot100": "allgraph-390-light-all-100.png",
+  "heads": [
+   {
+    "repo": "github.com/chemitaro/company-os",
+    "depth": 0,
+    "parent": null,
+    "text": "chemitaro/company-os",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/housing-lifecycle",
+    "depth": 1,
+    "parent": null,
+    "text": "chemitaro/housing-lifecycle",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/taikyohiyou_project",
+    "depth": 2,
+    "parent": null,
+    "text": "chemitaro/taikyohiyou_project",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/input-devices",
+    "depth": 1,
+    "parent": null,
+    "text": "chemitaro/input-devices",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/generic-mona",
+    "depth": 2,
+    "parent": null,
+    "text": "chemitaro/generic-mona",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/tenting-cradle",
+    "depth": 2,
+    "parent": null,
+    "text": "chemitaro/tenting-cradle",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/yubisaki",
+    "depth": 2,
+    "parent": null,
+    "text": "chemitaro/yubisaki",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/orca-web",
+    "depth": 0,
+    "parent": null,
+    "text": "chemitaro/orca-web",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/spec-dock",
+    "depth": 0,
+    "parent": null,
+    "text": "chemitaro/spec-dock",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   }
+  ],
+  "box": {
+   "github.com/chemitaro/company-os": [
+    9.920000076293945,
+    159.9199981689453,
+    9345.759843826294,
+    29219.720779418945
+   ],
+   "github.com/chemitaro/housing-lifecycle": [
+    21.760000228881836,
+    257.6000061035156,
+    9333.920156478882,
+    26905.000396728516
+   ],
+   "github.com/chemitaro/taikyohiyou_project": [
+    33.599998474121094,
+    18736.140625,
+    9322.080467224121,
+    26893.16015625
+   ],
+   "github.com/chemitaro/input-devices": [
+    21.760000228881836,
+    26916.83984375,
+    2349.800039291382,
+    29207.880859375
+   ],
+   "github.com/chemitaro/generic-mona": [
+    33.599998474121094,
+    27614.66015625,
+    2337.959861755371,
+    28092.701171875
+   ],
+   "github.com/chemitaro/tenting-cradle": [
+    33.599998474121094,
+    28104.541015625,
+    2210.679832458496,
+    28806.060546875
+   ],
+   "github.com/chemitaro/yubisaki": [
+    33.599998474121094,
+    28817.900390625,
+    403.5999984741211,
+    29196.041015625
+   ],
+   "github.com/chemitaro/orca-web": [
+    9.920000076293945,
+    29231.560546875,
+    1427.7599658966064,
+    30122.51953125
+   ],
+   "github.com/chemitaro/spec-dock": [
+    9.920000076293945,
+    30134.361328125,
+    3255.560136795044,
+    45568.5390625
+   ]
+  },
+  "hscroll": false,
+  "errors": []
+ },
+ {
+  "width": 390,
+  "scheme": "dark",
+  "range": "next",
+  "shot": "allgraph-390-dark-next.png",
+  "shot100": "allgraph-390-dark-next-100.png",
+  "heads": [
+   {
+    "repo": "github.com/chemitaro/company-os",
+    "depth": 0,
+    "parent": null,
+    "text": "chemitaro/company-os",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/housing-lifecycle",
+    "depth": 1,
+    "parent": null,
+    "text": "chemitaro/housing-lifecycle",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/taikyohiyou_project",
+    "depth": 2,
+    "parent": null,
+    "text": "chemitaro/taikyohiyou_project",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/input-devices",
+    "depth": 1,
+    "parent": null,
+    "text": "chemitaro/input-devices",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/generic-mona",
+    "depth": 2,
+    "parent": null,
+    "text": "chemitaro/generic-mona",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/tenting-cradle",
+    "depth": 2,
+    "parent": null,
+    "text": "chemitaro/tenting-cradle",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/yubisaki",
+    "depth": 2,
+    "parent": null,
+    "text": "chemitaro/yubisaki",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/orca-web",
+    "depth": 0,
+    "parent": null,
+    "text": "chemitaro/orca-web",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/spec-dock",
+    "depth": 0,
+    "parent": null,
+    "text": "chemitaro/spec-dock",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   }
+  ],
+  "box": {
+   "github.com/chemitaro/company-os": [
+    9.920000076293945,
+    159.9199981689453,
+    1555.0399951934814,
+    6674.140213012695
+   ],
+   "github.com/chemitaro/housing-lifecycle": [
+    21.760000228881836,
+    225.04000854492188,
+    1543.2000637054443,
+    5009.140106201172
+   ],
+   "github.com/chemitaro/taikyohiyou_project": [
+    33.599998474121094,
+    3076.260009765625,
+    594.5200424194336,
+    4997.30029296875
+   ],
+   "github.com/chemitaro/input-devices": [
+    21.760000228881836,
+    5020.97998046875,
+    860.9199733734131,
+    6662.30029296875
+   ],
+   "github.com/chemitaro/generic-mona": [
+    33.599998474121094,
+    5718.80029296875,
+    684.8000106811523,
+    6021.4599609375
+   ],
+   "github.com/chemitaro/tenting-cradle": [
+    33.599998474121094,
+    6033.30029296875,
+    849.0800399780273,
+    6335.9599609375
+   ],
+   "github.com/chemitaro/yubisaki": [
+    33.599998474121094,
+    6347.80029296875,
+    403.5999984741211,
+    6650.4599609375
+   ],
+   "github.com/chemitaro/orca-web": [
+    9.920000076293945,
+    6685.97998046875,
+    379.92000007629395,
+    6988.64013671875
+   ],
+   "github.com/chemitaro/spec-dock": [
+    9.920000076293945,
+    7000.47998046875,
+    831.3200244903564,
+    7825.580078125
+   ]
+  },
+  "hscroll": false,
+  "errors": []
+ },
+ {
+  "width": 390,
+  "scheme": "dark",
+  "range": "all",
+  "shot": "allgraph-390-dark-all.png",
+  "shot100": "allgraph-390-dark-all-100.png",
+  "heads": [
+   {
+    "repo": "github.com/chemitaro/company-os",
+    "depth": 0,
+    "parent": null,
+    "text": "chemitaro/company-os",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/housing-lifecycle",
+    "depth": 1,
+    "parent": null,
+    "text": "chemitaro/housing-lifecycle",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/taikyohiyou_project",
+    "depth": 2,
+    "parent": null,
+    "text": "chemitaro/taikyohiyou_project",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/input-devices",
+    "depth": 1,
+    "parent": null,
+    "text": "chemitaro/input-devices",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/generic-mona",
+    "depth": 2,
+    "parent": null,
+    "text": "chemitaro/generic-mona",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/tenting-cradle",
+    "depth": 2,
+    "parent": null,
+    "text": "chemitaro/tenting-cradle",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/yubisaki",
+    "depth": 2,
+    "parent": null,
+    "text": "chemitaro/yubisaki",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/orca-web",
+    "depth": 0,
+    "parent": null,
+    "text": "chemitaro/orca-web",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/spec-dock",
+    "depth": 0,
+    "parent": null,
+    "text": "chemitaro/spec-dock",
+    "badges": 0,
+    "children": [
+     "ax-icon",
+     "ax-name",
+     "ax-link"
+    ]
+   }
+  ],
+  "box": {
+   "github.com/chemitaro/company-os": [
+    9.920000076293945,
+    159.9199981689453,
+    9345.759843826294,
+    29219.720779418945
+   ],
+   "github.com/chemitaro/housing-lifecycle": [
+    21.760000228881836,
+    257.6000061035156,
+    9333.920156478882,
+    26905.000396728516
+   ],
+   "github.com/chemitaro/taikyohiyou_project": [
+    33.599998474121094,
+    18736.140625,
+    9322.080467224121,
+    26893.16015625
+   ],
+   "github.com/chemitaro/input-devices": [
+    21.760000228881836,
+    26916.83984375,
+    2349.800039291382,
+    29207.880859375
+   ],
+   "github.com/chemitaro/generic-mona": [
+    33.599998474121094,
+    27614.66015625,
+    2337.959861755371,
+    28092.701171875
+   ],
+   "github.com/chemitaro/tenting-cradle": [
+    33.599998474121094,
+    28104.541015625,
+    2210.679832458496,
+    28806.060546875
+   ],
+   "github.com/chemitaro/yubisaki": [
+    33.599998474121094,
+    28817.900390625,
+    403.5999984741211,
+    29196.041015625
+   ],
+   "github.com/chemitaro/orca-web": [
+    9.920000076293945,
+    29231.560546875,
+    1427.7599658966064,
+    30122.51953125
+   ],
+   "github.com/chemitaro/spec-dock": [
+    9.920000076293945,
+    30134.361328125,
+    3255.560136795044,
+    45568.5390625
+   ]
+  },
+  "hscroll": false,
+  "errors": []
+ }
+]
