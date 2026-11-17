@@ -291,7 +291,8 @@ def test_slot_styles_stay_shared_and_leave_the_marks_to_orca_web() -> None:
             ".gx .gx-agents:not(:has(.orca-mark)) { display: none; }",
             ".gx .sd-orca .orca-marks { row-gap: 4px; }",
             ".gx .gx-fh:has(> .gx-agents .orca-mark) { flex-wrap: wrap; row-gap: 0; }",
-        )
+        ),
+        SHARED / "parts.css": (".sd-card__agents:not(:has(.orca-mark)) { display: none; }",),  # iss-00621 D-05
     }
     for path in [*DASHBOARD.glob("*.css"), *VIEWS.glob("*.css"), *SHARED.glob("*.css")]:
         text = path.read_text()
@@ -599,3 +600,4 @@ def test_the_frame_heading_keeps_the_worktree_mark_on_the_title_row() -> None:  
     assert '</span>${M.wtMark(s.state === "doing" ? s.branch : null)}<div class="gx-agents">' in head
     box = _function((VIEWS / "graph/draw.js").read_text(), "boxHtml")
     assert box.count('${M.wtMark(s.state === "doing" ? s.branch : null)}') == 2
+    assert ".gx .gx-fh > .wt { flex: none; }" in (VIEWS / "graph.css").read_text()

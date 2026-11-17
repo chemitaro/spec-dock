@@ -7,7 +7,7 @@
 import { ancestors, withoutEmbed, withParam } from "./logic.js";
 import { esc, icon, idleText, kindLabel, mergeBadge, orcaSlot, stateChip, stateMark } from "./parts.js";
 import { themeOf } from "./orca_logic.js";
-import { createOpenButton, paintOrcaMarks } from "./orca_marks.js";
+import { createOpenButton, markAgentAt, paintOrcaMarks } from "./orca_marks.js";
 import { nextOnTap, pickTab, settleSheet, sheetHeights } from "./panel_logic.js";
 import { panelEnv, SCOPE_TABS, TAB_KEYS, visibleTabs } from "./scope_tabs.js";
 import { mem, paintAgentList } from "./agents_tab.js";
@@ -265,8 +265,9 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
       }
       return;
     }
-    if (t.closest(".sd-orca")) {
-      preferTab("agents"); // a pressed mark in the heading opens the agents' tab (iss-00592 D-03)
+    const slot = t.closest(".sd-orca");
+    if (slot) {
+      openAgent(markAgentAt(slot, t)); // a pressed mark in the heading opens the agents' tab on it (iss-00621 D-03)
       return;
     }
     const act = t.closest("[data-pn-act]");

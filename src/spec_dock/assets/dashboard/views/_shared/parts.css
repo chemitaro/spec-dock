@@ -92,6 +92,10 @@
   & .sd-card__why { font-size: 12px; color: var(--st-ink); font-weight: 650; overflow-wrap: anywhere; }
   & .sd-card__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 3px; font-size: 12px; color: var(--ds-text-2); }
   & .sd-card__meta:not(:has(> :not(.sd-orca:empty))) { display: none; }
+  /* iss-00621 D-05: the agents' marks on a row of their own, which takes no height without a mark */
+  & .sd-card__agents { display: flex; margin-top: 4px; min-width: 0; }
+  & .sd-card__agents:not(:has(.orca-mark)) { display: none; }
+  & .sd-card__agents > .sd-orca { margin-left: 0; }
   & .sd-card__parent { display: flex; align-items: center; gap: 6px; margin: 2px 0 0; font-size: 11.5px; color: var(--ds-muted); min-width: 0; }
   & .sd-card__parent span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   & .sd-card__chg, & .sd-legend__chg { position: absolute; top: -4px; right: -4px; width: 10px; height: 10px; border-radius: 50%; background: var(--ds-accent); box-shadow: 0 0 0 2px var(--ds-bg); }

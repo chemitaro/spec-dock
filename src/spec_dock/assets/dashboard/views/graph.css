@@ -150,6 +150,8 @@
 .gx .sd-orca .orca-marks { row-gap: 4px; }
 .gx .gx-fh:has(> .gx-agents .orca-mark) { flex-wrap: wrap; row-gap: 0; }
 .gx .gx-fh > .gx-agents { flex: 1 1 100%; }
+/* iss-00621 D-04: a working frame's worktree mark stays on the title row; only the title shrinks */
+.gx .gx-fh > .wt { flex: none; }
 
 .gx .gx-bar { position: absolute; top: 12px; left: 12px; right: 12px; z-index: 10; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 8px 16px; pointer-events: none; }
 .gx .gx-bar > * { pointer-events: auto; }

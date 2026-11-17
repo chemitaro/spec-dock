@@ -4,7 +4,7 @@
 import * as api from "../core/api.js";
 import { boardColumns, boardCounts, boardOptions, groupByParent, KINDS, pullRequestNotice, withParam } from "./_shared/logic.js";
 import { createScopePanel } from "./_shared/panel.js";
-import { createOrcaWatch, paintOrcaMarks } from "./_shared/orca_marks.js";
+import { createOrcaWatch, markAgentAt, paintOrcaMarks } from "./_shared/orca_marks.js";
 
 const byNumber = (a, b) => a.number - b.number;
 import { card, emptyState, esc, icon, legend, newTabLink, stateIcon, stateMark } from "./_shared/parts.js";
@@ -61,7 +61,9 @@ function onCardClick(event) {
   if (!anchor || anchor.closest("dialog") || !B.byId.has(anchor.dataset.id)) return;
   event.preventDefault();
   select(anchor.dataset.id);
-  if (event.target.closest(".sd-orca")) B.pn?.preferTab("agents"); // a pressed mark opens the agents' tab (D-03)
+  // A pressed mark opens the agents' tab on its agent (iss-00592 D-03, iss-00621 D-03).
+  const slot = event.target.closest(".sd-orca");
+  if (slot) B.pn?.openAgent(markAgentAt(slot, event.target));
 }
 
 function onKey(event) {

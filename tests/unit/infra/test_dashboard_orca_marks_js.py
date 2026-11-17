@@ -386,6 +386,13 @@ def test_painting_records_the_component_order(tmp_path: Path) -> None:  # iss-00
         assert.equal(ui.markIds(slot), null);
         slot.children = [stale];
         assert.equal(ui.markAgentAt(slot, stale), null);
+        // A result without a marks list still draws, and records nothing to match.
+        const odd = new MarkSlot("iss-00001", "all");
+        const shapeless = {...drawing({ids: false}), buildMarks: () => ({w: [1, 2]})};
+        ui.paintOrcaMarks(rootOf(odd), ctxOf(shapeless, {id: "w", agents: [{id: "a"}, {id: "b"}]}), {});
+        assert.equal(odd.children.length, 2);
+        assert.deepEqual(ui.markIds(odd), []);
+        assert.equal(ui.markAgentAt(odd, odd.children[0]), null);
         """,
         tmp_path,
     )

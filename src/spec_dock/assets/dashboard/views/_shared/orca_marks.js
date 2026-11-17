@@ -21,7 +21,8 @@ export function paintOrcaMarks(root, ctx, structure) {
         shown.set(slot, []);
       } else {
         module.renderAgentMarks(slot, worktree, { size: "sm", max, now });
-        shown.set(slot, built.marks.map((m) => m.id ?? null));
+        // A result without a marks list records nothing to match, so a press only opens the tab (F-01).
+        shown.set(slot, Array.isArray(built.marks) ? built.marks.map((m) => m?.id ?? null) : []);
       }
       painted.set(slot, key);
     } catch {
