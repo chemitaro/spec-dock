@@ -454,3 +454,62 @@ def test_the_heading_css_keeps_the_row_and_the_close_button() -> None:
     assert draw.rstrip().endswith("refreshOrca();\n  }")
     refresh = panel[panel.index("  function refreshOrca() {") : panel.index("  function draw() {")]
     assert "paintOrcaMarks(parts.top, ctx, ctx.data)" in refresh and "openButton.update({" in refresh
+
+
+# --- iss-00621 T-03: the panel opens the agents' tab on the pressed agent ------------------------------------
+
+
+@needs_node
+def test_open_agent_chooses_the_agent_and_null_only_prefers_the_tab(tmp_path: Path) -> None:
+    out = run_panel(
+        """
+        const selected = () => (part(".pn-tabs").innerHTML.match(/data-pn-tab="([a-z]+)" aria-selected="true"/) || [])[1] ?? null;
+        const frameIds = () => [...part(".pn-body").innerHTML.matchAll(/<iframe class="sd-agent" src="[^"]*\\/embed\\/agent\\?id=([^"&]*)/g)].map((m) => decodeURIComponent(m[1]));
+        const raw = (id) => ({id, mark: "working", agentType: "claude", detail: "/embed/agent?id=" + encodeURIComponent(id)});
+        const one = {id: "iss-00011", number: 11, kind: "issue", state: "doing", title: "one", path: "/r/x/scopes/iss-00011", children: []};
+        const two = {id: "iss-00012", number: 12, kind: "issue", state: "doing", title: "two", path: "/r/x/scopes/iss-00012", children: []};
+        const records = [{path: "/w/w1", branch: "b1"}];
+        const data = {worktrees: {status: "ok", paths: []}, scopes: [{...one, worktrees: records}, {...two, worktrees: records}]};
+        const byIds = new Map(data.scopes.map((item) => [item.id, item]));
+        const trees = {[one.id]: [{id: "w1", path: "/w/w1", branch: "b1", agents: [raw("a"), raw("b"), raw("c")]}],
+          [two.id]: [{id: "w2", path: "/w/w2", branch: "b2", agents: [raw("x"), raw("y")]}]};
+        const orca = {status: () => "ok", origin: "http://192.0.2.1:8791", marks: () => null, subscribe: () => () => {},
+          forScope: (_, id) => trees[id] ?? []};
+        const at = (s) => ({ctx: {href: (p) => p, data, orca, embed: false, route: {path: "/r/x/graph", params: new URLSearchParams()}},
+          scope: s, doc: {scope: s, details: {catalog: "ok", documents: [], adrs: [], artifacts: []}}, docState: "ok", byId: byIds});
+        El.prototype.querySelector = () => null; // the agents' strip paints into nothing here
+        out.has = typeof pn.openAgent === "function";
+        pn.show(at(one));
+        // The person chose "a" in the strip, then looked at the summary.
+        aside.click({target: {closest: (sel) => (sel === "a[data-pn-param]" ? {dataset: {pnParam: "agent", pnValue: "a"}} : null)}, button: 0, preventDefault() {}});
+        pn.preferTab("agents");
+        out.before = frameIds();
+        pn.preferTab("summary");
+        out.summary = selected();
+        pn.openAgent("b");
+        out.tab = selected();
+        out.chosen = frameIds();
+        // null keeps the choice, like preferTab("agents").
+        pn.preferTab("summary");
+        pn.openAgent(null);
+        out.nullTab = selected();
+        out.nullFrame = frameIds();
+        pn.openAgent("");
+        out.emptyFrame = frameIds();
+        // Called after show() changes the Scope, the choice stays.
+        pn.show(at(two));
+        pn.openAgent("y");
+        out.otherScope = [selected(), frameIds()];
+        pn.show(at(two));
+        out.again = frameIds();
+        """,
+        tmp_path,
+    )
+    assert out["has"] is True
+    assert out["before"] == ["a"]
+    assert out["summary"] == "summary"
+    assert out["tab"] == "agents" and out["chosen"] == ["b"]
+    assert out["nullTab"] == "agents" and out["nullFrame"] == ["b"]
+    assert out["emptyFrame"] == ["b"]
+    assert out["otherScope"] == ["agents", ["y"]]
+    assert out["again"] == ["y"]

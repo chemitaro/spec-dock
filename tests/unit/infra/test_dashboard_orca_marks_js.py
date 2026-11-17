@@ -254,3 +254,143 @@ def test_slots_have_shared_layout_rules_and_scripts_use_element_api() -> None:
     assert "innerHTML" not in source
     assert "dataset.width" not in source
     assert "dataset.label" not in source
+
+
+# --- iss-00621: the agent of a pressed mark (T-01, T-02) ----------------------------------------------------
+
+MARKS_DOM = """
+class Mark {
+  constructor(slot, {agentId = null, more = false} = {}) {
+    this.slot = slot; this.agentId = agentId; this.more = more;
+    this.classList = {contains: (name) => (name === "orca-mark--more" ? this.more : name === "orca-mark")};
+  }
+  closest(selector) {assert.equal(selector, ".orca-mark"); return this;}
+  getAttribute(name) {assert.equal(name, "data-agent-id"); return this.agentId;}
+}
+class Child {  // the kind's logo or the elapsed time inside a mark
+  constructor(mark) {this.mark = mark;}
+  closest(selector) {assert.equal(selector, ".orca-mark"); return this.mark;}
+}
+class MarkSlot extends Slot {
+  querySelectorAll(selector) {
+    assert.equal(selector, ".orca-mark:not(.orca-mark--more)");
+    return this.children.filter((c) => c instanceof Mark && !c.more);
+  }
+  contains(el) {return this.children.includes(el);}
+}
+// A component that draws one .orca-mark per buildMarks entry, in its order, then "+N".
+const drawing = ({ids = true} = {}) => ({
+  buildMarks: (w, {max}) => ({marks: w.agents.slice(0, max).map((a) => ({id: a.id, mark: "working"})),
+    overflow: w.agents.length > max ? {count: w.agents.length - max} : null}),
+  renderAgentMarks(slot, w, {max}) {
+    const marks = w.agents.slice(0, max).map((a) => new Mark(slot, {agentId: ids ? a.id : null}));
+    if (w.agents.length > max) marks.push(new Mark(slot, {more: true}));
+    slot.replaceChildren(...marks);
+  },
+});
+const ctxOf = (module, worktree) => ({orca: {status: () => "ok", marks: () => module, forScope: () => (worktree ? [worktree] : [])}});
+"""
+
+
+def run_marks(script: str, tmp_path: Path) -> None:
+    run_node(MARKS_DOM + textwrap.dedent(script), tmp_path)
+
+
+def test_the_pressed_mark_names_its_agent(tmp_path: Path) -> None:  # iss-00621 T-01
+    run_marks(
+        """
+        const worktree = {id: "w", agents: [{id: "a"}, {id: "b"}, {id: "c"}]};
+        // A mark with data-agent-id gives that value.
+        const tagged = new MarkSlot("iss-00001", "all");
+        ui.paintOrcaMarks(rootOf(tagged), ctxOf(drawing(), worktree), {});
+        assert.deepEqual(tagged.children.map((m) => ui.markAgentAt(tagged, m)), ["a", "b", "c"]);
+        // Without data-agent-id (the older component): the same place in the record, also from a child element.
+        const bare = new MarkSlot("iss-00001", "all");
+        ui.paintOrcaMarks(rootOf(bare), ctxOf(drawing({ids: false}), worktree), {});
+        assert.deepEqual(bare.children.map((m) => ui.markAgentAt(bare, m)), ["a", "b", "c"]);
+        assert.deepEqual(bare.children.map((m) => ui.markAgentAt(bare, new Child(m))), ["a", "b", "c"]);
+        assert.deepEqual(ui.markIds(bare), ["a", "b", "c"]);
+        const copy = ui.markIds(bare); copy.push("x");
+        assert.deepEqual(ui.markIds(bare), ["a", "b", "c"]);
+        // "+N" is no agent.
+        const folded = new MarkSlot("iss-00001", "2");
+        ui.paintOrcaMarks(rootOf(folded), ctxOf(drawing({ids: false}), worktree), {});
+        assert.equal(folded.children.length, 3);
+        assert.deepEqual(folded.children.map((m) => ui.markAgentAt(folded, m)), ["a", "b", null]);
+        // Outside any mark, a mark of another slot, no target.
+        assert.equal(ui.markAgentAt(bare, {closest: () => null}), null);
+        assert.equal(ui.markAgentAt(bare, {}), null);
+        assert.equal(ui.markAgentAt(bare, null), null);
+        assert.equal(ui.markAgentAt(bare, tagged.children[0]), null);
+        // No record, a record of another length, a null id in the record.
+        const unpainted = new MarkSlot();
+        unpainted.children = [new Mark(unpainted)];
+        assert.equal(ui.markAgentAt(unpainted, unpainted.children[0]), null);
+        assert.equal(ui.markIds(unpainted), null);
+        bare.children.push(new Mark(bare));
+        assert.equal(ui.markAgentAt(bare, bare.children[0]), null);
+        const nulls = new MarkSlot("iss-00001", "all");
+        const module = {...drawing({ids: false}), buildMarks: (w) => ({marks: w.agents.map((a) => ({mark: "working"})), overflow: null})};
+        ui.paintOrcaMarks(rootOf(nulls), ctxOf(module, worktree), {});
+        assert.deepEqual(ui.markIds(nulls), [null, null, null]);
+        assert.equal(ui.markAgentAt(nulls, nulls.children[1]), null);
+        // An empty data-agent-id falls back to the record.
+        const empty = new MarkSlot("iss-00001", "all");
+        ui.paintOrcaMarks(rootOf(empty), ctxOf(drawing({ids: false}), worktree), {});
+        empty.children[1].agentId = "";
+        assert.equal(ui.markAgentAt(empty, empty.children[1]), "b");
+        """,
+        tmp_path,
+    )
+
+
+def test_painting_records_the_component_order(tmp_path: Path) -> None:  # iss-00621 T-02
+    run_marks(
+        """
+        Date.now = () => 60000;
+        let worktree = {id: "w", agents: [{id: "c"}, {id: "a"}, {id: "b"}]};
+        const slot = new MarkSlot("iss-00001", "all");
+        let renders = 0;
+        const base = drawing({ids: false});
+        const module = {...base, renderAgentMarks(...args) {renders++; base.renderAgentMarks(...args);}};
+        const ctx = {orca: {status: () => "ok", marks: () => module, forScope: () => (worktree ? [worktree] : [])}};
+        ui.paintOrcaMarks(rootOf(slot), ctx, {});
+        // The order of buildMarks, not sorted.
+        assert.deepEqual(ui.markIds(slot), ["c", "a", "b"]);
+        const first = ui.markIds(slot);
+        // The same key: no drawing, the record stays.
+        ui.paintOrcaMarks(rootOf(slot), ctx, {});
+        assert.equal(renders, 1);
+        assert.deepEqual(ui.markIds(slot), first);
+        assert.equal(ui.markAgentAt(slot, slot.children[2]), "b");
+        // Other agents: the new order.
+        worktree = {id: "w", agents: [{id: "b"}, {id: "d"}]};
+        ui.paintOrcaMarks(rootOf(slot), ctx, {});
+        assert.equal(renders, 2);
+        assert.deepEqual(ui.markIds(slot), ["b", "d"]);
+        assert.equal(ui.markAgentAt(slot, slot.children[1]), "d");
+        // An empty key: an empty record.
+        worktree = null;
+        ui.paintOrcaMarks(rootOf(slot), ctx, {});
+        assert.deepEqual(slot.children, []);
+        assert.deepEqual(ui.markIds(slot), []);
+        // A failure clears the slot and its record.
+        worktree = {id: "w", agents: [{id: "a"}]};
+        ui.paintOrcaMarks(rootOf(slot), ctx, {});
+        assert.deepEqual(ui.markIds(slot), ["a"]);
+        const stale = slot.children[0];
+        worktree = {id: "w", agents: [{id: "a"}, {id: "e"}]};
+        module.renderAgentMarks = () => {throw new Error("broken render");};
+        ui.paintOrcaMarks(rootOf(slot), ctx, {});
+        assert.deepEqual(slot.children, []);
+        assert.equal(ui.markIds(slot), null);
+        slot.children = [stale];
+        assert.equal(ui.markAgentAt(slot, stale), null);
+        """,
+        tmp_path,
+    )
+
+
+def test_no_sorting_of_marks_on_the_spec_dock_side() -> None:  # iss-00621 R-03
+    source = (DASHBOARD / "views/_shared/orca_marks.js").read_text()
+    assert ".sort(" not in source and "toSorted" not in source
