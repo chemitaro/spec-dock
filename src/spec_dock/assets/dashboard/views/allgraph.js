@@ -12,6 +12,7 @@ import * as M from "./graph/marks.js";
 import * as D from "./graph/draw.js";
 import { compactNeeds, headsDiffer, tallNeeds } from "./graph/measure.js";
 import { REPO, bodyWidth, compose } from "./allgraph/compose.js";
+import { splitNotices } from "./allgraph/notices.js";
 import { createScopePanel } from "./_shared/panel.js";
 import { createOrcaWatch, markAgentAt, paintOrcaMarks } from "./_shared/orca_marks.js";
 import { overviewWarnings } from "./_shared/logic.js";
@@ -190,7 +191,7 @@ function mount(root) {
   root.innerHTML =
     `<section class="gx" data-screen="allgraph" aria-label="横断の構造">` +
     `<div class="gx-view" tabindex="0" aria-label="横断の構造。ドラッグで移動、Ctrl とホイールか2本指で拡大・縮小"><div class="gx-world"></div><p class="gx-none" hidden></p></div>` +
-    `<div class="gx-bar"><div class="gx-left"><div class="gx-next" role="group" aria-label="状態で目立たせる"></div></div><div class="gx-tools"></div></div>` +
+    `<div class="gx-bar"><div class="gx-left"><div class="gx-next" role="group" aria-label="状態で目立たせる"></div><ul class="ax-sum" aria-label="リポジトリの知らせ" hidden></ul></div><div class="gx-tools"></div></div>` +
     `<div class="legend"></div>` +
     `<aside class="panel" aria-hidden="true" aria-label="Scope の欄"></aside>` +
     `<p class="gx-empty" hidden></p>` +
@@ -203,6 +204,7 @@ function mount(root) {
     world: q(".gx-world"),
     bar: q(".gx-bar"),
     next: q(".gx-next"),
+    sum: q(".ax-sum"),
     tools: q(".gx-tools"),
     legend: q(".legend"),
     panel: q(".panel"),
@@ -414,13 +416,25 @@ function showEmpty(text) {
   A.el.panel.classList.remove("is-open");
 }
 
-function sizes() {
+// The warnings split for the page (iss-00632 D-02, D-03): the kinds with a fixed text in one summary row per kind,
+// the rest (and every warning of a repository the screen cannot draw) in their frame.
+function notices() {
+  return splitNotices(
+    items().map((it) => {
+      const r = R.get(it.repository);
+      return { ...it, failed: r?.status === "failed", warnings: !r || r.status === "loading" ? null : r.warnings };
+    }),
+  );
+}
+
+function sizes(own) {
   const out = {};
   for (const it of items()) {
     const r = R.get(it.repository);
     if (!r || r.status === "loading") continue;
-    const warns = r.warnings.length;
-    const alerts = r.warnings.filter((w) => w.level !== "info").length;
+    const kept = own.get(it.repository) || [];
+    const warns = kept.length;
+    const alerts = kept.filter((w) => w.level !== "info").length;
     if (r.status === "failed") {
       out[it.repository] = { status: "failed", warns, alerts };
       continue;
@@ -478,7 +492,7 @@ function graphHtml(key) {
   return r.html;
 }
 
-function frameHtml(it, f) {
+function frameHtml(it, f, own) {
   const key = it.repository;
   const r = R.get(key);
   const b = f.body;
@@ -489,7 +503,7 @@ function frameHtml(it, f) {
   return (
     `<section class="ax-repo" data-repo="${esc(key)}" data-depth="${f.depth}" data-kind="${b.kind}" style="${D.pos(f)}"${r?.status === "loading" || !r ? ' aria-busy="true"' : ""}>` +
     headHtml(it) +
-    warnHtml(r?.warnings || []) +
+    warnHtml(own.get(key) || []) +
     body +
     `</section>`
   );
@@ -510,7 +524,8 @@ function bodies() {
 function draw() {
   if (!A.el || !items().length) return;
   const byKey = new Map(items().map((it) => [it.repository, it]));
-  A.comp = compose(items(), sizes(), { range: A.range, width: A.width, bands: {} });
+  const N = notices();
+  A.comp = compose(items(), sizes(N.own), { range: A.range, width: A.width, bands: {} });
   const C = A.comp;
   const w = A.el.world;
   w.style.width = `${C.width}px`;
@@ -520,13 +535,14 @@ function draw() {
   const none = A.range === "next" && !C.order.length;
   A.el.none.hidden = !none;
   A.el.none.textContent = none ? NONE : "";
-  w.innerHTML = C.order.map((key) => frameHtml(byKey.get(key), C.frames.get(key))).join("");
+  w.innerHTML = C.order.map((key) => frameHtml(byKey.get(key), C.frames.get(key), N.own)).join("");
   if (!A.ro && typeof ResizeObserver === "function") A.ro = new ResizeObserver(onMarksResize);
   if (A.ro) {
     A.ro.disconnect();
     for (const slot of w.querySelectorAll(".sd-orca")) A.ro.observe(slot);
   }
   renderBar();
+  renderSum(N.summary);
   renderLegend();
   if (!A.moved && C.order.length) {
     whenStyled(() => {
@@ -656,6 +672,24 @@ function renderBar() {
   A.el.next.innerHTML = D.chipsHtml(n, (key) => !A.sel && A.hl === key);
   const tool = (act, label, icon, name = label) => `<button type="button" class="tool" data-act="${act}" aria-label="${name}" title="${name}">${ic(icon)}<span class="lab">${label}</span></button>`;
   A.el.tools.innerHTML = D.zoomHtml(A.s) + tool("fit", "収める", "fit", "画面に収める") + D.rangesHtml(A.range);
+}
+
+// The page's summary of the notices (iss-00632 D-03): one row per kind under the state chips, the repositories it
+// applies to by name, its next step once; the whole text in the title, as a frame's warning row.
+function renderSum(summary) {
+  const el = A.el.sum;
+  el.hidden = !summary.length;
+  el.innerHTML = summary
+    .map((row) => {
+      const names = row.repos.map((r) => (r.detail ? `${r.label}（${r.detail}）` : r.label)).join("、");
+      const next = row.next.length ? `次の1手：${row.next.join("、")}` : "";
+      const full = `${row.text}：${names}${next ? ` ${next}` : ""}`;
+      return (
+        `<li data-level="${row.level}" data-kind="${esc(row.kind)}" title="${esc(full)}">${ic(row.level === "info" ? "info" : "zap")}` +
+        `<span class="ax-text"><b>${esc(row.text)}</b>：${esc(names)}${next ? `<span class="ax-next">次の1手：${row.next.map((s) => `<code>${esc(s)}</code>`).join("、")}</span>` : ""}</span></li>`
+      );
+    })
+    .join("");
 }
 
 function renderLegend() {
@@ -840,7 +874,7 @@ function applyT() {
 function barBottom() {
   const view = A.el.view.getBoundingClientRect();
   let bottom = view.top;
-  for (const el of [A.el.next, isPhone() ? null : A.el.tools]) {
+  for (const el of [A.el.next, A.el.sum, isPhone() ? null : A.el.tools]) {
     if (!el || el.hidden || !el.offsetParent) continue;
     bottom = Math.max(bottom, el.getBoundingClientRect().bottom);
   }
