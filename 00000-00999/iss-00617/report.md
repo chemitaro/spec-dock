@@ -44,6 +44,8 @@ ID: "iss-00617"
 
 - **最終品質ゲート（2026-11-17、合格）**：合格のコミット `18ba5383a`（origin/main の #643 を取り込んだマージ。base `0ef2dfeae`）。レビュー（quality-gate-reviewer opus / medium）P0〜P3 すべて0、網羅は完全。`make lint` exit 0、`uv run pytest` 4213 passed・7 skipped。この worktree の `.workbench/final-quality-gate/iss-00617/closure.md`。attempt 01（`57517bb32`）はレビュー合格だったが、テストの途中で main が進んだ（#643）ので止め、取り込んだコミットで attempt 02 をやり直した。記録だけのコミットはない（記録は Git の外）。
 
+- **PR**：https://github.com/chemitaro/spec-dock/pull/644（head `18ba5383a`、`Refs #617`）。CI（Commit identity、SpecDock check、Provider CI）すべて合格、マージの準備 READY（2026-11-17）。マージは統括。
+
 ## 実機の確かめ（S-04、2026-11-17、`57517bb32`）
 
 - 試しのサーバー：この worktree の候補の wheel を隔離した venv（`.workbench/iss-00617/venv`）に入れ、この PC の状態の置き場の写し（`.workbench/iss-00617/state`）と試しの `XDG_CONFIG_HOME`（`orca_web.port` 18817）で、`spec-dock dashboard serve --offline --tailscale --port 18617`。試しの orca の口は iss-00616 の `relay_orca.py`（常駐の orca-web を GET で読むだけの中継）を写して 18817 に。常駐の 47800・8791 の設定、道具の環境には触れていない。エージェントには何も送っていない。
@@ -57,3 +59,7 @@ ID: "iss-00617"
 - 本人が見る試しの URL：tailnet の 18617 の `/graph`（横断の構造）と `/r/github.com/chemitaro/spec-dock/graph`（`57517bb32`）。止め方：`.workbench/iss-00617/state/dashboard/server.json` の pid と、`relay_orca.py` の2つ（127.0.0.1 と tailnet の 18817）を止める。
 
 ## Residual Risks / Follow-ups
+
+- 帯だけの入れ物の枠（R-03）は、実データで例外が効く場面を写せていない（node・偽の DOM のテストで確かめた）。『これから』で見せる Scope がなく、入れ物の枠でもないリポジトリ（例：Scope のない単独のリポジトリ）の main に親がいる状態で、本人の試しの URL で見られる。
+- 長い線：入れ子の枠を深くまたぐ線（会社のリポジトリの帯 → 奥の spec-dock の Issue）は、世界の高さの分だけ長くなる。線を押すことはできないので、帯の押しで目立たせて追う。
+- 試しのエージェント3人（統括が用意）は、統括が止める。
