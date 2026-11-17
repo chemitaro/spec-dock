@@ -53,6 +53,12 @@ taikyohiyou_project の overlaps は、DOM なしで、ページで測った稼�
 - S-03（Claude Opus 5.5 / medium、このセッション）：Red `44c7973d5`（`tests/js/dashboard_graph_fit.mjs`・`test_dashboard_graph_fit.py`、6件が落ちる）→ Green `10610ce89`（graph.css D-01、layout.js D-02 の `compactHeight` と `heads`、measure.js D-03 の `compactNeeds`・`tallNeeds`・`headsDiffer`、graph.js と allgraph.js の checkRows）。iss-00620 の静的な検査（`test_the_graph_measures_the_marks_and_lays_out_again_only_when_the_rows_change`）の `if (!M) return;`・`V.marks = M;` を、測れないときは何もしない同じ契約の新しい文（`if (!M && !H) return;`・`if (M) V.marks = M;`）に直した。
 - 節目の検証：`uv run pytest tests/unit/presentation/ -k "graph or allgraph" tests/unit/infra -k dashboard`（317 passed の後、上の1件を直して全部合格）、`make lint` pass。static-inventory.json は dashboard の資産を持たないので変わらない。
 
+## 最終品質ゲート
+
+- キャンペーン iss-00627-fqg-1（quality-gate-reviewer opus / medium、second opinion なし、範囲 `5c0ebb916..HEAD`、観点 functional-correctness・requirements-closure・test-adequacy・compatibility-regression、test_commands `make lint`・`uv run pytest`）：attempt 01（`10610ce89`）で **合格**。review lane P0〜P3 0、coverage complete。`make lint` exit 0、`uv run pytest` exit 0（4066 passed、7 skipped）。closure は worktree の `.workbench/final-quality-gate/iss-00627-fqg-1/closure.md`。
+- 計画の観点 ui-behavior は観点の一覧にないので compatibility-regression に置き換えた（campaign に記録）。
+- 検証の時、実行中に書き足した plan.cue の status と report.md のため authority の sha256 が合わず機械の失敗になった。固めた時点の内容（足した部分を除くとバイトまで一致）を一時的に戻して検証し、戻した（closure.md に記録）。
+
 ## 実機の確かめ（S-05、タスク担当）
 
 - 試しのサーバー：この worktree の `10610ce89` の wheel を隔離した venv（`.workbench/iss-00627/venv`）に入れ、この PC の状態の置き場の写し（`.workbench/iss-00627/state`、iss-00614 の写しから）と `XDG_CONFIG_HOME` の試しの設定（`orca_web.port` 18727）で `spec-dock dashboard serve --offline --tailscale --port 18627`。試しの orca は `relay_orca.py`（GET だけで常駐の orca-web を中継し CORS の頭を足す）を 127.0.0.1 と tailnet の 18727 に。常駐の 47800 と 8791、道具の環境には触れていない。
