@@ -7,13 +7,13 @@ goal: "1000 前後の幅で、上の帯の道具の列が、状態の札の次�
 steps: {
 	"S-01": {title: "T-01・T-02 を tests/js/dashboard_allgraph_screen.mjs と tests/unit/presentation/test_dashboard_allgraph_screen.py に先に書いて落ちることを確かめ（T-02 は検査の写しの変更だけで既に通ることを確かめる）、D-01（allgraph.css）を入れて通す", realizes: ["R-01", "R-03", "F-01"], status: "todo", session: "owner"}
 	"S-02": {title: "make lint と全体の uv run pytest を通す（static-inventory.json に dashboard の資産があれば sha256 を直す）", realizes: ["R-01", "R-03"], status: "todo", after: ["S-01"], session: "owner"}
-	"S-03": {title: "D-04 の実機の確かめ（帯の寸法、写し、24組の edgeAudit）を report.md に残し、試しの URL を立てる", realizes: ["R-01", "R-02", "R-03", "R-04"], status: "todo", after: ["S-02"], session: "owner"}
+	"S-03": {title: "D-04 の実機の確かめ（帯の寸法、欄を開いた形とまとめなしの形、写し、24組の edgeAudit）を report.md に残し、試しの URL を立てる", realizes: ["R-01", "R-02", "R-03", "R-04", "F-01"], status: "todo", after: ["S-02"], session: "owner"}
 }
 
 tests: {
-	"T-01": {title: "静的な検査：allgraph.css の `@container app (min-width: 641px)` の中に `.gx[data-screen=\"allgraph\"] .gx-left { display: contents }` と `.ax-sum { order: 1; flex-basis: 100% }` があり、641 が allgraph.js の PHONE + 1。graph.css の `.gx-bar`・`.gx-tools`・スマホの帯の規則が今のまま", verifies: ["R-01", "R-02", "R-04"]}
+	"T-01": {title: "静的な検査：allgraph.css の `@container app not (max-width: 640px)` の中に `.gx[data-screen=\"allgraph\"] .gx-left { display: contents }` と `.ax-sum { order: 1; flex-basis: 100% }` があり、境目の 640 が allgraph.js の PHONE と graph.css のスマホの規則と同じ。graph.css の `.gx-bar`・`.gx-tools`・スマホの帯の規則が今のまま", verifies: ["R-01", "R-02", "R-04"]}
 	"T-02": {title: "画面の node の検査（styled）：札・道具・まとめの行の下端を別々の値（道具 > まとめ、まとめ > 道具、まとめなし）にしたとき、最初の表示の ty と『収める』の上端が最大の下端 + 8", verifies: ["R-03", "F-01"]}
-	"T-03": {title: "実機：1000・1280・1440・390 × 横断の構造・構造の図の帯の矩形（R-01・R-02 の位置、390 は直す前と同じ）、最初の表示の ty、写し。横断の構造の24組で edgeAudit の total の違反0と横のスクロールなし", verifies: ["R-01", "R-02", "R-03", "R-04"]}
+	"T-03": {title: "実機：1000・1280・1440・390 × 横断の構造・構造の図の帯の矩形（R-01・R-02 の位置、390 は直す前と同じ）、最初の表示の ty、写し。欄を開いた 1440 とまとめなしの 1000・1440 の帯（F-01）。横断の構造の24組で edgeAudit の total の違反0と横のスクロールなし", verifies: ["R-01", "R-02", "R-03", "R-04", "F-01"]}
 }
 
 verification: """

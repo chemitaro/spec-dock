@@ -51,14 +51,14 @@ requirements: {
 	"R-01": {
 		title: "横断の構造の PC の帯は、状態の札、道具の列、まとめの行の順に、決まった形で並ぶ"
 		text: """
-			app の幅が 641 以上（PC）の横断の構造の上の帯は、1行目に状態の札を左から並べる。道具の列は、札と同じ行に入るときはその行の右端に、
+			app の幅が 640 を越える（PC）の横断の構造の上の帯は、1行目に状態の札を左から並べる。道具の列は、札と同じ行に入るときはその行の右端に、
 			入らないときは次の行の右寄せに出る。まとめの行（iss-00632）は、その下に帯の幅いっぱいまで使って並ぶ（長い行は今と同じく1行のまま省略し、全文は title）。
 			道具の列がまとめの行の下に落ちることはない。
 			"""
 		acceptance: [
 			"実機の幅 1000 で、道具の列の上端 = 状態の札の下端 + 8、右端 = 帯の右端（±1px）、まとめの行の上端 = 道具の列の下端 + 8",
 			"実機の幅 1280・1440 で、道具の列の上端 = 状態の札の上端（同じ行）、まとめの行の上端 = 札の下端 + 8",
-			"静的な検査で、allgraph.css が `@container app (min-width: 641px)` の中で、横断の構造の `.gx-left` を `display: contents`、`.ax-sum` を `order: 1` と `flex-basis: 100%` にする",
+			"静的な検査で、allgraph.css が `@container app not (max-width: 640px)`（スマホの規則のちょうど補い）の中で、横断の構造の `.gx-left` を `display: contents`、`.ax-sum` を `order: 1` と `flex-basis: 100%` にする",
 		]
 	}
 	"R-02": {
@@ -82,6 +82,7 @@ requirements: {
 		text: "幅 390 の横断の構造と構造の図で、状態の札・まとめの行・道具の列の位置と大きさは、直す前と同じ。横断の構造の `window.specdockEdgeAudit()` の total の違反は0のまま。"
 		acceptance: [
 			"実機の 390 で、`.gx-left`・`.gx-next`・`.ax-sum`・`.gx-tools` の矩形が、直す前の wheel と同じ",
+			"実機の横断の構造で、Scope の欄を開いた 1440（帯が札の列より狭い）と、知らせのない写し（まとめの行なし）の 1000・1440 で、F-01 の並び（札の後に道具が右寄せ、まとめの行はその下、まとめなしでは帯の高さが札と道具だけ）",
 			"実機の横断の構造 1000・1280・1440・390 × これから・いま・全体 × 明・暗で、edgeAudit の total の違反（boxHits・ownHits・overlaps・diagonal・portShare・trunkOverlaps・frameExits・failed・missing・markOverflow）が0、横のスクロールがない",
 		]
 	}

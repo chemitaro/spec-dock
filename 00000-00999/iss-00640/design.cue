@@ -16,7 +16,7 @@ current: """
 	"""
 
 target: """
-	- PC（`@container app (min-width: 641px)`）の横断の構造では `.gx-left` が `display: contents` になり、`.gx-next`・`.ax-sum` が `.gx-bar` の flex の項目になる。
+	- PC（`@container app not (max-width: 640px)`）の横断の構造では `.gx-left` が `display: contents` になり、`.gx-next`・`.ax-sum` が `.gx-bar` の flex の項目になる。
 	- `.ax-sum` は `order: 1; flex-basis: 100%` で、札（order 0）と道具（order 0、DOM で後）の後の、自分だけの行に並ぶ。
 	- 札と道具は同じ行に入れば1行、入らなければ道具が次の行に折り返し、`margin-left: auto` で右寄せになる。
 	"""
@@ -28,13 +28,13 @@ design: {
 			allgraph.css に次を足す（新しい色・トークンなし）：
 
 			```css
-			@container app (min-width: 641px) {
+			@container app not (max-width: 640px) {
 			  .gx[data-screen="allgraph"] .gx-left { display: contents; }
 			  .gx[data-screen="allgraph"] .ax-sum { order: 1; flex-basis: 100%; }
 			}
 			```
 
-			- 641 は allgraph.js・graph.js の `PHONE = 640`（`isPhone` は app の幅 ≤ 640）と、graph.css のスマホの `@container app (max-width: 640px)` の補い。スマホの規則には触れない。
+			- 条件は graph.css のスマホの `@container app (max-width: 640px)` の否定で、小数の幅（640.5 など）でも隙間なく補い合う（allgraph.js の `PHONE = 640` と同じ境目）。スマホの規則には触れない。
 			- `.gx-left` の `pointer-events: none`（iss-00632）は `display: contents` で箱がなくなっても、子へ引き継がれる値として残る。`.gx-next` は auto、`.ax-sum` は none、その `li` は auto のまま（帯の空きは図に届く）。
 			- `.ax-sum` の `width: 0; min-width: 100%` は残す。flex の項目としては `flex-basis: 100%` と min-width 100% で帯の幅になり、スマホでは今と同じく札の列の幅になる。
 			- 行の間は `.gx-bar` の row-gap 8px（`.gx-left` の gap 8px と同じ）。
@@ -61,10 +61,10 @@ design: {
 			開始のコミットの wheel（直す前）と直した後の wheel を、それぞれ隔離した venv と、この PC の状態の置き場の写しで `spec-dock dashboard serve --offline` に立て
 			（直した後は `--tailscale`、試しの orca-web の中継つき）、headless Chrome（`--disable-features=MacAppCodeSignClone`、CDP の `Browser.close`）で測る。
 			1000・1280・1440・390 × 横断の構造・構造の図で、帯・札・道具・まとめの行の矩形と最初の表示の ty、写し（明）。
-			横断の構造の 1000・1280・1440・390 × これから・いま・全体 × 明暗（24組）で edgeAudit の total の違反と横のスクロール。
+			F-01 の形として、Scope の欄を開いた 1440 と、知らせのない状態の置き場の写し（まとめの行なし）の 1000・1440 の帯の矩形。横断の構造の 1000・1280・1440・390 × これから・いま・全体 × 明暗（24組）で edgeAudit の total の違反と横のスクロール。
 			常駐のダッシュボード（47800）と orca-web（8791）の設定、道具の環境には触れない。
 			"""
-		satisfies: ["R-01", "R-02", "R-03", "R-04"]
+		satisfies: ["R-01", "R-02", "R-03", "R-04", "F-01"]
 	}
 }
 
