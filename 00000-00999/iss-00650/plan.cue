@@ -5,8 +5,8 @@ package spec
 goal: "帯の欄のチャットの枠を、欄の本文の高さいっぱいに広げる"
 
 steps: {
-	"S-01": {title: "T-01 を先に足して落ちるのを確かめ、D-01（command_view.js の本文の属性）を入れて通す。make lint と全体の uv run pytest を通す（static-inventory.json に載る sha256 が変われば直す）", realizes: ["R-01", "R-02", "F-01"], status: "todo", session: "owner"}
-	"S-02": {title: "T-02 の実機の確かめ（直す前と後の写しと数）を report.md に残し、本人が見る試しの URL を立てたままにする", realizes: ["R-01", "R-02"], status: "todo", after: ["S-01"], session: "owner"}
+	"S-01": {title: "T-01 を先に足して落ちるのを確かめ、D-01（command_view.js の本文の属性）を入れて通す。make lint と全体の uv run pytest を通す（static-inventory.json に載る sha256 が変われば直す）", realizes: ["R-01", "R-02", "F-01"], status: "done", session: "owner"}
+	"S-02": {title: "T-02 の実機の確かめ（直す前と後の写しと数）を report.md に残し、本人が見る試しの URL を立てたままにする", realizes: ["R-01", "R-02"], status: "done", after: ["S-01"], session: "owner"}
 }
 
 tests: {
