@@ -19,6 +19,13 @@ export const REPO = {
   minW: 360, // the least width the contents can use
   headW: 280, // the heading's least width
   margin: 8, // around the world
+  // iss-00617 D-03: the command band of a frame (.gx-band in the frame, below its heading and warnings) and the band
+  // "ほかの場所" above every frame. The items (graph/command.js BAND.h 28) sit this far below their band's top, room for
+  // the arcs of one item that bulge 16px up.
+  band: 48, // the band's height: 16 above the items, 28 the items, 4 below (the graph's own margin follows)
+  bandTop: 16,
+  other: 56, // the band above every frame: 16 above the items, 28 the items, 12 below
+  otherTop: 16,
 };
 
 /** The width the contents of a frame at `depth` (the top is 0) can use when the graph area is `width` wide. */
@@ -86,13 +93,18 @@ function pack(items, limit) {
  * @param repos   the list API's repositories in its order: [{repository, parent, …}]
  * @param sizes   key → {status: "loading"|"failed"|"ok", w, h, shown, scopes, warns, alerts} (a Map or an object;
  *                a missing key is loading)
- * @param options {range, width: the graph area's width at 100%, bands: key → the band's height (px, missing is 0)}
- * @returns {frames: Map(key → frame), order: [the keys shown, depth first, a parent before its children], width, height}
+ * @param options {range, width: the graph area's width at 100%, bands: key → the band's height (px, missing is 0) or
+ *                {h, w} (iss-00617: w widens the frame to it), keep: the keys shown whatever the range (a frame kept for
+ *                its band, iss-00617 R-03), other: {h, w} of the band above every frame, or null}
+ * @returns {frames: Map(key → frame), order: [the keys shown, depth first, a parent before its children], width, height,
+ *          other: the band above every frame {x1, y1, x2, y2} or null}
  */
 export function compose(repos, sizes = {}, options = {}) {
   const range = options.range || "next";
   const width = options.width || 1240;
   const bands = options.bands || {};
+  const keep = new Set(options.keep || []);
+  const other = options.other && Number(options.other.h) > 0 ? options.other : null;
   const parentOf = parents(repos);
   const kids = new Map([[null, []]]);
   for (const r of repos) kids.set(r.repository, []);
@@ -105,11 +117,13 @@ export function compose(repos, sizes = {}, options = {}) {
     const shown = kids.get(key).map((k) => measure(k, depth + 1)).filter(Boolean);
     const alerts = size.status === "ok" ? size.alerts || 0 : 0;
     const visible =
-      range !== "next" || size.status !== "ok" || (size.shown || 0) > 0 || alerts > 0 || shown.length > 0;
+      range !== "next" || size.status !== "ok" || (size.shown || 0) > 0 || alerts > 0 || shown.length > 0 || keep.has(key);
     if (!visible) return null;
     const body = bodyOf(size, range);
     const warnH = (size.warns || 0) * REPO.warn;
-    const bandH = Math.max(0, Number(bands[key]) || 0);
+    const band = bands[key];
+    const bandH = Math.max(0, Number(band !== null && typeof band === "object" ? band.h : band) || 0);
+    const bandW = band !== null && typeof band === "object" ? Number(band.w) || 0 : 0;
     const bodyY = REPO.head + warnH + bandH;
     const limit = bodyWidth(width, depth);
     let at;
@@ -128,6 +142,7 @@ export function compose(repos, sizes = {}, options = {}) {
       h = (shown.length ? shelfY + shelf.h : bodyY + body.h) + REPO.pad;
       w = Math.max(REPO.headW, body.w, shelf.w) + 2 * REPO.pad;
     }
+    w = Math.max(w, bandW); // the band's row never leaves its frame
     const b = { key, depth, w, h, warnH, bandH, bodyY, body, shown, at };
     box.set(key, b);
     return b;
@@ -148,6 +163,42 @@ export function compose(repos, sizes = {}, options = {}) {
     order.push(b.key);
     b.shown.forEach((k, i) => place(k, x1 + REPO.pad + b.at[i].x, y1 + b.at[i].y));
   };
-  tops.forEach((b, i) => place(b, REPO.margin + top.at[i].x, REPO.margin + top.at[i].y));
-  return { frames, order, width: top.w + 2 * REPO.margin, height: top.h + 2 * REPO.margin };
+  const otherH = other ? other.h : 0;
+  tops.forEach((b, i) => place(b, REPO.margin + top.at[i].x, REPO.margin + otherH + top.at[i].y));
+  const worldW = top.w + 2 * REPO.margin;
+  const height = top.h + 2 * REPO.margin + otherH;
+  if (!other) return { frames, order, width: worldW, height, other: null };
+  const w = Math.max(Number(other.w) || 0, top.w);
+  return {
+    frames,
+    order,
+    width: Math.max(worldW, w + 2 * REPO.margin),
+    height,
+    other: { x1: REPO.margin, y1: REPO.margin, x2: REPO.margin + w, y2: REPO.margin + otherH },
+  };
+}
+
+/**
+ * The move that keeps the reader's place when the frames are composed again with another band (iss-00617 D-03, R-05):
+ * of prev's frames with a graph whose body meets `view` (the world's rectangle on the screen), the one whose visible top
+ * max(body.y, view.y1) is the least (prev's order on a tie); the difference of its body's origin in next.
+ * The page moves the world back by it: tx -= dx·s, ty -= dy·s.
+ * @returns {dx, dy}, {0, 0} without such a frame or when next has not got it
+ */
+export function anchorShift(prev, next, view) {
+  const none = { dx: 0, dy: 0 };
+  if (!prev?.frames || !next?.frames || !view) return none;
+  let best = null;
+  for (const key of prev.order || []) {
+    const f = prev.frames.get(key);
+    const b = f?.body;
+    if (!b || b.kind !== "graph") continue;
+    const meets = b.x < view.x2 && b.x + b.w > view.x1 && b.y < view.y2 && b.y + b.h > view.y1;
+    if (!meets) continue;
+    const top = Math.max(b.y, view.y1);
+    if (!best || top < best.top) best = { key, top, b };
+  }
+  const n = best && next.frames.get(best.key)?.body;
+  if (!n) return none;
+  return { dx: n.x - best.b.x, dy: n.y - best.b.y };
 }

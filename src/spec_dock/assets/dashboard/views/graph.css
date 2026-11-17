@@ -74,6 +74,10 @@
 .gx .gx-epic.is-compact { width: 236px; padding-bottom: 11px; }
 .gx .gx-ini.is-compact { padding-bottom: 15px; }
 .gx .gx-frame[data-st="done"] { background: var(--ds-surface-2); }
+/* --gx-fbg：枠の地の色（上の3つの背景の写し。一緒に直す）。見出しの文字の下地に使う（iss-00617 D-06） */
+.gx .gx-ini { --gx-fbg: color-mix(in srgb, var(--ds-surface) 55%, var(--ds-bg-2)); }
+.gx .gx-epic { --gx-fbg: var(--ds-surface); }
+.gx .gx-frame[data-st="done"] { --gx-fbg: var(--ds-surface-2); }
 .gx .gx-fh { display: flex; align-items: center; gap: 7px; min-width: 0; min-height: 22px; cursor: pointer; }
 .gx .gx-kicker { font-size: 11.5px; font-weight: 700; color: var(--ds-accent-strong); letter-spacing: .04em; }
 .gx .gx-fttl { min-width: 0; font-weight: 700; color: var(--ds-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -256,8 +260,19 @@
 /* ---------- Placement (iss-00532 D-03): everything in the world is absolute ---------- */
 .gx .gx-world { display: block; padding: 0; gap: 0; width: auto; }
 .gx .gx-world > .gx-box, .gx .gx-world > .gx-frame, .gx .gx-world > .gx-clean { position: absolute; margin: 0; }
-.gx .gx-world > .gx-frame { z-index: 1; }
+/* iss-00617 D-06：枠は重なりの文脈を作らない（z-index auto。木の線 0 → 枠 → 指揮の線 1 の順は今のまま）。
+   見出しの行と要約の行は指揮の線より上（2、箱と同じ。重ならない）。その文字と札の背に、その要素の範囲だけ枠の地の色を敷く */
+.gx .gx-world > .gx-frame { z-index: auto; }
 .gx .gx-world > .gx-box, .gx .gx-world > .gx-clean { z-index: 2; }
+.gx :is(.gx-ini, .gx-epic) > :is(.gx-fh, .gx-fm) { position: relative; z-index: 2; }
+.gx :is(.gx-ini, .gx-epic) > .gx-fh > :not(.gx-agents), .gx :is(.gx-ini, .gx-epic) > .gx-fm > * {
+  background-color: var(--gx-fbg);
+}
+/* 自分の地の色を持つ札は、その色を下地の上に重ねる（暗いテーマの半透明の色の見え方を今と同じにする） */
+.gx :is(.gx-ini, .gx-epic) > .gx-fh > .ds-docid { background: linear-gradient(var(--ds-accent-soft), var(--ds-accent-soft)) var(--gx-fbg); }
+.gx :is(.gx-ini, .gx-epic) > .gx-fm > .sbar { background: linear-gradient(var(--ds-surface-3), var(--ds-surface-3)) var(--gx-fbg); }
+.gx :is(.gx-ini, .gx-epic) > .gx-fm > .hm { background: linear-gradient(var(--sd-blocked-bg), var(--sd-blocked-bg)) var(--gx-fbg); }
+.gx :is(.gx-ini, .gx-epic) > .gx-fm > .dn { background: linear-gradient(var(--ds-surface-2), var(--ds-surface-2)) var(--gx-fbg); }
 .gx .gx-world > .gx-box { width: auto; overflow: visible; }
 .gx .gx-world > .gx-frame.gx-epic.is-compact { width: auto; }
 .gx .gx-frame { overflow: visible; }
@@ -314,9 +329,11 @@
 @keyframes sd-cmd-ripple { from { transform: scale(.4); opacity: .9; } to { transform: scale(2.2); opacity: 0; } }
 .gx .has-cmd-sel .cl.is-cmd-off, .gx .has-cmd-sel .cr.is-cmd-off { opacity: .15; }
 .gx .cl.is-cmd-hl .cl-line { stroke-width: 3; }
-/* 帯：寸法は command.js の BAND の写し（縁 1 = border、左右の余白 6 = pad、札の後ろ 6 = labelGap、ボタン 52 = slot）。一緒に直す */
+/* 帯：寸法は command.js の BAND の写し（縁 1 = border、左右の余白 6 = pad、札の後ろ 6 = labelGap、ボタン 52 = slot）。一緒に直す。
+   行の頭の文字（『横断の構造』の『ほかの場所』、iss-00617）の高さ 28 は BAND.h、文字の大きさは labelWidth の見積もりの写し */
 .gx .gx-world > .gx-band { position: absolute; left: 0; top: 0; z-index: 6; }
 .gx .gx-band-item { position: absolute; display: flex; align-items: center; box-sizing: border-box; padding: 0 6px; border: 1px solid var(--ds-border); border-radius: 999px; background: var(--ds-surface); box-shadow: var(--ds-shadow-s); white-space: nowrap; }
+.gx .gx-band-lead { position: absolute; height: 28px; line-height: 28px; font-size: 11.5px; font-weight: 700; color: var(--ds-text-2); white-space: nowrap; }
 .gx .gx-band-lab { flex: none; margin-right: 6px; overflow: hidden; text-overflow: ellipsis; font-size: 11.5px; color: var(--ds-text-2); }
 .gx .gx-band-agent { flex: none; width: 52px; height: 100%; display: flex; justify-content: center; align-items: center; background: none; border: 0; padding: 0; cursor: pointer; }
 .gx .gx-band-agent[aria-pressed="true"] { box-shadow: inset 0 -2px 0 var(--sd-cmd); }

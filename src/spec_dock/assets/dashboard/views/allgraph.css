@@ -13,6 +13,11 @@
 .gx .ax-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 750; }
 .gx .ax-link { display: inline-flex; flex: none; margin-left: auto; padding: 4px; border-radius: 6px; color: var(--ds-link); font-size: 15px; }
 .gx .ax-link:hover { background: var(--ds-surface); }
+/* iss-00617 D-06：見出しは指揮の線より上。その子の背に、その子の範囲だけ枠の地の色（上の .ax-repo の背景の写し）を敷く */
+.gx .ax-head { z-index: 2; }
+.gx .ax-head > * { position: relative; background-color: var(--ds-bg-2); }
+.gx .ax-repo:is([data-depth="1"], [data-depth="3"]) .ax-head > * { background-color: var(--ds-surface-2); }
+.gx .ax-repo:is([data-depth]) .ax-head > .ax-link:hover { background: var(--ds-surface); }
 
 /* ---------- The warnings: one line each, the whole text in the title ---------- */
 .gx .ax-warn { position: absolute; left: 0; right: 0; top: 40px; margin: 0; padding: 0; list-style: none; }
@@ -47,7 +52,7 @@
 /* ---------- The repository's graph: the structure graph's parts placed as in .gx-world (graph.css) ---------- */
 .gx .ax-body { position: absolute; margin: 0; }
 .gx .ax-body > .gx-box, .gx .ax-body > .gx-frame, .gx .ax-body > .gx-clean { position: absolute; margin: 0; }
-.gx .ax-body > .gx-frame { z-index: 1; }
+.gx .ax-body > .gx-frame { z-index: auto; } /* iss-00617 D-06：枠は重なりの文脈を作らない（graph.css と同じ） */
 .gx .ax-body > .gx-box, .gx .ax-body > .gx-clean { z-index: 2; }
 .gx .ax-body > .gx-box { width: auto; overflow: visible; }
 .gx .ax-body > .gx-frame.gx-epic.is-compact { width: auto; }

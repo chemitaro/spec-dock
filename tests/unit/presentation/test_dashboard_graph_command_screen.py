@@ -134,8 +134,9 @@ def test_the_layers_stack_and_never_take_a_press() -> None:
     assert "z-index: 1" in _rule(".gx .gx-world > .gx-cmd")
     assert "z-index: 3" in _rule(".gx .gx-world > .gx-cmd-top")
     assert "z-index: 6" in _rule(".gx .gx-world > .gx-band")
-    # the frames 1, the boxes and groups 2, the dependency lines 5 (unchanged)
-    assert "z-index: 1" in _rule(".gx .gx-world > .gx-frame")
+    # the frames make no stacking context (iss-00617 D-06: their headings over the lines), the boxes and groups 2,
+    # the dependency lines 5 (unchanged)
+    assert "z-index: auto" in _rule(".gx .gx-world > .gx-frame")
     assert "z-index: 2" in _rule(".gx .gx-world > .gx-box, .gx .gx-world > .gx-clean")
     assert "z-index: 5" in _rule(".gx .gx-edges")
 
