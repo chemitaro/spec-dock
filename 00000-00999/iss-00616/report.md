@@ -20,6 +20,10 @@ ID: "iss-00616"
 - **合格した文書の sha256**：requirement.cue `f7b9edb5e5a9ae9ad8013074cab8416447b31ae649f3cf14416d38edc6032d7e`、design.cue `8c3d0d5b8810b51d47c0b9921845eabacda32ab9f5d35c00a2f68b394fb4192d`、plan.cue `631f969055670bbba61b960b173b39d6e26046b962429e6a4617cdb8b7e31b4d`、explanation.html `51938e4bf6855968e342451f25d14b68d52cbc1f4297410838e0347685ef1159`。
 - round-2 の P3（止めない。実装担当への申し送り）：(1) 端の層の stubs にも `--cl-len` を置き、箱の中の短い線の点も流す（D-05 の意図どおり）。(2) plan.cue S-03 の『横断の構造』のテストは、箱の CSS で変わらないはずで、変えない（requirement の制約が優先）。
 
+- **仕様の変更（実装の後、2026-11-17）**：箱を縦の flex にすると題名2行の箱の中身（約 113〜117px）が箱の高さ（108）を越え、題名の2行目が切れた（実機の写しで見つけた退行）。エージェントの行のある箱の高さに `MARK_LEAD = 10` を足し、箱の中の子を縮めない形にした（requirement の decisions と制約、design D-02・D-05、plan S-05。最終品質ゲート attempt 01 の FQG-001・FQG-002 の直しも S-05）。round-3 **合格**（P0 0、P1 0、P2 2、P3 1。reviewed_sha `496a7b245`）。結果 `.workbench/spec-review/iss-00616/round-3.json`。
+- **今の合格した文書の sha256**（round-3）：requirement.cue `421c66e1ca141fa3ccfc654d8fa0a5436e39be6ae23d334fcc6804c13cc4d5df`、design.cue `8f3e94c6a65e39ee9e356f78fdd0495b715f3b07e1a623d1ada566cb5825e812`、plan.cue `11c8412ba8d0785321960672fa90d48cd0d2f7c70665afde70e15306a0992ac9`、explanation.html `51938e4bf6855968e342451f25d14b68d52cbc1f4297410838e0347685ef1159`。
+- round-3 の P2・P3（止めない。文面の残りで、実装は直っている）：(1) `MARK_LEAD` の例外が R-02 の4つ目の受け入れ（組がないときの世界の HTML が今と同じ）と design の goals・compatibility・risks に入っていない（エージェントのいる箱の高さだけ変わる。decisions に記録済み）。(2) 帯の親の波紋は帯の中の `.gx-band-cr` に描く（FQG-001 の直し）が、R-03・D-04・D-05 の文面は端の層のまま。(3) D-04 は `--cl-len` を本体の道だけに書く（実装は stubs にも付けた）。
+
 ## 実装の記録
 
 - 開始のコミット `3f5f8d8e9`（origin/main、iss-00621 の PR #637 の後）。
