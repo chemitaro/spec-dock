@@ -18,7 +18,7 @@ design: {
 			新しい `src/spec_dock/assets/dashboard/views/graph/view_input.js`。DOM を読まない。`e` は wheel のイベント（または同じ名前の値を持つただの物）。上から順に決める：
 			1. `ctrlKey` か `metaKey` → `"pinch"`（トラックパッドのピンチ。Windows の Ctrl＋ホイールも同じ扱いで、今と同じ）。
 			2. `shiftKey` → `"hpan"`（横に動かす）。
-			3. `deltaMode`（必ず `wheelDeltaY` より先に読む。Firefox の決まり）が 1 か 2 → `"wheel"`（マウスのホイール。確か）。
+			3. `deltaMode`（必ず `wheelDeltaY` より先に読む。Firefox の決まり）が 1 か 2 で、`deltaX` が 0 → `"wheel"`（マウスのホイール。確か）。`deltaX` が 0 でなければ（Firefox のチルト・横のホイール）→ `"pan"`（今と同じく横に動く。量は D-02 で画素に直す）。
 			4. `deltaX` が 0 で、`wheelDeltaY` が数で 0 でなく、`wheelDeltaY % 120 === 0` → `"wheel?"`（マウスのホイールらしい。弱い）。
 			5. それ以外 → `"pan"`（見分けられない値を含む。F-01）。
 
@@ -28,6 +28,7 @@ design: {
 			| Chrome macOS・Windows、マウスのホイール | deltaMode 0、deltaY ±100（Windows）・±4〜±40（macOS の加速）、deltaX 0、wheelDeltaY ∓120・∓240 | wheel? |
 			| Safari macOS、マウスのホイール | deltaMode 0、deltaY ±4、deltaX 0、wheelDeltaY ∓120 | wheel? |
 			| Firefox macOS・Windows、マウスのホイール | deltaMode 1、deltaY ±1・±3、deltaX 0 | wheel |
+			| Firefox、チルト・横のホイール | deltaMode 1、deltaY 0、deltaX ±1・±3 | pan |
 			| Chrome・Safari macOS、トラックパッドの2本指 | deltaMode 0、deltaY 2.5・−7・12、deltaX 0〜±3、wheelDeltaY = −3·deltaY（−7.5・21・−36） | pan |
 			| Chrome Windows、高精度タッチパッド | deltaMode 0、deltaY 小さな数、wheelDeltaY 120 の倍数でない | pan |
 			| Firefox macOS、トラックパッド | deltaMode 0、wheelDeltaY なし（読まない値）か 120 の倍数でない | pan |
@@ -42,7 +43,7 @@ design: {
 		text: """
 			`last` は前の写しの `{kind, at}`（初めは null）、`now` は時刻（ms）、`page` は横の1ページの画素（図の面の幅）。返り値は `{act, kind, at}` で、`act` は次のどれか：
 			- `{type: "zoom", f, x: e.clientX, y: e.clientY}`：`kind` が `pinch` なら `f = exp(−deltaY·0.01)`（今と同じ）。`wheel`・`wheel?` なら、刻み数 `n = min(WHEEL.maxSteps, max(1, round(|wheelDeltaY| / 120)))`（`wheelDeltaY` がないか `deltaMode` が 0 でないときは 1）、`f = WHEEL.step ^ (deltaY < 0 ? n : −n)`。`deltaY` が 0 なら `act` は null。`WHEEL = {step: 1.15, maxSteps: 2, stick: 200}`。
-			- `{type: "pan", dx, dy}`：`pan` は `dx = −deltaX`、`dy = −deltaY`（今と同じ向き）。`hpan` は、`deltaX` が 0 でなければ `dx = −deltaX·u`、0 なら `dx = −deltaY·u`、`dy = 0`。`u` は `deltaMode` 0 で 1、1 で 16、2 で `page`。
+			- `{type: "pan", dx, dy}`：`pan` は `dx = −deltaX·u`、`dy = −deltaY·u`（今と同じ向き。`deltaMode` 0 では今と同じ量）。`hpan` は、`deltaX` が 0 でなければ `dx = −deltaX·u`、0 なら `dx = −deltaY·u`、`dy = 0`。`u` は `deltaMode` 0 で 1、1 で 16、2 で `page`。
 			続きの扱い：`kind` が `wheel?`（弱い）で、`last.kind` が `pan` で、`now − last.at < WHEEL.stick` なら、`kind` を `pan` にする（トラックパッドの連続した動きの途中）。`wheel`・`pinch`・`hpan` は続きで変えない。返す `kind` は変えた後の値で、呼ぶ側はそれを次の `last` にする。
 			"""
 		satisfies: ["R-01", "R-02", "R-03", "F-01"]
@@ -56,7 +57,7 @@ design: {
 			- ほか → null。
 
 			`ownsKey(e, view)`：`e.target` を見る。DOM の `closest` だけを使う（偽の DOM で試せる）。
-			- `target` がないか、`document.body`・`document.documentElement` → true（どこにもフォーカスがない）。
+			- `target` がないか、`target.contains(view)`（`body`・`html`、画面の入れ物の `main#view`（`tabindex="-1"`。app.js の移動のたびに `focus()` される）など、図の面を包む要素）→ true（図の画面そのものにフォーカスがある）。
 			- `target.closest("input, textarea, select, button, a[href], summary, iframe, [contenteditable]:not([contenteditable='false'])")` があれば false。
 			- `view.contains(target)` なら true（図の面、中の箱・枠の見出し・帯のエージェント）。それ以外は false（欄・道具の棒など、図の面の外）。
 			"""
@@ -71,7 +72,7 @@ design: {
 			- 返り値 `{dispose()}` は2つの見張りを外す。
 			両方の画面の `bindView` は、今の wheel の見張りを消して `bindViewInput` を呼び、`dispose` でそれを外す。各画面の口：
 			- graph.js：`pan(dx, dy)` は `V.tx += dx; V.ty += dy; applyT()`、`zoomAt`・`zoomCenter`・`fit` は今の関数。`active()` は `!!V.el && !V.el.view.hidden`。
-			- allgraph.js：`pan` は `A.moved = true; A.tx += dx; A.ty += dy; applyT()`、ほかは今の関数（`A.moved` を付ける）。
+			- allgraph.js：`pan` は `A.moved = true; A.tx += dx; A.ty += dy; applyT()`、ほかは今の関数（`A.moved` を付ける）。`active()` は `!!A.el && !A.el.view.hidden`。
 			どれも `applyT()` を通るので、`motion.moved()`（iss-00646、`is-still`）が今と同じに呼ばれる。今の `onKey`（Escape・Enter・Space）はそのまま。
 			"""
 		satisfies: ["R-01", "R-04", "R-05", "R-06", "F-02"]
