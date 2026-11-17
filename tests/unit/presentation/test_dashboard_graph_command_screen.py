@@ -221,7 +221,9 @@ def test_the_css_copies_the_motion() -> None:
     m = _motion()
     seconds = re.search(r"animation: sd-cmd-phase ([\d.]+)s steps\(1, end\) infinite", _rule(".gx .cl-ph"))
     assert seconds and float(seconds.group(1)) == pytest.approx(m["phases"] * m["tick"])
-    dash = re.search(r"stroke-dasharray: ([\d.]+) ([\d.]+);", _rule('.gx .cl[data-state="flow"] :is(.cl-line, .cl-stub)'))
+    dash = re.search(
+        r"stroke-dasharray: ([\d.]+) ([\d.]+);", _rule('.gx .cl[data-state="flow"] :is(.cl-line, .cl-stub)')
+    )
     assert dash and float(dash.group(1)) + float(dash.group(2)) == pytest.approx(m["gap"])
     assert m["phases"] * m["step"] == m["gap"] and 0 < m["tail"] < m["gap"]
     phase = re.search(r"@keyframes sd-cmd-phase \{(.*?)\}\s*\}", GRAPH_CSS, re.S)

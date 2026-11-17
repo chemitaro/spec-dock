@@ -139,7 +139,8 @@ def test_the_constants(motion: dict[str, Any]) -> None:
 
 def test_the_delays_and_the_offsets(motion: dict[str, Any]) -> None:
     assert motion["delays"] == pytest.approx([0, *(-(12 - i) / 10 for i in range(1, 12))])
-    assert motion["delays"][:3] == [0, -1.1, -1.0] and motion["delays"][-1] == -0.1  # rounded in ms, no float tail
+    # rounded in ms: written without a float tail (−1.1, not −1.1000000000000001)
+    assert [str(d) for d in motion["delays"]] == ["0", "-1.1", "-1", *(f"-0.{9 - i}" for i in range(9))]
     assert motion["offsets"] == [-2 * i for i in range(12)]
     assert motion["offsets"][-1] == -22
 
