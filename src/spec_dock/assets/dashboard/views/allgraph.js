@@ -10,6 +10,7 @@ import { index, nodeMarkRows, routeLayout } from "./graph/layout.js";
 import { audit, svg as edgeSvg } from "./graph/router.js";
 import * as M from "./graph/marks.js";
 import * as D from "./graph/draw.js";
+import { compactNeeds, headsDiffer, tallNeeds } from "./graph/measure.js";
 import { REPO, bodyWidth, compose } from "./allgraph/compose.js";
 import { createScopePanel } from "./_shared/panel.js";
 import { createOrcaWatch, paintOrcaMarks } from "./_shared/orca_marks.js";
@@ -153,9 +154,12 @@ function checkRows() {
     const r = R.get(key);
     if (!r?.eg) continue;
     const m = measureMarks(body);
-    if (!m) continue;
-    const differ = r.eg.layout.nodes.some((n) => ["box", "tframe", "frame"].includes(n.type) && nodeMarkRows(n, m[n.id]) !== (n.rows ?? 1));
-    r.marks = m;
+    const h = compactNeeds(body, A.s); // iss-00627: the compact frames' contents, on the same count
+    if (!m && !h) continue;
+    const rows = !!m && r.eg.layout.nodes.some((n) => ["box", "tframe", "frame"].includes(n.type) && nodeMarkRows(n, m[n.id]) !== (n.rows ?? 1));
+    const differ = rows || headsDiffer(r.eg.layout.nodes, h);
+    if (m) r.marks = m;
+    if (h) r.heads = tallNeeds(r.eg.layout.nodes, h);
     if (!differ || r.rowsRedo >= 2) continue;
     r.rowsRedo++;
     r.sig = null;
@@ -264,7 +268,7 @@ function stopGesture(event) {
 function stateOf(key) {
   let r = R.get(key);
   if (!r) {
-    r = { status: "loading", structure: null, failure: null, revision: null, ix: null, desc: null, eg: null, sig: null, marks: {}, rowsRedo: 0, warnings: [], html: null };
+    r = { status: "loading", structure: null, failure: null, revision: null, ix: null, desc: null, eg: null, sig: null, marks: {}, heads: {}, rowsRedo: 0, warnings: [], html: null };
     R.set(key, r);
   }
   return r;
@@ -321,7 +325,7 @@ function liveIds(r) {
 }
 function sigOf(key) {
   const r = R.get(key);
-  return `${r.revision}|${A.range}|${bodyWidth(A.width, depthOf(key))}|${liveIds(r).join(",")}|${JSON.stringify(r.marks)}`;
+  return `${r.revision}|${A.range}|${bodyWidth(A.width, depthOf(key))}|${liveIds(r).join(",")}|${JSON.stringify(r.marks)}|${JSON.stringify(r.heads)}`;
 }
 function needsLayout(key) {
   const r = R.get(key);
@@ -338,7 +342,7 @@ function layoutRepo(key) {
   const sig = sigOf(key);
   if (sig === r.sig && r.eg) return;
   const t0 = performance.now();
-  const res = routeLayout(r.structure.scopes, r.structure.cleanup, { mode: "nest", range: A.range, focus: null, width: bodyWidth(A.width, depthOf(key)), height: A.height, marks: r.marks });
+  const res = routeLayout(r.structure.scopes, r.structure.cleanup, { mode: "nest", range: A.range, focus: null, width: bodyWidth(A.width, depthOf(key)), height: A.height, marks: r.marks, heads: r.heads });
   r.eg = { ...res, ms: Math.round(performance.now() - t0) };
   r.sig = sig;
   r.html = null;

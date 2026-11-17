@@ -64,6 +64,15 @@ export function nodeMarkRows(node, m) {
 }
 const markOf = (ctx, s) => ctx.opts.marks?.[s.id];
 
+/**
+ * A compact frame's height (a frame with nothing shown inside) from its rows of agents, before the routing's growth for
+ * ports (iss-00627 D-02). graph.css fits a one-line title in it; a longer title is measured (options.heads).
+ */
+export function compactHeight(kind, rows = 1) {
+  const [padT, , padB] = SIZE.pad[kind] || SIZE.pad.epic;
+  return padT + SIZE.head + (rows - 1) * MARK_ROW + padB;
+}
+
 // The width seen at 100% when the page does not say (the node check): the wrap before iss-00556 (iss-00560 F-01).
 export const WRAP_WIDTH = 1240;
 
@@ -581,11 +590,18 @@ function frameBlock(s, kids, ctx, avail) {
   const w = compact ? SIZE.compactW : Math.max(SIZE.minFrameW[s.kind] || 300, body.w + 2 * padX);
   const rows = markRows(markOf(ctx, s), w - 2 * padX - 2);
   const head = SIZE.head + grow(ctx, s) + (rows - 1) * MARK_ROW;
-  const h = padT + head + (body ? bodyGap + body.h : 0) + padB;
-  if (body) {
-    body.x = padX;
-    body.y = padT + head + bodyGap;
+  if (compact) {
+    // iss-00627 D-02: a compact frame is as tall as its measured contents when they need more (a title of two lines)
+    const base = compactHeight(s.kind, rows);
+    const need = Number(ctx.opts.heads?.[s.id]) || 0;
+    const fit = Math.max(base, need);
+    const out = { t: "frame", s, w, h: fit + grow(ctx, s), compact, head: padT + head, padT, body, key: `f${s.id}`, rows };
+    if (fit > base) out.fit = fit;
+    return out;
   }
+  const h = padT + head + bodyGap + body.h + padB;
+  body.x = padX;
+  body.y = padT + head + bodyGap;
   return { t: "frame", s, w, h, compact, head: padT + head, padT, body, key: `f${s.id}`, rows };
 }
 
@@ -624,6 +640,7 @@ function flatten(block, ox, oy, path, out) {
   const y = oy + (block.y || 0);
   const rect = { x1: x, y1: y, x2: x + block.w, y2: y + block.h };
   const marked = block.rows > 1 ? { rows: block.rows } : {}; // only a grown node carries rows (iss-00620)
+  if (block.fit) marked.fit = block.fit; // and only a measured compact frame its height (iss-00627)
   if (block.t === "box" || block.t === "tbox") {
     out.nodes.push({ type: block.t === "box" || !block.frame ? "box" : "tframe", id: block.s.id, depth: block.depth ?? null, ...rect, path, ...marked });
     return;
@@ -647,7 +664,8 @@ function flatten(block, ox, oy, path, out) {
  * @param options {mode: "nest"|"tree", range: "all"|"now"|"next", focus, width, height, marks} — width: the graph's
  *                visible width at 100% (px), where the groups wrap (WRAP_WIDTH when absent); height is accepted
  *                but unused by placement (the page keeps it as a resize signal, iss-00583); marks: {Scope id:
- *                {items, gap}} of the agents' marks the page measured (iss-00620, markRows).
+ *                {items, gap}} of the agents' marks the page measured (iss-00620, markRows); heads: {Scope id: px} of the
+ *                compact frames' contents the page measured (iss-00627, compactHeight).
  * @param gaps    extra pixels per gap key (from earlier routing rounds)
  */
 export function layout(scopes, cleanup, options = {}, gaps = {}) {

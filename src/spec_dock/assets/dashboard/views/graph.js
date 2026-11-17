@@ -13,6 +13,7 @@ import { LEGACY_KEYS, PREFS_KEY, restorePrefs } from "./graph/prefs.js";
 import { createScopePanel } from "./_shared/panel.js";
 import { createOrcaWatch, paintOrcaMarks } from "./_shared/orca_marks.js";
 import * as D from "./graph/draw.js";
+import { compactNeeds, headsDiffer, tallNeeds } from "./graph/measure.js";
 
 const { esc, ic, stateIcon } = M;
 const PHONE = 640;
@@ -50,6 +51,7 @@ const V = {
   desc: null,
   lastTap: null,
   marks: {}, // iss-00620: the agents' marks last measured, {Scope id: {items, gap}}, passed to the layout
+  heads: {}, // iss-00627: the compact frames' contents last measured, {Scope id: px}, passed to the layout
   rowsRedo: 0, // the lay-outs checkRows asked for since the last news or render of another cause (F-03)
   fromRows: false, // the render running was called by checkRows
   ro: null, // the ResizeObserver of the world's mark slots
@@ -129,12 +131,17 @@ function measureMarks(world) {
 
 // After the marks are drawn: lay out again only when a box's or frame's rows of agents differ from the layout's (R-06),
 // keeping the zoom, the position and the selection; at most twice per news or render (F-03).
+// iss-00627: the compact frames' contents are measured with them (a title of two lines), and a height that differs lays
+// out again on the same count.
 function checkRows() {
   if (!V.el || !V.EG || !V.data || !V.ctx) return;
   const M = measureMarks(V.el.world);
-  if (!M) return;
-  const differ = V.EG.layout.nodes.some((n) => ["box", "tframe", "frame"].includes(n.type) && nodeMarkRows(n, M[n.id]) !== (n.rows ?? 1));
-  V.marks = M;
+  const H = compactNeeds(V.el.world, V.s);
+  if (!M && !H) return;
+  const rows = !!M && V.EG.layout.nodes.some((n) => ["box", "tframe", "frame"].includes(n.type) && nodeMarkRows(n, M[n.id]) !== (n.rows ?? 1));
+  const differ = rows || headsDiffer(V.EG.layout.nodes, H);
+  if (M) V.marks = M;
+  if (H) V.heads = tallNeeds(V.EG.layout.nodes, H);
   if (!differ || V.rowsRedo >= 2) return;
   V.rowsRedo++;
   V.sig = null;
@@ -295,7 +302,7 @@ function buildWorld(focus) {
   const t0 = performance.now();
   V.width = seenWidth();
   V.height = seenHeight();
-  const r = routeLayout(V.data.scopes, V.data.cleanup, { ...V.opts, focus, width: V.width, height: V.height, marks: V.marks });
+  const r = routeLayout(V.data.scopes, V.data.cleanup, { ...V.opts, focus, width: V.width, height: V.height, marks: V.marks, heads: V.heads });
   V.EG = { ...r, ms: Math.round(performance.now() - t0) };
   const L = r.layout;
   const range = L.opts.range;
