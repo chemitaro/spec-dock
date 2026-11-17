@@ -57,7 +57,7 @@
   .sd-pn[data-snap="full"] { border-radius: 0; }
   .sd-pn .pn-grab { display: block; flex: none; width: 100%; height: 16px; margin: 0; padding: 0; border: 0; background: none; cursor: grab; touch-action: none; }
   .sd-pn .pn-grab::before { content: ""; display: block; width: 40px; height: 5px; margin: 6px auto 0; border-radius: 99px; background: var(--ds-border-2); opacity: .6; }
-  .sd-pn .pn-top { touch-action: none; }
+  .sd-pn .pn-top, .sd-pn > .pn-head { touch-action: none; }
   .sd-pn .pn-head { padding-top: 2px; }
   .sd-pn .pn-body:is([data-tab="docs"], [data-tab="explanation"], [data-tab="agents"]) { padding: 2px 4px 4px; }
   /* 下の帯は折り返さない1行で、ボタンは印だけ（名前は aria-label と title） */
@@ -66,7 +66,7 @@
   .sd-pn .pn-foot .ds-btn .ds-icon { font-size: 17px; }
   /* 全体の段：見出しを「状態の印、ID、題名（1行）、閉じる」の1行に詰め、ほかの行は概要のタブで読む */
   .sd-pn[data-snap="full"] .pn-top { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 6px 0 12px; }
-  .sd-pn[data-snap="full"] .pn-head { display: contents; }
+  .sd-pn[data-snap="full"] .pn-top > .pn-head { display: contents; }
   .sd-pn[data-snap="full"] .pn-orca { order: 3; }
   .sd-pn[data-snap="full"] .pn-close { order: 3; margin-left: 0; }
   .sd-pn[data-snap="full"] .pn-cover { order: 2; flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; padding: 0; }
