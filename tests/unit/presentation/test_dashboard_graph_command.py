@@ -250,13 +250,27 @@ def _raw(
 LEVELS = {2: "c-up", 3: "c-side", 4: "c-down", 5: "c-under"}
 PC = {"iss-00001": [ag("p"), ag("c", parent="p")]}
 PC_MARKS = {"iss-00001": mark("p", "c")}
-H_RUN = [{"x": 50, "y": 93}, {"x": 400, "y": 93}]  # a dependency line's horizontal run just above the box
+
+
+def _run_at(up: float, x1: float = 50, x2: float = 400) -> list[dict[str, float]]:
+    """A dependency line's horizontal run `up` px above the box A's upper edge."""
+    return [{"x": x1, "y": A["y1"] - up}, {"x": x2, "y": A["y1"] - up}]
+
+
+# the hop p > c in A runs from x 133 to 171: its middle half is 142.5..161.5
+RUNS_ABOVE = {
+    "run10": (_run_at(10),),
+    "run15": (_run_at(15),),
+    "run16": (_run_at(16),),
+    "runLegs": (_run_at(18, 50, 140), _run_at(18, 164, 400)),  # only where the legs are
+    "runNone": (_run_at(9), _run_at(14), _run_at(18)),
+}
 SCENARIOS |= {
     "room": _raw([A], PC, PC_MARKS),
     # a box 14px above (the rows' gap), and 6px above
     "above14": _raw([A, _box("iss-00002", 100, -2) | {"y2": 86}], PC, PC_MARKS),
     "above6": _raw([A, _box("iss-00002", 100, 6) | {"y2": 94}], PC, PC_MARKS),
-    "routeAbove": _raw([A], PC, PC_MARKS, (H_RUN,)),
+    **{name: _raw([A], PC, PC_MARKS, runs) for name, runs in RUNS_ABOVE.items()},
     # the child's mark right below the parent's (the second row's first mark)
     "stacked": _raw(
         [_box("iss-00001", 100, 100, rows=3)],
@@ -802,11 +816,20 @@ def test_hops_with_little_room_above(got: dict[str, Any]) -> None:
     assert (audit["crowded"], audit["boxOverlaps"]) == (1, 1)
 
 
-def test_a_hop_over_a_dependency_run_is_counted(got: dict[str, Any]) -> None:
-    """T-01 / R-03: a horizontal run of a dependency line inside the hop's bulge counts as an edge overlap."""
-    audit = got["routeAbove"]["model"]["audit"]
-    assert _bulge(_link(got["routeAbove"], "p>c")) == 18
-    assert (audit["edgeOverlaps"], audit["crowded"], audit["boxOverlaps"]) == (1, 0, 0)
+@pytest.mark.parametrize(
+    ("name", "height", "overlaps"),
+    [("run10", 18, 0), ("run15", 18, 0), ("run16", 13, 0), ("runLegs", 18, 0), ("runNone", 18, 1)],
+)
+def test_a_hops_peak_keeps_3px_from_the_dependency_runs(
+    got: dict[str, Any], name: str, height: int, overlaps: int
+) -> None:
+    """T-01 / R-03 (D-03): the highest height whose peak is 3px or more from every run over the hop's middle half; the
+    legs crossing a run do not count; no such height: the upper limit, counted as an edge overlap."""
+    link = _link(got[name], "p>c")
+    assert (link["from"]["x"], link["to"]["x"]) == (133, 171)
+    assert _bulge(link) == height and link["bulge"] == height and link["peak"] == A["y1"] - height
+    audit = got[name]["model"]["audit"]
+    assert (audit["edgeOverlaps"], audit["crowded"], audit["boxOverlaps"]) == (overlaps, 0, 0)
 
 
 def test_each_line_carries_the_childs_mark(got: dict[str, Any]) -> None:

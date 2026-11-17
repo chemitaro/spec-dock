@@ -331,12 +331,18 @@ export function commandModel({ pairs = [], places = new Map(), items = [], layou
     return obstacles.filter((o) => o.self !== self && !(own && o.self.type === "frame" && holds(o, own)));
   };
   const overlapsBox = (bb, self) => others(self).some((o) => Math.min(bb.x2, o.x2) - Math.max(bb.x1, o.x1) > 0 && Math.min(bb.y2, o.y2) - Math.max(bb.y1, o.y1) > 0);
-  // the dependency lines' horizontal runs inside the bulge's box
-  const overlapsRoute = (bb) => routes.some((rt) => (rt.pts || []).some((p, k, pts) => {
-    const q = pts[k + 1];
-    if (!q) return false;
-    return p.y === q.y && p.y >= bb.y1 && p.y <= bb.y2 && Math.min(bb.x2, Math.max(p.x, q.x)) - Math.max(bb.x1, Math.min(p.x, q.x)) > 0;
-  }));
+  // the y of the dependency lines' horizontal runs over [x1, x2] (by a length > 0)
+  const runsOver = (x1, x2) => {
+    const ys = [];
+    for (const rt of routes) {
+      const pts = rt.pts || [];
+      for (let k = 0; k + 1 < pts.length; k++) {
+        const p = pts[k], q = pts[k + 1];
+        if (p.y === q.y && Math.min(x2, Math.max(p.x, q.x)) - Math.max(x1, Math.min(p.x, q.x)) > 0) ys.push(p.y);
+      }
+    }
+    return ys;
+  };
   // the room above the upper edge of `self` across [lo, hi] (iss-00648 D-03): up to the nearest node, group or band item
   // above, the inner upper edge of a frame holding it, the world's bounds (not for a band item) and the ceiling
   const roomOf = (self, lo, hi) => {
@@ -452,12 +458,25 @@ export function commandModel({ pairs = [], places = new Map(), items = [], layou
     const inset = !item && self.type === "frame" ? 1 : 0;
     const [e1, e2] = widen(a.p, b.p, r.x1 + inset, r.x2 - inset);
     const lo = Math.min(e1.x, e2.x), hi = Math.max(e1.x, e2.x);
-    let d = Math.min(HOP.min, roomOf(self, lo, hi) - HOP.room);
-    if (d < HOP.min) audit.crowded++;
-    if (d < HOP.low) d = HOP.low;
-    const bb = bulgeBox(e1, e2, d);
-    if (overlapsBox(bb, self)) audit.boxOverlaps++;
-    if (overlapsRoute(bb)) audit.edgeOverlaps++;
+    let u = Math.min(HOP.min, roomOf(self, lo, hi) - HOP.room);
+    if (u < HOP.min) audit.crowded++;
+    if (u < HOP.low) u = HOP.low;
+    // the highest height whose peak keeps HOP.room from every dependency run over the middle half of the hop; the legs
+    // crossing a run do not count (iss-00648 D-03)
+    const q = (hi - lo) / 4;
+    const ys = runsOver(lo + q, hi - q);
+    let d = null;
+    for (let h = u; h >= HOP.low; h--) {
+      if (ys.every((y) => Math.abs(r.y1 - h - y) >= HOP.room)) {
+        d = h;
+        break;
+      }
+    }
+    if (d === null) {
+      d = u;
+      audit.edgeOverlaps++;
+    }
+    if (overlapsBox(bulgeBox(e1, e2, d), self)) audit.boxOverlaps++;
     const { d: path, len } = cubic(e1, UP, e2, UP, (4 * d) / 3);
     return { d: path, len, stubs: [], bulge: d, from: { x: r1(e1.x), y: r1(e1.y) }, to: { x: r1(e2.x), y: r1(e2.y) }, peak: r1(r.y1 - d) };
   }
