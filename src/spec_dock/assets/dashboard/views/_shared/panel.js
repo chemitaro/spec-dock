@@ -7,11 +7,11 @@
 import { ancestors, withoutEmbed, withParam } from "./logic.js";
 import { esc, icon, idleText, kindLabel, mergeBadge, orcaSlot, stateChip, stateMark } from "./parts.js";
 import { themeOf } from "./orca_logic.js";
-import { createOpenButton, paintOrcaMarks } from "./orca_marks.js";
+import { createOpenButton, markAgentAt, paintOrcaMarks } from "./orca_marks.js";
 import { nextOnTap, pickTab, settleSheet, sheetHeights } from "./panel_logic.js";
 import { panelEnv, SCOPE_TABS, TAB_KEYS, visibleTabs } from "./scope_tabs.js";
 import { mem, paintAgentList } from "./agents_tab.js";
-import { footChoice } from "./agents_logic.js";
+import { footChoice, forgetGone, memoryFor } from "./agents_logic.js";
 
 const plainClick = (event) => event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
 const PHONE = 640;
@@ -265,8 +265,9 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
       }
       return;
     }
-    if (t.closest(".sd-orca")) {
-      preferTab("agents"); // a pressed mark in the heading opens the agents' tab (iss-00592 D-03)
+    const slot = t.closest(".sd-orca");
+    if (slot) {
+      openAgent(markAgentAt(slot, t)); // a pressed mark in the heading opens the agents' tab on it (iss-00621 D-03)
       return;
     }
     const act = t.closest("[data-pn-act]");
@@ -309,6 +310,17 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
     if (current) draw();
   }
 
+  // Open the agents' tab on one agent (iss-00621 D-02), as if the person pressed it in the tab's strip. null (a mark
+  // that names no agent, "+N") only prefers the tab, like preferTab("agents"). Call it after show() for a new Scope.
+  function openAgent(agentId) {
+    userTab = "agents";
+    if (typeof agentId === "string" && agentId !== "" && current) {
+      params.set("agent", agentId);
+      forgetGone(memoryFor(mem, current.scope.id), agentId);
+    }
+    if (current) draw();
+  }
+
   return {
     element: aside,
     show(state) {
@@ -330,6 +342,7 @@ export function createScopePanel(aside, { onSelect = () => {}, onClose = () => {
       openButton?.reset();
     },
     preferTab,
+    openAgent,
     refreshOrca,
     isOpen: () => current != null,
     snap: () => (isSheet() ? snap : null),

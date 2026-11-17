@@ -2,6 +2,8 @@
 import { marksKey, openTarget, slotWorktree } from "./orca_logic.js";
 
 const painted = new WeakMap();
+// iss-00621 D-01: slot -> the agent ids in the order the component drew its marks (buildMarks' order, never sorted)
+const shown = new WeakMap();
 
 export function paintOrcaMarks(root, ctx, structure) {
   const now = Date.now();
@@ -14,14 +16,41 @@ export function paintOrcaMarks(root, ctx, structure) {
       const built = worktree && module ? module.buildMarks(worktree, { now, max }) : null;
       const key = marksKey(built);
       if (painted.get(slot) === key) continue;
-      if (key === "") slot.replaceChildren();
-      else module.renderAgentMarks(slot, worktree, { size: "sm", max, now });
+      if (key === "") {
+        slot.replaceChildren();
+        shown.set(slot, []);
+      } else {
+        module.renderAgentMarks(slot, worktree, { size: "sm", max, now });
+        // A result without a marks list records nothing to match, so a press only opens the tab (F-01).
+        shown.set(slot, Array.isArray(built.marks) ? built.marks.map((m) => m?.id ?? null) : []);
+      }
       painted.set(slot, key);
     } catch {
       slot.replaceChildren();
+      shown.delete(slot); // F-02: an old order never names another agent
       painted.set(slot, "");
     }
   }
+}
+
+// The agent of a pressed mark in a slot (iss-00621 D-01): the mark's data-agent-id, or else its place among the
+// slot's marks in the recorded order. null for "+N", a mark outside the slot, or a record that does not match (F-01).
+export function markAgentAt(slot, target) {
+  const mark = target?.closest?.(".orca-mark");
+  if (!mark || !slot?.contains?.(mark) || mark.classList.contains("orca-mark--more")) return null;
+  const tagged = mark.getAttribute("data-agent-id");
+  if (typeof tagged === "string" && tagged !== "") return tagged;
+  const marks = [...slot.querySelectorAll(".orca-mark:not(.orca-mark--more)")];
+  const ids = shown.get(slot);
+  const i = marks.indexOf(mark);
+  if (!ids || ids.length !== marks.length || i < 0) return null;
+  return ids[i];
+}
+
+// A copy of a slot's recorded agent ids, or null when it has none (for iss-00616's mark positions).
+export function markIds(slot) {
+  const ids = shown.get(slot);
+  return ids ? [...ids] : null;
 }
 
 export function createOpenButton(slot, { doc }) {

@@ -11,7 +11,7 @@ import { audit, svg as edgeSvg } from "./graph/router.js";
 import * as M from "./graph/marks.js";
 import { LEGACY_KEYS, PREFS_KEY, restorePrefs } from "./graph/prefs.js";
 import { createScopePanel } from "./_shared/panel.js";
-import { createOrcaWatch, paintOrcaMarks } from "./_shared/orca_marks.js";
+import { createOrcaWatch, markAgentAt, paintOrcaMarks } from "./_shared/orca_marks.js";
 import * as D from "./graph/draw.js";
 import { compactNeeds, headsDiffer, tallNeeds } from "./graph/measure.js";
 
@@ -617,10 +617,12 @@ function onTap(target) {
     return;
   }
   const id = hit.dataset.id;
-  // A pressed mark opens the agents' tab (iss-00592 D-03), also on a phone's second tap (iss-00602 D-01).
-  if (target.closest(".sd-orca")) {
+  // A pressed mark opens the agents' tab on its agent (iss-00592 D-03, iss-00621 D-03), also on a phone's second
+  // tap (iss-00602 D-01).
+  const slot = target.closest(".sd-orca");
+  if (slot) {
     if (V.sel !== id) select(id);
-    V.pn?.preferTab("agents");
+    V.pn?.openAgent(markAgentAt(slot, target));
     return;
   }
   if (isPhone() && V.sel === id) {
