@@ -681,3 +681,63 @@ def test_the_first_view_starts_below_the_summary(notices: dict[str, Any]) -> Non
     phone = notices["summed-phone"]["shots"][-1]
     tx, ty, s = _t(phone)
     assert (tx, s) == (4, 0.74) and ty == 90 + 8
+
+
+# --- iss-00640 T-01, T-02: the bar's rows on a PC and the view under them ------------------------------------------
+
+
+def test_the_pc_bar_puts_the_tools_after_the_chips_and_the_summary_last() -> None:
+    """R-01, R-04: on a PC the chips' column gives its parts to the bar (the tools follow the chips, the summary takes its
+    own row below); the condition is the exact complement of the phone's rule, whose rules stay as they are."""
+    body = re.sub(r"/\*.*?\*/", "", CSS.read_text(encoding="utf-8"), flags=re.S)
+    m = re.search(r"@container app not \(max-width: (\d+)px\) \{(.*?)\n\}", body, flags=re.S)
+    assert m, "the PC block"
+    phone = int(m.group(1))
+    block = m.group(2)
+    assert re.search(r'\.gx\[data-screen="allgraph"\] \.gx-left \{[^}]*display: contents', block)
+    assert re.search(r'\.gx\[data-screen="allgraph"\] \.ax-sum \{[^}]*order: 1;[^}]*flex-basis: 100%', block)
+    js = (ASSETS / "views" / "allgraph.js").read_text(encoding="utf-8")
+    assert re.search(rf"const PHONE = {phone};", js)
+    graph = re.sub(r"/\*.*?\*/", "", (ASSETS / "views" / "graph.css").read_text(encoding="utf-8"), flags=re.S)
+    assert f"@container app (max-width: {phone}px)" in graph
+    # the structure graph's bar is unchanged (R-02): tools pushed right, wrapping to the next row
+    assert re.search(r"\.gx \.gx-bar \{[^}]*flex-wrap: wrap;[^}]*justify-content: space-between", graph)
+    assert re.search(r"\.gx \.gx-tools \{[^}]*margin-left: auto", graph)
+
+
+BAR_ROWS = {
+    # one row: chips and tools side by side, the summary under them (1280, 1440)
+    "one-row": {"next": 44, "tools": 44, "sum": 96},
+    # the fixed form: chips, tools right-aligned on the next row, the summary under them (1000)
+    "two-rows": {"next": 44, "tools": 84, "sum": 136},
+    # no summary: the tools' row is the bar's bottom
+    "no-summary": {"next": 44, "tools": 84, "sum": 0},
+    # the tools lower than the summary (the bar before iss-00640): the lowest still counts
+    "tools-last": {"next": 44, "tools": 176, "sum": 136},
+}
+
+
+@pytest.fixture(scope="module")
+def rows(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
+    styled = {"styled": True, "hold": True, "width": 1440}
+    runs = []
+    for name, bottoms in BAR_ROWS.items():
+        view = PC_VIEW | {"bar": 44, **bottoms}
+        runs.append(base(name, steps=[{"release": True}], view=view, **styled))
+        runs.append(base(f"{name}-fit", steps=[{"release": True}, {"act": "fit"}], view=view, **styled))
+    return _run(tmp_path_factory.mktemp("rows"), runs)
+
+
+@pytest.mark.parametrize("name", BAR_ROWS)
+def test_the_first_view_and_fit_start_under_the_lowest_part_of_the_bar(rows: dict[str, Any], name: str) -> None:
+    """R-03, F-01: the first view and 'fit' start 8 px under the lowest of the chips, the tools and the summary."""
+    top = max(BAR_ROWS[name].values()) + 8
+    first = rows[name]["shots"][-1]
+    tx, ty, _ = _t(first)
+    assert (tx, ty) == (8, top)
+    shot = rows[f"{name}-fit"]["shots"][-1]
+    width, height = (float(v.removesuffix("px")) for v in shot["size"])
+    tx, ty, s = _t(shot)
+    fit = min(1, (PC_VIEW["width"] - 16) / width, (PC_VIEW["height"] - top - 16) / height)
+    assert s == pytest.approx(max(min(0.12, fit), fit))
+    assert ty == pytest.approx(top + max(0, (PC_VIEW["height"] - top - 8 - height * s) / 2))

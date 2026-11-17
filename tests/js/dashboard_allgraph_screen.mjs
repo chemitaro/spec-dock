@@ -191,7 +191,9 @@ for (const r of request.runs) {
   hooks.rect = run.view
     ? (el) => {
         if (el.classList?.contains("gx-view")) return { left: 0, top: 0, right: run.view.width, bottom: run.view.height, width: run.view.width, height: run.view.height };
-        if (el.classList?.contains("gx-next") || el.classList?.contains("gx-tools")) return { left: 0, top: 0, right: 100, bottom: run.view.bar, width: 100, height: run.view.bar };
+        // next, tools (iss-00640): the chips' and the tools' bottoms when the bar's rows differ (default: the bar's)
+        if (el.classList?.contains("gx-next")) return { left: 0, top: 0, right: 100, bottom: run.view.next ?? run.view.bar, width: 100, height: run.view.next ?? run.view.bar };
+        if (el.classList?.contains("gx-tools")) return { left: 0, top: 0, right: 100, bottom: run.view.tools ?? run.view.bar, width: 100, height: run.view.tools ?? run.view.bar };
         if (el.classList?.contains("ax-sum")) return { left: 0, top: 0, right: 100, bottom: run.view.sum ?? run.view.bar, width: 100, height: run.view.sum ?? run.view.bar };
         return null;
       }
