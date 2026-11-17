@@ -1,0 +1,52 @@
+[
+ {
+  "repo": "housing-lifecycle",
+  "screen": 1440,
+  "range": "all",
+  "own": {
+   "seen": 1344,
+   "v": {},
+   "marks": 8
+  }
+ },
+ {
+  "repo": "taikyohiyou_project",
+  "screen": 1440,
+  "range": "all",
+  "own": {
+   "seen": 1312,
+   "v": {},
+   "marks": 26
+  }
+ },
+ {
+  "repo": "taikyohiyou_project",
+  "screen": 1000,
+  "range": "all",
+  "own": {
+   "seen": 872,
+   "v": {},
+   "marks": 26
+  }
+ },
+ {
+  "repo": "taikyohiyou_project",
+  "screen": 390,
+  "range": "now",
+  "own": {
+   "seen": 360,
+   "v": {},
+   "marks": 26
+  }
+ },
+ {
+  "repo": "taikyohiyou_project",
+  "screen": 390,
+  "range": "all",
+  "own": {
+   "seen": 360,
+   "v": {},
+   "marks": 26
+  }
+ }
+]
