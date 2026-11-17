@@ -62,7 +62,8 @@ design: {
 		text: """
 			- `frameHtml` の見出し：題名（`.gx-fttl`）の後、`.gx-agents` の前に `M.wtMark(s.state === "doing" ? s.branch : null)` を置く。`wtMark` は branch が空なら空の文字列を返すので、作業中でない・branch のない枠の HTML は今と同じ（R-01）。
 			- `boxHtml` の木の表示の枠（`frame` の枝）の `.gx-marks`：Issue の箱と同じ位置（保証レベル・片付けの候補の後、人のタスクの前）に同じ `M.wtMark(...)` を足す。
-			- 見出しの行：配置の規則の `.gx .gx-fttl { max-width: none; flex: 1; }`（基準 0）で題名だけが縮むので、`.gx-fh` が `flex-wrap: wrap` になる稼働の印のある見出しでも、worktree の印は題名の行に残る（Epic の round-3 の申し送り）。足りなければ `.gx .gx-fh > .wt { flex: none; }` を足す。縮めた枠（`is-compact`）の題名は2行まで折り返し、その高さは iss-00627 の測り直し（`compactNeeds`）が測るので、配置の見込みの式は変えない。
+			- 見出しの行：配置の規則の `.gx .gx-fttl { max-width: none; flex: 1; }`（基準 0）で題名だけが縮むので、`.gx-fh` が `flex-wrap: wrap` になる稼働の印のある見出しでも、worktree の印は題名の行に残る（Epic の round-3 の申し送り）。`.gx .gx-fh > .wt { flex: none; }` で印は縮まない。
+			  ただし `flex: 1` の題名は見出しの幅いっぱいに広がり、印が見出しの右の端（幅の広い枠では画面の外）に行くので、枠の見出しの題名の広がりを自分の幅までにする：`.gx :is(.gx-ini, .gx-epic) > .gx-fh > .gx-fttl { max-width: max-content; }`（配置の規則の `.gx .gx-ini > .gx-fh .gx-fttl, .gx .gx-epic > .gx-fh .gx-fttl { max-width: none; }` より後に置き、同じ詳細度で勝つ）。基準 0 のまま題名の幅までしか伸びないので、折り返しの判断は今のまま（印は題名の行に残る）で、題名が見出しより長ければ今どおり縮む（省略の「…」）。縮めた枠の2行の題名も、使える幅が同じなので折り返しは今のまま。縮めた枠（`is-compact`）の題名は2行まで折り返し、その高さは iss-00627 の測り直し（`compactNeeds`）が測るので、配置の見込みの式は変えない。
 			- 『横断の構造』は `draw.js` の同じ部品を通る。見出しの aria-label は今のまま。
 			"""
 		satisfies: ["R-01"]
