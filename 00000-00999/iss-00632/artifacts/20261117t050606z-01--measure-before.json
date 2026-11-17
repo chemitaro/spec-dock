@@ -1,0 +1,1730 @@
+[
+ {
+  "width": 1440,
+  "scheme": "light",
+  "range": "next",
+  "first": {
+   "s": 0.590381,
+   "tx": 8,
+   "ty": 52,
+   "barBottom": 44,
+   "tyBelowBar": true
+  },
+  "total": {
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "missing": 0,
+   "markOverflow": 0,
+   "edges": 39
+  },
+  "sum": [],
+  "warns": [
+   {
+    "repo": "github.com/chemitaro/company-os",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/housing-lifecycle",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/taikyohiyou_project",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/input-devices",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/generic-mona",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/tenting-cradle",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/yubisaki",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/orca-web",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/spec-dock",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   }
+  ],
+  "compact": 6,
+  "overflow": [],
+  "marks": 5,
+  "frames": 9,
+  "errors": []
+ },
+ {
+  "width": 1440,
+  "scheme": "light",
+  "range": "now",
+  "first": {
+   "s": 0.514079,
+   "tx": 8,
+   "ty": 52,
+   "barBottom": 44,
+   "tyBelowBar": true
+  },
+  "total": {
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "missing": 0,
+   "markOverflow": 0,
+   "edges": 187
+  },
+  "sum": [],
+  "warns": [
+   {
+    "repo": "github.com/chemitaro/company-os",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/housing-lifecycle",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/taikyohiyou_project",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/input-devices",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/generic-mona",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/tenting-cradle",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/yubisaki",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/orca-web",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/spec-dock",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   }
+  ],
+  "compact": 42,
+  "overflow": [],
+  "marks": 33,
+  "frames": 9,
+  "errors": []
+ },
+ {
+  "width": 1440,
+  "scheme": "light",
+  "range": "all",
+  "first": {
+   "s": 0.10531,
+   "tx": 8,
+   "ty": 52,
+   "barBottom": 44,
+   "tyBelowBar": true
+  },
+  "total": {
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "missing": 0,
+   "markOverflow": 0,
+   "edges": 780
+  },
+  "sum": [],
+  "warns": [
+   {
+    "repo": "github.com/chemitaro/company-os",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/housing-lifecycle",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/taikyohiyou_project",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/input-devices",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/generic-mona",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/tenting-cradle",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/yubisaki",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/orca-web",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/spec-dock",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   }
+  ],
+  "compact": 12,
+  "overflow": [],
+  "marks": 37,
+  "frames": 9,
+  "errors": []
+ },
+ {
+  "width": 1440,
+  "scheme": "dark",
+  "range": "next",
+  "first": {
+   "s": 0.590381,
+   "tx": 8,
+   "ty": 52,
+   "barBottom": 44,
+   "tyBelowBar": true
+  },
+  "total": {
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "missing": 0,
+   "markOverflow": 0,
+   "edges": 39
+  },
+  "sum": [],
+  "warns": [
+   {
+    "repo": "github.com/chemitaro/company-os",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/housing-lifecycle",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/taikyohiyou_project",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/input-devices",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/generic-mona",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/tenting-cradle",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/yubisaki",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/orca-web",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/spec-dock",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   }
+  ],
+  "compact": 6,
+  "overflow": [],
+  "marks": 5,
+  "frames": 9,
+  "errors": []
+ },
+ {
+  "width": 1440,
+  "scheme": "dark",
+  "range": "now",
+  "first": {
+   "s": 0.514079,
+   "tx": 8,
+   "ty": 52,
+   "barBottom": 44,
+   "tyBelowBar": true
+  },
+  "total": {
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "missing": 0,
+   "markOverflow": 0,
+   "edges": 187
+  },
+  "sum": [],
+  "warns": [
+   {
+    "repo": "github.com/chemitaro/company-os",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/housing-lifecycle",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/taikyohiyou_project",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/input-devices",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/generic-mona",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/tenting-cradle",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/yubisaki",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/orca-web",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/spec-dock",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   }
+  ],
+  "compact": 42,
+  "overflow": [],
+  "marks": 33,
+  "frames": 9,
+  "errors": []
+ },
+ {
+  "width": 1440,
+  "scheme": "dark",
+  "range": "all",
+  "first": {
+   "s": 0.10531,
+   "tx": 8,
+   "ty": 52,
+   "barBottom": 44,
+   "tyBelowBar": true
+  },
+  "total": {
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "missing": 0,
+   "markOverflow": 0,
+   "edges": 780
+  },
+  "sum": [],
+  "warns": [
+   {
+    "repo": "github.com/chemitaro/company-os",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/housing-lifecycle",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/taikyohiyou_project",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/input-devices",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/generic-mona",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/tenting-cradle",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/yubisaki",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/orca-web",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/spec-dock",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   }
+  ],
+  "compact": 12,
+  "overflow": [],
+  "marks": 37,
+  "frames": 9,
+  "errors": []
+ },
+ {
+  "width": 1000,
+  "scheme": "light",
+  "range": "next",
+  "first": {
+   "s": 0.467681,
+   "tx": 8,
+   "ty": 92,
+   "barBottom": 44,
+   "tyBelowBar": true
+  },
+  "total": {
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "missing": 0,
+   "markOverflow": 0,
+   "edges": 39
+  },
+  "sum": [],
+  "warns": [
+   {
+    "repo": "github.com/chemitaro/company-os",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/housing-lifecycle",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/taikyohiyou_project",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/input-devices",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/generic-mona",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/tenting-cradle",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/yubisaki",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/orca-web",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/spec-dock",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   }
+  ],
+  "compact": 6,
+  "overflow": [],
+  "marks": 5,
+  "frames": 9,
+  "errors": []
+ },
+ {
+  "width": 1000,
+  "scheme": "light",
+  "range": "now",
+  "first": {
+   "s": 0.405606,
+   "tx": 8,
+   "ty": 92,
+   "barBottom": 44,
+   "tyBelowBar": true
+  },
+  "total": {
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "missing": 0,
+   "markOverflow": 0,
+   "edges": 187
+  },
+  "sum": [],
+  "warns": [
+   {
+    "repo": "github.com/chemitaro/company-os",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/housing-lifecycle",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/taikyohiyou_project",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/input-devices",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/generic-mona",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/tenting-cradle",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/yubisaki",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/orca-web",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/spec-dock",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   }
+  ],
+  "compact": 42,
+  "overflow": [],
+  "marks": 33,
+  "frames": 9,
+  "errors": []
+ },
+ {
+  "width": 1000,
+  "scheme": "light",
+  "range": "all",
+  "first": {
+   "s": 0.0754717,
+   "tx": 8,
+   "ty": 92,
+   "barBottom": 44,
+   "tyBelowBar": true
+  },
+  "total": {
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "missing": 0,
+   "markOverflow": 0,
+   "edges": 780
+  },
+  "sum": [],
+  "warns": [
+   {
+    "repo": "github.com/chemitaro/company-os",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/housing-lifecycle",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/taikyohiyou_project",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/input-devices",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/generic-mona",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/tenting-cradle",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/yubisaki",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/orca-web",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/spec-dock",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   }
+  ],
+  "compact": 12,
+  "overflow": [],
+  "marks": 37,
+  "frames": 9,
+  "errors": []
+ },
+ {
+  "width": 1000,
+  "scheme": "dark",
+  "range": "next",
+  "first": {
+   "s": 0.467681,
+   "tx": 8,
+   "ty": 92,
+   "barBottom": 44,
+   "tyBelowBar": true
+  },
+  "total": {
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "missing": 0,
+   "markOverflow": 0,
+   "edges": 39
+  },
+  "sum": [],
+  "warns": [
+   {
+    "repo": "github.com/chemitaro/company-os",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/housing-lifecycle",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/taikyohiyou_project",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/input-devices",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/generic-mona",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/tenting-cradle",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/yubisaki",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/orca-web",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/spec-dock",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   }
+  ],
+  "compact": 6,
+  "overflow": [],
+  "marks": 5,
+  "frames": 9,
+  "errors": []
+ },
+ {
+  "width": 1000,
+  "scheme": "dark",
+  "range": "now",
+  "first": {
+   "s": 0.405606,
+   "tx": 8,
+   "ty": 92,
+   "barBottom": 44,
+   "tyBelowBar": true
+  },
+  "total": {
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "missing": 0,
+   "markOverflow": 0,
+   "edges": 187
+  },
+  "sum": [],
+  "warns": [
+   {
+    "repo": "github.com/chemitaro/company-os",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/housing-lifecycle",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/taikyohiyou_project",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/input-devices",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/generic-mona",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/tenting-cradle",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/yubisaki",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/orca-web",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/spec-dock",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   }
+  ],
+  "compact": 42,
+  "overflow": [],
+  "marks": 33,
+  "frames": 9,
+  "errors": []
+ },
+ {
+  "width": 1000,
+  "scheme": "dark",
+  "range": "all",
+  "first": {
+   "s": 0.0754717,
+   "tx": 8,
+   "ty": 92,
+   "barBottom": 44,
+   "tyBelowBar": true
+  },
+  "total": {
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "missing": 0,
+   "markOverflow": 0,
+   "edges": 780
+  },
+  "sum": [],
+  "warns": [
+   {
+    "repo": "github.com/chemitaro/company-os",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/housing-lifecycle",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/taikyohiyou_project",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/input-devices",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/generic-mona",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/tenting-cradle",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/yubisaki",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/orca-web",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/spec-dock",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   }
+  ],
+  "compact": 12,
+  "overflow": [],
+  "marks": 37,
+  "frames": 9,
+  "errors": []
+ },
+ {
+  "width": 390,
+  "scheme": "light",
+  "range": "next",
+  "first": {
+   "s": 0.74,
+   "tx": 4,
+   "ty": 8,
+   "barBottom": -6,
+   "tyBelowBar": true
+  },
+  "total": {
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "missing": 0,
+   "markOverflow": 0,
+   "edges": 39
+  },
+  "sum": [],
+  "warns": [
+   {
+    "repo": "github.com/chemitaro/company-os",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/housing-lifecycle",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/taikyohiyou_project",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/input-devices",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/generic-mona",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/tenting-cradle",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/yubisaki",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/orca-web",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/spec-dock",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   }
+  ],
+  "compact": 6,
+  "overflow": [],
+  "marks": 5,
+  "frames": 9,
+  "errors": []
+ },
+ {
+  "width": 390,
+  "scheme": "light",
+  "range": "now",
+  "first": {
+   "s": 0.74,
+   "tx": 4,
+   "ty": 8,
+   "barBottom": -6,
+   "tyBelowBar": true
+  },
+  "total": {
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "missing": 0,
+   "markOverflow": 0,
+   "edges": 187
+  },
+  "sum": [],
+  "warns": [
+   {
+    "repo": "github.com/chemitaro/company-os",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/housing-lifecycle",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/taikyohiyou_project",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/input-devices",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/generic-mona",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/tenting-cradle",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/yubisaki",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/orca-web",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/spec-dock",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   }
+  ],
+  "compact": 42,
+  "overflow": [],
+  "marks": 33,
+  "frames": 9,
+  "errors": []
+ },
+ {
+  "width": 390,
+  "scheme": "light",
+  "range": "all",
+  "first": {
+   "s": 0.74,
+   "tx": 4,
+   "ty": 8,
+   "barBottom": -6,
+   "tyBelowBar": true
+  },
+  "total": {
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "missing": 0,
+   "markOverflow": 0,
+   "edges": 780
+  },
+  "sum": [],
+  "warns": [
+   {
+    "repo": "github.com/chemitaro/company-os",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/housing-lifecycle",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/taikyohiyou_project",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/input-devices",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/generic-mona",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/tenting-cradle",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/yubisaki",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/orca-web",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/spec-dock",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   }
+  ],
+  "compact": 12,
+  "overflow": [],
+  "marks": 37,
+  "frames": 9,
+  "errors": []
+ },
+ {
+  "width": 390,
+  "scheme": "dark",
+  "range": "next",
+  "first": {
+   "s": 0.74,
+   "tx": 4,
+   "ty": 8,
+   "barBottom": -6,
+   "tyBelowBar": true
+  },
+  "total": {
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "missing": 0,
+   "markOverflow": 0,
+   "edges": 39
+  },
+  "sum": [],
+  "warns": [
+   {
+    "repo": "github.com/chemitaro/company-os",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/housing-lifecycle",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/taikyohiyou_project",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/input-devices",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/generic-mona",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/tenting-cradle",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/yubisaki",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/orca-web",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/spec-dock",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   }
+  ],
+  "compact": 6,
+  "overflow": [],
+  "marks": 5,
+  "frames": 9,
+  "errors": []
+ },
+ {
+  "width": 390,
+  "scheme": "dark",
+  "range": "now",
+  "first": {
+   "s": 0.74,
+   "tx": 4,
+   "ty": 8,
+   "barBottom": -6,
+   "tyBelowBar": true
+  },
+  "total": {
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "missing": 0,
+   "markOverflow": 0,
+   "edges": 187
+  },
+  "sum": [],
+  "warns": [
+   {
+    "repo": "github.com/chemitaro/company-os",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/housing-lifecycle",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/taikyohiyou_project",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/input-devices",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/generic-mona",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/tenting-cradle",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/yubisaki",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/orca-web",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/spec-dock",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   }
+  ],
+  "compact": 42,
+  "overflow": [],
+  "marks": 33,
+  "frames": 9,
+  "errors": []
+ },
+ {
+  "width": 390,
+  "scheme": "dark",
+  "range": "all",
+  "first": {
+   "s": 0.74,
+   "tx": 4,
+   "ty": 8,
+   "barBottom": -6,
+   "tyBelowBar": true
+  },
+  "total": {
+   "boxHits": 0,
+   "ownHits": 0,
+   "overlaps": 0,
+   "diagonal": 0,
+   "portShare": 0,
+   "trunkOverlaps": 0,
+   "frameExits": 0,
+   "failed": 0,
+   "missing": 0,
+   "markOverflow": 0,
+   "edges": 780
+  },
+  "sum": [],
+  "warns": [
+   {
+    "repo": "github.com/chemitaro/company-os",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/housing-lifecycle",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/taikyohiyou_project",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/input-devices",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/generic-mona",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/tenting-cradle",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/yubisaki",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/orca-web",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   },
+   {
+    "repo": "github.com/chemitaro/spec-dock",
+    "rows": [
+     "6時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock canonical sta",
+     "PR の状態が分かりません。"
+    ]
+   }
+  ],
+  "compact": 12,
+  "overflow": [],
+  "marks": 37,
+  "frames": 9,
+  "errors": []
+ }
+]
