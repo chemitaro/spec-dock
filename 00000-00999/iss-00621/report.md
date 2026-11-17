@@ -33,6 +33,33 @@ ID: "iss-00621"
 - 2026-11-17 実装の判断（D-04）：`.gx .gx-fh > .wt { flex: none; }` を足した（設計の「足りなければ」の規則）。題名だけが縮み、worktree の印が縮まず題名の行に残ることを CSS で固める。実機の確かめは S-04。
 - 2026-11-17 実装の判断（D-05）：`.sd-card__meta:not(:has(> :not(.sd-orca:empty))) { display: none; }` は残した（置き場が meta の外へ出て効かなくなるが、消しても HTML は同じで、既存の静的な検査を変えずに済む）。T-03 の node のテストは、計画のとおり `test_dashboard_orca_views_js.py` の `run_panel` に、エージェントのいる構造を足して書いた（`El.prototype.querySelector` をその中だけ足した）。
 
-## 実機の確かめ
+- 2026-11-17 タスク担当：最終品質ゲートの観点の `ui-behavior`（plan.cue）は、レビューの契約の観点にないので `e2e-user-flow` に置き換えた（意味は同じ：画面の動き）。
+
+## 実機の確かめ（S-04、2026-11-17）
+
+- 試しのサーバー：この worktree の `797690b4f` の wheel を隔離した venv（`.workbench/iss-00621/venv`）に入れ、この PC の状態の置き場の写し（`.workbench/iss-00621/state`）と `XDG_CONFIG_HOME` の試しの設定（`orca_web.port` 18821）で `spec-dock dashboard serve --offline --tailscale --port 18621`。試しの orca は `relay_orca.py`（GET だけで常駐の orca-web 8791 を中継し CORS の頭を足す。iss-00629 の写し）を 127.0.0.1 と tailnet の 18821 に。常駐の 47800 と 8791 の設定、道具の環境には触れていない。エージェントには何も送っていない。
+- 試しの送り先（統括が用意）：taikyohiyou_project の作業中の Epic epic-02233（worktree `worktree/epic-02233`）に、親 A（`…be2027b0`）→ 子 B（`…36a945a8`）と、関係のない C（`…9af19d61`）。同じ箱の2人：spec-dock の iss-00621（タスク担当 `…97b7f902` → 実装担当 `…44e2ac2c`）。
+- 道具：`.workbench/iss-00621/tools/probe.mjs`（headless Chrome、`--disable-features=MacAppCodeSignClone`、CDP の `Browser.close` で閉じる。印の中心を `Input.dispatchMouseEvent` で押す）。結果 `.workbench/iss-00621/shots2/results.json`、写し `shots2/*.png`（1440・390 × 明・暗）。
+
+| 確かめ（受入） | 1440 明 | 1440 暗 | 390 明 | 390 暗 |
+|---|---|---|---|---|
+| R-01 枠の見出しの `.wt`（title「worktree：worktree/epic-02233」、`.gx-agents` の外、題名と同じ行） | ○ | ○ | ○ | ○ |
+| R-01 題名の右の端から印まで（8px 以内） | 6.2px | 6.2px | 5.2px | 5.2px |
+| R-01 『横断の構造』の枠の見出しの `.wt` | ○ | ○ | ○ | ○ |
+| R-03 枠の印の並び（C, A, B ＝ 関係なしが左、親 → 子が右。Epic R-14 の受入3） | ○ | ○ | ○ | ○ |
+| R-02 構造の図の枠の2つ目の印 → A のチャット（`/embed/agent?id=`） | ○ | ○ | ○ | ○ |
+| R-02 横の欄の見出しの3つ目の印 → B | ○ | ○ | ○ | ○ |
+| R-02 spec-dock の iss-00621 の箱の2つ目の印 → 実装担当 | ○ | ○ | ○ | ○ |
+| R-02 ボードの札の2つ目の印 → A | ○ | ○ | ○ | ○ |
+| R-02 『横断の構造』の枠の2つ目の印 → A | ○ | ○ | ○ | ○ |
+| R-05 札の `.sd-card__agents`（meta の外、`display: flex`、印が札の縁の内） | ○ | ○ | ○ | ○ |
+| R-05 印のない札の専用の行が見えない（35枚のうち出ている行 3、印のない出ている行 0） | ○ | ○ | ○ | ○ |
+| 線の検査（リポジトリの構造の図 taikyohiyou・spec-dock、『横断の構造』の全体）の違反 | 0 | 0 | 0 | 0 |
+| ブラウザーのエラー（ダッシュボード） | 0 | 0 | 0 | 0 |
+
+- 印の並びは、要約の `agents` の順（A, B, C）ではなく、部品の `buildMarks` の順（C, A, B）で、SpecDock が並べ替えていない（R-03）。spec-dock の箱も、親（タスク担当）→ 子（実装担当）。
+- 1440 暗では、試しの中継が、開いたチャットの中の orca-web の部品（`/embed/send-dom.js`・`send-view.js`）の読み込みで接続を切った（ERR_CONNECTION_RESET）。ダッシュボードのエラーではなく、試しの中継（同時の読み込み）の問題。
+- 『+N』の押し（選びを変えない）は、5人以上のいる worktree がないので実機では写していない。node のテスト（T-01・T-03）で確かめた。
+- 直す前（`ce999075e`）の写し（`.workbench/iss-00621/shots/`）で、枠の見出しの `.wt` が見出しの右の端（1440 で x=1614、画面の外）に出ていたので、仕様を直して（round-3）`797690b4f` で直した。
 
 ## Residual Risks / Follow-ups
