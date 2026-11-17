@@ -17,7 +17,7 @@ from pathlib import Path
 import threading
 from typing import TYPE_CHECKING, Literal
 
-from spec_dock.runtime.application.dashboard_nesting import Nesting, repository_nesting
+from spec_dock.runtime.application.dashboard_nesting import repository_nesting
 from spec_dock.runtime.application.dashboard_progress import issues_in_progress, plan_signature
 from spec_dock.runtime.domain.canonical_structure import parse_timestamp
 from spec_dock.runtime.domain.dashboard_model import STALE_AFTER, build_model
@@ -132,7 +132,7 @@ class _Listing:
     visibility: dict[str, Visibility] = field(default_factory=dict)
     problems: tuple[ConfigProblem, ...] = ()
     orca_web: OrcaWebSettings = field(default_factory=OrcaWebSettings)
-    nesting: dict[str, Nesting] = field(default_factory=dict)  # each listed repository's parent and tier (iss-00613)
+    nesting: dict[str, str | None] = field(default_factory=dict)  # each listed repository's parent (iss-00613)
 
 
 def _resolved(path: str) -> str | None:
@@ -140,17 +140,14 @@ def _resolved(path: str) -> str | None:
     return os.path.realpath(path) if path and Path(path).is_absolute() else None
 
 
-def _listing_nesting(
-    entries: tuple[RegistryEntry, ...], served: dict[str, SiteRepository], visibility: dict[str, Visibility]
-) -> dict[str, Nesting]:
+def _listing_nesting(served: dict[str, SiteRepository], visibility: dict[str, Visibility]) -> dict[str, str | None]:
     """Resolve the paths once per listing read and nest the listed repositories (iss-00613 D-02)."""
     shown = [
         (key, _resolved(str(served[key].checkout)) if served[key].checkout is not None else None)
         for key in sorted(served)
         if not visibility[key].hidden
     ]
-    boundaries = [path for path in (_resolved(entry.main_checkout) for entry in entries) if path is not None]
-    return repository_nesting(shown, boundaries)
+    return repository_nesting(shown)
 
 
 class DashboardSite:
@@ -241,7 +238,7 @@ class DashboardSite:
             visibility,
             tuple(problems),
             orca_web,
-            _listing_nesting(entries, served, visibility),
+            _listing_nesting(served, visibility),
         )
         return self._listing
 
@@ -251,12 +248,12 @@ class DashboardSite:
             listing = self._refresh_listing()
             return tuple(listing.served[key] for key in sorted(listing.served) if not listing.visibility[key].hidden)
 
-    def nested_repositories(self) -> tuple[tuple[SiteRepository, Nesting], ...]:
-        """The visible repositories, by key, each with its parent and tier labels from the same listing read."""
+    def nested_repositories(self) -> tuple[tuple[SiteRepository, str | None], ...]:
+        """The visible repositories, by key, each with its parent's key (or None) from the same listing read."""
         with self._lock:
             listing = self._refresh_listing()
             keys = [key for key in sorted(listing.served) if not listing.visibility[key].hidden]
-            return tuple((listing.served[key], listing.nesting.get(key, Nesting(None, ()))) for key in keys)
+            return tuple((listing.served[key], listing.nesting.get(key)) for key in keys)
 
     def unknown_count(self) -> int:
         with self._lock:

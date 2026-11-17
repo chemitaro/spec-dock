@@ -40,7 +40,16 @@ def test_the_api_item_explains_parent() -> None:
 
 def test_the_api_item_has_no_tier_labels_and_states_the_exception() -> None:
     item = _api_item()
-    for word in ("段の札", "businesses", "products", "services", "事業", "プロダクト", "サービス", "ほかの名前はそのまま"):
+    for word in (
+        "段の札",
+        "businesses",
+        "products",
+        "services",
+        "事業",
+        "プロダクト",
+        "サービス",
+        "ほかの名前はそのまま",
+    ):
         assert word not in item, word
     assert "0.9.6 で消し" in item and "版の規則の例外" in item and "`tier`" in item
     # The rule itself stays as it is at the head of the section.
