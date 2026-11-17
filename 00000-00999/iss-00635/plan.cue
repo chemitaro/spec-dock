@@ -5,9 +5,9 @@ package spec
 goal: "一覧の API と『横断の構造』の見出しから段の札をなくし、チェックアウトのパスの包含による入れ子だけで、どの置き方のリポジトリでも同じに見せる"
 
 steps: {
-	"S-01": {title: "D-05 のサーバーと文書のテスト（T-01・T-02・T-04・T-05）を先に直して落ちることを確かめ、D-01・D-02・D-04 を実装して通す（dashboard_nesting.py・dashboard_site.py・dashboard_http.py、reference_cli.md の配る側と dogfood、static-inventory.json）", realizes: ["R-01", "R-03"], status: "todo", session: "impl-sol"}
-	"S-02": {title: "D-05 の画面のテスト（T-03）を先に直して落ちることを確かめ、D-03 を実装して通す（allgraph.js・allgraph.css・compose.js と index.js のコメント）。make lint と全体の uv run pytest を通す", realizes: ["R-02", "F-01"], status: "todo", after: ["S-01"], session: "impl-claude"}
-	"S-03": {title: "D-06 の調べの表と、実機の確かめ（T-06）を report.md に残し、本人が見る試しの URL を tailnet で立てる", realizes: ["R-02", "R-04"], status: "todo", after: ["S-02"], session: "owner"}
+	"S-01": {title: "D-05 のサーバーと文書のテスト（T-01・T-02・T-04・T-05）を先に直して落ちることを確かめ、D-01・D-02・D-04 を実装して通す（dashboard_nesting.py・dashboard_site.py・dashboard_http.py、reference_cli.md の配る側と dogfood、static-inventory.json）", realizes: ["R-01", "R-03"], status: "done", session: "impl-sol"}
+	"S-02": {title: "D-05 の画面のテスト（T-03）を先に直して落ちることを確かめ、D-03 を実装して通す（allgraph.js・allgraph.css・compose.js と index.js のコメント）。make lint と全体の uv run pytest を通す", realizes: ["R-02", "F-01"], status: "done", after: ["S-01"], session: "impl-claude"}
+	"S-03": {title: "D-06 の調べの表と、実機の確かめ（T-06）を report.md に残し、本人が見る試しの URL を tailnet で立てる", realizes: ["R-02", "R-04"], status: "done", after: ["S-02"], session: "owner"}
 }
 
 tests: {
