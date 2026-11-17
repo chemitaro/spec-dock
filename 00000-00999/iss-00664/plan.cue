@@ -8,8 +8,8 @@ goal: "時間に左右されない横断の構造の動きのテストと、原�
 steps: {
 	"S-01": {title: "各マージで単独10回走らせ、計測で落ちる仕組みを確かめる", realizes: ["R-01"], status: "done", session: "impl"}
 	"S-02": {title: "ハーネスに run.styled を足し、motion と input の run に付ける", realizes: ["R-02", "F-01"], status: "done", after: ["S-01"], session: "impl"}
-	"S-03": {title: "単独20回、打ち切り 0ms・1e9ms、make lint、uv run pytest で確かめる", realizes: ["R-02"], status: "doing", after: ["S-02"], session: "impl"}
-	"S-04": {title: "1440×900 の Chrome で指揮の線の動きを確かめ、report.md に残す", realizes: ["R-03", "R-01"], status: "todo", after: ["S-02"], session: "impl"}
+	"S-03": {title: "単独20回、打ち切り 0ms・1e9ms、make lint、uv run pytest で確かめる", realizes: ["R-02"], status: "done", after: ["S-02"], session: "impl"}
+	"S-04": {title: "1440×900 の Chrome で指揮の線の動きを確かめ、report.md に残す", realizes: ["R-03", "R-01"], status: "done", after: ["S-02"], session: "impl"}
 }
 
 tests: {

@@ -41,7 +41,7 @@ ID: "iss-00664"
 - T-01：`test_the_motion_stills_and_watches_on_the_cross_repository_structure` を単独に20回、**0/20 落ち**。
 - T-02：`whenStyled` の打ち切りを一時的に 0ms と 1e9ms に変えて、このテストのファイル（23件）が両方で通る（戻した）。
 - T-04：上の表。
-- `make lint`：通過。`uv run pytest`（全体、手元）：下の「全体のテスト」。
+- `make lint`：通過。`uv run pytest`（全体、手元の macOS）：4306 passed・7 skipped（1802秒）。GitHub CI（PR #665）もすべて pass。
 - T-03（実機、1440×900 の headless Chrome、`--disable-features=MacAppCodeSignClone`、CDP の Browser.close で閉じた）：この worktree の editable の venv の `spec-dock dashboard serve --offline --port 18664`（127.0.0.1 だけ、iss-00657 の状態の置き場の写し）と、常駐の orca-web を GET で読むだけの中継（18864）。`/graph` で各操作の直後と 0.6秒後：
 
 | 操作 | 直後 is-still・動く絵 | 0.6秒後 is-still・動く絵 | 0.3秒で見えた絵の種類 |
@@ -52,6 +52,12 @@ ID: "iss-00664"
 | キー（→）の後 | true・0 | false・12（画面の外の絵は is-off） | 4 |
 
   ブラウザーのエラー 0。常駐の 47800・8791、道具の環境には触れていない。
+
+## レビュー記録
+
+- spec-review（spec-reviewer opus / medium、standard、2人目なし）：round-1 **合格**（P0 0・P1 0・P2 1・P3 1）。この worktree の `.workbench/spec-review/iss-00664/round-1.json`・`.check.json`。合格した文書の sha256：requirement.cue `bc4ad008…`、design.cue `3de8bd6c…`、plan.cue `be3eef49…`、explanation.html `dcea2358…`。P2 は下の残りの1つ目、P3 は説明資料と S-03 の状態の食い違い（後で S-03 を done にした）。
+- 最終品質ゲート（quality-gate-reviewer opus / medium）：attempt 01 で **合格**（`01f6f14b1`、P0/P1 0、P3 1）。closure：この worktree の `.workbench/final-quality-gate/iss-00664/closure.md`。
+- 実装：方針と同じセッションの例外（Claude Opus 5.5 / medium、変更がテスト2ファイルで調査と一体のため）。コミット `01f6f14b1`、PR #665。
 
 ## Residual Risks / Follow-ups
 
