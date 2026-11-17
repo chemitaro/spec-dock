@@ -73,5 +73,22 @@ SpecDock 0.9.6 のリリースの変更を作った。機能のコードは変�
 
 ## Verification
 
+- 最終品質ゲート：**合格**（attempt 1）。
+  - レビュアー：quality-gate-reviewer opus / medium。second opinion はない。範囲は `ee4bac5ae..9f718011f`（この Issue の差分は `git diff 3f5f8d8e9 HEAD`）。
+  - 結果：P0〜P3 は0、coverage complete。
+  - test lane：`make lint` exit 0、`uv run pytest` exit 0（4093 passed / 7 skipped、40分）。
+  - closure：`.workbench/final-quality-gate/iss-00634-fqg-1/closure.md`（worktree `/Volumes/990p2t/workspace/worktrees/orca/spec-dock/iss-00634`）。
+  - 区切りのレビューは、計画どおりなし。
+- 実装担当の報告：対象の統合テスト7ファイルで 22 passed。`make lint`、`uv lock --check` が合格。全体で 4093 passed / 7 skipped。
+- wheel：隔離した venv で `spec-dock --version` が `spec-dock 0.9.6` を返した（Outcome の S-04）。
+
+
+## 逸脱と判断
+
+- 0.9.6 の範囲を、統括の指示で2回広げた（#636 msg_bd5763cd5228・msg_d59cd06a98b7、#637 msg_dabb1c03680a）。そのたびに origin/main を取り込み、節と仕様を直して仕様のレビューをやり直した。
+- 仕様のレビューの P3（round-1）も、配るバイトの事実の誤りなので直してから合格させた。round-5 の P3（requirement.cue の background の資産の一覧）は受入に効かないので記録だけにした。
 
 ## Residual Risks / Follow-ups
+
+- `work finish iss-00634` は実行していない（マージの後に統括が行う）。
+- マージの後のタグの確かめ、wheel、導入、必要なら配布資産の更新は、統括が行う（上の手順）。
