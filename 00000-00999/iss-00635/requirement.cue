@@ -68,10 +68,10 @@ requirements: {
 	"R-03": {
 		title: "契約の文書から段の札の記述を消す"
 		text: """
-			配る側の `docs/reference_cli.md` の「orca-web との連携」の API の行から、`tier` と段の札の決め方の記述を消し、`parent` の記述だけを残す。目録 `static-inventory.json` の sha256 を新しい内容にし、前の値（0.9.5 で配ったもの）を `known_old_sha256` に足す。dogfood の写し `spec-dock/docs/reference_cli.md` を同じバイトにする。
+			配る側の `docs/reference_cli.md` の「orca-web との連携」の API の行から、`tier` と段の札の決め方の記述を消し、`parent` の記述だけを残す。契約の版 `specdock.dashboard/v1` は変えず、版の規則（「消すか意味を変えるときは版を上げます」）の例外として、API の行に「0.9.5 だけで配った `tier` は、使う者がなく、0.9.6 で消した（版の規則の例外）」の1文を書く。目録 `static-inventory.json` の sha256 を新しい内容にし、今の値（0.9.5 の後に iss-00614 で入った、まだ配っていない内容。0.9.5 で配った値は既に `known_old_sha256` にある）を `known_old_sha256` に足す。dogfood の写し `spec-dock/docs/reference_cli.md` を同じバイトにする。
 			"""
 		acceptance: [
-			"配る側と dogfood の `reference_cli.md` が同じバイトで、`tier`・`段の札`・`businesses` を含まず、`parent` の決め方（いちばん近い出す祖先、隠したもの、クローンが2つのもの、道を返さない）を含む",
+			"配る側と dogfood の `reference_cli.md` が同じバイトで、API の行が `段の札`・`businesses` を含まず、`parent` の決め方（いちばん近い出す祖先、隠したもの、クローンが2つのもの、道を返さない）と、`tier` を 0.9.6 で消した版の規則の例外の1文を含む",
 			"目録の sha256 が内容と合い、前の sha256 が `known_old_sha256` にある（今の目録のテストを含む）",
 		]
 	}
@@ -96,10 +96,12 @@ failures: {
 constraints: [
 	"入れ子の親の決まり（パスの部分で比べる包含、いちばん近い出す祖先、隠したもの・クローンが2つのもの・絶対の道でない行の扱い）は変えない",
 	"`docs/migration.md` は変えない（0.9.5 の節は過去の記録。新しい節は iss-00634）",
+	"一覧の API の契約の版 `specdock.dashboard/v1` は変えない（decisions の統括の判断 2026-11-17）",
 ]
 
 decisions: [
 	"2026-11-17 統括（依頼書の決定1〜4）：段の札をなくす。入れ子 `parent` は残す。見出しはリポジトリの名前だけにし、札の分の余白も詰める。名前やディレクトリの名前に特別な意味を持たせる決まりがほかにあれば同じく外し、report.md に書く。",
+	"2026-11-17 統括（仕様レビューの P1 への答え）：配る側の契約は「消すか意味を変えるときは版を上げます」と定めるが、`tier` は 0.9.5 だけで配り、使う者は SpecDock の画面だけで orca-web も読まない（schema の文字列も検査しない）。版を v2 に上げる波及や、使わない項目を残すことより、規則の例外を reference_cli.md に1文で明記して消すほうが単純で正しい。版は `specdock.dashboard/v1` のまま。",
 	"タスク担当（2026-11-17）：`REPO.headW`（280）は、札の分ではなく、名前とリンクの見出しの最小の幅（iss-00614 D-01）なので変えない。札の `.ax-tier` は `flex: none` で名前を省略させていたので、札を消すと、その分を名前が使う（『札の分の余白を詰める』は、札の入れ物と間（gap）を消すことで満たす）。headW を変えると、読み込み中・Scope のない枠の幅が変わり、iss-00629 の並びの測りが変わるので、この Issue の範囲の外とする。",
 	"タスク担当（2026-11-17）：`canonical.md` の設定の例のパス（`/path/to/taikyohiyou_project/...` など本人のリポジトリの名前）は、決まりではなく例なので、この Issue では変えず、report.md に後続の候補として書く（変えると配る資産と目録が増え、版上げの Issue と重なる）。",
 ]

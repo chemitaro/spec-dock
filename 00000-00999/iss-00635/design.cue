@@ -48,7 +48,7 @@ design: {
 	"D-04": {
 		title: "契約の文書と目録"
 		text: """
-			配る側 `src/spec_dock/assets/spec_dock/docs/reference_cli.md` の API の行を、`…の後ろに、入れ子の親\\`parent\\`（…）があります。親は、…いちばん近い出すリポジトリです。隠したリポジトリは親にならず、…（なければ最上位）になります。クローンが2つのものと、\\`main_checkout\\`が絶対の道でない行のリポジトリは、最上位になり、親にもなりません。チェックアウトとカタログの道は返しません。` にする（段の札の文と「で札が空」を消す。親の文は今の言い方を保つ）。
+			配る側 `src/spec_dock/assets/spec_dock/docs/reference_cli.md` の API の行を、`…の後ろに、入れ子の親\\`parent\\`（…）があります。親は、…いちばん近い出すリポジトリです。隠したリポジトリは親にならず、…（なければ最上位）になります。クローンが2つのものと、\\`main_checkout\\`が絶対の道でない行のリポジトリは、最上位になり、親にもなりません。チェックアウトとカタログの道は返しません。` にする（段の札の文と「で札が空」を消す。親の文は今の言い方を保つ）。その後ろに「0.9.5 だけで配った`tier`は、使う者がなく、0.9.6 で消しました（版の規則の例外）。」の1文を足す。冒頭の版の規則の文は変えない。
 			`static-inventory.json` の `spec-dock/docs/reference_cli.md` の `sha256` を新しい値にし、今の値 `bd8b72aff0b0…` を `known_old_sha256` の最後に足す。dogfood の写し `spec-dock/docs/reference_cli.md` に同じバイトを写す。
 			"""
 		satisfies: ["R-03"]
@@ -58,9 +58,9 @@ design: {
 		text: """
 			- `tests/unit/application/test_dashboard_nesting.py`：`TIER_LABELS` と札の値の確かめを消し、親の確かめ（この PC の形、名前の頭が同じだけのもの、同じ道、隠したもの、クローンが2つのもの、絶対でない道）を新しい戻り値で残す。名前に依らないことの確かめ（`businesses/x/products/y` と `groups/x/team/y` で同じ形の親）を足す。
 			- `tests/unit/application/test_dashboard_repositories_nesting.py`：項目の並びを `[*FIELDS, "parent"]` にし、`tier` がないことを確かめる。親の値の確かめは残す。
-			- `tests/unit/presentation/test_dashboard_allgraph_screen.py`：札の確かめ（`["プロダクト", "groups"]`）を、`tier` を持つ入力でも見出しに `sd-badge`・`ax-tier` がなく名前とリンクがある確かめに替える。FQG-001 の `.ax-tier .sd-badge` の規則のテストは、`allgraph.css` に `ax-tier` がない確かめに替える。入力の合成から `tier` を外すかどうかは、F-01 を確かめる1つを除いて外す。
+			- `tests/unit/presentation/test_dashboard_allgraph_screen.py`：札の確かめ（`["プロダクト", "groups"]`）を、`tier` を持つ入力でも見出しに `sd-badge`・`ax-tier` がなく名前とリンクがある確かめに替える。FQG-001 の `.ax-tier .sd-badge` の規則のテストは、`allgraph.css` に `ax-tier` がなく、`allgraph.js` に `ax-tier` と語 `tier` がない確かめに替える。入力の合成から `tier` を外すかどうかは、F-01 を確かめる1つを除いて外す。
 			- `tests/unit/presentation/test_dashboard_allgraph_compose.py`：入力の `tier` を外す（compose は読まない）。
-			- `tests/unit/infra/test_issue613_repository_nesting_docs.py`：`tier` の記述があることの確かめを、ないことと `parent` の記述があることの確かめに替え、dogfood の写しが同じバイトであることを確かめる（名前は変えず、文書の文をこの Issue に合わせる）。
+			- `tests/unit/infra/test_issue613_repository_nesting_docs.py`：`tier` の記述があることの確かめを、段の札の記述がないことと、`parent` の記述と版の規則の例外の1文があることの確かめに替え、dogfood の写しが同じバイトであることを確かめる（名前は変えず、文書の文をこの Issue に合わせる）。
 			- `src/spec_dock/runtime/` に読み替えの語がないことの静的な確かめ（R-01 の4つ目）を足す。
 			- `tests/integration/test_issue623_release_0_9_5.py`：0.9.5 の migration.md の節は残すので変えない。
 			"""
@@ -76,7 +76,7 @@ design: {
 }
 
 compatibility: """
-	一覧の API から `tier` がなくなる（0.9.5 で足した項目）。SpecDock の画面は同じパッケージで配るので組み合わせの問題はない。外の利用者 orca-web は `tier` を読んでいない（requirement の background）。移行の記録は 0.9.6 の版上げの Issue（iss-00634）が migration.md の新しい節に書く。
+	一覧の API から `tier` がなくなる（0.9.5 で足した項目）。契約の版は `specdock.dashboard/v1` のままにし、版の規則の例外として reference_cli.md に1文で明記する（requirement の decisions、統括 2026-11-17）。SpecDock の画面は同じパッケージで配るので組み合わせの問題はない。外の利用者 orca-web は `tier` を読んでいない（requirement の background）。移行の記録は 0.9.6 の版上げの Issue（iss-00634）が migration.md の新しい節に書く。
 	"""
 
 risks: [

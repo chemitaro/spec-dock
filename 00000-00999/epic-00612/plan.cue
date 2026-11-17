@@ -14,6 +14,14 @@ slices: {
 			"""
 		session: "owner"
 	}
+	"iss-00635": {
+		covers: ["R-02", "R-03", "R-05"]
+		text: """
+			段の札（`tier`）をなくす（本人の指摘 2026-11-17）：一覧の API の `tier` と読み替えの表、画面の見出しの札、契約の文書の記述を消し、入れ子はパスの包含だけで決める。版の規則の例外を契約の文書に1文で明記する。
+			"""
+		after: ["iss-00614"]
+		session: "owner"
+	}
 	"iss-00614": {
 		covers: ["R-04", "R-05", "R-06", "R-07", "R-08", "R-09", "F-01", "F-04"]
 		text: """
@@ -34,7 +42,7 @@ verification: """
 
 rollback: "各 Issue の PR を戻す。iss-00614 を戻すと `/graph` とタブがなくなり、iss-00613 を戻すと一覧の API の `parent` がなくなる（`tier` は iss-00635 でなくした）。保存（`specdock.allgraph.v1`）は残っても害がない。"
 
-exit: "2つの子の Issue が閉じ、`/graph` で、この PC の9つのリポジトリが company-os の入れ子のまま1枚に描かれ、既定の『これから』で見えるものだけが出る。"
+exit: "子の Issue（iss-00613・iss-00614・iss-00635）が閉じ、`/graph` で、この PC の9つのリポジトリが company-os の入れ子のまま1枚に描かれ、既定の『これから』で見えるものだけが出る。"
 
 execution: {
 	sessions: {
