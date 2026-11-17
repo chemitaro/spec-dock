@@ -3,7 +3,7 @@ package spec
 // 設計（Epic）。型 specdock/v1。
 
 goals: [
-	"入れ子（親と段の札）はサーバーが1か所で決め、パスを出さずに一覧の API で返す",
+	"入れ子（親）はサーバーが1か所で決め、パスを出さずに一覧の API で返す",
 	"各リポジトリの中は、今の配置（layout.js）と線（router.js）と部品をそのまま使い、リポジトリの枠の組み立てだけを新しく足す",
 	"リポジトリの構造の図の見え方と動きは変えない",
 ]
@@ -16,21 +16,21 @@ current: """
 	"""
 
 target: """
-	- サーバー：一覧の各リポジトリに `parent`（親のリポジトリの鍵か null）と `tier`（段の札の配列）。決め方は純粋な関数1つ。
+	- サーバー：一覧の各リポジトリに `parent`（親のリポジトリの鍵か null）。決め方は純粋な関数1つ（段の札 `tier` は iss-00635 でなくした）。
 	- 画面：`/graph` の新しい画面 `allgraph`。各リポジトリの構造を読み、リポジトリごとに今の `routeLayout` で配置と線を求め、新しい純粋な組み立て（`views/allgraph/compose.js`）でリポジトリの枠を入れ子に並べ、今の部品で描く。
 	"""
 
 design: {
 	"D-01": {
-		title: "入れ子と段の札を決める純粋な関数"
+		title: "入れ子を決める純粋な関数"
 		text: """
 			`runtime/application/dashboard_nesting.py`（新しい、DOM・ファイル・ネットワークに触れない）に、
-			`repository_nesting(shown: Sequence[tuple[str, str | None]], boundaries: Sequence[str]) -> dict[str, Nesting]` を置く。
-			`shown` は出すリポジトリの（鍵、ただ1つの main のチェックアウトか None）、`boundaries` は登録簿のすべての行の main のチェックアウト（隠したもの、リポジトリの分からない行、2つ目のクローンを含む）。`Nesting` は `parent: str | None` と `tier: tuple[str, ...]`。
+			`repository_nesting(shown: Sequence[tuple[str, str | None]]) -> dict[str, str | None]`（鍵 → 親の鍵か None）を置く（iss-00635 で、段の札のための `boundaries` と `Nesting` をなくした）。
+			`shown` は出すリポジトリの（鍵、ただ1つの main のチェックアウトか None）。
 
 			- 道の比べ方：呼ぶ側が `os.path.realpath` で正規化した絶対の道を渡す（関数の中ではファイルを見ない）。「中にある」は、道の部分（`PurePath.parts`）で、親の部分が子の部分の真の頭であること（文字の頭ではない。R-01 の2つ目）。同じ道は親子にしない。
 			- 親：チェックアウトが None でない出すリポジトリのうち、子のチェックアウトを中に持つ、いちばん深いもの（R-01）。None のリポジトリは親にならず、自身も最上位（F-02）。
-			- 段の札：子のチェックアウトを中に持つ境界（boundaries と、出すリポジトリのチェックアウト）のうち、いちばん深いものから子までの相対の部分の、最後（子のディレクトリ）を除いた並び。各部分を `{"businesses": "事業", "products": "プロダクト", "services": "サービス"}` で写し、ないものはそのまま。中に持つ境界がないか、親がないなら空（R-02、F-03）。親が隠したリポジトリを飛び越すときも、札はいちばん近い境界（隠したもの）から数えるので、隠したもののディレクトリの名前は現れない。
+			- ディレクトリの名前は読まない（R-02）。隠したリポジトリは `shown` に入らないので親にならず、その中のものは外の出す祖先の子になる（F-03）。
 			- 返す順と鍵は `shown` のまま。
 
 			`DashboardSite` は、一覧を読み直すとき（`_refresh_listing`）にこの関数を呼び、結果を `_Listing` に覚える（登録簿と印が変わったときだけ計算し直す）。`realpath` は、その時の1回だけ。
@@ -38,11 +38,11 @@ design: {
 		satisfies: ["R-01", "R-02", "F-02", "F-03"]
 	}
 	"D-02": {
-		title: "一覧の API に `parent` と `tier` を足す"
+		title: "一覧の API に `parent` を足す"
 		text: """
-			`_repositories` の各リポジトリに `"parent": <鍵か null>` と `"tier": [<札>…]` を足す。今の項目、並び（鍵の順）、`schema` は変えない。
+			`_repositories` の各リポジトリに `"parent": <鍵か null>` を足す（iss-00613 で足した `"tier"` は iss-00635 でなくした）。今の項目、並び（鍵の順）、`schema` は変えない。
 			`parent` は、同じ応答の `repositories` にある鍵だけを指す（出さないリポジトリを指さない）。道とカタログの文字列は応答に入れない。
-			`src/spec_dock/assets/spec_dock/docs/reference_cli.md` の「ダッシュボードのサーバーの契約」の API の行に、2つの項目、決め方（チェックアウトの道のいちばん近い祖先、段の札の写し、隠したものと ambiguous の扱い）、道を返さないことを書く。
+			`src/spec_dock/assets/spec_dock/docs/reference_cli.md` の「ダッシュボードのサーバーの契約」の API の行に、`parent` の項目、決め方（チェックアウトの道のいちばん近い祖先、隠したものと ambiguous の扱い）、道を返さないことを書く。
 			"""
 		satisfies: ["R-03", "F-02", "F-03"]
 	}
@@ -62,7 +62,7 @@ design: {
 		text: """
 			`views/allgraph/compose.js`（DOM なし）に `compose(repos, sizes, options)` を置く。
 
-			- 入力：`repos` は一覧の API の並びの `[{repository, parent, tier, owner, name}]`。`sizes` は鍵ごとの `{status: "loading"|"failed"|"ok", w, h, shown}`（ok のとき `w`・`h` はそのリポジトリの `layout` の幅と高さ、`shown` は見える箱・枠・塊の数）。`options` は `{range, width}`（width は図の領域の 100% での幅）。
+			- 入力：`repos` は一覧の API の並びの `[{repository, parent, owner, name}]`。`sizes` は鍵ごとの `{status: "loading"|"failed"|"ok", w, h, shown}`（ok のとき `w`・`h` はそのリポジトリの `layout` の幅と高さ、`shown` は見える箱・枠・塊の数）。`options` は `{range, width}`（width は図の領域の 100% での幅）。
 			- 木：`parent` が同じ一覧にあればその子、なければ最上位。循環は起こらないが、たどった鍵を覚えて二度目は最上位に置く。兄弟は一覧の並び。
 			- 状態の決め方（画面の側）：構造の API が HTTP で失敗した → `failed`。答えが返ったが `snapshot.status` が `ok` でなく `scopes` が空 → `failed`（理由は概況と同じ `overviewWarnings`）。`scopes` があれば、`snapshot.status` によらず `ok` で、その `scopes` を描き、`ok` でない理由（前回読めたものを描いている、など）は見出しの下の警告の帯に出す（概況と構造の図と同じ扱い）。`sizes` にはこの警告の有無 `warn`（info でない警告があるか）も渡す。
 			- 出すか：`all`・`now` ではすべて。`next` では、`status` が ok で `shown` が0で `warn` がないリポジトリは、出す子がなければ出さない（R-06）。`warn` のある ok のリポジトリは、`shown` が0でも理由のために出す（F-01）。`loading` と `failed` は出す（F-01）。
@@ -78,7 +78,7 @@ design: {
 		text: """
 			- 読み込み：`ctx.repositories`（殻が読んだ一覧）の各リポジトリの構造を `api.structure(repo, null)` で並べて読み、届いたものから描く。各リポジトリについて `routeLayout(scopes, cleanup, {mode: "nest", range, width: その深さで使える幅})` を求め、鍵ごとに（revision、range、幅、30分の動きの印）の組で覚える。組が同じなら計算し直さない（R-09）。重い計算で画面が固まらないよう、リポジトリの間で一度描画に戻す（`requestAnimationFrame` か `setTimeout(0)`）。
 			- 更新：5秒ごと（`document.hidden` でないとき）に各リポジトリの `api.revision` を読み、変わったものだけ構造を読み直す（R-09）。「見た」は送らない。
-			- 描画：`compose` の結果で、リポジトリごとに `<section class="ax-repo" data-repo="<鍵>">` を置き、見出し（folder のアイコン、`owner/name`、段の札を `sd-badge` で、札が2つ以上なら「 › 」でつなぐ。読めないときは理由）と、中の構造の図の層（今の箱・枠・塊・線の HTML を、そのリポジトリの `layout` の座標で、body の原点だけずらして置く）を描く。拡大・移動は全体の1つの世界（`gx-world` と同じ transform）で行う。
+			- 描画：`compose` の結果で、リポジトリごとに `<section class="ax-repo" data-repo="<鍵>">` を置き、見出し（folder のアイコン、`owner/name`、読めないときは理由。段の札は iss-00635 でなくした）と、中の構造の図の層（今の箱・枠・塊・線の HTML を、そのリポジトリの `layout` の座標で、body の原点だけずらして置く）を描く。拡大・移動は全体の1つの世界（`gx-world` と同じ transform）で行う。
 			- 部品の共有：`graph.js` の箱・枠・塊・線の HTML を作る関数（`boxHtml`、`frameHtml`、`chipHtml` と、線の class の決め方）を `views/graph/draw.js` に取り出し、構造（`data`、`ix`、`desc`、`cleanup`、range）を引数で受けるようにする。`graph.js` はそれを呼ぶだけにし、出す HTML を変えない（取り出す前後で、同じ構造の graph.js の DOM が一致することを写しの比べで確かめる）。graph.js のソースの文字列を調べる今のテストは、調べるファイルを draw.js に移し、確かめる文字列と数は変えない（requirement.cue の constraints の2つ目）。
 			- リポジトリの枠の見え方：Initiative の枠と違う形（例：見出しに folder のアイコンと名前の帯、2px の線や二重線、角の丸みの違い）を、今の色の札（`--sd-*`、`--ds-*`）だけで作る。新しい色の値は足さない（R-05）。
 			- 見せる範囲：道具の帯に、構造の図と同じ『全体・いま・これから』と、状態で目立たせる札、凡例、収める、拡大・縮小を置く。入れ子と木の切り替えはない。範囲の覚えは `localStorage` の `specdock.allgraph.v1`（`{range}`、読めなければ既定の `next`）。構造の図の `specdock.graph.v3` には触れない（R-06）。
@@ -111,7 +111,7 @@ design: {
 
 compatibility: """
 	一覧の API は項目を足すだけ（版は変えない）。リポジトリの画面、概況、人のタスクの見え方と道は変わらず、横断の画面のタブが1つ増える。保存は新しい鍵 `specdock.allgraph.v1` を足すだけ。
-	PR を戻すと、`parent`・`tier` と `/graph` がなくなり、今の画面に戻る。
+	PR を戻すと、`parent` と `/graph` がなくなり、今の画面に戻る。
 	"""
 
 risks: [
