@@ -24,6 +24,7 @@ ID: "iss-00621"
 - S-01（`dd775ba8d` テスト先行 → `99b375648`）：T-01・T-02（`test_dashboard_orca_marks_js.py`）、T-03（`test_dashboard_orca_views_js.py` の `run_panel`）を書いて落ちることを確かめ、D-01（`orca_marks.js` の WeakMap の記録、`markAgentAt`・`markIds`）、D-02（`panel.js` の `openAgent`）で通した。節目 67 passed。
 - S-02（`688d9eca0` テスト先行 → `31bb71d04`）：T-04〜T-06 を書いて落ちることを確かめ、D-03（graph・allgraph・board・panel の押し）、D-04（`draw.js` の枠の見出しと木の枠の箱の `wtMark`、`graph.css` の `.gx .gx-fh > .wt { flex: none; }`）、D-05（`parts.js` の `.sd-card__agents`、`parts.css`）で通した。今の `preferTab("agents")` を固定していた静的な検査と札の HTML の検査は、R-02・R-05 の置き換えに合わせて直した。節目（S-01 の4ファイル＋`test_dashboard_screens_js.py`＋`tests/unit/presentation/`）262 passed。構造の図の golden と線の検査も通る。
 - S-03（`124f9b9c7`）：`make lint` 合格（ruff check・format・mypy）。全体の `uv run pytest` は 4073 passed、7 skipped（1898秒）。dashboard の資産は `static-inventory.json` に載っていないので、sha256 の直しは要らなかった。
+- 仕様の変更（round-3）の直し（`ce999075e` の上に、`3dfc3e083` テスト先行 → `797690b4f`）：T-04 に、`graph.css` の `.gx :is(.gx-ini, .gx-epic) > .gx-fh > .gx-fttl { max-width: max-content; }` が配置の規則（`max-width: none`）より後にあることの静的な検査を足して落ちることを確かめ、その規則を配置の規則のすぐ後に足して通した。`make lint` 合格、全体の `uv run pytest` 4081 passed、7 skipped（1956秒）。S-02・S-03 を done にした。
 
 ## 逸脱と判断
 
