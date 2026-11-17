@@ -1,0 +1,36 @@
+iss-00633 node の比べ（直す前 3f5f8d8e9 の資産 → 直した後 3ca68b2c9 の資産、routeLayout、稼働の印なし）
+組：8 つのリポジトリ（この PC の状態の置き場の写し）と固定した入力の2構造 × 入れ子（範囲3 × 見える幅 344・360・600・872・984・1240・1312・1344・1424）＋ 木（範囲3 × 1240）
+違反 = boxHits+ownHits+overlaps+diagonal+portShare+trunkOverlaps+failed。sig = 世界の大きさと経路の digest
+
+240 組（8 リポジトリ）: {"cases": 240, "worse": 0, "better": 1, "same_route": 233, "changed_route": 7, "bad_before": 1, "bad_after": 0}
+  うち入れ子 216: {"cases": 216, "worse": 0, "better": 0, "same_route": 216, "changed_route": 0, "bad_before": 0, "bad_after": 0}
+  うち木 24: {"cases": 24, "worse": 0, "better": 1, "same_route": 17, "changed_route": 7, "bad_before": 1, "bad_after": 0}
+300 組（固定した入力を含む）: {"cases": 300, "worse": 0, "better": 2, "same_route": 289, "changed_route": 11, "bad_before": 2, "bad_after": 0}
+  うち入れ子 270: {"cases": 270, "worse": 0, "better": 0, "same_route": 270, "changed_route": 0, "bad_before": 0, "bad_after": 0}
+
+違反のあった組と、経路の変わった組：
+  fixture-business tree all 1240: 違反 0 -> 0, 巡 10 -> 4, 経路 変わった
+  fixture-business tree now 1240: 違反 0 -> 0, 巡 5 -> 4, 経路 変わった
+  fixture-product tree all 1240: 違反 9 -> 0, 巡 10 -> 5, 経路 変わった
+  fixture-product tree now 1240: 違反 0 -> 0, 巡 7 -> 4, 経路 変わった
+  generic-mona tree all 1240: 違反 0 -> 0, 巡 6 -> 4, 経路 変わった
+  housing-lifecycle tree all 1240: 違反 0 -> 0, 巡 10 -> 4, 経路 変わった
+  housing-lifecycle tree now 1240: 違反 0 -> 0, 巡 5 -> 4, 経路 変わった
+  orca-web tree all 1240: 違反 0 -> 0, 巡 2 -> 2, 経路 変わった
+  spec-dock tree all 1240: 違反 0 -> 0, 巡 7 -> 9, 経路 変わった
+  taikyohiyou_project tree all 1240: 違反 3 -> 0, 巡 10 -> 5, 経路 変わった
+  taikyohiyou_project tree now 1240: 違反 0 -> 0, 巡 7 -> 4, 経路 変わった
+
+固定した入力の木（稼働の印あり・なし × 範囲3）、直した後：
+  product all nomarks=0 {"boxHits":0,"ownHits":0,"overlaps":0,"diagonal":0,"portShare":0,"trunkOverlaps":0,"failed":0} []
+  product all nomarks=1 {"boxHits":0,"ownHits":0,"overlaps":0,"diagonal":0,"portShare":0,"trunkOverlaps":0,"failed":0} []
+  product now nomarks=0 {"boxHits":0,"ownHits":0,"overlaps":0,"diagonal":0,"portShare":0,"trunkOverlaps":0,"failed":0} []
+  product now nomarks=1 {"boxHits":0,"ownHits":0,"overlaps":0,"diagonal":0,"portShare":0,"trunkOverlaps":0,"failed":0} []
+  product next nomarks=0 {"boxHits":0,"ownHits":0,"overlaps":0,"diagonal":0,"portShare":0,"trunkOverlaps":0,"failed":0} []
+  product next nomarks=1 {"boxHits":0,"ownHits":0,"overlaps":0,"diagonal":0,"portShare":0,"trunkOverlaps":0,"failed":0} []
+  business all nomarks=0 {"boxHits":0,"ownHits":0,"overlaps":0,"diagonal":0,"portShare":0,"trunkOverlaps":0,"failed":0} []
+  business all nomarks=1 {"boxHits":0,"ownHits":0,"overlaps":0,"diagonal":0,"portShare":0,"trunkOverlaps":0,"failed":0} []
+  business now nomarks=0 {"boxHits":0,"ownHits":0,"overlaps":0,"diagonal":0,"portShare":0,"trunkOverlaps":0,"failed":0} []
+  business now nomarks=1 {"boxHits":0,"ownHits":0,"overlaps":0,"diagonal":0,"portShare":0,"trunkOverlaps":0,"failed":0} []
+  business next nomarks=0 {"boxHits":0,"ownHits":0,"overlaps":0,"diagonal":0,"portShare":0,"trunkOverlaps":0,"failed":0} []
+  business next nomarks=1 {"boxHits":0,"ownHits":0,"overlaps":0,"diagonal":0,"portShare":0,"trunkOverlaps":0,"failed":0} []
