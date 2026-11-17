@@ -32,6 +32,7 @@ ID: "iss-00616"
   - 既存のテストの直し：`test_dashboard_graph_golden.py` は、Orca のある run（`marks`）の凡例から指揮の2行を除いて比べる（2行があることも確かめる）。違いがその2行だけであることを、写しの全 run・全段で確かめた（ほかの部分の差は0）。写し（`graph_dom_golden.json`）は書き直していない。`test_dashboard_orca_views_js.py` の固定した行に合わせ、`graph.js` の import の行と `V.pn?.openAgent(markAgentAt(slot, target));` の行をそのまま残した。
   - `uv run pytest tests/unit/presentation/ tests/unit/infra/test_dashboard_orca_marks_js.py tests/unit/infra/test_dashboard_orca_views_js.py tests/unit/infra/test_dashboard_screens_js.py -q` → 281 passed。`ruff check`・`ruff format --check`（tests、src/spec_dock）合格、新しいテストの mypy 合格。
   - 画面の写しは S-02 では撮っていない（S-04 の実機の確かめに任せる）。
+- S-03（impl-claude、`70be1f1d6` で）：`make lint` → ruff check・ruff format check・mypy すべて合格。`uv run pytest`（全体）→ 4141 passed、7 skipped（41分19秒）。失敗なし。『横断の構造』のテストは変更なしで通った。`static-inventory.json` は dashboard の資産を載せていないので直していない。コードの変更はなく、S-03 のコミットはない。
 
 ## 逸脱と判断
 
