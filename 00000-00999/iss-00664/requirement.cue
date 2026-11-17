@@ -14,35 +14,34 @@ assurance: {
 	reason: "0.9.8 のリリースを止めている不具合か不安定なテストかを見分ける"
 }
 
-// 目的と背景（任意）。
-// purpose:    "この Issue が実現する価値"
-// background: "解く問題と、関係者"
+purpose:    "0.9.8 のリリース（iss-00663）の最終品質ゲートで手元だけ落ちた、横断の構造の動きのテストの原因を見分け、時間に左右されずに毎回同じ結果を出す形に直す。"
+background: "`tests/unit/presentation/test_dashboard_allgraph_command_screen.py::test_the_motion_stills_and_watches_on_the_cross_repository_structure`（iss-00646）が、macOS の手元で `shots[1].still` が True になって落ちる（main `fa9824cb9` で単独5回中4回）。provider CI（Linux）は通る。"
 
-// 対象と対象外（任意）。
-// includes: ["..."]
-// excludes: ["..."]
+includes: ["原因の見分け（利用者に見える不具合か、テストの時間の決め方か）と、落ち始めたマージの特定", "テストまたは画面のコードの最小の修正", "1440×900 の Chrome での指揮の線の動きの確かめ"]
+excludes: ["横断の構造の動きの仕組み（iss-00646・iss-00655・iss-00657）の変更", "構造のグラフ（graph.js）の側のハーネス"]
 
-// 観測できる要件。番号（R-01、R-02、…）をキーにする。
-// title は必須。acceptance（観測できる受け入れの条件）は standard 以上で必須。
 requirements: {
-	// "R-01": {
-	// 	title: "利用者が〜できる"
-	// 	text:  "詳しい説明"
-	// 	acceptance: ["〜が観測できる"]
-	// }
+	"R-01": {
+		title: "落ちる原因と、落ち始めたマージを記録する"
+		text:  "92e26aff7（#649）、#658、#659、#660、#661、#662 の各マージで、このテストを単独に10回ずつ走らせた落ちる回数と、落ちる仕組みを report.md に残す。"
+		acceptance: ["report.md に各マージの落ちた回数の表と、落ちる仕組み（どの呼び出しが、どの時計で、なぜ実時間に左右されるか）がある"]
+	}
+	"R-02": {
+		title: "横断の構造の動きのテストが、時間に左右されずに毎回通る"
+		text:  "テストの結果が、実時間の速さ（機械の負荷、先に走る run の長さ）で変わらない。不具合なら画面のコードを、テストの不安定さならテストを、最小に直す。"
+		acceptance: ["修正の後、このテストを単独に20回走らせて0回落ちる", "`whenStyled` の打ち切りの時間を 0ms と 1e9ms に変えても、このテストのファイルが通る", "`make lint` と `uv run pytest`（全体）が通る"]
+	}
+	"R-03": {
+		title: "利用者の画面で、指揮の線が動き始める"
+		text:  "1440×900 の Chrome で、横断の構造の指揮の線が、読み込み後・ドラッグの後・ホイールの後・キーの後に、止めたままにならず流れ始める。"
+		acceptance: ["実機で、各操作の後に `.gx-view` の is-still が外れ、流れる絵の opacity が切り替わり続けることを確かめ、report.md に記録する"]
+	}
 }
 
-// 失敗・境界の条件。番号（F-01、…）をキーにする。
-// title は必須。impact（起きたときの影響）と recovery（回復のしかた）は strict 以上で必須。
 failures: {
-	// "F-01": {
-	// 	title:    "〜のときは、何も書かずに止まる"
-	// 	impact:   "〜"
-	// 	recovery: "〜"
-	// }
+	"F-01": {
+		title: "原因が利用者に見える不具合だったときは、テストを緩めずに画面のコードを直す"
+	}
 }
 
-// 制約・前提、合意した判断、未解決事項（任意）。
-// constraints: ["..."]
-// decisions: ["..."]
-// questions: ["..."]
+constraints: ["書いてよいのは `src/spec_dock/assets/dashboard/`、`tests/`、`src/spec_dock/assets/static-inventory.json`、この Scope のディレクトリ"]
