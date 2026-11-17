@@ -608,3 +608,9 @@ def test_the_frame_heading_keeps_the_worktree_mark_on_the_title_row() -> None:  
     box = _function((VIEWS / "graph/draw.js").read_text(), "boxHtml")
     assert box.count('${M.wtMark(s.state === "doing" ? s.branch : null)}') == 2
     assert ".gx .gx-fh > .wt { flex: none; }" in (VIEWS / "graph.css").read_text()
+    # the title grows only to its own width, so the mark follows it instead of the heading's right end (T-04)
+    css = (VIEWS / "graph.css").read_text()
+    own = ".gx :is(.gx-ini, .gx-epic) > .gx-fh > .gx-fttl { max-width: max-content; }"
+    layout = ".gx .gx-ini > .gx-fh .gx-fttl, .gx .gx-epic > .gx-fh .gx-fttl { max-width: none; }"
+    assert own in css and layout in css
+    assert css.index(layout) < css.index(own)
