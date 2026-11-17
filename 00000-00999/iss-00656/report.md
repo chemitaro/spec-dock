@@ -26,9 +26,22 @@ ID: "iss-00656"
 
 - 実装担当 impl-claude（Claude Opus 5.5 / medium）。開始のコミット `afe2df5c2af6c54672a7727e03e1a44525bf47ec`。基準（開始のコミット）：`make lint` 合格、S-02 の節目のテスト 113 passed（記録は worktree の `.workbench/implement/iss-00656/`）。
 - S-01（`7395f9148`）：T-01（`headerBand` の表、4件）を先に書いて落ちることを確かめ、`panel_logic.js` に D-01 の `headerBand` を入れた。`uv run pytest tests/unit/infra/test_dashboard_panel_logic_js.py` 12 passed。
+- S-02（`ebbca611f`）：T-02・T-05 を新しい `tests/unit/infra/test_dashboard_panel_head_js.py`（`tests/js/fake_dom.mjs` の偽の DOM で `createScopePanel` を描く）に先に書き、12件が落ちることを確かめてから、D-02（見出し）・D-03（`open`・`frameBar`・`tabOpenLink`・欄と詳しい画面のタブの行）・D-07（`headOverflows`・`fitHead`）・D-08（`hide()` の `keep`、`show()` の半分）・D-04（CSS）を入れた。T-03 は `test_dashboard_scope_tabs_js.py` に足した（`tabOpenLink` のエスケープ、文書の `open` の端、詳しい画面のタブの行、CSS の静的な検査）。節目のテスト（plan.cue の8ファイル＋新しいファイル）135 passed、`tests/unit/presentation/test_dashboard_{allgraph,graph}_command_screen.py` も通る。`make lint` 合格。
+- 直した今のテストの期待（見出しとタブの行の形の変化によるものだけ）：
+  - `test_dashboard_orca_views_js.py`：偽の欄の `PARTS` に `.pn-crumb`・`.pn-tabopen`、偽の aside の `classList.contains`（D-08 の `isShown()` を `show()` が読むため）。見出しの HTML の先頭に `.pn-crumb`、`.pn-hl` に `pn-merge` がない、書き込みの数に `.pn-crumb` の列を足した。
+  - `test_dashboard_agents_tab_js.py`：同じ `PARTS` と `classList.contains`。
+  - `test_dashboard_scope_tabs_js.py`：説明資料の中身が枠だけ（`sd-framebar` と印がない）、文書の帯に印がなく新しいタブの行き先は `open(env)`。
+  - `test_dashboard_state_marks.py`：帯（`.pn-why`）に状態の印（`stateMark`）がない（R-03）。札（`stateChip` の motion）は今のまま。
+  - `tests/js/fake_dom.mjs`：`scrollWidth`（`sizes` の鉤、なければ `clientWidth`）を足した。
+
 
 ## 逸脱と判断
 
+- S-02：申し送り1（P2）のとおり、`fitHead` を `refreshOrca()` の終わり（`draw()` は `refreshOrca()` で終わるので、D-07 の『`draw()` の終わり』はこれで満たす。今の静的なテスト『draw は refreshOrca() で終わる』を変えないため）、窓の大きさの変化、取っ手のタップ・`release`・`pointercancel` の `applySnap()` の後、`ResizeObserver` で呼ぶ。`ResizeObserver` は `.pn-head` に加えて `.pn-crumb` も見る（Orca で開くの遅れた表示では `.pn-head` の大きさは変わらず、パンくずの幅だけが変わるため）。送りの付け外しで大きさが戻るので、知らせは繰り返さない。
+- S-02：申し送り2（P3）：帯の欄（`renderAgentPanel`）の描き直しでも `hide()` が `keep` になり段を保つ。T-05 は片付けの候補の形で確かめた（帯の欄も同じ道筋）。
+- S-02：1行目で縮まない部品を確かにするため、`.sd-pn .pn-hl > *` と `.sd-pn .pn-head > .iconbtn` に `flex: none` を足した（D-04 の『札・印・Orca で開く・閉じるは縮まない』）。祖先のボタンの縮みの重み 4 は `flex: 0 4 auto`、`.pn-self` は 1。
+- S-02：T-03 のうち `test_dashboard_scope_tabs_js.py` に足した4件は、欄の T-02（先に落ちることを確かめた）の後、実装と同じ単位の中で書いた（中身は欄の印の形と同じ口 `open`・`tabOpenLink` の端）。新しいファイルの14件のうち2件（片付けの候補の見出しに送りが付かない、閉じた後は半分で開く）は今の振る舞いを固定する回帰のテストで、Red の時から通る。
+- S-02：祖先のボタンの title は『<ID> <題名>』（R-01）。スマートフォンの全体の段の題名は `display: block` と `-webkit-line-clamp: none` で1行に戻す。
 - S-01：`headerBand` の `merge` は `MERGE_WORDS` の鍵（`needs_fix`・`mergeable`）だけを値として返し、ほかはすべて `null`。理由の文は `String(…).trim()` で読む（`reason` が null・text がない場合も空として扱う。F-01）。
 
 ## Residual Risks / Follow-ups
