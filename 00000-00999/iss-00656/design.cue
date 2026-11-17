@@ -35,8 +35,8 @@ design: {
 			- `PLAIN_REASONS = new Set(["closed", "in_progress", "no_waits"])`。
 			- `reason`：`scope.reason?.text` を前後の空白を除いて読み、空、`label` と同じ、または `PLAIN_REASONS.has(scope.reason?.code)` なら `""`、ほかはその文。
 			- `idle`：引数のまま。
-			- `merge`：`scope.merge` が `"needs_fix"` か `"mergeable"` で、`reason` が空でないときその値、ほかは `null`。
-			- `reason` と `idle` がどちらも空なら `null`（帯を出さない）。
+			- `merge`：`scope.merge` が `"needs_fix"` か `"mergeable"` ならその値、ほかは `null`。`merge` があり `reason` が空なら、`reason` を `MERGE_WORDS[merge]`（`needs_fix`『マージ待ち・直す必要あり』、`mergeable`『マージ待ち・マージできる』。`mergeBadge` と同じ言葉）にする（統括の条件：マージの状態は必ず帯に出る）。
+			- `reason` と `idle` がどちらも空で `merge` もなければ `null`（帯を出さない）。
 			"""
 		satisfies: ["R-03", "R-04", "F-01"]
 	}
@@ -64,7 +64,7 @@ design: {
 			- 帯：`frameBar(left)`（印の引数をやめる）。`explanationTab` の `written` は `<div class="sd-framebox" data-frame="explanation"><iframe class="sd-explain" …></iframe></div>`（帯なし）。`docsTab` は `frameBar(文書の選び)`。`agents_tab.js` は `frameBar(選び)`。
 			- 印の HTML（共通の関数 `tabOpenLink(open)` を `scope_tabs.js` から出す）：`open` が `null` なら `""`、ほかは `<a class="sd-tabopen" href="<href>" target="_blank" rel="noopener" aria-label="<label>を新しいタブで開く" title="<label>を新しいタブで開く">` ＋ `external` の印 ＋ `</a>`。
 			- 欄（`panel.js`）：`build()` のタブの行を `<div class="pn-tabrow"><div class="pn-tabs" role="tablist" aria-label="欄のタブ"></div><span class="pn-tabopen"></span></div>` にする（`parts.tabs` は今の `.pn-tabs`、`parts.tabopen` を足す）。`draw()` で、`env` があり選んだタブの行に `open` があれば `put(parts.tabopen, tabOpenLink(row.open(env)))`、ほかは `put(parts.tabopen, "")`（F-02：読み込み中・前の Scope の印を残さない）。
-			- 詳しい画面（`scope.js`）：`.sd-tabs-row` を `<nav class="sd-tabs" …>タブ</nav>` ＋ `tabOpenLink(選んだタブの open(env))` ＋ `legend()` にする。
+			- 詳しい画面（`scope.js`）：`.sd-tabs-row` を `<nav class="sd-tabs" …>タブ</nav>` ＋ `tabOpenLink(選んだタブの open(env))` ＋ `legend()` にする（印はタブの並びのすぐ右、凡例は今のまま右端）。
 			"""
 		satisfies: ["R-05", "F-02"]
 	}
@@ -72,16 +72,17 @@ design: {
 		title: "CSS（panel.css・scope_tabs.css・scope.css）"
 		text: """
 			PC（panel.css）：
-			- `.pn-head`：今の flex・中央そろえ・`gap: 8px`・`padding: 12px 10px 0 16px` のまま。`.pn-crumb { flex: 1 1 auto; min-width: 0; }`、`.pn-hl`・`.pn-orca`・閉じるは縮まない（今の `margin-left: auto` の規則は `.pn-crumb` が残りを取るので不要になる。`.pn-orca:empty` を隠す規則は残す）。
+			- `.pn-head`：今の flex・中央そろえ・`gap: 8px`・`padding: 12px 10px 0 16px` に、`flex-wrap: wrap-reverse; row-gap: 4px;` を足す。`.pn-crumb { flex: 1 1 12em; min-width: 0; }`（12em より狭くなるときだけ、`.pn-crumb` が右の部品の下の行に送られる。`wrap-reverse` なので右の部品と閉じるは上の行に残り、閉じるは `margin-left: auto` で右端）。`.pn-hl` の中身・`.pn-orca`・閉じるは縮まない。
+			- 今の `.pn-head .iconbtn { margin-left: auto; … }`・`.pn-orca:not(:empty) { margin-left: auto; }`・`.pn-orca:not(:empty) + .pn-close { margin-left: 0; }`・`.pn-orca:empty` の規則は消さない（同じ欄に描く『片付けの候補』の `.pn-head` は `.pn-crumb` を持たず、閉じるの右寄せをこの規則に頼る）。`.pn-crumb` がない見出しの見た目は今と同じ。
 			- `.pn-path`（`.pn-crumb` の中の nav）：`display: flex; align-items: center; flex-wrap: nowrap; gap: 2px; min-width: 0; margin: 0; font-size: 12.5px; color: var(--ds-muted);`。祖先のボタンは今の見た目のまま `flex: 0 1 auto; min-width: 3ch;`（`max-width: 22ch`・省略記号は今のまま）。`.pn-self { flex: 0 1 auto; min-width: 0; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }`、`.pn-self .ds-docid { flex: none; }`、`.pn-kind { min-width: 0; overflow: hidden; text-overflow: ellipsis; }`。祖先のボタンは今の ID より先に縮む（`flex-shrink` の重みを祖先 4、`.pn-kind` 1 にする）。
 			- `.pn-cover { padding: 4px 16px 0; }`、`.pn-title { margin: 0; font-size: 16px; line-height: 1.45; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }`（今の折り返しの規則は残す）。
 			- `.pn-why`：今の左の線（`--st`）・地（`--st-bg`）・角を保ち、`margin: 6px 0 0; padding: 4px 10px; align-items: center; gap: 8px; white-space: nowrap; overflow: hidden; font-size: 12.5px;`。中の `.pn-reason { min-width: 0; overflow: hidden; text-overflow: ellipsis; }`、`.pn-idle`（帯の中）は `flex: none; display: inline-flex; gap: 4px; color: var(--ds-muted);`、`.pn-merge-mark` は `[data-merge="needs_fix"]` で `--ds-danger-ink`、`[data-merge="mergeable"]` で `--ds-ok-ink`（`mergeBadge` の札の文字と同じ色の変数）。今の `.pn-why .st-ico` と、別の行の `.pn-idle` の規則は消す。
 			- タブの行：`.pn-tabrow { flex: none; display: flex; align-items: center; margin-top: 8px; border-bottom: 1px solid var(--ds-border); }`、`.pn-tabs` は今の規則から `margin-top` と `border-bottom` を外し `flex: 1; min-width: 0;`。`.pn-tabopen { flex: none; display: flex; padding-right: 8px; } .pn-tabopen:empty { display: none; }`。
 			- 印（scope_tabs.css の `:is([data-view="scope"], .sd-pn)` の中）：`.sd-tabopen` は今の `.sd-framebar__open` と同じ 24px の四角・`--ds-muted`・hover。`.sd-framebar__open` と `.sd-framebar__name` の規則を消す。
-			- 詳しい画面（scope.css）：`.sd-tabs-row .sd-tabopen { align-self: center; margin-left: auto; }`、印があるとき凡例は `margin-left: 0`（`.sd-tabopen + .sd-legend`）。
+			- 詳しい画面（scope.css）：`.sd-tabs-row .sd-tabopen { align-self: center; margin-bottom: 6px; }`（凡例の `margin-left: auto` は今のまま）。
 
 			スマートフォン（panel.css の `@container app (max-width: 640px)`）の全体の段：
-			- `.pn-top` の1行の flex と `.pn-head { display: contents; }` は今のまま。`.pn-crumb { order: 1; flex: none; }`、`.pn-cover { order: 2; flex: 1; min-width: 0; padding: 0; }`、`.pn-hl { order: 0 }`（今の並び：札が先）、`.pn-orca, .pn-close { order: 3; }`。
+			- `.pn-top` の1行の flex と `.pn-head { display: contents; }` は今のまま（`.pn-hl` も今どおり `display: contents` で、札と印は order 0 の flex の項目）。`.pn-crumb { order: 1; flex: none; }`、`.pn-cover { order: 2; flex: 1; min-width: 0; padding: 0; }`、`.pn-orca, .pn-close { order: 3; }`。並びは今と同じ『札・印・今の ID・題名・Orca で開く・閉じる』。
 			- 隠す：`.pn-path > button, .pn-path > .ds-icon, .pn-top-mark, .pn-kind, .pn-why`。`.pn-title` は今の1行と省略記号（`-webkit-line-clamp` を外し `white-space: nowrap; display: block;`）。今の `.pn-merge, .pn-idle, .pn-kicker` の規則は、要素がなくなるので消す。
 			- タブの行：`.pn-tabrow { margin-top: 0; }`（今の `.pn-tabs { margin-top: 0 }` の置き換え）。
 			"""
@@ -102,9 +103,12 @@ design: {
 		text: """
 			試しのサーバー：直す前は実装の開始のコミット（iss-00650 のマージ後の `origin/main`）を `git archive` して隔離した venv、直した後はこの worktree を隔離した venv に入れ、同じ状態の置き場の写し、別のポート（後は `--tailscale`）。常駐の 47800・8791 の設定と道具の環境に触れない。headless Chrome は `--disable-features=MacAppCodeSignClone`、閉じるのは CDP の `Browser.close`。
 
+			- 画面：構造の図・横断の構造・ボードの欄（3つとも `createScopePanel`）。
 			- 高さ：1440×900 と 1000×800 で、作業中の Issue の欄を説明資料のタブで開き、`getBoundingClientRect` で『欄の上端からタブの行の上端まで』（見出しの高さ）と『説明資料の枠（`.sd-explain`）の高さ』を、直す前と後で測る。止められている Scope と Epic でも同じ数を書く。
-			- 1行目：1000×800 で、1行目の高さが閉じるのボタンの行の高さ（32px 前後）に収まり、`.pn-head` の `scrollWidth` が `clientWidth` を超えない。
-			- 写し：Issue・Epic・Initiative・止められている Scope・エージェントのいる Scope の欄を、構造の図と横断の構造で、1440・1280・1000 × 明・暗、スマートフォン 390×844 の通常と全体の段。直す前と後を並べる。
+			- 1行目：1000×800 で、祖先2つの作業中の Issue の1行目の高さが閉じるのボタンの行の高さ（32px 前後）に収まり、`.pn-head` の `scrollWidth` が `clientWidth` を超えない。
+			- 印が4つのとき：エージェントが4つある Scope があればそれで、なければ欄の `.sd-orca` の印の要素を DevTools（CDP の Runtime.evaluate）で4つに複製して、1000×800 の見出しが1行か、パンくずが下の行に送られ、`.pn-head` がはみ出さず閉じるが右上にあることを確かめ、写しを残す。
+			- 片付けの候補の欄：見出しの閉じるが右端にあること（写し）。
+			- 写し：Issue・Epic・Initiative・止められている Scope・マージ待ちの Scope（あれば）・エージェントのいる Scope の欄を、構造の図と横断の構造（ボードは作業中の Issue だけ）で、1440・1280・1000 × 明・暗、スマートフォン 390×844 の通常と全体の段。直す前と後を並べる。
 			- 本人が見る試しの URL（tailnet）を report.md に書き、本人の確かめまで残す。
 			"""
 		satisfies: ["R-01", "R-06", "R-07"]
