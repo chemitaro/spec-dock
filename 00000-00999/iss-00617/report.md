@@ -42,6 +42,8 @@ ID: "iss-00617"
 - `window.specdockAllGraphStats` に `composes`（枠の組み立ての回数）を足した（T-05 の「同じ形で組み立て直さない」「F-05 の2回」の数え。今の項目は変えない）。
 - 偽の DOM には位置（offset）がないので、`specdockCmdAudit` の `spotDrift` は T-05 では項目があることだけを確かめ、値は実機（T-06）で数える。
 
+- **最終品質ゲート（2026-11-17、合格）**：合格のコミット `18ba5383a`（origin/main の #643 を取り込んだマージ。base `0ef2dfeae`）。レビュー（quality-gate-reviewer opus / medium）P0〜P3 すべて0、網羅は完全。`make lint` exit 0、`uv run pytest` 4213 passed・7 skipped。この worktree の `.workbench/final-quality-gate/iss-00617/closure.md`。attempt 01（`57517bb32`）はレビュー合格だったが、テストの途中で main が進んだ（#643）ので止め、取り込んだコミットで attempt 02 をやり直した。記録だけのコミットはない（記録は Git の外）。
+
 ## 実機の確かめ（S-04、2026-11-17、`57517bb32`）
 
 - 試しのサーバー：この worktree の候補の wheel を隔離した venv（`.workbench/iss-00617/venv`）に入れ、この PC の状態の置き場の写し（`.workbench/iss-00617/state`）と試しの `XDG_CONFIG_HOME`（`orca_web.port` 18817）で、`spec-dock dashboard serve --offline --tailscale --port 18617`。試しの orca の口は iss-00616 の `relay_orca.py`（常駐の orca-web を GET で読むだけの中継）を写して 18817 に。常駐の 47800・8791 の設定、道具の環境には触れていない。エージェントには何も送っていない。
