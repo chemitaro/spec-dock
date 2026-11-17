@@ -83,3 +83,38 @@ export function ownsKey(e, view) {
   if (t.closest(OTHER_INPUT)) return false;
   return !!view?.contains(t);
 }
+
+// Binds the wheel on `view` and the keys on the document to a screen's moves (D-04). `ops`: {active(), pan(dx, dy),
+// zoomAt(f, x, y), zoomCenter(f), fit()}, x and y in the view's coordinates; each move goes through the screen's
+// applyT, so the lines still while the graph moves (iss-00646). Returns {dispose()}.
+export function bindViewInput(view, ops) {
+  let last = null;
+  const onWheel = (e) => {
+    e.preventDefault();
+    const r = wheelAction(e, last, performance.now(), view.clientWidth);
+    last = { kind: r.kind, at: r.at };
+    const act = r.act;
+    if (!act) return;
+    if (act.type === "zoom") {
+      const b = view.getBoundingClientRect();
+      ops.zoomAt(act.f, act.x - b.left, act.y - b.top);
+    } else ops.pan(act.dx, act.dy);
+  };
+  const onKeyDown = (e) => {
+    if (!ops.active() || !ownsKey(e, view)) return;
+    const act = keyAction(e);
+    if (!act) return;
+    e.preventDefault();
+    if (act.type === "pan") ops.pan(act.dx, act.dy);
+    else if (act.type === "zoom") ops.zoomCenter(act.f);
+    else ops.fit();
+  };
+  view.addEventListener("wheel", onWheel, { passive: false });
+  document.addEventListener("keydown", onKeyDown);
+  return {
+    dispose() {
+      view.removeEventListener("wheel", onWheel, { passive: false });
+      document.removeEventListener("keydown", onKeyDown);
+    },
+  };
+}

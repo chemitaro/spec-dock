@@ -8,6 +8,8 @@
 //       worktree to the other path: the same summary object whose places differ each time, F-05), {tap: selector}, {click: selector},
 //       {key: "Escape" | "Enter" | " ", on: selector?}, {wheel: {dx, dy}} (the reader pans: A.moved), {range: name},
 //       {advance: ms} (the motion's clock, iss-00646), {hidden: bool}, {tell: {sel, hit}} (IntersectionObserver's answer)
+// iss-00655: wheel also takes {mode (deltaMode), wy (wheelDeltaY), shift, ctrl, x, y}; key takes shift, and on: "main"
+// (the screen's container) or "input" (an input in the graph area); {viewHidden: bool} hides the graph area.
 // run.io: the page has an IntersectionObserver (the fake one of fake_motion.mjs); without it, none (F-01).
 // Prints {runs: {name: [snapshot after the first render, after each step]}}.
 import { readFileSync } from "node:fs";
@@ -86,6 +88,8 @@ function snap(root) {
     svgSizes: world.querySelectorAll(".gx-cmd svg, .gx-cmd-top svg").map((sv) => [sv.getAttribute("width"), sv.getAttribute("height")]),
     phases: world.querySelectorAll(".cl-ph").length,
     still: q(".gx-view").classList.contains("is-still"),
+    label: q(".gx-view").getAttribute("aria-label"),
+    keyPrevented,
     off: world.querySelectorAll(".is-off").length,
     observed: motion.observed(world),
     size: [world.style.width, world.style.height],
@@ -116,6 +120,7 @@ function snap(root) {
   };
 }
 
+let keyPrevented = null; // whether the last key step was prevented (iss-00655)
 const target = (root, sel) => {
   const el = root.querySelector(sel);
   if (!el) throw new Error(`nothing at ${sel}`);
@@ -123,6 +128,7 @@ const target = (root, sel) => {
 };
 
 async function step(root, s, orca) {
+  keyPrevented = null;
   if (s.summary !== undefined) {
     orca.summary = orca.plainSummary;
     orca.set({ summary: s.summary, order: s.order });
@@ -147,13 +153,22 @@ async function step(root, s, orca) {
     for (const fn of view.listeners.pointerup || []) fn({ ...ev, type: "pointerup" });
   } else if (s.click) target(root, s.click).dispatch("click");
   else if (s.key) {
-    const el = s.on ? target(root, s.on) : target(root, ".gx-view");
-    const ev = { key: s.key, target: el, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
+    let el;
+    if (s.on === "main") el = root;
+    else if (s.on === "input") el = root.querySelector(".gx-view > input") ?? target(root, ".gx-view").appendChild(new Element("input"));
+    else el = s.on ? target(root, s.on) : target(root, ".gx-view");
+    const ev = { key: s.key, shiftKey: !!s.shift, target: el, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
     for (const fn of page.docListeners.keydown || []) fn(ev);
+    keyPrevented = ev.defaultPrevented;
   } else if (s.wheel) {
     const view = target(root, ".gx-view");
-    for (const fn of view.listeners.wheel || []) fn({ deltaX: s.wheel.dx, deltaY: s.wheel.dy, ctrlKey: false, metaKey: false, clientX: 0, clientY: 0, preventDefault() {} });
+    const w = s.wheel;
+    const ev = { deltaX: w.dx, deltaY: w.dy, shiftKey: !!w.shift, ctrlKey: !!w.ctrl, metaKey: false, clientX: w.x ?? 0, clientY: w.y ?? 0, preventDefault() {} };
+    if (w.mode !== undefined) ev.deltaMode = w.mode;
+    if (w.wy !== undefined) ev.wheelDeltaY = w.wy;
+    for (const fn of view.listeners.wheel || []) fn(ev);
   } else if (s.range) target(root, `[data-act="range"][data-range="${s.range}"]`).dispatch("click");
+  else if (s.viewHidden !== undefined) target(root, ".gx-view").hidden = s.viewHidden;
   else if (s.advance) motion.advance(s.advance);
   else if (s.hidden !== undefined) motion.setHidden(s.hidden);
   else if (s.tell) motion.tell(s.tell.sel, s.tell.hit);

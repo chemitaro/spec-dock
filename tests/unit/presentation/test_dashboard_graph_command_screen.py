@@ -389,6 +389,36 @@ RUNS += [
 ]
 
 
+# iss-00655 T-03: the mouse wheel, the trackpad and the keys
+MOUSE_UP = {"dx": 0, "dy": -100, "mode": 0, "wy": 120, "x": 300, "y": 200}
+TWO_FINGERS = {"dx": 3, "dy": 7, "mode": 0, "wy": -21, "x": 300, "y": 200}
+RUNS += [
+    {
+        "name": "input",
+        "orca": {"summary": FIVE},
+        "steps": [
+            {"advance": 400},  # 1: the first view's quiet time over
+            {"wheel": MOUSE_UP},  # 2: a mouse wheel's notch zooms at the cursor
+            {"advance": 400},  # 3
+            {"wheel": TWO_FINGERS},  # 4: two fingers pan
+            {"advance": 400},  # 5
+            {"key": "ArrowRight"},  # 6
+            {"key": "ArrowDown", "shift": True},  # 7
+            {"key": "+"},  # 8
+            {"act": "fit"},  # 9
+            {"key": "ArrowLeft"},  # 10
+            {"key": "0"},  # 11: like the fit button
+            {"key": "ArrowRight", "on": "input"},  # 12: an input keeps its keys
+            {"key": "ArrowRight", "on": "main"},  # 13: the screen's container focused on a move
+            {"viewHidden": True},  # 14
+            {"key": "ArrowRight"},  # 15: a hidden graph takes no key
+            {"viewHidden": False},  # 16
+            {"key": "Escape"},  # 17: Escape is not the graph's
+        ],
+    },
+]
+
+
 @pytest.fixture(scope="module")
 def drawn(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
     return _run(tmp_path_factory.mktemp("screen"), {"doc": structure(), "runs": RUNS})
@@ -660,3 +690,63 @@ def test_the_watching_of_the_graph_area(drawn: dict[str, Any]) -> None:
     assert not shots[9]["still"]
     left = drawn["after"]["watch"]
     assert left["observed"]["live"] == 0 and left["timers"] == 0 and left["listeners"] == 0 and not left["still"]
+
+
+# --- iss-00655 T-03: the wheel, the trackpad and the keys on the page ---------------------------------------------------
+
+LABEL = "構造の図。ドラッグ・2本指・矢印キーで移動、ホイール・ピンチ・+ と - で拡大・縮小、0 で全体"
+
+
+def _under(shot: dict[str, Any], x: float, y: float) -> tuple[float, float]:
+    """The world's point under (x, y) of the graph area."""
+    tx, ty, s = _transform(shot)
+    return (x - tx) / s, (y - ty) / s
+
+
+def test_a_mouse_wheel_zooms_at_the_cursor_and_two_fingers_pan(runs: dict[str, list[dict[str, Any]]]) -> None:
+    shots = runs["input"]
+    _, _, s1 = _transform(shots[1])
+    _, _, s2 = _transform(shots[2])
+    assert s2 == pytest.approx(s1 * 1.15)
+    assert _under(shots[2], 300, 200) == pytest.approx(_under(shots[1], 300, 200))
+    tx3, ty3, s3 = _transform(shots[3])
+    tx4, ty4, s4 = _transform(shots[4])
+    assert s4 == s3
+    assert (tx4, ty4) == pytest.approx((tx3 - 3, ty3 - 7))
+
+
+def test_the_keys_pan_zoom_and_fit(runs: dict[str, list[dict[str, Any]]]) -> None:
+    shots = runs["input"]
+    t = [_transform(shot) for shot in shots]
+    assert (t[6][0], t[6][1], t[6][2]) == pytest.approx((t[5][0] - 80, t[5][1], t[5][2]))
+    assert (t[7][0], t[7][1], t[7][2]) == pytest.approx((t[6][0], t[6][1] - 320, t[6][2]))
+    assert t[8][2] == pytest.approx(t[7][2] * 1.25)
+    assert _under(shots[8], 600, 400) == pytest.approx(_under(shots[7], 600, 400))  # the middle of the area
+    assert t[10][0] == pytest.approx(t[9][0] + 80)
+    assert shots[11]["transform"] == shots[9]["transform"]  # 0 is the fit button
+    for i in (6, 7, 8, 10, 11, 13):
+        assert shots[i]["keyPrevented"] is True, i
+    assert shots[12]["transform"] == shots[11]["transform"] and shots[12]["keyPrevented"] is False
+    assert t[13][0] == pytest.approx(t[12][0] - 80)
+    assert shots[15]["transform"] == shots[13]["transform"] and shots[15]["keyPrevented"] is False
+    assert shots[17]["keyPrevented"] is False
+
+
+def test_every_wheel_and_key_move_stills_the_motion(runs: dict[str, list[dict[str, Any]]]) -> None:
+    shots = runs["input"]
+    assert not shots[1]["still"] and not shots[3]["still"] and not shots[5]["still"]
+    for i in (2, 4, 6, 7, 8, 10, 11, 13):
+        assert shots[i]["still"], i
+
+
+def test_the_graph_area_tells_the_new_controls(runs: dict[str, list[dict[str, Any]]]) -> None:
+    assert runs["input"][0]["label"] == LABEL
+
+
+def test_the_screens_leave_the_input_to_view_input() -> None:
+    """R-06: no copy of the wheel's or the keys' rules in either screen; both use views/graph/view_input.js."""
+    for name, imp in (("graph.js", "./graph/view_input.js"), ("allgraph.js", "./graph/view_input.js")):
+        src = (ASSETS / "views" / name).read_text(encoding="utf-8")
+        assert f'from "{imp}"' in src, name
+        for word in ("ctrlKey", "deltaX", "deltaY", "ArrowLeft", "wheelDelta", '"wheel"'):
+            assert word not in src, (name, word)
