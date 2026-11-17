@@ -22,6 +22,11 @@ if TYPE_CHECKING:
 CHECK = ROOT / "tests" / "js" / "dashboard_graph_command_motion.mjs"
 CURVE = "M 10 20 C 10 80 200 40 200 120"
 STUB = "M 200 120 L 200 134"
+ARROW = "M 196.5 128 L 200 134 L 203.5 128 Z"  # iss-00648 D-04: the arrowhead at `to` (200, 134)
+MARK = {"x": 182, "y": 140, "w": 36, "h": 16, "band": False}  # a box's mark below the edge
+SLOT = {"x": 174, "y": 134, "w": 52, "h": 28, "band": True}  # a band slot
+IN_MARK = '<rect class="cl-in" x="180" y="138" width="40" height="20" rx="4"/>'
+IN_SLOT = '<rect class="cl-in" x="172" y="132" width="56" height="32" rx="4"/>'
 SVG = re.compile(r"<svg ([^>]*)>(.*?)</svg>", re.S)
 
 
@@ -107,7 +112,12 @@ def motion(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
                 link("wait", (STUB,)),
                 link("done"),
                 link("flow", id='p"<&>', parent='p"<&>', child="c'x"),
+                link("flow", mark=MARK),  # 5: a box's mark, no stub
+                link("wait", mark=SLOT),  # 6: a band slot
+                link("done", mark=MARK),  # 7
             ],
+            "arrow": [{"x": 200, "y": 134}, {"x": 12.5, "y": -16}],
+            "markRect": [MARK, SLOT],
             "ripples": [{"agent": "p-a", "x": 12.5, "y": 30}, {"agent": 'a"<&', "x": 0, "y": -4}],
             "svgOpen": [
                 [{"x": -3, "y": 4, "w": 20, "h": 10}, "cl-svg", ""],
@@ -205,11 +215,11 @@ def test_the_ends_of_a_flowing_line_with_stubs(motion: dict[str, Any]) -> None:
     assert len(ends) == 5
     (first, inner), phases = ends[0], ends[1:]
     assert re.fullmatch(
-        r'<g class="cl" data-id="p-a\nc-b" data-state="flow"><circle class="cl-dot" cx="200" cy="134" r="2.5"/></g>',
+        rf'<g class="cl" data-id="p-a\nc-b" data-state="flow"><path class="cl-arrow" d="{re.escape(ARROW)}"/></g>',
         inner,
     )
     box = box_of(first)
-    assert inside(box, [*points([STUB]), (200, 136.5), (200, 131.5)], 4)
+    assert inside(box, points([STUB, ARROW]), 4)
     for i, (a, inner) in enumerate(phases):
         assert a["class"] == "cl-svg cl-ph"
         assert a["data-ph"] == str(i)
@@ -223,16 +233,62 @@ def test_the_ends_of_a_flowing_line_with_stubs(motion: dict[str, Any]) -> None:
 def test_the_ends_without_stubs_and_of_a_waiting_line(motion: dict[str, Any]) -> None:
     plain = svgs(motion["links"][0]["ends"])
     assert len(plain) == 1  # no phases without stubs
-    assert (
-        plain[0][1]
-        == '<g class="cl" data-id="p-a\nc-b" data-state="flow"><circle class="cl-dot" cx="200" cy="134" r="2.5"/></g>'
-    )
+    assert plain[0][1] == f'<g class="cl" data-id="p-a\nc-b" data-state="flow"><path class="cl-arrow" d="{ARROW}"/></g>'
     waiting = svgs(motion["links"][2]["ends"])
     assert len(waiting) == 1
     assert (
         waiting[0][1]
-        == f'<g class="cl" data-id="p-a\nc-b" data-state="wait"><path class="cl-stub" d="{STUB}"/><circle class="cl-dot" cx="200" cy="134" r="2.5"/></g>'
+        == f'<g class="cl" data-id="p-a\nc-b" data-state="wait"><path class="cl-stub" d="{STUB}"/><path class="cl-arrow" d="{ARROW}"/></g>'
     )
+
+
+def test_the_constants_of_the_arrowhead(motion: dict[str, Any]) -> None:
+    """iss-00648 T-02 / R-04: 6 long, 3.5 each side (7 wide)."""
+    assert motion["ARROW"] == {"len": 6, "half": 3.5}
+
+
+def test_the_arrowhead_points_down_at_to(motion: dict[str, Any]) -> None:
+    """iss-00648 T-02 / R-04: the tip at `to`, the base 6 above it and 7 wide."""
+    assert motion["arrow"] == [ARROW, "M 9 -22 L 12.5 -16 L 16 -22 Z"]
+    for d, to in zip(motion["arrow"], ((200, 134), (12.5, -16)), strict=True):
+        (lx, ly), tip, (rx, ry) = points([d.removesuffix(" Z")])
+        assert tip == to and ly == ry == to[1] - 6 and rx - lx == 7
+        assert (lx + rx) / 2 == pytest.approx(to[0])
+
+
+def test_the_mark_rect_rings_the_mark_2px_out(motion: dict[str, Any]) -> None:
+    """iss-00648 T-02 / R-04."""
+    assert motion["markRect"] == [IN_MARK, IN_SLOT]
+
+
+def test_the_ends_have_one_arrowhead_no_dot_and_ring_a_boxs_mark(motion: dict[str, Any]) -> None:
+    """iss-00648 T-02 / R-04, R-05: every end has one arrowhead and no dot; a box's mark is ringed in the ends' SVG,
+    which holds the arrowhead and the ring; a flowing line without stubs has one still picture of its ends."""
+    for entry in motion["links"]:
+        assert entry["ends"].count('class="cl-arrow"') == 1
+        assert "cl-dot" not in entry["ends"] and "<circle" not in entry["ends"]
+    for i, state in ((5, "flow"), (7, "done")):
+        ends = svgs(motion["links"][i]["ends"])
+        assert len(ends) == 1 and ends[0][0]["class"] == "cl-svg" and "data-ph" not in ends[0][0]
+        assert (
+            ends[0][1]
+            == f'<g class="cl" data-id="p-a\nc-b" data-state="{state}">{IN_MARK}<path class="cl-arrow" d="{ARROW}"/></g>'
+        )
+        assert inside(box_of(ends[0][0]), [*points([ARROW]), (180, 138), (220, 158)], 4)
+    # a band slot: the ring is not in the ends' layer
+    slot = svgs(motion["links"][6]["ends"])
+    assert len(slot) == 1 and "cl-in" not in slot[0][1]
+
+
+def test_band_mark_html_rings_only_a_band_childs_slot(motion: dict[str, Any]) -> None:
+    """iss-00648 T-02 / R-04: one SVG with the ring and the line's id and state for a band slot; nothing otherwise."""
+    band = svgs(motion["links"][6]["band"])
+    assert len(band) == 1
+    a, inner = band[0]
+    assert a["class"] == "cl-svg"
+    assert inner == f'<g class="cl" data-id="p-a\nc-b" data-state="wait">{IN_SLOT}</g>'
+    assert inside(box_of(a), [(172, 132), (228, 164)], 4)
+    assert [motion["links"][i]["band"] for i in (0, 1, 2, 3, 5, 7)] == [""] * 6
 
 
 def test_the_ripple_is_an_html_ring_pair_at_its_centre(motion: dict[str, Any]) -> None:
@@ -247,6 +303,6 @@ def test_the_values_are_escaped_and_no_length_is_written(motion: dict[str, Any])
     assert 'data-id="p&quot;&lt;&amp;&gt;"' in html
     assert 'data-child="c&#39;x"' in html
     assert "<&>" not in html
-    every = "".join(v["body"] + v["ends"] for v in motion["links"])
+    every = "".join(v["body"] + v["ends"] + v["band"] for v in motion["links"])
     assert "--cl-len" not in every
     assert "<animate" not in every

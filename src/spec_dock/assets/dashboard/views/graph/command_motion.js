@@ -54,18 +54,51 @@ export function bodyHtml(link) {
   return flow ? still + phases(box, g, (off) => `<path class="cl-line" d="${esc(link.d)}" style="stroke-dashoffset:${off}px"/>`) : still;
 }
 
-/** The line's ends layer (.gx-cmd-top): its stubs in the boxes and the dot at its end; a flowing line's stubs in four pictures. */
+/** The arrowhead at the child's end (iss-00648 D-04): len px long, half px to each side. */
+export const ARROW = { len: 6, half: 3.5 };
+
+const n1 = (v) => Math.round(v * 10) / 10;
+
+/** A downward triangle with its tip at `to`. */
+export const arrowPath = (to) =>
+  `M ${n1(to.x - ARROW.half)} ${n1(to.y - ARROW.len)} L ${n1(to.x)} ${n1(to.y)} L ${n1(to.x + ARROW.half)} ${n1(to.y - ARROW.len)} Z`;
+
+// the ring's rectangle: the mark 2px out on every side
+const ringOf = (m) => ({ x: n1(m.x - 2), y: n1(m.y - 2), w: n1(m.w + 4), h: n1(m.h + 4) });
+
+/** The ring around the child's mark (iss-00648 D-04): the mark's rectangle 2px out, rounded. */
+export function markRect(m) {
+  const r = ringOf(m);
+  return `<rect class="cl-in" x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="4"/>`;
+}
+const ringPath = (m) => {
+  const r = ringOf(m);
+  return `M ${r.x} ${r.y} L ${n1(r.x + r.w)} ${n1(r.y + r.h)}`;
+};
+
+/**
+ * The line's ends layer (.gx-cmd-top): its stubs, the arrowhead at its end and the ring of the child's mark in a box or
+ * a frame's heading (a band child's ring is bandMarkHtml's); a flowing line's stubs in four pictures.
+ */
 export function endsHtml(link) {
   const stubs = Array.isArray(link.stubs) ? link.stubs : [];
-  const dot = link.to ? [{ x: link.to.x, y: link.to.y, r: 2.5 }] : [];
-  const box = boxOf(stubs, MOTION.pad, dot);
+  const arrow = link.to ? arrowPath(link.to) : null;
+  const mark = link.mark && !link.mark.band ? link.mark : null;
+  const box = boxOf([...stubs, ...(arrow ? [arrow] : []), ...(mark ? [ringPath(mark)] : [])]);
   if (!box) return "";
   const g = `<g class="cl" data-id="${esc(link.id)}" data-state="${esc(link.state)}">`;
   const flow = link.state === "flow";
   const lines = (off) => stubs.map((d) => `<path class="cl-stub" d="${esc(d)}"${off === null ? "" : ` style="stroke-dashoffset:${off}px"`}/>`).join("");
-  const end = dot.length ? `<circle class="cl-dot" cx="${link.to.x}" cy="${link.to.y}" r="2.5"/>` : "";
+  const end = `${mark ? markRect(mark) : ""}${arrow ? `<path class="cl-arrow" d="${arrow}"/>` : ""}`;
   const still = `${svgOpen(box, "cl-svg")}${g}${flow ? "" : lines(null)}${end}</g></svg>`;
   return flow && stubs.length ? still + phases(box, g, lines) : still;
+}
+
+/** A band child's ring (iss-00648 D-04): one SVG of the line's own in the band's layer (.gx-band-cr); "" otherwise. */
+export function bandMarkHtml(link) {
+  if (!link.mark?.band) return "";
+  const box = boxOf([ringPath(link.mark)]);
+  return `${svgOpen(box, "cl-svg")}<g class="cl" data-id="${esc(link.id)}" data-state="${esc(link.state)}">${markRect(link.mark)}</g></svg>`;
 }
 
 /** A ripple: an HTML ring pair centred at its place (the rings' size is graph.css's). */

@@ -100,10 +100,14 @@ function snap(root) {
     t: m ? { tx: Number(m[1]), ty: Number(m[2]), s: Number(m[3]) } : null,
     lines: classes(".gx-cmd .cl", "id"),
     paths: Object.fromEntries(world.querySelectorAll(".gx-cmd .cl").map((g) => [g.dataset.id, g.querySelector(".cl-glow, .cl-line").getAttribute("d")])),
-    dots: Object.fromEntries(world.querySelectorAll(".gx-cmd-top .cl").filter((g) => g.querySelector(".cl-dot")).map((g) => {
-      const c = g.querySelector(".cl-dot");
-      return [g.dataset.id, [Number(c.getAttribute("cx")), Number(c.getAttribute("cy"))]];
+    // iss-00648: the tip of each line's arrowhead, what its ends picture holds and the band children's rings
+    arrows: Object.fromEntries(world.querySelectorAll(".gx-cmd-top .cl").filter((g) => g.querySelector(".cl-arrow")).map((g) => {
+      const n = g.querySelector(".cl-arrow").getAttribute("d").match(/-?[\d.]+/g).map(Number);
+      return [g.dataset.id, [n[2], n[3]]];
     })),
+    endParts: Object.fromEntries(world.querySelectorAll(".gx-cmd-top .cl").map((g) => [g.dataset.id, g.children.filter((c) => c instanceof Element).map((c) => c.getAttribute("class"))])),
+    bandMarks: classes(".gx-band-cr .cl", "id"),
+    dots: world.querySelectorAll(".cl-dot").length,
     leads: world.querySelectorAll(".gx-band-lead").map((el) => ({ text: el.textContent, style: el.getAttribute("style") })),
     bandItems: world.querySelectorAll(".gx-band-item").map((it) => {
       const st = it.getAttribute("style");
