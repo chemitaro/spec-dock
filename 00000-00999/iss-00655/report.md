@@ -70,7 +70,8 @@ ID: "iss-00655"
 
 - **合格のコミット** `b50c11ddbf44dbbe9c400889385450764c272946`（base `92e26aff7`）。レビュー（quality-gate-reviewer opus / medium、4観点）P0〜P3 すべて0、網羅は完全。`make lint` exit 0、`uv run pytest` 4281 passed・7 skipped。この worktree の `.workbench/final-quality-gate/iss-00655/closure.md`。attempt 01（`c607dc2ec`）も合格したが、origin/main が進んだので取り込み直してやり直した。記録だけのコミットはない（記録は Git の外）。
 
-- **PR**：https://github.com/chemitaro/spec-dock/pull/661（head `b50c11ddb`、`Refs #655`）。CI（Commit identity の check、SpecDock check、Provider CI の route・provider-tests・Provider distribution parity の ubuntu と macos）すべて合格、merge_readiness READY、mergeable（2026-11-18）。マージは統括。
+- **取り込み直し（2026-11-18、統括の依頼）**：origin/main `3f0e1e9e0`（#660 iss-00657）を取り込んだ `d3c9eecf5`（競合なし）で、最終品質ゲートをやり直して**合格**（キャンペーン iss-00655-r2。report.md を authority から外した理由は closure にある）。レビュー P0〜P3 0、網羅は完全、`make lint` exit 0、`uv run pytest` 4284 passed・7 skipped。この worktree の `.workbench/final-quality-gate/iss-00655-r2/closure.md`。試しの 18655 を取り込んだ後のコードで立て直し、同じ台本で両方の画面の数・線の検査の違反0・cmdAudit 0・エラー0・is-still を確かめた（`.workbench/iss-00655/final2/`）。
+- **PR**：https://github.com/chemitaro/spec-dock/pull/661（最初の head `b50c11ddb`、今の head `d3c9eecf5`、`Refs #655`）。CI（Commit identity の check、SpecDock check、Provider CI の route・provider-tests・Provider distribution parity の ubuntu と macos）すべて合格、merge_readiness READY、mergeable（2026-11-18）。マージは統括。
 
 ## Residual Risks / Follow-ups
 
