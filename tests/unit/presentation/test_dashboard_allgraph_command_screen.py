@@ -270,6 +270,7 @@ RUNS += [
         # iss-00646 T-03: the still mark and the watching on the cross-repository structure
         "name": "motion",
         "io": True,
+        "styled": True,  # iss-00664: the first view at the first draw, not at the real clock's limit of the wait
         "orca": {"summary": CROSS},
         "repos": REPOS,
         "docs": DOCS,
@@ -292,6 +293,7 @@ RUNS += [
 RUNS += [
     {
         "name": "input",
+        "styled": True,  # iss-00664: likewise
         "orca": {"summary": FLAT},
         "repos": REPOS,
         "docs": DOCS,
