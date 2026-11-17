@@ -76,6 +76,8 @@ epic-00615 の requirement.cue の R-05 の text（点の組・12枚・20px/秒�
 
 - 合格のコミット `1f723bfcb`（origin/main `afe2df5c2` の取り込み。base `106f214e8`）。レビュー（quality-gate-reviewer opus / medium、functional-correctness・requirements-closure・test-adequacy・e2e-user-flow）P0〜P3 すべて0、網羅は完全。`make lint` exit 0、`uv run pytest` 4264 passed・7 skipped。この worktree の `.workbench/final-quality-gate/iss-00657/closure.md`。記録だけのコミットはない（記録は Git の外）。
 
+- **PR**：https://github.com/chemitaro/spec-dock/pull/660（head `1f723bfcb`、`Refs #657`）。CI（Actions と Commit Status）合格、merge_readiness READY（2026-11-18）。マージは統括。
+
 ## 逸脱
 
 - S-01 の担当の交代（impl-sol → impl-claude）：上の実装の記録のとおり。統括の了承済みの手順。
