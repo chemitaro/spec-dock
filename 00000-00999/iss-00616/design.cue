@@ -57,7 +57,7 @@ design: {
 			  - Issue の箱・木の枠の箱（`box`・`tframe`）：`avail = (x2 − x1) − MARK_INSET.box`。行の数 k。印 i は `x = x1 + MARK_LEFT.box + x_i`、`y = y2 − MARK_BOTTOM.box − MARK_H − (k − 1 − row_i) × MARK_ROW`、`w = items[i]`、`h = MARK_H`。
 			  - 入れ子の枠（`frame`）：`padT, padX = SIZE.pad[kind]`、`avail = (x2 − x1) − 2·padX − 2`（`nodeMarkRows` と同じ）。題名の行の高さ `t = FRAME_TITLE + (compact ? max(0, (node.fit ?? base) − base) : 0)`、`base = compactHeight(kind, node.rows ?? 1)`。印 i は `x = x1 + 1 + padX + x_i`、`y = y1 + padT + t + FRAME_GAP + row_i × MARK_ROW`。
 			- CSS（統括の了承、2026-11-17）：`.gx .gx-box { display: flex; flex-direction: column; }` と `.gx .gx-box > .gx-agents { margin-top: auto; }`と `padding-top: 4px;`（箱の中では、印の行の上の 4px を margin ではなく padding で持ち、余りを `margin-top: auto` が吸う。中身の項目の並びは今のまま。`MARK_ROW` の 4 は行の間の `row-gap` のまま）。木の枠の箱も同じ要素なので同じ規則。印の行の下の縁が、箱の下の内側の縁（`y2 − 9`）にそろう。
-			- 実機の検査（`specdockCmdAudit().spotDrift`）：描いた各 `.orca-mark` について、箱・枠の要素までの `offsetLeft`・`offsetTop` の和（拡大の影響を受けない）に、その要素の配置の左上を足した位置と、`markSpots` の矩形の左上との差の最大（px）。1 以下が合格（R-03）。
+			- 実機の検査（`specdockCmdAudit().spotDrift`）：帯の各ボタンの中央（`offsetLeft`・`offsetWidth` を帯の入れ物まで足したもの）と計算の枠の中央の差も含める。描いた各 `.orca-mark` について、箱・枠の要素までの `offsetLeft`・`offsetTop` の和（拡大の影響を受けない）に、その要素の配置の左上を足した位置と、`markSpots` の矩形の左上との差の最大（px）。1 以下が合格（R-03）。
 
 			node のテスト（T-02）：`packMarks` の場合（今の `markRows` の表）、箱の1行・2行、木の枠の箱、Epic・Initiative の入れ子の枠、縮めた Epic の題名2行（`fit`）、F-04 の4つ。
 			"""
@@ -68,20 +68,21 @@ design: {
 		text: """
 			`commandModel({pairs, places, items, layout, spotsOf, routes})` → `{band, links, ripples, audit, top, width}`。`spotsOf(node)` は描く側が `markSpots(node, {…V.marks[id], ids: markIds(slot)})` を渡す。`routes` は `V.EG.routes`（依存の線の道の点の列）。
 
-			- 帯の寸法（定数 `BAND`）：`{top: −16, h: 28, left: SIZE.margin, pad: 6, gap: 10, labelGap: 6, slot: 52}`。帯は世界の座標の負の側の1行（y が −16 から 12。配置の上の余白 24 の上の 12px に重ねる。decisions）。項目 j の幅 `pad + labelWidth(label) + labelGap + slot × n + pad`、左から `gap` ずつ空けて並べる（折り返さない）。`labelWidth(text)`：ASCII の文字 6.6px、ほかの文字 11.5px の和を切り上げ、24〜200 に収める。各エージェントの矩形はその項目の中の `slot` 幅の枠、高さは項目と同じ。`top` は帯があれば `BAND.top`、なければ 0。`width` は配置の幅と、帯の右の端 + `SIZE.margin` の大きいほう。
+			- 帯の寸法（定数 `BAND`）：`{top: −16, h: 28, left: SIZE.margin, border: 1, pad: 6, gap: 10, labelGap: 6, slot: 52}`。帯は世界の座標の負の側の1行（y が −16 から 12。配置の上の余白 24 の上の 12px に重ねる。decisions）。項目 j の幅 `2·border + 2·pad + labelWidth(label) + labelGap + slot × n`、左から `gap` ずつ空けて並べる（折り返さない）。エージェント i の枠の左は `項目の x + border + pad + labelWidth + labelGap + slot × i`（D-05 の CSS は、この式と同じ寸法で描く）。`labelWidth(text)`：ASCII の文字 6.6px、ほかの文字 11.5px の和を切り上げ、24〜200 に収める。各エージェントの矩形はその項目の中の `slot` 幅の枠、高さは項目と同じ。`top` は帯があれば `BAND.top − 16`（帯の上の弧を含む）、なければ 0。`width` は配置の幅と、帯の右の端 + `SIZE.margin` の大きいほう。
 			- 端の点と出る向き（Epic D-02 の3）：
 			  - `mark`（箱・木の枠の箱）：印の下の辺の中央から真下に箱の下の縁（`y2`）までの短い線を `stubs` に入れ、端は `(印の中央の x, y2)`、向きは下。
 			  - `mark`（入れ子の枠）：端は印の下の辺の中央、向きは下（`stubs` なし。枠は指揮の層より下）。
 			  - 帯：端はそのエージェントの枠の下の縁の中央 `(cx, BAND.top + BAND.h)`、向きは下（帯から出る線は制御点を下に置く）。
-			  - `group`・`frame`（印がない端）：相手の端の点へ向かう向きのうち、縦横の大きいほうの縁（上・下・左・右）の中央、向きはその縁の外向き。ただし `frame` の枠が相手の端の点を中に含むときは、枠の内側の下の縁の中央で、向きは上。同じ縁から出る線は、その縁に沿って 10px ずつずらす（線の id の順）。
+			  - `group`・`frame`（印がない端）：相手の端の点へ向かう向きのうち、縦横の大きいほうの縁（上・下・左・右）の中央、向きはその縁の外向き。ただし `frame` の枠が相手の端の点を中に含むときは、枠の内側の下の縁の中央で、向きは上。同じ縁から出る線は、その縁に沿って 10px ずつずらす（線の id の順）。帯の項目の上の縁の弧は、帯の上（y < −16）に出る。
 			  - 印の位置が分からない（`spotsOf` が null、id が記録にない）`mark` の端は、その箱は下の縁の中央・枠は上の縁の中央、向きは外（F-04）。
 			- 道（`kind: "curve"`）：両端 P、C と向き dP、dC、距離 L から `k = clamp(0.45 × L, 24, 140)`、`d = M P C (P + dP·k) (C + dC·k) C`。
 			- 同じ居場所（両端が同じ node の `mark`、または帯の同じ項目）：Epic D-10 の弧（`kind: "arc"`）。
-			  - 縁：同じ行なら、箱は下の縁、入れ子の枠は上の縁、帯の項目は下の縁。違う行なら右の縁（帯の項目は1行なので、いつも下の縁で、もう一方の縁はない）。
+			  - 縁：箱（`box`・`tframe`）は、同じ行なら下の縁、違う行なら右の縁。帯の項目は上の縁だけ（帯の上は世界の外の負の y で、依存の線の道（`graphInput` の範囲は y ≥ 0）も node もないので、いつも `d = 16` で、もう一方の縁を試さない）。
+			    入れ子の枠の見出しは縁を使わない：両端の印の下の辺の中央から、下へふくらむ弧（`d = 12`。見出しの印の行の下は、枠の要約の行（6 + 18px）と本体の余白 12px なので、枠の中の箱に届かない）。違う行でも同じ（上の行の印から下の行の印の下へ）。弦が 40px 未満なら、両端を印の行に沿って互いに外へ広げる。枠は指揮の層より下なので `stubs` は要らず、弧は印にじかに届く（Epic D-10 の『上の縁』から変えた。上の縁へ出すと、印から縁まで約 35px の短い線が題名の行の上を横切るため。decisions）。
 			  - 両端、弦 40px への広げ（縁の長さの内に限る）、ふくらみ `d = min(16, room − 3)`（`room` は縁から外へ、弧の幅の範囲で向かい合う、いちばん近い自分以外の node・塊・帯の項目の縁、自分を入れる祖先の枠の内側の縁、帯なら配置のいちばん上の node までの距離）、`d < 8` なら もう一方の縁、そこでも `d < 8` なら初めの縁で `d = 8` にして `crowded` に数える、依存の線の、その縁と平行な区間が弧の外接の四角に入ればもう一方の縁、どちらでも入れば初めの縁で `edgeOverlaps` に数える、は Epic D-10 のとおり。
 			  - 道は、両端から縁の外へ直角に制御点 `4d/3`（三次ベジェのふくらみの頂が d になる）。箱の印から縁までの短い線（下の縁なら真下、右の縁なら印の右の辺の中央から横）は `stubs`。
 			- 両端が同じ塊・同じ祖先の枠（どちらにも印がない）なら、線を作らない。
-			- `links[]`：`{id: "<親>><子>", parent, child, state, kind, d, stubs: [d], from, to}`。`state` は子の `mark` が working なら `flow`、done なら `done`、ほか（waiting・blocked・sleeping・unknown と知らない値）は `wait`。
+			- `links[]`：`{id: "<親>><子>", parent, child, state, kind, d, len, stubs: [d], from, to}`。`len` は道の長さ（三次ベジェを 24 分割した折れ線の長さ）を 8 の倍数に切り上げた値（点の流れの1周。D-05）。`state` は子の `mark` が working なら `flow`、done なら `done`、ほか（waiting・blocked・sleeping・unknown と知らない値）は `wait`。
 			- `ripples[]`：組の親ごとに1つ（同じ親は1つ）、親の印の中央（帯ならその枠の中央）。印の位置が分からない親には付けない。
 			- `audit = {links, arcs, boxOverlaps, edgeOverlaps, crowded}`。`boxOverlaps` は、弧のふくらみの外接の四角が、自分以外の node（自分を入れる祖先の枠を除く）・塊・帯の項目と重なる（面積が 0 より大きい）数。
 			- 鍵 `commandKey(...)`：要約の object、`V.EG` の object、使った `V.marks` と各置き場の `markIds` の JSON、`BAND` が同じなら同じ文字列。描く側は鍵が同じなら何もしない（R-08）。
@@ -93,20 +94,20 @@ design: {
 	"D-04": {
 		title: "構造の図への描画（graph.js）"
 		text: """
-			- `paintCommand()` を `paintOrca()` の最後（`checkRows()` の後）に呼ぶ。`checkRows()` が配置をやり直したときは、その中の描き直しの `paintOrca()` が先に描き、外の呼び出しは鍵が同じなので何もしない。
+			- `paintCommand()` を `paintOrca()` の最後（`checkRows()` の後）に呼ぶ。`checkRows()` が配置をやり直したときは、その中の描き直しの `paintOrca()` が先に描き、外の呼び出しは鍵が同じなので何もしない。`onMarksResize`（ResizeObserver）も `checkRows()` の後に `paintCommand()` を呼ぶ（印の幅だけが変わり行の数が変わらないときも、鍵が変われば線を描き直す）。
 			- 入力：`ctx.orca.status() === "ok"` と `ctx.orca.summary()`、`V.data`、`V.EG.layout`・`V.EG.routes`、`V.ix`、`V.marks`、各置き場の `markIds`（`[data-orca-scope="<id>"]` の要素から）。`orderOf` は部品の `orderAgents` があればそれ、なければ要約の順。
 			- 組がない（F-01 を含む）なら、`.gx-cmd`・`.gx-cmd-top`・`.gx-band` を世界から取り除き、帯の高さを 0 に戻す。世界の innerHTML（`buildWorld`）は変えない。
-			- 世界の中の並びと重なり：`<svg class="gx-cmd" aria-hidden="true">` を最後の枠の後（箱の前）に、`<svg class="gx-cmd-top" aria-hidden="true">` を最後の塊の後（依存の線の SVG の前）に、`<div class="gx-band">` を世界の最後に差し込む。z-index：`.gx-cmd` 1（枠と同じ値で DOM の順が後）、`.gx-cmd-top` 3、`.gx-band` 4（依存の線 5 より下。帯は負の y にあり依存の線と重ならない）。両 SVG は `position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none`、幅と高さは配置の幅と高さ。
-			- 線：各 link を `<g class="cl" data-id data-parent data-child data-state>` にし、中に下地の光の `<path class="cl-glow">` と本体の `<path class="cl-line">`（同じ d）。端の層には stubs（同じ `data-state` の `<path class="cl-stub">`）、端の点（子の端に小さな円 `cl-dot`）、波紋（`<g class="cr">` に円 `cr-a`・`cr-b` を2つ）。
+			- 世界の中の並びと重なり：`<svg class="gx-cmd" aria-hidden="true">` を最後の枠の後（箱の前）に、`<svg class="gx-cmd-top" aria-hidden="true">` を最後の塊の後（依存の線の SVG の前）に、`<div class="gx-band">` を世界の最後に差し込む。z-index：`.gx-cmd` 1（枠と同じ値で DOM の順が後）、`.gx-cmd-top` 3、`.gx-band` 6（依存の線 5 より上。帯は y が 12 まで上の余白にかかり、上の余白を通る依存の線（`margin.y` の道）がありうるので、帯の項目を線の上に出す）。両 SVG は `position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none`、幅と高さは配置の幅と高さ。
+			- 線：各 link を `<g class="cl" data-id data-parent data-child data-state>` にし、中に下地の光の `<path class="cl-glow">` と本体の `<path class="cl-line">`（同じ d）。端の層には、link ごとの `<g class="cl" data-id data-state>` に stubs（`<path class="cl-stub">`）と端の点（子の端に小さな円 `cl-dot`）、親ごとの波紋（`<g class="cr" data-agent>` に円 `cr-a`・`cr-b` を2つ）。本体の道の `style` に `--cl-len: <len>px`。
 			- 帯：`.gx-band` は `left: 0; top: 0` の入れ物で、各項目 `<div class="gx-band-item" style="left;top;width;height">` に札 `<span class="gx-band-lab" style="width:<labelWidth>px" title="<札>">` と、各エージェントの `<button type="button" class="gx-band-agent" data-cmd-agent="<id>" aria-pressed="false" aria-label="<札>：<部品の label>">` の中の置き場（`<span class="gx-band-slot">`）。置き場には `renderAgentMarks(slot, {…worktree, agents: [そのエージェント]}, {size: "sm", max: 1, now})` で描く。ボタンの幅は `BAND.slot`、印は中央に置く。
 			- 世界の大きさ・初めの見え方・『収める』：`V.cmd = {top, width}` を持ち、`initialView`・`fitScale`・`fit` は、外接の四角を `y: top〜L.height`、幅 `max(L.width, width)` で計算する（帯がなければ今と同じ値）。帯の出入りでは `V.tx`・`V.ty`・`V.s` を変えない（R-08）。
 			- 指揮の選び `V.cmdSel`（エージェントの id）と、帯のエージェントの詳細の欄 `V.agentPanel`（エージェントの id）：
 			  - `onTap`：押した要素が `[data-cmd-agent]` の中なら、同じ id が選ばれていれば両方を解き、違えば `V.sel` を解いて（`select(null)` と同じ）`V.cmdSel` と `V.agentPanel` をその id にする。箱・枠の見出しの印（`.sd-orca`）の押しでは、今の処理の後に `V.cmdSel = markAgentAt(slot, target)`（null なら解く）。印でない箱の押し・空いたところの押しでは `V.cmdSel` を解く。
 			  - `onKey`：Esc で `V.agentPanel` を閉じ（なければ今の順）、`V.cmdSel` を解く。`[data-cmd-agent]` の上の Enter・Space は `preventDefault` して、`onTap` と同じ処理。
 			  - `select(null)`・欄の閉じる・`V.cleanup` の一覧を開く、で `V.cmdSel` と `V.agentPanel` を解く。
-			  - 目立たせ：`.gx-cmd` と `.gx-cmd-top` に `has-cmd-sel`、`V.cmdSel` が親か子の `g.cl` に `is-cmd-hl`、ほかに `is-cmd-off`。帯のボタンの `aria-pressed`。クラスを付け替えるだけで、線の要素は作り直さない。
+			  - 目立たせ：`.gx-cmd` と `.gx-cmd-top` に `has-cmd-sel`、`V.cmdSel` が親か子の link の要素（指揮の層の `g.cl` と、端の層の同じ `data-id` の `g.cl`（stubs と端の点を入れる））に `is-cmd-hl`、ほかに `is-cmd-off`。波紋 `g.cr`（`data-agent` は親の id）は、その親が `V.cmdSel` か、`V.cmdSel` の親子の組の親なら `is-cmd-hl`、ほかは `is-cmd-off`。帯のボタンの `aria-pressed`。クラスを付け替えるだけで、線の要素は作り直さない。
 			  - 消えたら：`paintCommand` で `V.cmdSel` が要約にいなければ解き、`V.agentPanel` なら欄も閉じる。
-			- 詳細の欄（`renderPanel` の `V.cleanup` の前）：`V.pn.hide()` の後、aside に `pn-grab`、見出し（そのエージェントの印・種類・札、閉じるボタン `data-act="close"`）、`pn-body` に `agentFrame(ctx.orca.origin, {detail, agentType, branch}, currentTheme())` の iframe（`sandbox="${AGENT_SANDBOX}"`、`referrerpolicy="no-referrer"`）。枠が作れなければ「チャットを開けません」の一文。ページの URL は変えない。
+			- 詳細の欄（`renderPanel` の `V.cleanup` の前）：`V.pn.hide()` の後、aside に `pn-grab`、見出し（そのエージェントの印・種類・札、閉じるボタン `data-act="close"`）、`pn-body` に `agentFrame(ctx.orca.origin, {detail, agentType, branch}, currentTheme())` の iframe（`sandbox="${AGENT_SANDBOX}"`、`referrerpolicy="no-referrer"`）。枠が作れなければ「チャットを開けません」の一文。ページの URL は変えない。欄がすでに同じエージェントの同じテーマの枠を出しているとき（aside の `data-cmd-agent` と `data-theme` が同じ）は、`renderPanel` は欄を書き直さない（チャットを読み直さない。構造の revision、テーマ以外の描き直し、配置のやり直しでも iframe の要素が同じ。エージェントのタブの前例 iss-00602 D-02 と同じ考え）。
 			- `window.specdockCmdAudit()`：`{...audit, spotDrift, spotMissing, layers: [世界の子の class の並び], pointer: [両 SVG の pointer-events]}`。`dispose` で消す（`specdockEdgeAudit` と同じ扱い）。
 			"""
 		satisfies: ["R-02", "R-03", "R-06", "R-07", "R-08", "F-01"]
@@ -118,11 +119,12 @@ design: {
 			  計算（タスク担当、2026-11-17）：#8a8100 は色相 56.1°（`--sd-blocked` 明 #a86e00 の 39.3° より 16.8° 黄の側）、`--ds-bg-2` #f6f7f9 と 3.75:1、`--ds-surface` #ffffff と 4.02:1。#fff04d は 54.9°（暗 #ffc93c の 43.4° より 11.5°）、暗の `--ds-bg-2` #15181e と 15.1:1。
 			- `graph.css`（色は札と今のデザインシステムの変数だけ）：
 			  - `.cl-glow`：`stroke: var(--sd-cmd-glow); stroke-width: 6; stroke-linecap: round; fill: none`。`.cl-line`・`.cl-stub`：`stroke: var(--sd-cmd); stroke-width: 2; fill: none; stroke-linecap: round`。
-			  - `flow`：`stroke-dasharray: 0.1 8`（丸い点）と `animation: sd-cmd-flow .15s linear infinite`、`@keyframes sd-cmd-flow { to { stroke-dashoffset: -8.1; } }`（一定の速さ、約 54px/s。写しで本人の確かめを受けて ±50% の内で直してよい）。点は親から子へ流れる（道は親から子へ描く）。
+			  - `flow`：`stroke-dasharray: 0.1 7.9`（1周 8px の丸い点）と `animation: sd-cmd-flow 2.5s linear infinite`、`@keyframes sd-cmd-flow { from { stroke-dashoffset: 0; } to { stroke-dashoffset: calc(-1 * var(--cl-len)); } }`（`--cl-len` は 8 の倍数なので継ぎ目なく繰り返し、どの点も端から端まで 2.5 秒で進む。Epic D-04 の 2〜3 秒）。点は親から子へ流れる（道は親から子へ描く）。
 			  - `wait`：同じ点線で `animation: none`。`done`：実線で `opacity: .35`、`animation: none`、下地の光なし。
 			  - 波紋：`.cr circle { fill: none; stroke: var(--sd-cmd); transform-box: fill-box; transform-origin: center; animation: sd-cmd-ripple 2.4s ease-out infinite; }`、`.cr-b { animation-delay: 1.2s; }`、`@keyframes sd-cmd-ripple { from { transform: scale(.4); opacity: .9; } to { transform: scale(2.2); opacity: 0; } }`。端の点 `.cl-dot { fill: var(--sd-cmd); }`。
 			  - 目立たせ：`.has-cmd-sel .cl.is-cmd-off, .has-cmd-sel .cr.is-cmd-off { opacity: .15; }`、`.cl.is-cmd-hl .cl-line { stroke-width: 3; }`。
 			  - 帯：`.gx-band-item` は `position: absolute; display: flex; align-items: center; box-sizing: border-box; padding: 0 6px; border: 1px solid var(--ds-border); border-radius: 999px; background: var(--ds-surface); box-shadow: var(--ds-shadow-s); white-space: nowrap`、`.gx-band-lab` は決まった幅と `overflow: hidden; text-overflow: ellipsis; font-size: 11.5px; color: var(--ds-text-2)`、`.gx-band-agent` は幅 `52px`、高さ 100%、`display: flex; justify-content: center; align-items: center; background: none; border: 0; padding: 0; cursor: pointer`、`[aria-pressed="true"]` で `box-shadow: inset 0 -2px 0 var(--sd-cmd)`。フォーカスの輪は今の `:focus-visible` の規則。
+			  - 帯の項目の `.gx-band-lab` は `margin-right: 6px`（`BAND.labelGap`）、`.gx-band-item` の縁 1px・左右の余白 6px は `BAND.border`・`BAND.pad` の写し（コメントで互いを指す）。`.gx-band` の z-index は 6（依存の線より上。帯の項目の後ろを通る依存の線は帯で隠れる）。
 			  - `@media (prefers-reduced-motion: reduce)`：`.gx .cl-line, .gx .cl-stub { animation: none; }`、`.gx .cr circle { animation: none; transform: scale(1.4); opacity: .6; }`、`.gx .cr-b { display: none; }`（R-04）。
 			  - `.gx .gx-box { display: flex; flex-direction: column; }`、`.gx .gx-box > .gx-agents { margin-top: auto; padding-top: 4px; }`（D-02）。`.gx .gx-agents { display: flex; margin-top: 4px; }` の行は今の静的な検査が固定しているので残し、箱の中だけ上の規則で上書きする。
 			- 凡例（`draw.js`）：`renderLegend(el, open, {cmd = false} = {})`。`cmd` が true のときだけ、『そのほか』に `li('<span class="lg-cmd"></span>', "指揮（親 → 子）", 1)` と `li('<span class="lg-cr"></span>', "指揮している親（波紋）")` を足す。`graph.js` は `{cmd: V.ctx?.orca?.status?.() !== "off"}` を渡す。`allgraph.js` は今のまま（既定 false）。`.lg-cmd`（26×0 の点線の見本、`border-top: 2px dotted var(--sd-cmd)`）と `.lg-cr`（10px の円の輪 `border: 1.5px solid var(--sd-cmd)`）は `graph.css` に置く。
@@ -133,9 +135,9 @@ design: {
 		title: "確かめのしかた（Epic D-07）"
 		text: """
 			- 純粋な計算（T-01〜T-03）：`tests/js/dashboard_graph_command.mjs`（新）を `tests/unit/presentation/test_dashboard_graph_command.py`（新）が今の流儀（`test_dashboard_graph_js.py` の `_run` と同じ形）で呼ぶ。合成の値だけを使い、実際のパス・IP・セッションの id を書かない。
-			- CSS と HTML の静的な検査（T-04）：`app.css` の3か所の札、テストの中で色相とコントラストを計算、`graph.css` の規則（層の z-index と pointer-events、点の流れの keyframes、減らす設定、`.gx-box` の flex と `.gx-agents` の `margin-top: auto`、禁じたもの（`<animate`・`animateMotion`・`canvas`・`blur(`）がない）、`renderLegend` の既定の HTML が今と同じ。
-			- 画面（T-05）：`tests/js/fake_dom.mjs` の偽の DOM と偽の orca（`summary()` と `orderAgents` を足す。今の呼び手は変わらない）で `graph.js` を描き、層の有無と順、組がないときの世界の HTML、`routeLayout` の呼び数（要約だけの更新で増えない）、同じ入力で同じ要素、帯の押し（`onTap`・Enter）で欄の iframe と `aria-pressed`、Esc・閉じるで解ける、消えたエージェントで解ける、凡例の行の有無を確かめる。偽の DOM で足りない処理（ポインター、offset）は、画面の関数を直接呼ぶか、実機（T-06）で確かめる。
-			- 実機（T-06）：iss-00621 の実機の確かめと同じ組み立て（この worktree の wheel を隔離した venv に入れ、この PC の状態の置き場の写しと試しの設定で `spec-dock dashboard serve --offline --tailscale --port <空いたポート>`、GET だけを中継する試しの orca の口）。常駐のダッシュボード（47800）と orca-web（8791）の設定、道具の環境には触れない。headless Chrome（`--disable-features=MacAppCodeSignClone`、CDP の `Browser.close` で閉じる）で、spec-dock の構造の図を 1440・1000・390 × 明・暗、『全体・いま・これから』で写し、`specdockEdgeAudit()` の違反 0、`specdockCmdAudit()` の `boxOverlaps`・`edgeOverlaps` 0・`spotDrift` ≤ 1、ブラウザーのエラー 0、横のスクロールなし、減らす設定の写し、帯の押しのチャット、題名が1行の箱の印の行の前後の写し（統括の求め）を数えて report.md に残す。実データは、今の Run の統括（main のチェックアウト → 帯）とタスク担当・実装担当（同じ worktree の弧）。Epic の枠の印からの線が要れば、統括に試しのエージェントを頼む。
+			- CSS と HTML の静的な検査（T-04）：`app.css` の3か所の札、テストの中で色相とコントラストを計算、`graph.css` の規則（層の z-index と pointer-events、点の流れの keyframes、減らす設定、`.gx-box` の flex と `.gx-agents` の `margin-top: auto`、禁じたもの（`<animate`・`animateMotion`・`canvas`・`blur(`）が指揮の規則（セレクターに `.gx-cmd`・`.gx-cmd-top`・`.cl`・`.cr`・`.gx-band`・`.lg-cmd`・`.lg-cr` を含む規則と `sd-cmd-` の keyframes）にない。今の `.legend` の `backdrop-filter: blur(8px)` は対象外）、`renderLegend` の既定の HTML が今と同じ。
+			- 画面（T-05）：`tests/js/fake_dom.mjs` の偽の DOM と偽の orca（`summary()` と `orderAgents` を足す。今の呼び手は変わらない）で `graph.js` を描き、層の有無と順、組がないときの世界の HTML、`routeLayout` の呼び数（要約だけの更新で増えない）、同じ入力で同じ要素、帯の押し（`onTap`・Enter）で欄の iframe と `aria-pressed`、欄を開いたまま render・テーマの外の描き直しをしても iframe の要素が同じ、Esc・閉じるで解ける、消えたエージェントで解ける、凡例の行の有無を確かめる。偽の DOM で足りない処理（ポインター、offset）は、画面の関数を直接呼ぶか、実機（T-06）で確かめる。
+			- 実機（T-06）：iss-00621 の実機の確かめと同じ組み立て（この worktree の wheel を隔離した venv に入れ、この PC の状態の置き場の写しと試しの設定で `spec-dock dashboard serve --offline --tailscale --port <空いたポート>`、GET だけを中継する試しの orca の口）。常駐のダッシュボード（47800）と orca-web（8791）の設定、道具の環境には触れない。headless Chrome（`--disable-features=MacAppCodeSignClone`、CDP の `Browser.close` で閉じる）で、spec-dock の構造の図を 1440・1000・390 × 明・暗、『全体・いま・これから』で写し、`specdockEdgeAudit()` の違反 0、`specdockCmdAudit()` の `boxOverlaps`・`edgeOverlaps` 0・`spotDrift` ≤ 1（帯のボタンの中央と計算の中央の差を含む）、ブラウザーのエラー 0、横のスクロールなし、減らす設定の写し、帯の押しのチャット、題名が1行の箱の印の行の前後の写し（統括の求め）を数えて report.md に残す。実データは、今の Run の統括（main のチェックアウト → 帯）とタスク担当・実装担当（同じ worktree の弧）。Epic の枠の印からの線が要れば、統括に試しのエージェントを頼む。
 			"""
 		satisfies: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06", "R-07", "R-08"]
 	}
