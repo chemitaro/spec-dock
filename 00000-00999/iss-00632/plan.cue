@@ -5,9 +5,9 @@ package spec
 goal: "横断の構造の同じ種類の知らせを上に1回だけまとめ、縮めた枠の測り直しを実機で確かめる"
 
 steps: {
-	"S-01": {title: "T-01・T-02 を tests/js/dashboard_allgraph_notices.mjs と tests/unit/presentation/test_dashboard_allgraph_notices.py に先に書いて落ちることを確かめ、D-01（logic.js の kind・detail）と D-02（views/allgraph/notices.js）を入れて通す", realizes: ["R-01", "R-02", "R-05", "F-01"], status: "todo", session: "impl-sol"}
-	"S-02": {title: "T-03・T-04 を tests/unit/presentation/test_dashboard_allgraph_screen.py（と tests/js/dashboard_allgraph_screen.mjs）に先に書いて落ちることを確かめ、D-03（allgraph.js・allgraph.css）を入れて通す。既存の知らせの検査を新しい置き場に直す", realizes: ["R-01", "R-02", "R-03", "F-01"], status: "todo", after: ["S-01"], session: "impl-claude"}
-	"S-03": {title: "make lint と全体の uv run pytest を通す（static-inventory.json に dashboard の資産があれば sha256 を直す）", realizes: ["R-01", "R-02", "R-03", "R-05"], status: "todo", after: ["S-02"], session: "impl-claude"}
+	"S-01": {title: "T-01・T-02 を tests/js/dashboard_allgraph_notices.mjs と tests/unit/presentation/test_dashboard_allgraph_notices.py に先に書いて落ちることを確かめ、D-01（logic.js の kind・detail）と D-02（views/allgraph/notices.js）を入れて通す", realizes: ["R-01", "R-02", "R-05", "F-01"], status: "done", session: "impl-sol"}
+	"S-02": {title: "T-03・T-04 を tests/unit/presentation/test_dashboard_allgraph_screen.py（と tests/js/dashboard_allgraph_screen.mjs）に先に書いて落ちることを確かめ、D-03（allgraph.js・allgraph.css）を入れて通す。既存の知らせの検査を新しい置き場に直す", realizes: ["R-01", "R-02", "R-03", "F-01"], status: "done", after: ["S-01"], session: "impl-claude"}
+	"S-03": {title: "make lint と全体の uv run pytest を通す（static-inventory.json に dashboard の資産があれば sha256 を直す）", realizes: ["R-01", "R-02", "R-03", "R-05"], status: "done", after: ["S-02"], session: "impl-claude"}
 	"S-04": {title: "D-04 の実機の確かめ（R-04 の18組、まとめの行、写し）を report.md に残し、試しの URL を立てる", realizes: ["R-03", "R-04"], status: "todo", after: ["S-03"], session: "owner"}
 }
 
