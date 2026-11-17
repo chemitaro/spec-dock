@@ -82,7 +82,7 @@ requirements: {
 		text: "幅 390 の横断の構造と構造の図で、状態の札・まとめの行・道具の列の位置と大きさは、直す前と同じ。横断の構造の `window.specdockEdgeAudit()` の total の違反は0のまま。"
 		acceptance: [
 			"実機の 390 で、`.gx-left`・`.gx-next`・`.ax-sum`・`.gx-tools` の矩形が、直す前の wheel と同じ",
-			"実機の横断の構造で、Scope の欄を開いた 1440（帯が札の列より狭い）と、知らせのない写し（まとめの行なし）の 1000・1440 で、F-01 の並び（札の後に道具が右寄せ、まとめの行はその下、まとめなしでは帯の高さが札と道具だけ）",
+			"実機の横断の構造で、Scope の欄を開いた 1440（帯が札の列より狭い）と、まとめの行を隠した形（実機の頁で `.ax-sum` を hidden にする。知らせのない状態の置き場はこの PC の写しから作れないため）の 1000・1440 で、F-01 の並び（札の後に道具が右寄せ、まとめの行はその下、まとめなしでは帯の高さが札と道具だけ）",
 			"実機の横断の構造 1000・1280・1440・390 × これから・いま・全体 × 明・暗で、edgeAudit の total の違反（boxHits・ownHits・overlaps・diagonal・portShare・trunkOverlaps・frameExits・failed・missing・markOverflow）が0、横のスクロールがない",
 		]
 	}
