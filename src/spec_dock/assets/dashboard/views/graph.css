@@ -308,8 +308,9 @@
 @media (prefers-reduced-motion: reduce) { .gx .gx-box { transition: none; } .gx .ci[data-ci="running"] { animation: none; } }
 
 /* ============================================================
-   8. 指揮の線と帯（iss-00616 D-04・D-05）。線の本体と下地の光は枠の上・箱の下の .gx-cmd、箱の中の短い線・端の点・波紋は
-   塊の上・依存の線の下の .gx-cmd-top、帯は依存の線の上の .gx-band。どれも押せない（帯のボタンだけが押せる）。
+   8. 指揮の線と帯（iss-00616 D-04・D-05、iss-00648）。線の本体と下地の光は枠の上・箱の下の .gx-cmd、子の端の矢じり・受けた印の縁・
+   波紋は塊の上・依存の線の下の .gx-cmd-top、帯は依存の線の上の .gx-band（帯の子の印の縁と帯の波紋は .gx-band-cr）。
+   どれも押せない（帯のボタンだけが押せる）。
    色は指揮の札（app.css の --sd-cmd、--sd-cmd-glow）と今の変数だけ。層は入れ物の div で、中は線ごとの外接の四角の SVG と
    波紋の HTML の輪（iss-00646 D-01・D-02）。動きは合成スレッドで動く opacity と transform だけ（主スレッドで描き直さない）
    ============================================================ */
@@ -327,7 +328,10 @@
 .gx .cl[data-state="done"] .cl-glow { display: none; }
 .gx .cl-ph { animation: sd-cmd-phase .2s steps(1, end) infinite; }
 @keyframes sd-cmd-phase { 0% { opacity: 1; } 25% { opacity: 0; } 100% { opacity: 0; } }
-.gx .cl-dot { fill: var(--sd-cmd); }
+/* 受けた側（iss-00648 D-04）：子の端の下向きの矢じりと、受けた印を囲む縁。動かない絵で、done は薄い */
+.gx .cl-arrow { fill: var(--sd-cmd); stroke: none; }
+.gx .cl-in { fill: none; stroke: var(--sd-cmd); stroke-width: 1.5; }
+.gx .cl[data-state="done"] :is(.cl-arrow, .cl-in) { opacity: .35; }
 /* 波紋は中心に置いた輪の組。外径 15.5・内径 12.5 は今の半径 7・縁 1.5 の円と同じ */
 .gx .cr { position: absolute; width: 15.5px; height: 15.5px; margin: -7.75px 0 0 -7.75px; }
 .gx .cr > i { position: absolute; inset: 0; box-sizing: border-box; border: 1.5px solid var(--sd-cmd); border-radius: 50%; animation: sd-cmd-ripple 2.4s ease-out infinite; }

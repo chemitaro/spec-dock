@@ -189,6 +189,7 @@ export function crossModel({ comp, repos, placed, spotsOf = () => null }) {
     spotsOf: shifted,
     routes,
     boundsOf: (c) => bounds.get(c) || null,
+    ceiling: 4, // iss-00648 D-05: the world starts at y 0; no hop rises above it
   });
   return { ...model, world: { nodes, groups, origin } };
 }

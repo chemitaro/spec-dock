@@ -113,6 +113,16 @@ def structure(
     return doc
 
 
+def tall(main: str, last: int, worktree: str) -> dict[str, Any]:
+    """A repository of Epic 1 with Issues 2..last (open, no dependency), the last one's worktree at `worktree`."""
+    doc = copy.deepcopy(document(snapshot(node(1, "epic"), *(node(n, "issue", parent=1) for n in range(2, last + 1)))))
+    doc["worktrees"] = {"status": "ok", "paths": [main, worktree]}
+    for scope in doc["scopes"]:
+        if scope["id"] == f"iss-{last:05d}":
+            scope["worktrees"] = [{"path": worktree, "branch": scope["id"]}]
+    return doc
+
+
 def mark(*ids: str) -> dict[str, Any]:
     return {"items": [W] * len(ids), "gap": GAP, "ids": list(ids)}
 
@@ -216,6 +226,15 @@ SCENARIOS: dict[str, dict[str, Any]] = {
             wt("wt-d5", "/w/d-5", "iss-00005", [ag("d-five", parent="a-coord")], ("p-d", "repo-d")),
         ),
     ),
+    # iss-00648 F-02: "ほかの場所" at the world's top directs an agent in a box far below (and one beside the band)
+    "deep": _sc(
+        repos=[{"key": key("t"), "parent": None, "structure": tall("/w/t", 60, "/w/t-60")}],
+        summary=summary(
+            wt("wt-x", "/x/one", "topic-x", [ag("x-coord"), ag("x-help", parent="x-coord")], PROJ_X, main=True),
+            wt("wt-t60", "/w/t-60", "iss-00060", [ag("t-own", parent="x-coord")], ("p-t", "repo-t")),
+        ),
+        marks={key("t"): {"iss-00060": mark("t-own")}},
+    ),
 }
 
 
@@ -296,22 +315,22 @@ def test_the_ends_of_a_line_across_repositories_are_their_bodies_origins_plus_th
     spot = next(s for s in sc["spots"][key("c")]["iss-00002"] if s["id"] == "a-own")
     box = sc["nodes"][key("c")]["iss-00002"]
     link = _link(sc, "a-coord>a-own")
-    # the child's end: the middle of its mark on the bottom of its box, moved by c's body origin
-    assert link["to"] == {"x": fc["body"]["x"] + spot["x"] + spot["w"] / 2, "y": fc["body"]["y"] + box["y2"]}
-    # the parent's end: the bottom of its slot in p's band row, below p's heading
+    # the child's end: right above its mark on the top of its box, moved by c's body origin (iss-00648 D-01)
+    assert link["to"] == {"x": fc["body"]["x"] + spot["x"] + spot["w"] / 2, "y": fc["body"]["y"] + box["y1"]}
+    # the parent's end: the top of its slot's item in p's band row, below p's heading
     row = sc["model"]["band"]["rows"][0]
     assert row["key"] == key("p")
     assert row["left"] == fp["x1"] + PAD and row["top"] == fp["band"]["y1"] + REPO_BAND_TOP
     slot = row["items"][0]["agents"][0]
-    assert link["from"] == {"x": slot["x"] + slot["w"] / 2, "y": row["top"] + BAND["h"]}
+    assert link["from"] == {"x": slot["x"] + slot["w"] / 2, "y": row["top"]}
     assert row["items"][0]["y"] == row["top"]
-    # the arc of one box: both marks moved by the same origin, on the box's bottom
+    # the hop of one box: both marks moved by the same origin, on the box's top, no stub
     arc = _link(sc, "a-own>a-impl")
     assert arc["kind"] == "arc"
-    assert arc["from"]["y"] == arc["to"]["y"] == fc["body"]["y"] + box["y2"]
+    assert arc["from"]["y"] == arc["to"]["y"] == fc["body"]["y"] + box["y1"]
     mids = [fc["body"]["x"] + s["x"] + s["w"] / 2 for s in sc["spots"][key("c")]["iss-00002"]]
-    starts = [float(stub.split()[1]) for stub in arc["stubs"]]
-    assert starts == mids
+    assert [arc["from"]["x"], arc["to"]["x"]] == mids
+    assert arc["stubs"] == [] and link["stubs"] == []
 
 
 def test_the_band_moves_the_body_down_and_widens_nothing_narrow(got: dict[str, Any]) -> None:
@@ -413,9 +432,22 @@ def test_frames_of_the_same_id_in_two_repositories_are_not_one_edge(got: dict[st
         f = sc["comp"]["frames"][repo]["body"]
         n = sc["nodes"][repo]["epic-00001"]
         x1, y1, x2, y2 = f["x"] + n["x1"], f["y"] + n["y1"], f["x"] + n["x2"], f["y"] + n["y2"]
-        # the middle of one edge: not moved along it by a spread with the other repository's frame
-        mid = {(x1 + x2) / 2, (y1 + y2) / 2}
-        assert link["to"]["x"] in mid or link["to"]["y"] in mid, (agent, link["to"], (x1, y1, x2, y2))
+        # the middle of the upper edge: not moved along it by a spread with the other repository's frame
+        assert link["to"] == {"x": (x1 + x2) / 2, "y": y1}, (agent, link["to"], (x1, y1, x2, y2))
+
+
+def test_hops_from_the_other_places_band_stay_below_the_ceiling(got: dict[str, Any]) -> None:
+    """iss-00648 T-01 / F-02: crossModel passes ceiling 4: the hop to a box 500px or more below peaks at 4 - 0.5 or
+    lower, and the band item's own hop as well."""
+    sc = _sc_of(got, "deep")
+    link = _link(sc, "x-coord>t-own")
+    assert link["kind"] == "curve"
+    assert link["to"]["y"] - link["from"]["y"] >= 500
+    assert link["from"]["y"] - 56 < 4  # without the ceiling it would rise above the world
+    assert link["peak"] >= 4 - 0.5 and link["peak"] == pytest.approx(4, abs=0.5)
+    own = _link(sc, "x-coord>x-help")
+    assert own["kind"] == "arc" and own["peak"] >= 4 - 0.5
+    assert all(link["peak"] >= 4 - 0.5 for link in sc["model"]["links"])
 
 
 # --- T-03: the world's model ------------------------------------------------------------------------------------------
@@ -432,7 +464,7 @@ def test_unmeasured_marks_end_on_the_edge_and_make_no_arc(got: dict[str, Any]) -
     assert [link["id"] for link in sc["model"]["links"]] == ["a-coord>a-own"]
     fc = sc["comp"]["frames"][key("c")]["body"]
     box = sc["nodes"][key("c")]["iss-00002"]
-    assert _link(sc, "a-coord>a-own")["to"] == {"x": fc["x"] + (box["x1"] + box["x2"]) / 2, "y": fc["y"] + box["y2"]}
+    assert _link(sc, "a-coord>a-own")["to"] == {"x": fc["x"] + (box["x1"] + box["x2"]) / 2, "y": fc["y"] + box["y1"]}
 
 
 def test_without_a_band_row_in_the_frames_the_band_ends_are_not_drawn(got: dict[str, Any]) -> None:
@@ -489,7 +521,7 @@ def test_command_model_rows_place_the_items_after_the_lead_and_end_at_the_rows_b
     }
     out = run(tmp_path, {"rows": [rc]})["rows"][0]
     band = out["band"]
-    assert band["top"] == 24 and out["top"] == 24 - 16
+    assert band["top"] == 24 and out["top"] == min(0, *(link["peak"] - 6 for link in out["links"]))
     first, second = band["rows"]
     assert (
         first["leadWidth"] == 58
@@ -500,11 +532,11 @@ def test_command_model_rows_place_the_items_after_the_lead_and_end_at_the_rows_b
     arc = next(link for link in out["links"] if link["id"] == "o1>o2")
     assert arc["kind"] == "arc" and arc["from"]["y"] == 24 and arc["to"]["y"] == 24
     curve = next(link for link in out["links"] if link["id"] == "o1>c1")
-    assert curve["from"]["y"] == 24 + BAND["h"] and curve["to"]["y"] == 140 + BAND["h"]
+    assert curve["from"]["y"] == 24 and curve["to"]["y"] == 140  # iss-00648 D-01: the items' upper edges
     assert band["right"] == max(it["x"] + it["w"] for r in band["rows"] for it in r["items"])
 
 
-def test_bounds_of_limit_an_arcs_bulge_below_a_box(tmp_path: Path) -> None:
+def test_bounds_of_limit_a_hops_height_above_a_box(tmp_path: Path) -> None:
     node_ = {"type": "box", "id": "b1", "x1": 100, "y1": 300, "x2": 278, "y2": 388, "rows": 2}
     base = {
         "layout": {"nodes": [node_], "width": 2000, "height": 2000},
@@ -512,9 +544,9 @@ def test_bounds_of_limit_an_arcs_bulge_below_a_box(tmp_path: Path) -> None:
         "rows": [],
         "marks": {"b1": mark("m1", "m2")},
     }
-    out = run(tmp_path, {"rows": [base, base | {"bounds": {"x1": 0, "y1": 0, "x2": 2000, "y2": 388 + 13}}]})["rows"]
+    out = run(tmp_path, {"rows": [base, base | {"bounds": {"x1": 0, "y1": 300 - 13, "x2": 2000, "y2": 2000}}]})["rows"]
     free, bounded = out[0]["links"][0], out[1]["links"][0]
-    assert free["bulge"] == 16 and bounded["bulge"] == 10
+    assert free["bulge"] == 18 and bounded["bulge"] == 10  # 13px of room: 13 - 3
 
 
 def test_placer_gives_place_agents_places(tmp_path: Path) -> None:
