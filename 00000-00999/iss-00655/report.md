@@ -70,6 +70,8 @@ ID: "iss-00655"
 
 - **合格のコミット** `b50c11ddbf44dbbe9c400889385450764c272946`（base `92e26aff7`）。レビュー（quality-gate-reviewer opus / medium、4観点）P0〜P3 すべて0、網羅は完全。`make lint` exit 0、`uv run pytest` 4281 passed・7 skipped。この worktree の `.workbench/final-quality-gate/iss-00655/closure.md`。attempt 01（`c607dc2ec`）も合格したが、origin/main が進んだので取り込み直してやり直した。記録だけのコミットはない（記録は Git の外）。
 
+- **PR**：https://github.com/chemitaro/spec-dock/pull/661（head `b50c11ddb`、`Refs #655`）。CI（Commit identity の check、SpecDock check、Provider CI の route・provider-tests・Provider distribution parity の ubuntu と macos）すべて合格、merge_readiness READY、mergeable（2026-11-18）。マージは統括。
+
 ## Residual Risks / Follow-ups
 
 - 本物のマウス・トラックパッドの値は手元で測れていない（CDP の合成の値は `wheelDeltaY` ±120 に固定）。マウスのホイールが 120 の倍数にならない環境では動かすに倒れ（今と同じ動き）、トラックパッドの一続きの初めの1つがちょうど deltaY 40（`wheelDeltaY` 120）で deltaX 0 だと、その一続きが拡大・縮小になる。本人の確かめで食い違えば、見分けの決まりを直す別の Issue にする。
