@@ -3,17 +3,17 @@ package spec
 goal: "マージできる 0.9.6 のリリースの PR（CI 合格、最終品質ゲートの closure.md あり）。"
 
 steps: {
-	"S-01": {title: "migration.md に 0.9.6 の節を足す（提供側と dogfood、タスク担当）", realizes: ["R-02"], status: "done", session: "owner"}
+	"S-01": {title: "migration.md に 0.9.6 の節を足す（提供側と dogfood、タスク担当。#636 の取り込みの後に tier と段の札の除去を足す）", realizes: ["R-02"], status: "done", session: "owner"}
 	"S-02": {title: "版を 0.9.6 にし、0.9.5 の版固定のテストを外す", realizes: ["R-01"], status: "done", after: ["S-01"], session: "impl"}
-	"S-03": {title: "static-inventory.json の2行、0.9.5 の fixture、統合テストを足す", realizes: ["R-03", "R-01", "R-02"], status: "done", after: ["S-02"], session: "impl"}
-	"S-04": {title: "wheel を隔離した venv で確かめ、配布の手順を report.md に書く（タスク担当）", realizes: ["R-01", "R-04"], status: "done", after: ["S-03"], session: "owner2"}
+	"S-03": {title: "static-inventory.json の2行、0.9.5 の fixture、統合テストを足す（#636 の取り込みの後に migration.md の sha256 と節の語を合わせる）", realizes: ["R-03", "R-01", "R-02"], status: "doing", after: ["S-02"], session: "impl"}
+	"S-04": {title: "wheel を隔離した venv で確かめ、配布の手順を report.md に書く（タスク担当）", realizes: ["R-01", "R-04"], status: "todo", after: ["S-03"], session: "owner2"}
 }
 
 tests: {
 	"T-01": {title: "版が 0.9.6 の4つの場所でそろう（統合テスト）、隔離した venv の wheel の `spec-dock --version` が 0.9.6", verifies: ["R-01"]}
 	"T-02": {title: "migration.md の 0.9.6 の節が 0.9.5 の直後にあり、主な語があり、dogfood の写しと一致する（統合テスト）", verifies: ["R-02"]}
 	"T-03": {title: "inventory が 0.9.5 のバイトを知り、0.9.5 の consumer が installation update で3つのファイルだけ変わって上がる。0.9.4・0.9.3・0.9.2・0.9.1・0.9.0 の consumer のテストも通る（統合テスト）", verifies: ["R-03"]}
-	"T-04": {title: "`git diff --stat` に範囲外のファイルがなく、タグがない。report.md に配布の手順がある", verifies: ["R-04"]}
+	"T-04": {title: "`git diff --stat 3204f5d39 HEAD`（取り込んだ origin/main との差。#636 の機能のコードは含まない）に範囲外のファイルがなく、タグがない。report.md に配布の手順がある", verifies: ["R-04"]}
 }
 
 verification: """
@@ -29,7 +29,7 @@ gates: {
 	checkpoints: {}
 	checkpoints_note: "なし。手本のある機械的な変更で、最終品質ゲートで足りる"
 	final_quality_gate: {
-		scope:          "開始のコミット ee4bac5ae から S-03 の終わりまで（S-04 は記録だけ）"
+		scope:          "この Issue の変更：開始のコミット ee4bac5ae から S-03 の終わりまで。#636 の合流（3b45ff8a5）で入った main の変更はレビューの対象外で、この Issue の差分は `git diff 3204f5d39 HEAD` で読む（S-04 は記録だけ）"
 		perspectives:   ["requirements-closure", "test-adequacy"]
 		test_commands:  ["make lint", "uv run pytest"]
 		record_paths:   []

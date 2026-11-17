@@ -16,6 +16,11 @@ ID: "iss-00634"
 - 仕様のレビュー round-2（同じレビュアー）：**合格**。P0〜P3 0。結果 `.workbench/spec-review/iss-00634/round-2.json`、検査 `round-2.check.json`（valid、status pass）。固定したコミット e7bc4167b（S-01 の後、clean）。
 - 合格した文書の sha256：requirement.cue `917e62d290ef7251ace4ad4651d63ba34bcb419adf71756b91632f7a26bfdb26`、design.cue `69937f7ba69d2e599086244121d547a2241c6874470d7353478d4fa5804779d6`、plan.cue `a1dac95cfdf668fdfb43494a31f666caeb94d0da200795a5c5f498773605490a`（以後 plan.cue は手順の status だけを書き換える）。
 
+- 仕様の変更（統括の指示 msg_bd5763cd5228・msg_d59cd06a98b7）：0.9.6 に #636（iss-00635、tier と段の札の除去）を入れる。origin/main を取り込み（合流 3b45ff8a5）、migration.md の 0.9.6 の節と要件・設計・計画を直した（32e3257ed）。
+- 仕様のレビュー round-3（同じレビュアー）：合格。P0 0、P1 0、P2 2（S-04 の status の誤りと、ゲート・T-04 の差分の基準。どちらも plan.cue で直した）。結果 `round-3.json`。
+- 仕様のレビュー round-4（同じレビュアー）：**合格**。P0〜P3 0。結果 `.workbench/spec-review/iss-00634/round-4.json`、検査 `round-4.check.json`（valid、status pass）。固定したコミット 32e3257ed。
+- 合格した文書の sha256（round-4）：requirement.cue `62b47da1efa4b2e628251011b28292fca42b4c4396bfa1c89d20d3df551cf366`、design.cue `b9bff008ef9671f74f125abcdd034db9ee2d14a19ad3f4743295c3e83e465256`、plan.cue `985c6af9c08ccdbfb50462dc4f1d885a3b8175863fe6125ffd66303582a975aa`（以後 plan.cue は手順の status だけを書き換える）。
+
 ## Outcome
 
 ## Verification
