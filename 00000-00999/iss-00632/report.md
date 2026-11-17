@@ -68,7 +68,7 @@ ID: "iss-00632"
 
 - 仕様のレビュー合格（round-2）。最終品質ゲート合格（`6f0ad7f84`、review P0〜P3 0、`make lint`・`uv run pytest` 4101 passed）。
 - 実機：18組すべてで edgeAudit の違反0・縮めた枠のはみ出し0、まとめの行2行、知らせの行のある枠 9 → 0、最初の表示がまとめの行の下、帯の空きが図に届く。
-- PR https://github.com/chemitaro/spec-dock/pull/639（head `6f0ad7f84`）。マージは統括が行う。
+- PR https://github.com/chemitaro/spec-dock/pull/639（head `6f0ad7f84`）。CI（Actions と Commit Status）は observable_ci PASS、merge_readiness READY（2026-11-17T06:03Z、`.workbench/iss-00632/pr-checks.json`）。マージは統括が行う。
 
 ## Residual Risks / Follow-ups
 
