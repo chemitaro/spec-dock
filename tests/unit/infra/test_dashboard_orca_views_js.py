@@ -133,9 +133,10 @@ def test_the_graph_measures_the_marks_and_lays_out_again_only_when_the_rows_chan
     assert "requestAnimationFrame(" in resized and "checkRows()" in resized and "rowsRedo" not in resized
     check = _function(graph, "checkRows")
     assert "measureMarks(V.el.world)" in check
-    assert "if (!M) return;" in check
+    # iss-00627: the compact frames are measured with the marks; nothing measurable lays out nothing again
+    assert "if (!M && !H) return;" in check
     assert "nodeMarkRows(n, M[n.id])" in check and "(n.rows ?? 1)" in check
-    assert "V.marks = M;" in check
+    assert "if (M) V.marks = M;" in check
     # a different count lays out again (twice at most per news or render), keeping the zoom and the position
     assert check.index("V.rowsRedo >= 2") < check.index("render(V.root, V.ctx)")
     assert "V.sig = null;" in check and "V.fitted" not in check
