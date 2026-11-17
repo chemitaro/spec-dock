@@ -72,7 +72,7 @@ export function boxHtml(V, s, n) {
   let marks;
   if (frame) {
     const { cnt, total } = tally(V, s.id);
-    marks = `<div class="gx-marks">${M.sbar(cnt, total, 64)}${M.frac(cnt, total)}${M.counts(cnt)}${M.asMark(s.assurance)}${cln}${M.hmMark(s)}${M.dnMark(s.downstream)}</div>`;
+    marks = `<div class="gx-marks">${M.sbar(cnt, total, 64)}${M.frac(cnt, total)}${M.counts(cnt)}${M.asMark(s.assurance)}${cln}${M.wtMark(s.state === "doing" ? s.branch : null)}${M.hmMark(s)}${M.dnMark(s.downstream)}</div>`;
   } else {
     marks = `<div class="gx-marks">${M.asMark(s.assurance)}${cln}${M.prMark(s.pr)}${M.wtMark(s.state === "doing" ? s.branch : null)}${M.hmMark(s)}${M.dnMark(s.downstream)}</div>`;
   }
@@ -95,7 +95,7 @@ export function frameHtml(V, s, n) {
   const head =
     `<div class="gx-fh" data-id="${esc(s.id)}" role="button" tabindex="0" aria-label="${esc(`${s.id} ${s.title}。${STATES[s.state]?.label ?? s.state}`)}">${M.stateMark(s, V.ix.byId, { motion: true })}` +
     (ini ? `<span class="gx-kicker">Initiative</span>` : "") +
-    `<span class="ds-docid">${esc(s.id)}</span><span class="gx-fttl" title="${esc(s.title)}">${esc(s.title)}</span><div class="gx-agents">${orcaSlot(s.id, "all")}</div></div>`;
+    `<span class="ds-docid">${esc(s.id)}</span><span class="gx-fttl" title="${esc(s.title)}">${esc(s.title)}</span>${M.wtMark(s.state === "doing" ? s.branch : null)}<div class="gx-agents">${orcaSlot(s.id, "all")}</div></div>`;
   const meta =
     `<div class="gx-fm">${M.sbar(cnt, total, ini ? 150 : 84)}${M.frac(cnt, total)}${M.counts(cnt)}${M.asMark(s.assurance)}` +
     (range === "next" ? "" : clnMark(s, cleanup)) +

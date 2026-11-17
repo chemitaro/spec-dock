@@ -13,7 +13,7 @@ import * as D from "./graph/draw.js";
 import { compactNeeds, headsDiffer, tallNeeds } from "./graph/measure.js";
 import { REPO, bodyWidth, compose } from "./allgraph/compose.js";
 import { createScopePanel } from "./_shared/panel.js";
-import { createOrcaWatch, paintOrcaMarks } from "./_shared/orca_marks.js";
+import { createOrcaWatch, markAgentAt, paintOrcaMarks } from "./_shared/orca_marks.js";
 import { overviewWarnings } from "./_shared/logic.js";
 
 const { esc, ic, stateIcon } = M;
@@ -815,9 +815,10 @@ function onTap(target) {
     return;
   }
   const same = A.sel?.repo === hit.repo && A.sel.id === hit.id;
-  if (target.closest(".sd-orca")) {
+  const slot = target.closest(".sd-orca"); // iss-00621 D-03: the agents' tab opens on the pressed agent
+  if (slot) {
     if (!same) select(hit.repo, hit.id);
-    A.pn?.preferTab("agents");
+    A.pn?.openAgent(markAgentAt(slot, target));
     return;
   }
   if (isPhone() && same) {
