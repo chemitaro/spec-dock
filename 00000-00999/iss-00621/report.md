@@ -17,6 +17,8 @@ ID: "iss-00621"
 - **仕様の変更（実機の確かめから、2026-11-17）**：枠の見出しの worktree の印が見出しの右の端（幅の広い枠では画面の外）に出たので、題名の広がりを自分の幅までにして印を題名のすぐ後に続ける（requirement.cue の decisions と R-01 の受入4、design.cue D-04、plan.cue T-04）。round-3 **合格**（P0 0、P1 0、P2 1：直しの手順が台帳にない → S-02 を doing、S-03 を todo に開き直した。P3 0）。結果 `.workbench/spec-review/iss-00621/round-3.json`（reviewed_sha `ce999075e`）。
 - **今の合格した文書の sha256**（round-3、S-02・S-03 の status の開き直しの前）：requirement.cue `8703d689ccec242a9cc6f1cd704c976197c57d07f9ca8b66ee9e40a0502f6dc5`、design.cue `e9edb9e92b162c813656f4eebba4b605262fa6b410ae95d5eb7b9ab134225c4a`、plan.cue `5a936266977ec84859305278992ae32e44f614d7036d5cac93b5782951810e7a`。その後の変更は plan.cue の手順の status だけ。
 
+- **最終品質ゲート（2026-11-17、合格）**：合格のコミット `797690b4f`（base `edfabc759`、試み1回）。レビュー（quality-gate-reviewer opus / medium）P0〜P3 すべて0、網羅は完全。`make lint` exit 0、`uv run pytest` 4081 passed・7 skipped。この worktree の `.workbench/final-quality-gate/iss-00621/closure.md`。観点の `ui-behavior` は契約にないので `e2e-user-flow` に置き換えた。
+
 ## 実装の記録
 
 - 開始のコミット `edfabc759`（origin/main、iss-00620・iss-00614・iss-00627 の後）。
