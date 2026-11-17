@@ -6,6 +6,7 @@ import { esc, ic } from "./marks.js";
 import { bandMarkHtml, bodyHtml, endsHtml, rippleHtml } from "./command_motion.js";
 import { AGENT_SANDBOX, agentFrame } from "../_shared/agents_logic.js";
 import { currentTheme } from "../_shared/agents_tab.js";
+import { SHEET_GRAB } from "../_shared/panel.js";
 
 export const LAYERS = ["gx-cmd", "gx-cmd-top", "gx-band"];
 
@@ -206,6 +207,7 @@ export function paintCmdSel(w, model, sel) {
  * The band agent's heading and chat (orca-web's /embed/agent, as the agents' tab frames it). A panel that already shows
  * the same agent in the same theme is left alone, so the chat is not loaded again (iss-00616 D-04).
  * hide() is called before the panel is drawn again (the screen's Scope panel steps aside).
+ * The chat's body takes the agents tab's data-tab, so panel.css lays it out as a column the frame fills (iss-00650).
  * @returns false when the agent is gone from the summary
  */
 export function renderAgentPanel(panel, { id, summary, model, orca, hide }) {
@@ -223,8 +225,8 @@ export function renderAgentPanel(panel, { id, summary, model, orca, hide }) {
   panel.dataset.cmdAgent = id;
   panel.dataset.theme = theme;
   panel.innerHTML =
-    `<div class="pn-grab"></div><div class="pn-head"><b><span class="gx-band-slot pn-cmd-mark"></span>${esc(type)} · ${esc(label)}</b><button type="button" class="iconbtn" data-act="close" aria-label="閉じる">${ic("x")}</button></div>` +
-    `<div class="pn-body">${frame ? `<iframe class="sd-agent" src="${esc(frame.src)}" sandbox="${AGENT_SANDBOX}" referrerpolicy="no-referrer" title="${esc(frame.title)}"></iframe>` : `<p class="pn-cmd-none">チャットを開けません。</p>`}</div>`;
+    `${SHEET_GRAB}<div class="pn-head"><b><span class="gx-band-slot pn-cmd-mark"></span>${esc(type)} · ${esc(label)}</b><button type="button" class="iconbtn" data-act="close" aria-label="閉じる">${ic("x")}</button></div>` +
+    `<div class="pn-body"${frame ? ' data-tab="agents"' : ""}>${frame ? `<iframe class="sd-agent" src="${esc(frame.src)}" sandbox="${AGENT_SANDBOX}" referrerpolicy="no-referrer" title="${esc(frame.title)}"></iframe>` : `<p class="pn-cmd-none">チャットを開けません。</p>`}</div>`;
   const slot = panel.querySelector(".pn-cmd-mark");
   const module = orca?.marks?.();
   try {

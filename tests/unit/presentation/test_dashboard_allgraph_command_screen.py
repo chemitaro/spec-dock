@@ -243,7 +243,29 @@ RUNS = [
 ]
 
 
+# c's closed Issue 5 is a cleanup candidate (iss-00650: the cleanup list's panel)
+CLEAN_DOCS = DOCS | {key("c"): DOCS[key("c")] | {"cleanup": [{"id": "iss-00005", "text": "worktree が残っている"}]}}
+
 RUNS += [
+    # iss-00650 D-03: the phone sheet (390 × 844: half 490px, full 844px) of the band's and the cleanup's panels
+    {
+        "name": "sheet",
+        "orca": {"summary": FLAT},
+        "range": "now",  # the cleanup candidates fold into one button
+        "repos": REPOS,
+        "docs": CLEAN_DOCS,
+        "width": 390,
+        "height": 844,
+        "steps": [
+            {"summary": CROSS},  # 1
+            {"tap": BAND_BTN},  # 2: open at half
+            {"grab": True},  # 3: full
+            {"sheet": {"on": ".panel .pn-head b", "dy": -800}},  # 4: closed
+            {"tap": ".gx-clean"},  # 5: the cleanup list at half
+            {"grab": True},  # 6: full
+            {"sheet": {"on": ".panel .pn-head b", "dy": -800}},  # 7: closed
+        ],
+    },
     {
         # iss-00646 T-03: the still mark and the watching on the cross-repository structure
         "name": "motion",
@@ -355,6 +377,7 @@ def test_pressing_the_band_agent_opens_its_chat_and_highlights_its_lines(runs: d
     on = shots[4]
     assert on["panel"]["open"] and on["panel"]["agent"] == "a-coord"
     assert "/embed/agent?id=a-coord" in on["panel"]["iframe"]["src"]
+    assert on["panel"]["bodyTab"] == "agents"  # iss-00650 R-01: the agents tab's column rule of panel.css
     assert on["pressed"] == {"a-coord": "true"}
     assert on["lines"] == {"a-coord>c-own": "is-cmd-hl"}
     for closed in (shots[5], shots[7], shots[9]):
@@ -449,3 +472,20 @@ def test_the_motion_stills_and_watches_on_the_cross_repository_structure(drawn: 
     assert drawn["motion"]["left"] == {"observed": 0, "timers": 0, "listeners": 0, "still": False}
     for name, run in drawn.items():
         assert run["left"]["observed"] == 0 and run["left"]["timers"] == 0, name
+
+
+def test_the_band_and_cleanup_panels_move_on_a_phone(runs: dict[str, Any]) -> None:
+    """iss-00650 R-03: the grab switches half and full; a pull down closes them as their close button does."""
+    shots = runs["sheet"]
+    sheet = lambda i: (shots[i]["panel"]["open"], shots[i]["panel"]["snap"], shots[i]["panel"]["pnH"])  # noqa: E731
+    assert shots[2]["panel"]["agent"] == "a-coord" and shots[2]["panel"]["grab"] == "button"
+    assert [sheet(2), sheet(3)] == [(True, None, None), (True, "full", "844px")]
+    closed = shots[4]
+    assert not closed["panel"]["open"] and closed["panel"]["agent"] is None
+    assert closed["pressed"] == {"a-coord": "false"} and closed["lines"] == {"a-coord>c-own": ""}
+    assert shots[5]["panel"]["clean"] and shots[5]["panel"]["grab"] == "button"
+    assert [sheet(5), sheet(6)] == [
+        (True, "half", "490px"),
+        (True, "full", "844px"),
+    ]  # the last sheet's height is reset
+    assert not shots[7]["panel"]["open"]

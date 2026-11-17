@@ -6,6 +6,7 @@
 //       {render: true} (the shell renders again), {revision: "r2"} (a new structure revision rendered),
 //       {styled: true} (the screen's CSS applies: the first view is placed), {act: "fit"} (a toolbar button),
 //       {tap: selector} (a pointer tap), {key: "Enter" | " " | "Escape", on: selector?}, {click: selector},
+//       {sheet: {on: selector, dy}} (a finger on the panel moves dy px; up is positive), {grab: true} (a tap on the grab),
 //       {drag: true} (a drag on the graph area), {wheel: {dx, dy}}, {advance: ms} (the motion's clock, iss-00646),
 //       {hidden: bool} (the page goes to the back or comes back), {tell: {sel, hit}} (IntersectionObserver's answer)
 // run.io: the page has an IntersectionObserver (the fake one of fake_motion.mjs); without it, none (F-01).
@@ -24,8 +25,17 @@ let styled = false;
 const computed = globalThis.getComputedStyle;
 globalThis.getComputedStyle = (el) => ({ ...computed(el), position: styled && el?.classList?.contains("gx") ? "absolute" : "" });
 // the bar above the graph is 40px tall; the graph area is the fake's 1200 × 800
+// the panel is as tall as its --pn-h (the phone sheet), the bars above the graph are 40px tall
+const sheetRect = (el) => {
+  const h = parseFloat(el.style.getPropertyValue("--pn-h"));
+  return Number.isFinite(h) ? { left: 0, top: innerHeight - h, right: innerWidth, bottom: innerHeight, width: innerWidth, height: h } : null;
+};
 hooks.rect = (el) =>
-  ["gx-next", "gx-crumbs", "gx-tools"].some((c) => el.classList?.contains(c)) ? { left: 0, top: 0, right: 100, bottom: 40, width: 100, height: 40 } : null;
+  el.classList?.contains("panel")
+    ? sheetRect(el)
+    : ["gx-next", "gx-crumbs", "gx-tools"].some((c) => el.classList?.contains(c))
+      ? { left: 0, top: 0, right: 100, bottom: 40, width: 100, height: 40 }
+      : null;
 const graph = (await import(pathToFileURL(`${assets}/views/graph.js`).href)).default;
 
 const ids = new WeakMap();
@@ -100,6 +110,12 @@ function snap(root) {
       text: panel.querySelector(".pn-head")?.textContent ?? null,
       tab: panel.querySelector('[aria-selected="true"]')?.dataset?.pnTab ?? null,
       agentPicked: panel.querySelector(".sd-agent")?.getAttribute("src") ?? null,
+      bodyTab: panel.querySelector(".pn-body")?.getAttribute("data-tab") ?? null,
+      none: panel.querySelector(".pn-cmd-none")?.textContent ?? null,
+      snap: panel.dataset.snap ?? null,
+      pnH: panel.style.getPropertyValue("--pn-h") || null,
+      grab: panel.querySelector(".pn-grab")?.tag ?? null,
+      clean: panel.querySelector(".pn-clean") ? true : false,
     },
     legend: q(".legend").innerHTML.includes("指揮（親 → 子）"),
     transform: world.style.transform,
@@ -143,7 +159,19 @@ async function step(root, s, orca, ctx) {
   } else if (s.wheel) {
     const view = target(root, ".gx-view");
     for (const fn of view.listeners.wheel || []) fn({ deltaX: s.wheel.dx, deltaY: s.wheel.dy, ctrlKey: false, metaKey: false, clientX: 0, clientY: 0, preventDefault() {} });
-  } else if (s.advance) motion.advance(s.advance);
+  } else if (s.sheet) {
+    // a finger on the panel: down, three moves, up (iss-00650 D-03)
+    const panel = target(root, ".panel");
+    const el = root.querySelector(s.sheet.on);
+    if (!el) return; // nothing to hold: the shot shows the panel as it is
+    const ev = { pointerId: 3, pointerType: "touch", button: 0, target: el };
+    const y0 = 700;
+    for (const fn of panel.listeners.pointerdown || []) fn({ ...ev, clientY: y0 });
+    for (const k of [1, 2, 3]) for (const fn of panel.listeners.pointermove || []) fn({ ...ev, clientY: y0 - (s.sheet.dy * k) / 3 });
+    for (const fn of panel.listeners.pointerup || []) fn({ ...ev, type: "pointerup", clientY: y0 - s.sheet.dy });
+    await new Promise((r) => setTimeout(r, 0)); // the click that ends a drag is not a tap
+  } else if (s.grab) root.querySelector(".panel .pn-grab")?.dispatch("click");
+  else if (s.advance) motion.advance(s.advance);
   else if (s.hidden !== undefined) motion.setHidden(s.hidden);
   else if (s.tell) motion.tell(s.tell.sel, s.tell.hit);
   else if (s.key) {
@@ -168,6 +196,8 @@ if (request.legend) {
   out.legend = { plain: html(true), off: html(true, { cmd: false }), on: html(true, { cmd: true }), closed: html(false), closedOn: html(false, { cmd: true }) };
 }
 for (const run of request.runs || []) {
+  globalThis.innerWidth = run.width ?? 1440;
+  globalThis.innerHeight = run.height ?? 900;
   styled = !!run.styled;
   page.store.clear();
   motion.reset();
