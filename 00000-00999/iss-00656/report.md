@@ -70,6 +70,10 @@ ID: "iss-00656"
 - 写し：`shots/before/` と `shots/after/` に、構造の図・横断の構造・ボードの Issue・Epic・Initiative・止められている Scope（1440・1280・1000 × 明・暗）、スマートフォンの通常と全体の段、印4つ、片付けの候補、詳しい画面（説明資料・文書・概要）。
 - 本人が見る試しの URL：tailnet の 18656 の `/r/github.com/chemitaro/spec-dock/graph`（構造の図）、`/graph`（横断の構造）、`/r/github.com/chemitaro/spec-dock/board`（ボード）。止め方：worktree の `.workbench/iss-00656/state/dashboard/server.json` の pid（または `pkill -f "port 18656 --state-root"`）と、`relay_orca.py` の2つ（127.0.0.1 と tailnet の 18858）。直す前のサーバー（18756、127.0.0.1 だけ）も比べのために残す。
 
+- **最終品質ゲート（2026-11-18、合格）**：合格のコミット `40299192a`（`ebbca611f` に origin/main の #660 を取り込んだマージ。衝突なし。base `afe2df5c2`）。attempt 01（`ebbca611f`）でもレビュー P0〜P3 0・テスト合格（4283 passed）だったが、PR の前の取り込みの後に attempt 02 で全体をやり直した。attempt 02：レビュー（quality-gate-reviewer opus / medium、4観点）P0〜P3 すべて0、網羅は完全。`make lint` exit 0、`uv run pytest` 4286 passed・7 skipped。この worktree の `.workbench/final-quality-gate/iss-00656/closure.md`。記録だけのコミットはない（記録は Git の外）。
+- 実装担当の起動：impl-claude（dispatch `ctx_a67cac37b1a5`、launch.effective claude / claude-opus-5-5 / medium）が S-01〜S-03 を行った。Codex は使っていない（plan の rationale のとおり）。
+- **PR**：https://github.com/chemitaro/spec-dock/pull/662（head `40299192a`、`Refs #656`）。マージは統括。
+
 ## Residual Risks / Follow-ups
 
 - 1000px 前後の欄でエージェントの印があると、パンくずが下の行に送られ、見出しが1行分高くなる（統括の決定 A で受け入れ。60% 以下）。
