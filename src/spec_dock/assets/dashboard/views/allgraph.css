@@ -24,6 +24,19 @@
 .gx .ax-next { margin-left: 8px; color: var(--ds-muted); }
 .gx .ax-next code { font-size: 11.5px; }
 
+/* ---------- The page's summary of the notices (iss-00632): one row per kind under the state chips. Only the rows take
+   the pointer (their title holds the whole text); the bar's column around them lets a drag or a zoom reach the graph.
+   width 0 with min-width 100%: the summary is as wide as the chips' column and never widens it (the tools keep their row). */
+.gx[data-screen="allgraph"] .gx-left { pointer-events: none; }
+.gx[data-screen="allgraph"] .gx-next { pointer-events: auto; }
+.gx .ax-sum { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; width: 0; min-width: 100%; margin: 0; padding: 0; list-style: none; pointer-events: none; }
+.gx .ax-sum[hidden] { display: none; }
+.gx .ax-sum li { display: flex; align-items: center; gap: 6px; width: fit-content; max-width: 100%; height: 24px; box-sizing: border-box; padding: 0 10px; overflow: hidden; white-space: nowrap; font-size: 12px; color: var(--ds-warn-ink); background: var(--ds-surface); border: 1px solid var(--ds-border); border-radius: var(--ds-radius); pointer-events: auto; }
+.gx .ax-sum li[data-level="error"] { color: var(--ds-danger-ink); }
+.gx .ax-sum li[data-level="info"] { color: var(--ds-muted); }
+.gx .ax-sum li .ds-icon { flex: none; }
+.gx .ax-sum b { font-weight: 650; }
+
 /* ---------- The repository's graph: the structure graph's parts placed as in .gx-world (graph.css) ---------- */
 .gx .ax-body { position: absolute; margin: 0; }
 .gx .ax-body > .gx-box, .gx .ax-body > .gx-frame, .gx .ax-body > .gx-clean { position: absolute; margin: 0; }
