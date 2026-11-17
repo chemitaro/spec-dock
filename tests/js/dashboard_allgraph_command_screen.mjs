@@ -6,11 +6,14 @@
 // step: {summary, order?} (orca-web's news with this summary), {news: true} (news with the same summary),
 //       {flip: {summary?, worktree, paths: [a, b]}} (the summary given, then from now on each read of it moves that
 //       worktree to the other path: the same summary object whose places differ each time, F-05), {tap: selector}, {click: selector},
-//       {key: "Escape" | "Enter" | " ", on: selector?}, {wheel: {dx, dy}} (the reader pans: A.moved), {range: name}
+//       {key: "Escape" | "Enter" | " ", on: selector?}, {wheel: {dx, dy}} (the reader pans: A.moved), {range: name},
+//       {advance: ms} (the motion's clock, iss-00646), {hidden: bool}, {tell: {sel, hit}} (IntersectionObserver's answer)
+// run.io: the page has an IntersectionObserver (the fake one of fake_motion.mjs); without it, none (F-01).
 // Prints {runs: {name: [snapshot after the first render, after each step]}}.
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { Element, fakeOrca, hooks, install, json, settle } from "./fake_dom.mjs";
+import { installMotion } from "./fake_motion.mjs";
 
 const [assets, requestPath] = process.argv.slice(2);
 const request = JSON.parse(readFileSync(requestPath, "utf8"));
@@ -26,6 +29,7 @@ const page = install({
     return json({ error: { message: "not found" } }, 404);
   },
 });
+const motion = installMotion(page);
 // the bar above the graph is 40px tall; the graph area is the fake's 1200 × 800
 hooks.rect = (el) =>
   ["gx-next", "gx-tools", "ax-sum"].some((c) => el.classList?.contains(c)) ? { left: 0, top: 0, right: 100, bottom: 40, width: 100, height: 40 } : null;
@@ -78,12 +82,17 @@ function snap(root) {
     cmd: idOf(q(".gx-cmd")),
     top: idOf(q(".gx-cmd-top")),
     band: idOf(q(".gx-band")),
-    cmdSize: q(".gx-cmd") ? [q(".gx-cmd").getAttribute("width"), q(".gx-cmd").getAttribute("height")] : null,
+    layerTags: world.querySelectorAll(".gx-cmd, .gx-cmd-top, .gx-band-cr").map((el) => el.tag),
+    svgSizes: world.querySelectorAll(".gx-cmd svg, .gx-cmd-top svg").map((sv) => [sv.getAttribute("width"), sv.getAttribute("height")]),
+    phases: world.querySelectorAll(".cl-ph").length,
+    still: q(".gx-view").classList.contains("is-still"),
+    off: world.querySelectorAll(".is-off").length,
+    observed: motion.observed(world),
     size: [world.style.width, world.style.height],
     t: m ? { tx: Number(m[1]), ty: Number(m[2]), s: Number(m[3]) } : null,
     lines: classes(".gx-cmd .cl", "id"),
-    paths: Object.fromEntries(world.querySelectorAll(".gx-cmd .cl").map((g) => [g.dataset.id, g.querySelector(".cl-line").getAttribute("d")])),
-    dots: Object.fromEntries(world.querySelectorAll(".gx-cmd-top .cl").map((g) => {
+    paths: Object.fromEntries(world.querySelectorAll(".gx-cmd .cl").map((g) => [g.dataset.id, g.querySelector(".cl-glow, .cl-line").getAttribute("d")])),
+    dots: Object.fromEntries(world.querySelectorAll(".gx-cmd-top .cl").filter((g) => g.querySelector(".cl-dot")).map((g) => {
       const c = g.querySelector(".cl-dot");
       return [g.dataset.id, [Number(c.getAttribute("cx")), Number(c.getAttribute("cy"))]];
     })),
@@ -103,6 +112,7 @@ function snap(root) {
     legend: q(".legend").innerHTML.includes("指揮（親 → 子）"),
     stats: stats ? { layouts: stats.layouts, composes: stats.composes ?? null } : null,
     audit: audit && Object.fromEntries(Object.entries(audit).map(([k, v]) => [k, typeof v === "number" ? v : Array.isArray(v) ? v : typeof v])),
+    motion: audit?.motion ?? null,
   };
 }
 
@@ -144,6 +154,9 @@ async function step(root, s, orca) {
     const view = target(root, ".gx-view");
     for (const fn of view.listeners.wheel || []) fn({ deltaX: s.wheel.dx, deltaY: s.wheel.dy, ctrlKey: false, metaKey: false, clientX: 0, clientY: 0, preventDefault() {} });
   } else if (s.range) target(root, `[data-act="range"][data-range="${s.range}"]`).dispatch("click");
+  else if (s.advance) motion.advance(s.advance);
+  else if (s.hidden !== undefined) motion.setHidden(s.hidden);
+  else if (s.tell) motion.tell(s.tell.sel, s.tell.hit);
   await settle();
   page.flushFrames();
   await settle();
@@ -153,6 +166,8 @@ const out = {};
 for (const r of request.runs) {
   run = structuredClone(r);
   page.store.clear();
+  motion.reset();
+  motion.useObserver(!!run.io);
   if (run.range) page.store.set("specdock.allgraph.v1", JSON.stringify({ range: run.range }));
   const root = new Element("main");
   root.setAttribute("data-view", "allgraph");
@@ -183,7 +198,9 @@ for (const r of request.runs) {
     await step(root, s, orca);
     shots.push(snap(root));
   }
+  const view = root.querySelector(".gx-view");
   allgraph.dispose();
-  out[r.name] = { shots, audit: globalThis.window.specdockCmdAudit ? "left" : "gone" };
+  const left = { observed: motion.observed(null).live, timers: motion.pending(), listeners: (page.docListeners.visibilitychange || []).length, still: view.classList.contains("is-still") };
+  out[r.name] = { shots, audit: globalThis.window.specdockCmdAudit ? "left" : "gone", left };
 }
 process.stdout.write(JSON.stringify({ runs: out }));

@@ -62,6 +62,7 @@ const V = {
   // iss-00616: the command lines and the band
   cmd: { top: 0, width: 0 }, // the band's top and the world's width with it, for the first view and "fit" (D-04)
   cmdKey: null, // commandKey of the lines drawn; the same key draws nothing again (R-08)
+  motion: null, // the lines' stopping while the graph moves, off the area and at the back (iss-00646 D-03)
   cmdModel: null, // the last commandModel drawn, or null without a pair
   cmdSel: null, // the agent whose lines stand out (R-06)
   agentPanel: null, // the band's agent whose chat the panel shows
@@ -219,17 +220,17 @@ function paintCommand() {
 // No pair (F-01): no layer, no band; the world is as it was.
 function clearCommand() {
   if (V.el) CV.removeLayers(V.el.world);
+  V.motion?.watch(null);
   V.cmdModel = null;
   V.cmd = { top: 0, width: 0 };
 }
 
 function drawCommand(model) {
   const w = V.el.world;
-  const L = V.EG.layout;
   CV.removeLayers(w);
   V.cmdModel = model;
   V.cmd = { top: model.top, width: model.width };
-  const html = CV.layersHtml(model, { width: L.width, height: L.height });
+  const html = CV.layersHtml(model);
   const cmd = CV.element(html.cmd);
   const top = CV.element(html.top);
   const kids = Array.from(w.children);
@@ -237,6 +238,7 @@ function drawCommand(model) {
   w.insertBefore(cmd, kids.find((c) => hasClass(c, "gx-box") || hasClass(c, "gx-clean") || hasClass(c, "gx-edges")) ?? null);
   w.insertBefore(top, kids.find((c) => hasClass(c, "gx-edges")) ?? null);
   if (html.band) w.appendChild(CV.element(html.band));
+  V.motion?.watch(w);
 }
 
 // The band's marks, each drawn by the component (one agent each); a mark is drawn again only when it changes.
@@ -350,6 +352,7 @@ export function cmdAudit() {
     layers: Array.from(w.children).map((c) => c.getAttribute("class")),
     pointer: [...w.querySelectorAll(".gx-cmd, .gx-cmd-top")].map((s) => getComputedStyle(s).pointerEvents),
     band: BAND,
+    motion: V.motion?.state() ?? null, // iss-00646 D-04: the watched pictures and ripples, the off ones, the still mark
     heads: CV.headsAudit(w), // iss-00617 D-05: the headings over the lines
   };
 }
@@ -389,6 +392,8 @@ function mount(root) {
     onClose: () => select(null),
     extraActions: (s) => (frameOf(s) ? `<button type="button" class="ds-btn" data-act="focus" data-focus="${esc(s.id)}" aria-label="この範囲に絞る" title="この範囲に絞る">${ic("target")}この範囲に絞る</button>` : ""),
   });
+  V.motion?.stop();
+  V.motion = CV.createMotion(V.el.view);
   bindView();
   V.el.gx.addEventListener("click", onClick);
   document.addEventListener("keydown", onKey);
@@ -406,6 +411,8 @@ function dispose() {
   V.rowsRaf = 0;
   if (window.specdockEdgeAudit === edgeAudit) delete window.specdockEdgeAudit;
   if (window.specdockCmdAudit === cmdAudit) delete window.specdockCmdAudit;
+  V.motion?.stop();
+  V.motion = null;
   V.cmdKey = null;
   V.cmdModel = null;
   V.cmd = { top: 0, width: 0 };
@@ -879,6 +886,7 @@ function applyT() {
   V.el.world.style.transform = `translate(${V.tx}px, ${V.ty}px) scale(${V.s})`;
   const z = V.el.tools.querySelector(".zoomval");
   if (z) z.textContent = `${Math.round(V.s * 100)}%`;
+  V.motion?.moved(); // iss-00646 D-04: every move of the graph stills the lines for a moment
 }
 
 // The bottom of the bar above the graph, in the graph area's coordinates (#527 P-6: no box under the bar).

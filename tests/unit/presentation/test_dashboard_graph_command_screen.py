@@ -142,29 +142,62 @@ def test_the_layers_stack_and_never_take_a_press() -> None:
 
 
 def test_the_dots_flow_and_the_ripples_grow() -> None:
-    """T-04 / R-04: the flowing dots move stroke-dashoffset over 2.5s; waiting stands still; done is faint; ripples scale."""
+    """T-04 / R-04, iss-00646 T-02 / R-01: the flowing dots are four still pictures switched by opacity alone (0.05s
+    each, steps); waiting stands still; done is faint; the ripples are HTML rings that scale on the compositor."""
     flow = _rule('.gx .cl[data-state="flow"] :is(.cl-line, .cl-stub)')
-    assert "stroke-dasharray: 0.1 7.9" in flow and "animation: sd-cmd-flow 2.5s linear infinite" in flow
+    assert "stroke-dasharray: 0.1 7.9" in flow and "animation" not in flow
     wait = _rule('.gx .cl[data-state="wait"] :is(.cl-line, .cl-stub)')
     assert "stroke-dasharray: 0.1 7.9" in wait and "animation: none" in wait
     done = _rule('.gx .cl[data-state="done"] :is(.cl-line, .cl-stub)')
     assert "opacity: .35" in done and "animation: none" in done and "dasharray" not in done
-    flow_frames = re.search(r"@keyframes sd-cmd-flow \{(.*?)\}\s*\}", GRAPH_CSS, re.S)
-    assert flow_frames and "stroke-dashoffset: calc(-1 * var(--cl-len))" in flow_frames.group(1)
+    assert "@keyframes sd-cmd-flow" not in GRAPH_CSS and "stroke-dashoffset" not in GRAPH_CSS
+    assert "animation: sd-cmd-phase .2s steps(1, end) infinite" in _rule(".gx .cl-ph")
+    phase = re.search(r"@keyframes sd-cmd-phase \{(.*?)\}\s*\}", GRAPH_CSS, re.S)
+    assert phase
+    assert re.findall(r"([\d.]+%) \{ ([a-z-]+): ([\d.]+);", phase.group(1)) == [
+        ("0%", "opacity", "1"),
+        ("25%", "opacity", "0"),
+        ("100%", "opacity", "0"),
+    ]
     ripple = re.search(r"@keyframes sd-cmd-ripple \{(.*?)\}\s*\}", GRAPH_CSS, re.S)
     assert ripple
     props = set(re.findall(r"([a-z-]+):", ripple.group(1)))
     assert props == {"transform", "opacity"}
+    assert "transform: scale(.4); opacity: .9;" in ripple.group(
+        1
+    ) and "transform: scale(2.2); opacity: 0;" in ripple.group(1)
+    ring = _rule(".gx .cr > i")
+    for part in (
+        "position: absolute",
+        "inset: 0",
+        "box-sizing: border-box",
+        "border: 1.5px solid var(--sd-cmd)",
+        "border-radius: 50%",
+        "animation: sd-cmd-ripple 2.4s ease-out infinite",
+    ):
+        assert part in ring, part
+    # today's circle of radius 7 and stroke 1.5: 15.5 across outside, centred at its place
+    centre = _rule(".gx .cr")
+    assert "position: absolute" in centre and "width: 15.5px" in centre and "height: 15.5px" in centre
+    assert "margin: -7.75px 0 0 -7.75px" in centre
     assert "animation-delay: 1.2s" in _rule(".gx .cr .cr-b")
+    assert "position: absolute" in _rule(".gx .cl-svg") and "overflow: visible" in _rule(".gx .cl-svg")
+
+
+def test_the_motion_stops_while_the_graph_moves_off_the_screen_and_at_the_back() -> None:
+    """iss-00646 T-02 / R-03, R-04: the still mark of the graph area and each picture's or ripple's off mark pause."""
+    paused = _rule(".gx .gx-view.is-still :is(.cl-ph, .cr > i), .gx .cl-ph.is-off, .gx .cr.is-off > i")
+    assert paused.strip() == "animation-play-state: paused;"
 
 
 def test_reduced_motion_stops_the_dots_and_the_ripples() -> None:
-    """T-04 / R-04: no animation and one still ring."""
+    """T-04 / R-04, iss-00646 T-02 / R-05: no switching, only the picture shifted by 0, and one still ring."""
     media = GRAPH_CSS[GRAPH_CSS.rindex("@media (prefers-reduced-motion: reduce)") :]
     rules = dict(_rules(media))
-    stop = rules[".gx .cl-line, .gx .cl-stub, .gx .cl[data-state] :is(.cl-line, .cl-stub)"]
-    assert "animation: none" in stop
-    assert "animation: none" in rules[".gx .cr circle"] and "transform: scale(1.4)" in rules[".gx .cr circle"]
+    assert "animation: none" in rules[".gx .cl-ph"] and "opacity: 0" in rules[".gx .cl-ph"]
+    assert "opacity: 1" in rules['.gx .cl-ph[data-ph="0"]']
+    ring = rules[".gx .cr > i"]
+    assert "animation: none" in ring and "transform: scale(1.4)" in ring and "opacity: .6" in ring
     assert "display: none" in rules[".gx .cr-b"]
 
 
@@ -206,6 +239,11 @@ def test_the_command_rules_use_no_forbidden_drawing() -> None:
     for word in ("<animate", "animateMotion", "canvas", "blur("):
         assert word not in text, word
     assert "<animate" not in GRAPH_JS and "animateMotion" not in GRAPH_JS
+    # iss-00646 R-01: the motion is CSS's; no clock of the page draws it
+    for name in ("command_view.js", "command_motion.js"):
+        text = (ASSETS / "views" / "graph" / name).read_text(encoding="utf-8")
+        for word in ("<animate", "animateMotion", "canvas", "blur(", "setInterval", "requestAnimationFrame"):
+            assert word not in text, (name, word)
 
 
 def test_the_command_colours_are_only_the_tokens() -> None:
@@ -307,9 +345,58 @@ RUNS: list[dict[str, Any]] = [
 ]
 
 
+RUNS += [
+    {
+        # iss-00646 T-03: the still mark after a move (no IntersectionObserver: F-01)
+        "name": "still",
+        "orca": {"summary": FIVE},
+        "steps": [
+            {"advance": 400},  # 1: the first view's 0.3s are over
+            {"drag": True},  # 2
+            {"advance": 200},  # 3: still
+            {"wheel": {"dx": 0, "dy": 20}},  # 4: moved again
+            {"advance": 200},  # 5: 0.2s after the last move: still
+            {"advance": 150},  # 6: 0.35s after it: moving
+            {"hidden": True},  # 7: at the back
+            {"hidden": False},  # 8: back to the front
+            {"wheel": {"dx": 5, "dy": 0}},  # 9
+            {"hidden": True},  # 10
+            {"advance": 400},  # 11: the clock comes at the back: still
+            {"hidden": False},  # 12
+            {"wheel": {"dx": 5, "dy": 0}},  # 13
+            {"hidden": True},  # 14
+            {"hidden": False},  # 15: the clock is still to come: still
+            {"advance": 400},  # 16
+        ],
+    },
+    {
+        # iss-00646 T-03: the IntersectionObserver of the graph area
+        "name": "watch",
+        "io": True,
+        "orca": {"summary": FIVE},
+        "steps": [
+            {"tell": {"sel": ".cl-ph, .cr", "hit": False}},  # 1: everything off the screen
+            {"tell": {"sel": ".cl-ph", "hit": True}},  # 2: the pictures back on it
+            {"summary": WORKING},  # 3: the layers drawn again
+            {"wheel": {"dx": 0, "dy": 20}},  # 4
+            {"summary": NO_PARENT},  # 5: the layers gone: no watching, no still mark
+            {"summary": FIVE},  # 6
+            {"hidden": True},  # 7
+            {"summary": NO_PARENT},  # 8: the layers gone at the back: the back keeps its mark
+            {"hidden": False},  # 9
+        ],
+    },
+]
+
+
 @pytest.fixture(scope="module")
-def runs(tmp_path_factory: pytest.TempPathFactory) -> dict[str, list[dict[str, Any]]]:
-    return _run(tmp_path_factory.mktemp("screen"), {"doc": structure(), "runs": RUNS})["runs"]
+def drawn(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
+    return _run(tmp_path_factory.mktemp("screen"), {"doc": structure(), "runs": RUNS})
+
+
+@pytest.fixture(scope="module")
+def runs(drawn: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    return drawn["runs"]
 
 
 LAYERS = ("gx-cmd", "gx-cmd-top", "gx-band")
@@ -495,3 +582,81 @@ def test_the_band_never_moves_the_boxes_and_fit_shows_it(runs: dict[str, list[di
     # the first view of a summary with pairs starts above the band's top
     _, ty1, s1 = _transform(runs["first"][1])
     assert ty1 == pytest.approx(48 + 32 * s1)
+
+
+# --- iss-00646 T-03: the lines in SVGs of their own, the still mark and the watching -----------------------------------
+
+
+def test_the_layers_hold_one_svg_per_picture_and_none_is_as_big_as_the_world(
+    runs: dict[str, list[dict[str, Any]]],
+) -> None:
+    shot = runs["news"][0]
+    assert shot["layerTags"] == ["div", "div", "div"]  # .gx-cmd, .gx-cmd-top, .gx-band-cr
+    assert shot["worldSvgs"] == ["gx-edges"]  # only the dependency lines' SVG is as big as the world
+    width, height = (v.removesuffix("px") for v in shot["size"])
+    for svg in shot["svgs"]:
+        assert (svg["width"], svg["height"]) != (width, height), svg
+        m = re.fullmatch(r"left:(-?\d+)px;top:(-?\d+)px(;animation-delay:-?[\d.]+s)?", svg["style"])
+        assert m, svg
+        assert svg["viewBox"] == f"{m.group(1)} {m.group(2)} {svg['width']} {svg['height']}"
+        assert svg["layer"] in ("gx-cmd", "gx-cmd-top")
+    body: dict[str, int] = {}
+    for svg in shot["svgs"]:
+        if svg["layer"] == "gx-cmd":
+            body[svg["id"]] = body.get(svg["id"], 0) + 1
+    assert body == {k: 5 if v == "flow" else 1 for k, v in shot["states"].items()}
+    assert set(shot["states"].values()) >= {"flow", "wait"}
+    phases = [svg for svg in shot["svgs"] if svg["cls"] == "cl-svg cl-ph"]
+    assert len(phases) == shot["phases"] and all(svg["ph"] in "0123" for svg in phases)
+    assert all(r == "span:i.cr-a,i.cr-b" for r in shot["rings"])
+    assert len(shot["rings"]) == 3
+
+
+def test_the_highlight_reaches_every_picture_of_a_line(runs: dict[str, list[dict[str, Any]]]) -> None:
+    shot = runs["band"][1]
+    seen: dict[str, set[str]] = {}
+    for line, classes in shot["every"]:
+        seen.setdefault(line, set()).add(classes)
+    assert all(len(v) == 1 for v in seen.values()), seen
+    assert {k: next(iter(v)) for k, v in seen.items()} == _hl(shot)["lines"]
+    assert len(shot["every"]) > len(seen)  # the pictures and the ends carry the classes too
+
+
+def test_a_move_stills_the_motion_for_its_quiet_time(drawn: dict[str, Any]) -> None:
+    shots = drawn["runs"]["still"]
+    assert shots[0]["still"]  # the first view is placed: a move too
+    expect = [True, False, True, True, True, True, False, True, False, True, True, True, False, True, True, True, False]
+    assert [shot["still"] for shot in shots] == expect
+    assert shots[6]["audit"]["motion"] == {"phases": 0, "ripples": 0, "off": 0, "still": False}  # no observer (F-01)
+    assert shots[2]["audit"]["motion"]["still"] is True
+    assert shots[16]["phases"] > 0 and shots[16]["off"] == []
+    left = drawn["after"]["still"]
+    assert left == {"observed": left["observed"], "timers": 0, "listeners": 0, "still": False}
+
+
+def test_the_watching_of_the_graph_area(drawn: dict[str, Any]) -> None:
+    shots = drawn["runs"]["watch"]
+    first = shots[0]
+    n = first["phases"] + len(first["rings"])
+    assert first["phases"] > 0
+    assert first["observed"]["live"] == 1 and first["observed"]["count"] == n and first["observed"]["gone"] == 0
+    assert first["observed"]["roots"][0].split()[0] == "gx-view" and first["observed"]["threshold"] == [0]
+    assert first["audit"]["motion"] == {"phases": first["phases"], "ripples": 3, "off": 0, "still": True}
+    off = shots[1]
+    assert sorted(off["off"]) == sorted(["ph"] * first["phases"] + ["cr"] * 3)
+    assert off["audit"]["motion"]["off"] == n
+    assert sorted(shots[2]["off"]) == ["cr"] * 3  # the pictures back on the screen
+    again = shots[3]  # drawn again: the new elements watched, the old ones no more
+    assert again["observed"]["live"] == 1 and again["observed"]["made"] == first["observed"]["made"] + 1
+    assert again["observed"]["gone"] == 0 and again["observed"]["count"] == again["phases"] + len(again["rings"])
+    assert shots[4]["still"]
+    gone = shots[5]  # the layers removed: no watching, the still mark and its clock gone (F-02)
+    assert gone["layers"] == _plain(gone["layers"])
+    assert gone["observed"]["live"] == 0 and not gone["still"]
+    assert gone["audit"]["motion"] == {"phases": 0, "ripples": 0, "off": 0, "still": False}
+    back = shots[6]
+    assert back["observed"]["live"] == 1 and back["observed"]["gone"] == 0
+    assert shots[7]["still"] and shots[8]["still"] and shots[8]["observed"]["live"] == 0
+    assert not shots[9]["still"]
+    left = drawn["after"]["watch"]
+    assert left["observed"]["live"] == 0 and left["timers"] == 0 and left["listeners"] == 0 and not left["still"]

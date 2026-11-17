@@ -3,6 +3,7 @@
 // band agent's chat in the panel, and the check of the headings above the lines. The screens' own state stays in the
 // screens; these parts take what they draw from their arguments.
 import { esc, ic } from "./marks.js";
+import { bodyHtml, endsHtml, rippleHtml } from "./command_motion.js";
 import { AGENT_SANDBOX, agentFrame } from "../_shared/agents_logic.js";
 import { currentTheme } from "../_shared/agents_tab.js";
 
@@ -43,25 +44,19 @@ export function removeLayers(world) {
   for (const el of world.querySelectorAll(LAYERS.map((c) => `.${c}`).join(", "))) el.remove();
 }
 
-export const ripple = (r) => `<g class="cr" data-agent="${esc(r.agent)}"><circle class="cr-a" cx="${r.x}" cy="${r.y}" r="7"/><circle class="cr-b" cx="${r.x}" cy="${r.y}" r="7"/></g>`;
 // A ripple centred in a band item: its parent is placed in the band (iss-00616 D-03).
 export const inBand = (model, r) => !!model.band?.items.some((it) => r.x >= it.x && r.x <= it.x + it.w && r.y >= it.y && r.y <= it.y + it.h);
 
 /**
- * The three layers' HTML of a commandModel (iss-00616 D-04): the lines' bodies and glows (.gx-cmd), the stubs in the
- * boxes, the ends' dots and the ripples outside the band (.gx-cmd-top), the band's items, buttons and the ripples in it
- * (.gx-band, "" without a band). A row with a lead has its text at the row's left (iss-00617: "ほかの場所").
+ * The three layers' HTML of a commandModel (iss-00616 D-04, iss-00646 D-02): the lines' bodies and glows (.gx-cmd), the
+ * stubs in the boxes, the ends' dots and the ripples outside the band (.gx-cmd-top), the band's items, buttons and the
+ * ripples in it (.gx-band, "" without a band). Each layer is a box of SVGs of each line's own bounding box and HTML
+ * rings (command_motion.js), never one SVG as big as the world. A row with a lead has its text at the row's left
+ * (iss-00617: "ほかの場所").
  */
-export function layersHtml(model, { width, height }) {
-  const size = `width="${width}" height="${height}"`;
-  const lines = model.links
-    .map((l) => `<g class="cl" data-id="${esc(l.id)}" data-parent="${esc(l.parent)}" data-child="${esc(l.child)}" data-state="${l.state}"><path class="cl-glow" d="${l.d}"/><path class="cl-line" d="${l.d}" style="--cl-len:${l.len}px"/></g>`)
-    .join("");
-  const ends =
-    model.links
-      .map((l) => `<g class="cl" data-id="${esc(l.id)}" data-state="${l.state}">${l.stubs.map((d) => `<path class="cl-stub" d="${d}" style="--cl-len:${l.len}px"/>`).join("")}<circle class="cl-dot" cx="${l.to.x}" cy="${l.to.y}" r="2.5"/></g>`)
-      .join("") +
-    model.ripples.filter((r) => !inBand(model, r)).map(ripple).join("");
+export function layersHtml(model) {
+  const lines = model.links.map(bodyHtml).join("");
+  const ends = model.links.map(endsHtml).join("") + model.ripples.filter((r) => !inBand(model, r)).map(rippleHtml).join("");
   let band = "";
   if (model.band) {
     const leads = (model.band.rows || [])
@@ -74,14 +69,87 @@ export function layersHtml(model, { width, height }) {
         `</div>`,
     );
     // a band parent's ripples over its items (the items are opaque and the band lies over .gx-cmd-top)
-    const rings = model.ripples.filter((r) => inBand(model, r)).map(ripple).join("");
-    const over = rings ? `<svg class="gx-band-cr" width="1" height="1" aria-hidden="true">${rings}</svg>` : "";
+    const rings = model.ripples.filter((r) => inBand(model, r)).map(rippleHtml).join("");
+    const over = rings ? `<div class="gx-band-cr" aria-hidden="true">${rings}</div>` : "";
     band = `<div class="gx-band">${leads.join("")}${items.join("")}${over}</div>`;
   }
   return {
-    cmd: `<svg class="gx-cmd" ${size} aria-hidden="true">${lines}</svg>`,
-    top: `<svg class="gx-cmd-top" ${size} aria-hidden="true">${ends}</svg>`,
+    cmd: `<div class="gx-cmd" aria-hidden="true">${lines}</div>`,
+    top: `<div class="gx-cmd-top" aria-hidden="true">${ends}</div>`,
     band,
+  };
+}
+
+/**
+ * The stopping of the lines' motion (iss-00646 D-03), one per screen: while the graph moves and quiet ms after it, and
+ * while the page is at the back, the graph area has is-still; the pictures and ripples off the graph area have is-off
+ * (an IntersectionObserver of the area, none without one: F-01). Only classes change; graph.css pauses the animations.
+ * @returns {{moved(): void, watch(world: Element | null): void, stop(): void, state(): object}}
+ */
+export function createMotion(view, { quiet = 300 } = {}) {
+  let timer = null;
+  let io = null;
+  let phases = 0;
+  let ripples = 0;
+  let world = null;
+  const back = () => document.visibilityState === "hidden";
+  const still = (on) => view?.classList.toggle("is-still", on);
+  const clearTimer = () => {
+    if (timer !== null) clearTimeout(timer);
+    timer = null;
+  };
+  const onVisible = () => {
+    if (back()) still(true);
+    else if (timer === null) still(false);
+  };
+  document.addEventListener("visibilitychange", onVisible);
+  const unwatch = () => {
+    io?.disconnect();
+    io = null;
+    world = null;
+    phases = 0;
+    ripples = 0;
+  };
+  return {
+    moved() {
+      still(true);
+      clearTimer();
+      timer = setTimeout(() => {
+        timer = null;
+        if (!back()) still(false);
+      }, quiet);
+    },
+    watch(next) {
+      unwatch();
+      if (!next) {
+        // F-02: no layer, no still mark nor its clock (the back keeps its mark)
+        clearTimer();
+        if (!back()) still(false);
+        return;
+      }
+      world = next;
+      if (typeof IntersectionObserver !== "function") return; // F-01: no watching; the motion runs everywhere
+      io = new IntersectionObserver(
+        (entries) => {
+          for (const e of entries) e.target.classList.toggle("is-off", !e.isIntersecting);
+        },
+        { root: view, threshold: 0 },
+      );
+      for (const el of next.querySelectorAll(".cl-ph, .cr")) {
+        io.observe(el);
+        if (el.classList.contains("cr")) ripples++;
+        else phases++;
+      }
+    },
+    stop() {
+      unwatch();
+      clearTimer();
+      document.removeEventListener("visibilitychange", onVisible);
+      still(false);
+    },
+    state() {
+      return { phases, ripples, off: world ? world.querySelectorAll(".cl-ph.is-off, .cr.is-off").length : 0, still: !!view?.classList.contains("is-still") };
+    },
   };
 }
 

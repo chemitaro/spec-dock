@@ -57,6 +57,7 @@ const A = {
   sizes: null, // the sizes the frames were composed with
   // iss-00617: the command lines and the bands
   cmdKey: null, // crossKey of the lines drawn; the same key draws nothing again
+  motion: null, // the lines' stopping while the graph moves, off the area and at the back (iss-00646 D-03)
   cmdModel: null, // the last crossModel drawn, or null without a pair
   cmdSel: null, // the agent whose lines stand out
   agentPanel: null, // the band's agent whose chat the panel shows
@@ -301,6 +302,7 @@ function spotsFor(repos, node, k) {
 // No pair (F-01): no layer, no band; the world is as it was.
 function clearCommand() {
   if (A.el) CV.removeLayers(A.el.world);
+  A.motion?.watch(null);
   A.cmdModel = null;
 }
 
@@ -308,11 +310,12 @@ function drawCommand(model) {
   const w = A.el.world;
   CV.removeLayers(w);
   A.cmdModel = model;
-  const html = CV.layersHtml(model, { width: A.comp.width, height: A.comp.height });
+  const html = CV.layersHtml(model);
   // the layers stack by their z-index (graph.css) over the frames and under the boxes; the DOM's order is free
   w.appendChild(CV.element(html.cmd));
   w.appendChild(CV.element(html.top));
   if (html.band) w.appendChild(CV.element(html.band));
+  A.motion?.watch(w);
 }
 
 function paintBandMarks() {
@@ -428,6 +431,7 @@ export function cmdAudit() {
     spotMissing: missing,
     layers: Array.from(w.children).map((c) => c.getAttribute("class")),
     pointer: [...w.querySelectorAll(".gx-cmd, .gx-cmd-top")].map((s) => getComputedStyle(s).pointerEvents),
+    motion: A.motion?.state() ?? null, // iss-00646 D-04: the watched pictures and ripples, the off ones, the still mark
     heads: CV.headsAudit(w),
   };
 }
@@ -469,6 +473,8 @@ function mount(root) {
     onClose: () => select(null),
     extraActions: (s) => (A.sel && frameOf(A.sel.repo, s) ? `<button type="button" class="ds-btn" data-act="focus" data-focus="${esc(s.id)}" aria-label="この範囲に絞る" title="この範囲に絞る">${ic("target")}この範囲に絞る</button>` : ""),
   });
+  A.motion?.stop();
+  A.motion = CV.createMotion(A.el.view);
   bindView();
   A.el.gx.addEventListener("click", onClick);
   document.addEventListener("keydown", onKey);
@@ -490,6 +496,8 @@ function dispose() {
   A.rowsRaf = 0;
   if (window.specdockEdgeAudit === edgeAudit) delete window.specdockEdgeAudit;
   if (window.specdockCmdAudit === cmdAudit) delete window.specdockCmdAudit;
+  A.motion?.stop();
+  A.motion = null;
   A.token++;
   A.root = null;
   A.el = null;
@@ -1185,6 +1193,7 @@ function applyT() {
   A.el.world.style.transform = `translate(${A.tx}px, ${A.ty}px) scale(${A.s})`;
   const z = A.el.tools.querySelector(".zoomval");
   if (z) z.textContent = `${Math.round(A.s * 100)}%`;
+  A.motion?.moved(); // iss-00646 D-04: every move of the graph stills the lines for a moment
 }
 
 function barBottom() {
