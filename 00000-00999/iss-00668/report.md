@@ -28,6 +28,7 @@ ID: "iss-00668"
 - 開始のコミットでの基準（impl-sol）：`test_dashboard_structure_facts.py` 14 passed。S-02 の今ある3ファイル（graph_command・allgraph_command・allgraph_compose）84 passed（`test_dashboard_graph_unscoped.py` は新しいので基準なし）。
 - S-01（impl-sol、Codex GPT-6.1 Sol / medium）：T-01 を先に書き、未実装の関数・`items` の属性・API の `items` の欠落で落ちることを確かめてから、D-01（`worktree_items`、`StructureFacts.items`、1回の一覧から items、`dashboard_http` の JSON の `items`）を入れて通した。`test_dashboard_structure_facts.py` 19 passed、`test_dashboard_orca_worktrees.py` 込みで 26 passed、変えた4ファイルの ruff check・ruff format --check・mypy 合格。コミット `794033ceb`（Codex の `66d1b9337` の件名を、タスク担当が日本語に直した amend。内容は同じ）。最初の行が bare のとき次の行を主にしないことも確かめた。
 - S-02（impl-claude、Claude Opus 5.5 / medium）：T-02 を `tests/js/dashboard_graph_unscoped.mjs`・`tests/unit/presentation/test_dashboard_graph_unscoped.py`（新）に先に書き、`views/graph/unscoped.js` がないこと（ERR_MODULE_NOT_FOUND）で落ちることを確かめてから D-02 を入れて通した（17 passed）。T-03 を `dashboard_graph_command`（`bandRows` の要求）と `dashboard_allgraph_command`（`rows`・`wrap` の場面、`range` を渡す、`groups` の出力）に先に書き、`BAND` の定数・`bandRowHeight` の欠落などで落ちることを確かめてから D-03・D-04 を入れて通した。節目：`uv run pytest tests/unit/presentation/test_dashboard_graph_unscoped.py tests/unit/presentation/test_dashboard_graph_command.py tests/unit/presentation/test_dashboard_allgraph_command.py tests/unit/presentation/test_dashboard_allgraph_compose.py` → 107 passed。`make lint` 合格（ruff check・ruff format --check・mypy）。今のテストの期待の直し：札「main のチェックアウト」→「main」（graph_command の2か所と labelWidth の 125→27、allgraph_command の cross）、帯の行の幅に頭の文字 `Unscoped`（allgraph_command の cross の bands の w）、`BAND` の定数に `perLine`・`lineH`。『これから』の線がなくなる分：allgraph_command の keep・childOnly・keepParent を git の一覧つきの構造で『これから』の新しい決まり（組と居場所が空、`commanding` で keep、行の数）に書き直し、sameIds（線の端が別のリポジトリの同じ key に広がらないこと）は『これから』では線がないので、『いま』の畳んだまとまり（両方のリポジトリの `root.f`）で同じ仕組みを確かめる形にした。S-02 の時点で、画面のテスト（`test_dashboard_graph_command_screen.py` の2件・`test_dashboard_allgraph_command_screen.py` の2件）は札の変更と『これから』の keep で落ちる。graph.js・allgraph.js を変える S-03 でまとめて直す（二度直しを避ける）。コミット `3d47ca4fc`。
+- S-03（impl-claude、Claude Opus 5.5 / medium）：D-05（graph.js：組がなくても行を描く、『これから』は線なし、`commandKey` に構造と見方、項目・`+N` の押しと詳細の欄、Esc・閉じる・空の場所で閉じる）、D-06（allgraph.js：組がなくても `crossPlace`、`crossKey` に見方、同じ押し）、D-07（command_view.js の `layersHtml` の項目・印・数・折り返しの位置、`renderWorktreePanel`、orca_marks.js の `openWorktreeButton`）、D-08（graph.css）を入れ、T-04 を `tests/unit/presentation/test_dashboard_unscoped_screen.py`（新）と画面の台本（`dashboard_graph_command_screen.mjs` の run ごとの `doc`・`range`・`embed` と行の写し、`dashboard_allgraph_command_screen.mjs` の印・数・詳細の欄の写し）に書いた。T-04 は実装の後に書いたので、S-02 のコミット（HEAD `3d47ca4fc`）の資産を写した場所で同じ台本を走らせ、行の項目（`[data-cmd-wt]`）がなくて落ちることを確かめた（Red の代わり）。今の画面のテストの期待の直し（理由）：構造の図の帯の札「main のチェックアウト」→「main」と、頭の文字 `Unscoped`（53 + 6）と `Primary` の印（38 + 6、構造に git の一覧がないので F-01 で要約の main に印）の分の位置と幅（`test_the_band_shows_its_items`、`test_pressing_the_band_agent_opens_its_chat` の見出し）。『横断の構造』は、画面の既定の見方が『これから』で、『これから』では線を引かなくなったので、線を確かめる場面を `range: "all"` で走らせる（run に見方がないときの既定）。keep の場面は git の一覧つきの構造で、『これから』の新しい決まり（子の数のある Primary で枠が残る、線なし、見える枠の行は idle の Primary）に書き直し、cross の札と位置（頭の文字の分）を直した。結果は節目のコマンドの記録に書く。
 
 ## 逸脱と判断
 
@@ -43,5 +44,14 @@ ID: "iss-00668"
   - `bandLabel` は、自分のリポジトリの項目の detached（`branch` がなく `head` がある）を `detached @<先頭7文字>`。git の行から札を作るときは、detached の行だけ `head` を渡す。
   - `crossPlace` は、全体・いまでは今の keep の決め方のまま、行は見える（`visibleWith(keep)` の後の）リポジトリだけに作る。『これから』では見えないリポジトリの行を先に作り、`commanding` のものを keep にする。
   - `crossKey` に `range` を足した（D-06。allgraph.js が渡すのは S-03）。
+
+- 2026-11-19 impl-claude（S-03、実装の裁量）：
+  - 詳細の欄のエージェントのボタンは `data-wt-agent`（D-07 の `data-cmd-agent` ではない）。チャットを出している間は欄そのものが `data-cmd-agent` を持つので、`closest("[data-cmd-agent]")` が欄の中のどこを押しても当たってしまう（つまみ・閉じるが効かなくなった）ため。
+  - 『横断の構造』の `+N` の key は `fold|<リポジトリの鍵>`（帯の項目は行をまたいで key で引くので、枠ごとに分ける）。`unscopedItems` の `fold` のまま返し、`crossPlace` が付け替える。
+  - 線の組があって行の項目が0のときも描く（`clearCommand` は項目も組もないときだけ）。
+  - 詳細の欄は、開いている間に帯を描き直すたびに描き直す。中身（key・札・印・パス・エージェント・『Orca で開く』の id・テーマ）が同じなら何もしない（『Orca で開く』の script を読み直さない）。項目が行から消えたら閉じる。
+  - `+N` の title・aria-label は「エージェントのいない worktree N件」（英語はこの Issue で決めた語だけ、constraints）。詳細の欄の文言（ブランチ・パス・エージェント・なし）も日本語。
+  - 項目の角は `border-radius: 14px`（高さ 28px では今の丸と同じ。折り返した高い項目は角の丸い四角）。印と数は 9.2px・太さ 600・余白なしで、幅は模型の推定（`ceil(labelWidth × 0.8)`）を style で渡す。実際の字の幅とのずれは S-05 の実機で確かめる（design の risks）。
+  - エージェントのボタンは模型の slot の位置に絶対の位置で置く（`left = slot.x − item.x − 枠 1px`、`top = slot.y − item.y`、高さ 26px）。`cmdAudit` のボタンの中心と slot の中心のずれの測り方（`offsetLeft + clientLeft + offsetLeft`）はそのまま合う。
 
 ## Residual Risks / Follow-ups
