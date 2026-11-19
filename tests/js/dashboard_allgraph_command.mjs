@@ -32,11 +32,16 @@ const placeJson = (p) => {
   return { ...base, key: p.key };
 };
 const compJson = (c) => ({ frames: Object.fromEntries(c.frames), order: c.order, width: c.width, height: c.height, other: c.other ?? null });
-const rowsJson = (rows) => Object.fromEntries([...rows].map(([k, items]) => [k, items.map((it) => ({ key: it.key, label: it.label, own: it.own, main: it.main, agents: it.agents.map((a) => a.id) }))]));
+const rowsJson = (rows) => Object.fromEntries([...rows].map(([k, items]) => [k, items.map((it) => {
+  const base = { key: it.key, label: it.label, own: it.own, main: it.main, agents: it.agents.map((a) => a.id) };
+  // iss-00668: the Unscoped row's fields when the item has them
+  for (const f of ["badge", "count", "kind", "idle"]) if (it[f] !== undefined && it[f] !== null && it[f] !== false && !(f === "kind" && it[f] === "worktree")) base[f] = it[f];
+  return base;
+})]));
 const bandJson = (band) => band && {
   top: band.top, h: band.h, right: band.right,
   rows: (band.rows || []).map((r) => ({
-    key: r.key, left: r.left, top: r.top, lead: r.lead, leadWidth: r.leadWidth,
+    key: r.key, left: r.left, top: r.top, h: r.h, lead: r.lead, leadTitle: r.leadTitle ?? null, leadWidth: r.leadWidth,
     items: r.items.map((it) => ({ key: it.key, label: it.label, x: it.x, y: it.y, w: it.w, h: it.h, agents: it.agents.map(({ id, x, y, w, h }) => ({ id, x, y, w, h })) })),
   })),
   items: band.items.map((it) => ({ key: it.key, x: it.x, y: it.y, w: it.w, h: it.h })),
@@ -127,7 +132,7 @@ function scenario(sc) {
   const pairs = C.commandPairs(summary);
   const order = sc.order || {};
   const orderOf = (w) => order[w.id] || null;
-  const placed = X.crossPlace(pairs, { repos, summary, visible, visibleWith, orderOf });
+  const placed = X.crossPlace(pairs, { repos, summary, visible, visibleWith, orderOf, range });
   const shape = X.bandShape(placed.rows, placed.keep);
   const comp = P.compose(listed, sizes, { range, width, bands: shape.bands, keep: shape.keep, other: shape.other });
   const spots = {};
@@ -154,6 +159,7 @@ function scenario(sc) {
     plain: compJson(plain),
     comp: compJson(comp),
     nodes: Object.fromEntries(repos.filter((r) => r.layout).map((r) => [r.key, Object.fromEntries(r.layout.nodes.map((n) => [n.id, { type: n.type, x1: n.x1, y1: n.y1, x2: n.x2, y2: n.y2, kind: n.kind ?? null }]))])),
+    groups: Object.fromEntries(repos.filter((r) => r.layout).map((r) => [r.key, (r.layout.groups || []).map((g) => ({ key: g.key, x1: g.x1, y1: g.y1, x2: g.x2, y2: g.y2 }))])),
     spots,
     model: modelJson(model),
     flat: { links: flat.links.length, band: !!flat.band },
@@ -179,6 +185,8 @@ if (request.key) {
     otherIds: k({}) === k({ repos: [{ ...repos[0], ids: { s: ["y"] } }] }),
     otherComp: k({}) === k({ comp: { frames: new Map() } }),
     otherVisible: k({}) === k({ visible: [] }),
+    otherRange: k({ range: "all" }) === k({ range: "next" }),
+    sameRange: k({ range: "next" }) === k({ range: "next" }),
     withoutComp: k({ comp: null }) === k({ comp: { frames: new Map() } }),
     withoutCompSame: k({ comp: null }) === k({ comp: null }),
   };

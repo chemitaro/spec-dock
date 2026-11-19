@@ -319,3 +319,71 @@ def test_the_structure_api_answers_when_every_reader_fails(env: Env, monkeypatch
     status, body = env.json("/api/v1/r/github.com/o/r/structure")
     assert status == 200
     assert all(item["assurance"] is None and item["branch"] is None for item in body["scopes"])
+
+
+def test_worktree_items_filter_internal_and_unusable_checkouts() -> None:
+    records = [
+        GitWorktreeRecord(Path("/w/main"), "a", "main"),
+        GitWorktreeRecord(Path("/w/task"), "b", "task", locked=True),
+        GitWorktreeRecord(Path("/w/detached"), "c", None, detached=True),
+        GitWorktreeRecord(Path("/w/bare"), "d", None, bare=True),
+        GitWorktreeRecord(Path("/w/gone"), "e", "gone", prunable=True),
+        GitWorktreeRecord(Path("/w/catalog"), "f", "spec-dock/canonical", locked=True),
+    ]
+    assert details_module.worktree_items(records, Path("/w/catalog/")) == (
+        {"path": "/w/main", "branch": "main", "head": "a", "main": True, "detached": False, "locked": False},
+        {"path": "/w/task", "branch": "task", "head": "b", "main": False, "detached": False, "locked": True},
+        {"path": "/w/detached", "branch": None, "head": "c", "main": False, "detached": True, "locked": False},
+    )
+
+
+def test_bare_primary_does_not_promote_the_next_checkout() -> None:
+    items = details_module.worktree_items(
+        [
+            GitWorktreeRecord(Path("/w/bare"), "a", None, bare=True),
+            GitWorktreeRecord(Path("/w/task"), "b", "task"),
+        ],
+        Path("/catalog"),
+    )
+    assert len(items) == 1 and items[0]["main"] is False
+
+
+@pytest.mark.parametrize("fails", [False, True])
+def test_structure_facts_share_one_listing_for_paths_and_items(tmp_path: Path, fails: bool) -> None:
+    catalog = _catalog(tmp_path)
+    lister = Lister(
+        [
+            GitWorktreeRecord(Path("/w/main"), "a", "main"),
+            GitWorktreeRecord(catalog, "b", "spec-dock/canonical", locked=True),
+        ],
+        error=OSError("unreadable") if fails else None,
+    )
+    facts = read_structure_facts(_site(catalog), (), StructureFactsCache(), worktree_lister=lister, cue_locator=_locate)
+    assert lister.calls == 1
+    assert facts.worktrees_status == ("unreadable" if fails else "ok")
+    assert facts.paths == (() if fails else ("/w/main", str(catalog)))
+    assert facts.items == (
+        ()
+        if fails
+        else ({"path": "/w/main", "branch": "main", "head": "a", "main": True, "detached": False, "locked": False},)
+    )
+
+
+def test_structure_api_exposes_checkout_inventory(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+    status, body = env.json("/api/v1/r/github.com/o/r/structure")
+    assert status == 200
+    assert body["worktrees"] == {
+        "status": "ok",
+        "paths": ["/w/a"],
+        "items": [
+            {"path": "/w/a", "branch": "u/iss-00002", "head": "b", "main": True, "detached": False, "locked": False}
+        ],
+    }
+
+    def broken(*args: object, **kwargs: object) -> Any:
+        raise OSError("unreadable")
+
+    monkeypatch.setattr(details_module, "worktree_list", broken)
+    status, body = env.json("/api/v1/r/github.com/o/r/structure")
+    assert status == 200
+    assert body["worktrees"] == {"status": "unreadable", "paths": [], "items": []}

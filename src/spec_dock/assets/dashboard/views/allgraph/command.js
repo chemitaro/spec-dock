@@ -5,7 +5,8 @@
 // Pure computation like compose.js: no DOM, no clock, no network. The page passes compose() as a function where the
 // frames shown are needed, and the measured marks of each repository as spotsOf.
 import { normPath, summaryValid } from "../../core/orca_match.js";
-import { BAND, bandItems, bandKeys, bandRowWidth, commandModel, placer } from "../graph/command.js";
+import { BAND, bandItems, bandKeys, bandRowHeight, bandRowWidth, commandModel, placer } from "../graph/command.js";
+import { UNSCOPED, commanding, unscopedItems } from "../graph/unscoped.js";
 import { REPO } from "./compose.js";
 
 /** The text at the head of the band above every frame (R-02). */
@@ -44,19 +45,23 @@ export function repoOfWorktrees(repos, summary) {
 }
 
 /**
- * Where each end of the pairs sits in the cross-repository structure (R-01, R-03, F-02).
+ * Where each end of the pairs sits in the cross-repository structure (iss-00617 R-01, R-03, F-02) and each repository's
+ * Unscoped row (iss-00668 D-04).
  * Place: graph/command.js's Place with `repo` (the worktree's repository or null), and `row` for a band's end (the
  * repository's key, "" for "ほかの場所").
+ * @param pairs       commandPairs(summary), all of them (the rows' counts use them in "next")
  * @param repos       [{key, structure, layout, ix, graph}] in the list's order; graph: the frame's body is a graph
  * @param visible     the keys compose() shows without a band
  * @param visibleWith (keep) => the keys compose() shows with `keep`
  * @param orderOf     worktree -> its agents in the component's order (orderAgents), or null
- * @returns {pairs, places: Map<agent id, Place>, rows: Map<row, bandItems>, keep: Set<key>, of, unknown}
+ * @param range       "all" | "now" | "next": "next" draws no line (its pairs and places are empty)
+ * @returns {pairs, places: Map<agent id, Place>, rows: Map<row, items>, keep: Set<key>, of, unknown}
  */
-export function crossPlace(pairs, { repos, summary, visible, visibleWith, orderOf }) {
+export function crossPlace(pairs, { repos, summary, visible, visibleWith, orderOf, range = "all" }) {
   const { of, unknown } = repoOfWorktrees(repos, summary);
   const keys = summaryValid(summary) ? bandKeys(summary) : new Map();
   const byKey = new Map(repos.map((r) => [r.key, r]));
+  const next = range === "next";
   const placers = new Map();
   const placeIn = (k, ref) => {
     const r = byKey.get(k);
@@ -67,7 +72,7 @@ export function crossPlace(pairs, { repos, summary, visible, visibleWith, orderO
   };
   const places = new Map();
   const kept = [];
-  for (const pair of pairs) {
+  for (const pair of next ? [] : pairs) {
     const ends = [pair.parent, pair.child];
     // F-02: a worktree in no repository may be one not known yet: no guess of "ほかの場所"
     if (unknown && ends.some((ref) => !of.has(ref.worktree))) continue;
@@ -78,25 +83,44 @@ export function crossPlace(pairs, { repos, summary, visible, visibleWith, orderO
     }
     kept.push(pair);
   }
-  // R-03: a repository not shown keeps its frame for the band when a pair's parent is in it
+  // R-03: a repository not shown keeps its frame for the band when a pair's parent is in it ("next": a commanding item)
   const shown = visible instanceof Set ? visible : new Set(visible || []);
+  const ownOf = (k) => new Set([...of].filter(([, key]) => key === k).map(([w]) => w));
+  const rowOf = (k) => {
+    const mine = new Map([...places].filter(([, p]) => p.kind === "band" && p.row === k));
+    return unscopedItems({ structure: byKey.get(k)?.structure, summary, pairs, places: mine, own: ownOf(k), orderOf, range });
+  };
   const keep = new Set();
-  for (const pair of kept) {
-    const p = places.get(pair.parent.id);
-    if (p.kind === "band" && p.row && !shown.has(p.row)) keep.add(p.row);
+  const early = new Map();
+  if (next) {
+    for (const r of repos) {
+      if (shown.has(r.key)) continue;
+      const res = rowOf(r.key);
+      early.set(r.key, res);
+      if (commanding(res.items)) keep.add(r.key);
+    }
+  } else {
+    for (const pair of kept) {
+      const p = places.get(pair.parent.id);
+      if (p.kind === "band" && p.row && !shown.has(p.row)) keep.add(p.row);
+    }
   }
   const shown2 = keep.size && typeof visibleWith === "function" ? new Set(visibleWith(keep)) : shown;
   for (const [id, p] of places) {
     if (p.repo && !shown2.has(p.repo)) places.set(id, { kind: "band", key: keys.get(refOf(kept, id)?.worktree) ?? p.key, repo: p.repo, row: "" });
   }
-  // the band's items, one row per repository and "ほかの場所" first
+  // the rows: "ほかの場所" first (all and now: today's band items), then each shown repository's Unscoped row
   const rows = new Map();
-  const rowKeys = ["", ...repos.map((r) => r.key)];
-  for (const row of rowKeys) {
-    const mine = new Map([...places].filter(([, p]) => p.kind === "band" && p.row === row));
-    if (!mine.size) continue;
-    const own = new Set(row ? [...of].filter(([, k]) => k === row).map(([w]) => w) : []);
-    rows.set(row, bandItems(kept, mine, own, orderOf));
+  if (!next) {
+    const mine = new Map([...places].filter(([, p]) => p.kind === "band" && p.row === ""));
+    if (mine.size) rows.set("", bandItems(kept, mine, new Set(), orderOf));
+  }
+  for (const r of repos) {
+    if (!shown2.has(r.key)) continue;
+    const res = early.get(r.key) || rowOf(r.key);
+    for (const [id, p] of res.places) if (p.kind === "band" && p.row === r.key) places.set(id, p);
+    // one "+N" per frame: its key names its repository (the band's items are looked up by key across the rows)
+    if (res.items.length) rows.set(r.key, res.items.map((it) => (it.kind === "fold" ? { ...it, key: `fold|${r.key}` } : it)));
   }
   return { pairs: kept, places, rows, keep, of, unknown };
 }
@@ -115,9 +139,13 @@ function refOf(pairs, id) {
  */
 export function bandShape(rows, keep) {
   const bands = {};
-  for (const k of [...rows.keys()].filter((k) => k !== "").sort()) bands[k] = { h: REPO.band, w: bandRowWidth(rows.get(k)) + 2 * REPO.pad };
+  // iss-00668 D-04: a row's lead "Unscoped" and its tallest item (R-09)
+  for (const k of [...rows.keys()].filter((k) => k !== "").sort()) {
+    const items = rows.get(k);
+    bands[k] = { h: REPO.band + bandRowHeight(items) - BAND.h, w: bandRowWidth(items, UNSCOPED.lead) + 2 * REPO.pad };
+  }
   const items = rows.get("");
-  const other = items?.length ? { h: REPO.other, w: bandRowWidth(items, OTHER_LEAD) + 2 * REPO.pad } : null;
+  const other = items?.length ? { h: REPO.other + bandRowHeight(items) - BAND.h, w: bandRowWidth(items, OTHER_LEAD) + 2 * REPO.pad } : null;
   const kept = [...(keep || [])].sort();
   return { bands, keep: kept, other, key: JSON.stringify({ bands, keep: kept, other }) };
 }
@@ -174,7 +202,7 @@ export function crossModel({ comp, repos, placed, spotsOf = () => null }) {
       continue;
     }
     const f = comp.frames.get(row);
-    if (f && f.band.y2 > f.band.y1) rows.push({ key: row, left: f.x1 + REPO.pad, top: f.band.y1 + REPO.bandTop, lead: null, items });
+    if (f && f.band.y2 > f.band.y1) rows.push({ key: row, left: f.x1 + REPO.pad, top: f.band.y1 + REPO.bandTop, lead: UNSCOPED.lead, leadTitle: UNSCOPED.leadTitle, items });
   }
   const shifted = (c) => {
     const o = origin.get(c.repo);
@@ -207,10 +235,10 @@ const idOf = (o) => {
 /**
  * The same string for the same inputs (graph/command.js's commandKey's way): the summary object, each repository's
  * structure and routing objects, its measured widths and recorded ids of the marks, the shown frames' keys, and the
- * composed frames (comp; null leaves it out, for F-05's count of the places' inputs).
+ * composed frames (comp; null leaves it out, for F-05's count of the places' inputs) and the range (iss-00668 D-06).
  * @param repos [{key, structure, eg, marks, ids}]
  */
-export function crossKey({ summary, repos = [], comp = null, visible = null }) {
+export function crossKey({ summary, repos = [], comp = null, visible = null, range = null }) {
   const parts = repos.map((r) => `${r.key}:${idOf(r.structure)}:${idOf(r.eg)}:${JSON.stringify(r.marks ?? null)}:${JSON.stringify(r.ids ?? null)}`);
-  return [idOf(summary), ...parts, JSON.stringify(visible ?? null), comp ? idOf(comp) : "-", JSON.stringify(BAND), JSON.stringify(REPO)].join("|");
+  return [idOf(summary), ...parts, JSON.stringify(visible ?? null), comp ? idOf(comp) : "-", String(range), JSON.stringify(BAND), JSON.stringify(REPO)].join("|");
 }

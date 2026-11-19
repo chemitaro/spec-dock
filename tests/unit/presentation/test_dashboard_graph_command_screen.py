@@ -598,15 +598,19 @@ def test_news_never_lays_out_again_and_the_same_input_draws_nothing(runs: dict[s
 
 
 def test_the_band_shows_its_items(runs: dict[str, list[dict[str, Any]]]) -> None:
-    """T-05 / R-02: the main checkout with the coordinator and the researcher, then the other repository."""
+    """T-05 / R-02: the main checkout with the coordinator and the researcher, then the other repository.
+
+    iss-00668: the row starts after its lead "Unscoped" (53 + 6); the main checkout is its branch with the Primary badge
+    (38 + 6 wider, F-01: the structure has no git list, so the summary's main is Primary).
+    """
     shot = runs["news"][0]
     assert shot["bandItems"] == [
-        "left:24px;top:-16px;width:249px;height:28px",
-        "left:283px;top:-16px;width:157px;height:28px",
+        "left:83px;top:-16px;width:195px;height:28px",
+        "left:288px;top:-16px;width:157px;height:28px",
     ]
     assert shot["bandLabels"] == [
-        "main のチェックアウト：label a-coord",
-        "main のチェックアウト：label a-research",
+        "main：label a-coord",
+        "main：label a-research",
         "other · main：label x-coord",
     ]
     assert list(runs["order"][0]["pressed"]) == ["a-research", "a-coord"]  # orderAgents' order
@@ -641,7 +645,7 @@ def test_pressing_the_band_agent_opens_its_chat(runs: dict[str, list[dict[str, A
     assert panel["iframe"]["src"] == "http://192.0.2.1:8791/embed/agent?id=a-coord&theme=light"
     assert panel["iframe"]["sandbox"] == "allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
     assert panel["iframe"]["referrer"] == "no-referrer"
-    assert panel["text"] == "claude · main のチェックアウト"
+    assert panel["text"] == "claude · main"  # iss-00668: the branch, not 「main のチェックアウト」
     # iss-00650 R-01: the body follows the agents tab's column rule of panel.css, so the frame fills the panel
     assert panel["bodyTab"] == "agents" and panel["none"] is None
     column = '.sd-pn .pn-body:is([data-tab="docs"], [data-tab="explanation"], [data-tab="agents"])'

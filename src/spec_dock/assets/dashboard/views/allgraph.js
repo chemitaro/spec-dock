@@ -62,6 +62,7 @@ const A = {
   cmdModel: null, // the last crossModel drawn, or null without a pair
   cmdSel: null, // the agent whose lines stand out
   agentPanel: null, // the band's agent whose chat the panel shows
+  wtPanel: null, // iss-00668: the key of the Unscoped row's item whose worktree the panel shows
   shape: null, // the bands' shape the frames are to be composed with (bandShape), or null without a band
   compShape: null, // the key of the shape A.comp was composed with
   shapeRedo: 0, // the frames composed again for a new shape with the same places' inputs (F-05)
@@ -252,16 +253,18 @@ function paintCommand() {
   const summary = summaryNow();
   const repos = cmdRepos();
   const visible = A.plain.order;
-  const key = crossKey({ summary, repos, comp: A.comp, visible });
+  const range = A.range;
+  const key = crossKey({ summary, repos, comp: A.comp, visible, range });
   if (key === A.cmdKey) {
     paintBandMarks();
     return;
   }
+  // iss-00668 D-06: each frame's Unscoped row comes from git and the summary, with no pair too; "next" draws no line
   const pairs = commandPairs(summary);
-  const placed = pairs.length ? crossPlace(pairs, { repos, summary, visible: new Set(visible), visibleWith, orderOf: CV.orderOf(A.ctx.orca?.marks?.()) }) : null;
-  if (!placed || !placed.pairs.length) {
+  const placed = crossPlace(pairs, { repos, summary, visible: new Set(visible), visibleWith, orderOf: CV.orderOf(A.ctx.orca?.marks?.()), range });
+  if (!placed.pairs.length && !placed.rows.size) {
     if (A.shape) {
-      // F-01: no pair: the frames as they are without a band
+      // F-01: no pair and no row: the frames as they are without a band
       A.shape = null;
       draw();
       return;
@@ -270,9 +273,10 @@ function paintCommand() {
     clearCommand();
     dropGone(summary);
     paintCmdSel();
+    if (A.wtPanel) renderPanel();
     return;
   }
-  const input = crossKey({ summary, repos, comp: null, visible });
+  const input = crossKey({ summary, repos, comp: null, visible, range });
   if (input !== A.shapeInput) {
     A.shapeInput = input;
     A.shapeRedo = 0;
@@ -291,6 +295,7 @@ function paintCommand() {
   dropGone(summary);
   paintCmdSel();
   paintBandMarks();
+  if (A.wtPanel) renderPanel(); // the item's worktree in the panel follows its row (or closes with its item)
 }
 
 function spotsFor(repos, node, k) {
@@ -345,15 +350,38 @@ function pressBandAgent(id) {
   }
   if (A.sel) select(null);
   A.cleanup = false;
+  A.wtPanel = null;
   A.cmdSel = id;
   A.agentPanel = id;
   paintCmdSel();
   renderPanel();
 }
 
+// An Unscoped row's item pressed (its label or "+N", iss-00668 D-06): its worktree in the panel; again closes it.
+function pressBandItem(key) {
+  if (!key) return;
+  if (A.wtPanel === key) {
+    closeWtPanel();
+    return;
+  }
+  if (A.sel) select(null);
+  A.cleanup = false;
+  A.agentPanel = null;
+  A.cmdSel = null;
+  paintCmdSel();
+  A.wtPanel = key;
+  renderPanel();
+}
+
+function closeWtPanel() {
+  A.wtPanel = null;
+  renderPanel();
+}
+
 // The panel's close, whatever it shows: its close button and the phone sheet pulled down (iss-00650 D-03).
 function closePanel() {
-  if (A.agentPanel) closeAgentPanel();
+  if (A.wtPanel) closeWtPanel();
+  else if (A.agentPanel) closeAgentPanel();
   else if (A.cleanup) {
     A.cleanup = false;
     renderPanel();
@@ -371,6 +399,17 @@ function renderAgentPanel(panel) {
   const ok = CV.renderAgentPanel(panel, { id: A.agentPanel, summary: summaryNow(), model: A.cmdModel, orca: A.ctx?.orca, hide: () => A.pn.hide() });
   if (!ok) {
     A.agentPanel = null;
+    return false;
+  }
+  A.el.gx.dataset.panel = "open";
+  return true;
+}
+
+// The pressed item's worktree (graph/command_view.js). false: the item left its row.
+function renderWtPanel(panel) {
+  const item = A.cmdModel?.band?.items.find((it) => it.key === A.wtPanel) ?? null;
+  if (!item || !CV.renderWorktreePanel(panel, { item, orca: A.ctx?.orca, embed: !!A.ctx?.embed, hide: () => A.pn.hide() })) {
+    A.wtPanel = null;
     return false;
   }
   A.el.gx.dataset.panel = "open";
@@ -528,6 +567,7 @@ function dispose() {
   A.cmdModel = null;
   A.cmdSel = null;
   A.agentPanel = null;
+  A.wtPanel = null;
   A.shape = null;
   A.compShape = null;
   A.shapeRedo = 0;
@@ -915,6 +955,7 @@ async function select(repo, id) {
   A.sel = repo && id ? { repo, id } : null;
   A.cmdSel = null; // a mark pressed in the box sets it again after this (onTap)
   A.agentPanel = null;
+  A.wtPanel = null;
   paintCmdSel();
   A.path = null;
   A.docState = "loading";
@@ -1005,6 +1046,7 @@ function renderPanel() {
   const panel = A.el?.panel;
   if (!panel) return;
   if (A.agentPanel && renderAgentPanel(panel)) return;
+  if (A.wtPanel && renderWtPanel(panel)) return;
   CV.clearAgentPanel(panel); // the band agent's chat closes with its panel
   if (A.cleanup) {
     A.pn.hide();
@@ -1050,6 +1092,11 @@ function goDetail(repo, id) {
 
 function onClick(event) {
   const t = event.target;
+  const inPanel = t.closest("[data-wt-agent]");
+  if (inPanel && A.el.panel.contains(inPanel)) {
+    pressBandAgent(inPanel.dataset.wtAgent); // iss-00668 D-07: an agent of the worktree's panel opens its chat
+    return;
+  }
   const act = t.closest("[data-act]");
   if (act) {
     const a = act.dataset.act;
@@ -1094,6 +1141,10 @@ function onClick(event) {
 function onKey(event) {
   if (!A.el) return;
   if (event.key === "Escape") {
+    if (A.wtPanel) {
+      closeWtPanel();
+      return;
+    }
     if (A.agentPanel) {
       closeAgentPanel();
       return;
@@ -1116,6 +1167,12 @@ function onKey(event) {
   if (band && A.el.view.contains(band) && (event.key === "Enter" || event.key === " ")) {
     event.preventDefault();
     pressBandAgent(band.dataset.cmdAgent);
+    return;
+  }
+  const item = event.target.closest?.("[data-cmd-wt], [data-cmd-fold]");
+  if (item && A.el.view.contains(item) && (event.key === "Enter" || event.key === " ")) {
+    event.preventDefault();
+    pressBandItem(item.dataset.cmdWt ?? item.dataset.cmdFold);
     return;
   }
   const target = event.target.closest?.(".gx-box, .gx-fh");
@@ -1148,6 +1205,11 @@ function onTap(target) {
     pressBandAgent(band.dataset.cmdAgent);
     return;
   }
+  const item = target.closest("[data-cmd-wt], [data-cmd-fold]");
+  if (item) {
+    pressBandItem(item.dataset.cmdWt ?? item.dataset.cmdFold);
+    return;
+  }
   const clean = target.closest(".gx-clean");
   const frame = target.closest("[data-repo]");
   if (clean && frame) {
@@ -1158,6 +1220,7 @@ function onTap(target) {
     A.path = null;
     A.cmdSel = null;
     A.agentPanel = null;
+    A.wtPanel = null;
     paintCmdSel();
     A.cleanup = { repo, list: clean.dataset.ids.split(" ").map((id) => all.get(id) || { id, text: "" }) };
     paint();
@@ -1167,6 +1230,7 @@ function onTap(target) {
   const hit = hitOf(target);
   if (!hit) {
     if (A.sel) select(null);
+    else if (A.wtPanel) closeWtPanel();
     else if (A.agentPanel) closeAgentPanel();
     else if (A.cmdSel) {
       A.cmdSel = null;

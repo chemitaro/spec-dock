@@ -124,7 +124,14 @@ function snap(root) {
     leads: world.querySelectorAll(".gx-band-lead").map((el) => ({ text: el.textContent, style: el.getAttribute("style") })),
     bandItems: world.querySelectorAll(".gx-band-item").map((it) => {
       const st = it.getAttribute("style");
-      return { label: it.querySelector(".gx-band-lab").textContent, x: px(st, "left"), y: px(st, "top"), w: px(st, "width"), h: px(st, "height") };
+      return {
+        label: it.querySelector(".gx-band-lab").textContent, x: px(st, "left"), y: px(st, "top"), w: px(st, "width"), h: px(st, "height"),
+        // iss-00668: the Unscoped row's badge and count
+        badge: it.querySelector(".gx-band-badge")?.dataset.badge ?? null,
+        count: it.querySelector(".gx-band-count")?.textContent ?? null,
+        countTitle: it.querySelector(".gx-band-count")?.getAttribute("title") ?? null,
+        idle: it.classList.contains("is-idle"),
+      };
     }),
     pressed: Object.fromEntries(world.querySelectorAll("[data-cmd-agent]").map((b) => [b.dataset.cmdAgent, b.getAttribute("aria-pressed")])),
     selected: world.querySelectorAll(".is-sel").map((el) => el.dataset.id),
@@ -138,7 +145,15 @@ function snap(root) {
       pnH: panel.style.getPropertyValue("--pn-h") || null,
       grab: panel.querySelector(".pn-grab")?.tag ?? null,
       clean: panel.querySelector(".pn-clean") ? true : false,
+      // iss-00668: the worktree of a pressed item of an Unscoped row
+      wt: panel.dataset.cmdWt ?? null,
+      head: panel.querySelector(".pn-head b")?.textContent ?? null,
+      dd: panel.querySelectorAll(".pn-wt dd").map((d) => d.textContent),
+      openBtn: panel.querySelector(".pn-wt-open script")?.dataset.worktree ?? null,
+      list: panel.querySelectorAll(".pn-wt-list li").map((li) => li.textContent),
     },
+    rowKeys: world.querySelectorAll(".gx-band-lab").map((b) => b.dataset.cmdWt ?? b.dataset.cmdFold ?? null),
+    leadTexts: world.querySelectorAll(".gx-band-lead").map((el) => [el.textContent, el.getAttribute("title")]),
     legend: q(".legend").innerHTML.includes("指揮（親 → 子）"),
     stats: stats ? { layouts: stats.layouts, composes: stats.composes ?? null } : null,
     audit: audit && Object.fromEntries(Object.entries(audit).map(([k, v]) => [k, typeof v === "number" ? v : Array.isArray(v) ? v : typeof v])),

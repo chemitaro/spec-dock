@@ -146,6 +146,12 @@ OTHER = summary(
 )
 # e has nothing to show in "next": its coordinator keeps its frame
 E_DOCS = DOCS | {key("e"): doc("/w/e", done=True)}
+# iss-00668 R-07: the same with the git worktree lists, so that each frame has its Unscoped row
+E_GIT_DOCS = {
+    key("a"): doc("/w/a", {"iss-00002": "/w/a-2"}, git=()),
+    key("c"): doc("/w/c", {"iss-00002": "/w/c-2"}, git=()),
+    key("e"): doc("/w/e", done=True, git=()),
+}
 KEEP = summary(
     wt("wt-e", "/w/e", "main", [ag("e-coord")], PROJ["e"], main=True),
     wt("wt-c2", "/w/c-2", "iss-00002", [ag("c-own", parent="e-coord")], PROJ["c"]),
@@ -166,7 +172,7 @@ BAND_KID = summary(
     wt("wt-c2", "/w/c-2", "iss-00002", [ag("c-own", parent="a-coord")], PROJ["c"]),
 )
 BAND_BTN = '[data-cmd-agent="a-coord"]'
-RUNS = [
+RUNS: list[dict[str, Any]] = [
     {"name": "off", "orca": False, "repos": REPOS, "docs": DOCS},
     {"name": "flat", "orca": {"summary": FLAT}, "repos": REPOS, "docs": DOCS},
     # a pair comes and goes
@@ -223,7 +229,7 @@ RUNS = [
         "range": "next",
         "orca": {"summary": KEEP_GONE},
         "repos": [*REPOS, listed("e")],
-        "docs": E_DOCS,
+        "docs": E_GIT_DOCS,
         "steps": [{"summary": KEEP}, {"summary": KEEP_GONE}],
     },
     {
@@ -317,6 +323,11 @@ RUNS += [
 ]
 
 
+# iss-00668 R-06: "next" (the screen's default) draws no command line; the runs about the lines draw "all"
+for _run_def in RUNS:
+    _run_def.setdefault("range", "all")
+
+
 @pytest.fixture(scope="module")
 def drawn(tmp_path_factory: pytest.TempPathFactory) -> dict[str, list[dict[str, Any]]]:
     path = tmp_path_factory.mktemp("allcmdscreen") / "request.json"
@@ -356,8 +367,8 @@ def test_a_pair_draws_one_of_each_layer_and_a_band_in_its_frame(runs: dict[str, 
     a0, a1 = _sec(before, "a"), _sec(shot, "a")
     assert a1["h"] == a0["h"] + BAND_H and a1["body"]["y"] == a0["body"]["y"] + BAND_H
     item = shot["bandItems"][0]
-    assert item["label"] == "main のチェックアウト"
-    assert item["y"] == a1["y"] + 40 + BAND_TOP and item["x"] == a1["x"] + 16
+    assert item["label"] == "main" and item["badge"] == "primary"  # iss-00668: the branch and the Primary badge
+    assert item["y"] == a1["y"] + 40 + BAND_TOP and item["x"] == a1["x"] + 16 + 53 + 6  # after the lead "Unscoped"
     assert a1["y"] + 40 <= item["y"] and item["y"] + ITEM_H <= a1["body"]["y"]
     # iss-00646 R-02: the layers are not SVGs; each line has SVGs of its own box, none as big as the world
     assert len(shot["layerTags"]) >= 2 and set(shot["layerTags"]) == {"div"} and shot["svgSizes"]
@@ -446,14 +457,22 @@ def test_a_new_band_shape_keeps_the_top_most_frame_on_the_screen_after_a_move(ru
 
 
 def test_a_repository_with_nothing_in_next_is_kept_for_its_coordinator(runs: dict[str, Any]) -> None:
+    """iss-00617 R-03 by iss-00668 R-06, R-07: "next" keeps the frame whose row directs, with a count and no line."""
     before, kept, gone = runs["keep"]
     assert key("e") not in {s["key"] for s in before["sections"]}
     e = _sec(kept, "e")
     assert e["kind"] in {"quiet", "empty"} and e["body"] is None
     assert e["h"] == 40 + BAND_H + 16
-    assert any(it["label"] == "main のチェックアウト" and it["y"] == e["y"] + 40 + BAND_TOP for it in kept["bandItems"])
-    assert kept["lines"] == {"e-coord>c-own": ""}
-    assert key("e") not in {s["key"] for s in gone["sections"]} and gone["layers"] == []
+    (item,) = [it for it in kept["bandItems"] if it["y"] == e["y"] + 40 + BAND_TOP]
+    assert (item["label"], item["badge"], item["count"]) == ("main", "primary", "1")
+    assert item["countTitle"] == "1 agent in progress — claude #1: 1"
+    assert kept["lines"] == {} and kept["layers"] == ["gx-cmd", "gx-cmd-top", "gx-band"]
+    # the shown frames keep their rows (their main checkouts, Primary and idle) without a count
+    assert {(it["label"], it["badge"], it["count"], it["idle"]) for it in before["bandItems"]} == {
+        ("main", "primary", None, True)
+    }
+    assert len(before["bandItems"]) == 2
+    assert key("e") not in {s["key"] for s in gone["sections"]} and gone["lines"] == {}
 
 
 def test_the_band_shape_composes_again_at_most_twice_for_the_same_places(runs: dict[str, Any]) -> None:

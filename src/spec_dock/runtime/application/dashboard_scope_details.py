@@ -256,6 +256,23 @@ class StructureFacts:
     readings: dict[str, dict[str, object]]
     worktrees_status: Literal["ok", "unreadable"] = "unreadable"
     paths: tuple[str, ...] = ()
+    items: tuple[dict[str, object], ...] = ()
+
+
+def worktree_items(records: Sequence[GitWorktreeRecord], catalog: Path) -> tuple[dict[str, object], ...]:
+    """Usable checkouts in Git order, excluding the internal catalog worktree (iss-00668 D-01)."""
+    return tuple(
+        {
+            "path": str(record.path),
+            "branch": record.branch,
+            "head": record.head,
+            "main": index == 0,
+            "detached": record.detached,
+            "locked": record.locked,
+        }
+        for index, record in enumerate(records)
+        if not record.bare and not record.prunable and os.path.normpath(record.path) != os.path.normpath(catalog)
+    )
 
 
 def read_structure_facts(
@@ -340,4 +357,4 @@ def read_structure_facts(
         facts[scope_id]["assurance"] = level
     with cache.lock:
         cache.catalogs[key] = kept
-    return StructureFacts(facts, status, paths)
+    return StructureFacts(facts, status, paths, worktree_items(records, catalog))

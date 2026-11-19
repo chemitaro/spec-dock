@@ -7,6 +7,8 @@ import { bandMarkHtml, bodyHtml, endsHtml, rippleHtml } from "./command_motion.j
 import { AGENT_SANDBOX, agentFrame } from "../_shared/agents_logic.js";
 import { currentTheme } from "../_shared/agents_tab.js";
 import { SHEET_GRAB } from "../_shared/panel.js";
+import { openWorktreeButton } from "../_shared/orca_marks.js";
+import { UNSCOPED, countTitle } from "./unscoped.js";
 
 export const LAYERS = ["gx-cmd", "gx-cmd-top", "gx-band"];
 
@@ -63,13 +65,8 @@ export function layersHtml(model) {
   if (model.band) {
     const leads = (model.band.rows || [])
       .filter((r) => r.lead)
-      .map((r) => `<span class="gx-band-lead" style="left:${r.left}px;top:${r.top}px">${esc(r.lead)}</span>`);
-    const items = model.band.items.map(
-      (it) =>
-        `<div class="gx-band-item" style="left:${it.x}px;top:${it.y}px;width:${it.w}px;height:${it.h}px"><span class="gx-band-lab" style="width:${it.labelWidth}px" title="${esc(it.label)}">${esc(it.label)}</span>` +
-        it.agents.map((a) => `<button type="button" class="gx-band-agent" data-cmd-agent="${esc(a.id)}" data-cmd-item="${esc(it.key)}" aria-pressed="false" aria-label="${esc(`${it.label}：${a.id}`)}"><span class="gx-band-slot"></span></button>`).join("") +
-        `</div>`,
-    );
+      .map((r) => `<span class="gx-band-lead" style="left:${r.left}px;top:${r.top}px"${r.leadTitle ? ` title="${esc(r.leadTitle)}"` : ""}>${esc(r.lead)}</span>`);
+    const items = model.band.items.map(itemHtml);
     // a band parent's ripples and the band children's rings over its items (the items are opaque and the band lies over
     // .gx-cmd-top)
     const rings = model.links.map(bandMarkHtml).join("") + model.ripples.filter((r) => inBand(model, r)).map(rippleHtml).join("");
@@ -81,6 +78,30 @@ export function layersHtml(model) {
     top: `<div class="gx-cmd-top" aria-hidden="true">${ends}</div>`,
     band,
   };
+}
+
+const BADGES = { primary: UNSCOPED.primary, unlinked: UNSCOPED.unlinked };
+
+/**
+ * One item of the band (iss-00668 D-07): its label is a button opening the worktree's panel, then its badge and count,
+ * then its agents at the model's slots (wrapped lines too); "+N" is its label alone; an idle item is faint.
+ */
+function itemHtml(it) {
+  const style = `left:${it.x}px;top:${it.y}px;width:${it.w}px;height:${it.h}px`;
+  const cls = `gx-band-item${it.idle ? " is-idle" : ""}${it.kind === "fold" ? " is-fold" : ""}`;
+  if (it.kind === "fold") {
+    const title = `エージェントのいない worktree ${(it.folded || []).length}件`; // the Issue's English words only (constraints)
+    return `<div class="${cls}" style="${style}"><button type="button" class="gx-band-lab gx-band-fold" data-cmd-fold="${esc(it.key)}" style="width:${it.labelWidth}px" title="${esc(title)}" aria-label="${esc(title)}">${esc(it.label)}</button></div>`;
+  }
+  const lab = `<button type="button" class="gx-band-lab" data-cmd-wt="${esc(it.key)}" style="width:${it.labelWidth}px" title="${esc(it.label)}">${esc(it.label)}</button>`;
+  const b = BADGES[it.badge];
+  const badge = b ? `<span class="gx-band-badge" data-badge="${esc(it.badge)}" style="width:${it.badgeWidth}px" title="${esc(b.title)}" aria-label="${esc(b.title)}">${esc(b.text)}</span>` : "";
+  const ct = countTitle(it);
+  const count = ct ? `<span class="gx-band-count" style="width:${it.countWidth}px" title="${esc(ct)}" aria-label="${esc(ct)}">${esc(String(it.count))}</span>` : "";
+  const agents = it.agents
+    .map((a) => `<button type="button" class="gx-band-agent" style="left:${a.x - it.x - 1}px;top:${a.y - it.y}px" data-cmd-agent="${esc(a.id)}" data-cmd-item="${esc(it.key)}" aria-pressed="false" aria-label="${esc(`${it.label}：${a.id}`)}"><span class="gx-band-slot"></span></button>`)
+    .join("");
+  return `<div class="${cls}" style="${style}">${lab}${badge}${count}${agents}</div>`;
 }
 
 /**
@@ -222,6 +243,8 @@ export function renderAgentPanel(panel, { id, summary, model, orca, hide }) {
   const type = typeof agent.agentType === "string" && agent.agentType ? agent.agentType : "種類不明";
   const frame = typeof agent.detail === "string" ? agentFrame(orca?.origin, { detail: agent.detail, agentType: agent.agentType ?? null, branch: worktree.branch ?? null }, theme) : null;
   panel.dataset.st = "unknown";
+  delete panel.dataset.cmdWt; // iss-00668: a worktree's panel gives way to the chat
+  delete panel.dataset.cmdWtSig;
   panel.dataset.cmdAgent = id;
   panel.dataset.theme = theme;
   panel.innerHTML =
@@ -239,12 +262,74 @@ export function renderAgentPanel(panel, { id, summary, model, orca, hide }) {
   return true;
 }
 
-/** The band agent's chat leaves the panel when it closes (the panel's content is the chat's). */
+/** The band agent's chat or a band item's worktree leaves the panel when it closes (the panel's content is theirs). */
 export function clearAgentPanel(panel) {
-  if (!panel?.dataset.cmdAgent) return;
+  if (!panel?.dataset.cmdAgent && !panel?.dataset.cmdWt) return;
   panel.innerHTML = "";
   delete panel.dataset.cmdAgent;
+  delete panel.dataset.cmdWt;
+  delete panel.dataset.cmdWtSig;
   delete panel.dataset.theme;
+}
+
+/**
+ * A band item's worktree in the panel (iss-00668 D-07, R-04, R-05): its badge and label, its branch, its path and its
+ * agents (each opens its chat, data-wt-agent: the panel itself carries data-cmd-agent while it shows a chat), and orca-web's "open in Orca" when the summary has the worktree; "+N"
+ * lists its folded worktrees. A panel that shows the same in the same theme is left alone (its button is not loaded
+ * again). hide() is called before the panel is drawn again (the screen's Scope panel steps aside).
+ */
+export function renderWorktreePanel(panel, { item, orca, embed = false, hide }) {
+  if (!item) return false;
+  // the band's items hold the model's slots ({id, ref, x, y, w, h}): the agent's own fields are in its ref
+  const refs = item.agents.map((a) => a.ref ?? a);
+  const theme = currentTheme();
+  const worktreeId = typeof item.worktree?.id === "string" ? item.worktree.id : null;
+  const open = !!worktreeId && orca?.status?.() === "ok" && !embed;
+  const sig = JSON.stringify([item.key, item.label, item.badge, item.path, item.worktree?.branch ?? null, refs.map((a) => [a.id, a.agentType ?? null]), item.folded ?? null, open ? worktreeId : null, theme]);
+  if (panel.dataset.cmdWt === item.key && panel.dataset.cmdWtSig === sig && panel.classList.contains("is-open")) return true;
+  hide?.();
+  delete panel.dataset.cmdAgent;
+  panel.dataset.st = "unknown";
+  panel.dataset.cmdWt = item.key;
+  panel.dataset.cmdWtSig = sig;
+  panel.dataset.theme = theme;
+  const close = `<button type="button" class="iconbtn" data-act="close" aria-label="閉じる">${ic("x")}</button>`;
+  if (item.kind === "fold") {
+    const list = (item.folded || []).map((f) => `<li><b>${esc(f.label)}</b><small>${esc(f.path ?? "")}</small></li>`).join("");
+    panel.innerHTML =
+      `${SHEET_GRAB}<div class="pn-head"><b>${esc(item.label)} · エージェントのいない worktree</b>${close}</div>` +
+      `<div class="pn-body"><ul class="pn-wt-list">${list}</ul></div>`;
+  } else {
+    const b = BADGES[item.badge];
+    const badge = b ? `<span class="gx-band-badge" data-badge="${esc(item.badge)}" title="${esc(b.title)}">${esc(b.text)}</span> ` : "";
+    const branch = typeof item.worktree?.branch === "string" && item.worktree.branch ? item.worktree.branch : item.label;
+    const agents = refs
+      .map((a) => {
+        const type = typeof a.agentType === "string" && a.agentType ? a.agentType : "種類不明";
+        return `<li><button type="button" class="pn-wt-agent" data-wt-agent="${esc(a.id)}"><span class="gx-band-slot"></span>${esc(type)}</button></li>`;
+      })
+      .join("");
+    panel.innerHTML =
+      `${SHEET_GRAB}<div class="pn-head"><b>${badge}${esc(item.label)}</b>${close}</div>` +
+      `<div class="pn-body"><dl class="pn-wt"><dt>ブランチ</dt><dd>${esc(branch)}</dd><dt>パス</dt><dd class="pn-wt-path">${esc(item.path ?? "")}</dd>` +
+      `<dt>エージェント</dt><dd>${agents ? `<ul class="pn-wt-agents">${agents}</ul>` : "なし"}</dd></dl>` +
+      `<div class="pn-wt-open"></div></div>`;
+    const module = orca?.marks?.();
+    const slots = panel.querySelectorAll(".pn-wt-agent .gx-band-slot");
+    refs.forEach((a, i) => {
+      const slot = slots[i];
+      try {
+        if (slot && module && item.worktree) module.renderAgentMarks(slot, soloWorktree(item.worktree, a.id), { size: "sm", max: 1, now: Date.now() });
+      } catch {
+        slot?.replaceChildren();
+      }
+    });
+    const slot = panel.querySelector(".pn-wt-open");
+    if (slot) openWorktreeButton(slot, { orca, worktreeId, theme, embed, doc: document });
+  }
+  panel.classList.add("is-open");
+  panel.setAttribute("aria-hidden", "false");
+  return true;
 }
 
 // The headings' parts drawn over the lines (iss-00617 D-06): the frames' heading and meta rows' children but the row of
