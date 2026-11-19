@@ -2,22 +2,10 @@ package spec
 
 // 設計（Epic）。型 specdock/v1。
 
-// 設計目標、今の状態と、この Epic の後の状態（任意）。
-// goals: ["..."]
-// current: "..."
-// target:  "..."
-
-// 設計の単位（責務、interface、data など）。番号（D-01、…）をキーにする。
-// title と satisfies（満たす要件・失敗の条件の番号）が必須。
-// standard 以上では、すべての要件に、それを満たす設計が要る。
 design: {
-	// "D-01": {
-	// 	title:     "〜の部品"
-	// 	text:      "責務と interface"
-	// 	satisfies: ["R-01"]
-	// }
+	"D-01": {
+		title:     "iss-00668 の設計（構造の API の items、行の項目の純粋な計算、両方の画面の描画）に任せる"
+		text:      "設計の正本は iss-00668 の design.cue。Epic としての追加の部品はない。"
+		satisfies: ["R-01", "R-02", "R-03", "F-01"]
+	}
 }
-
-// 移行・互換性、リスク（任意）。
-// compatibility: "..."
-// risks: ["..."]

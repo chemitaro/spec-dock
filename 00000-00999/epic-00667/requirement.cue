@@ -1,48 +1,38 @@
 package spec
 
-// 要件（Epic）。型 specdock/v1。書き方は spec-dock/docs/authoring/ のガイドにある。
-// 文章の項目には Markdown を書いてよい。型にない項目は、必要に応じて足してよい。
+// 要件（Epic）。型 specdock/v1。
 
-// 型の版。消さない。
 schema: "specdock/v1"
 
-// 保証レベル（light、standard、strict、critical）と、その理由。
-// 失敗したときの影響と回復の難しさで選ぶ（工数や作業の難しさでは選ばない）。
-// 具体化や作業の途中で、上げても下げてもよい。正本はここだけで、ほかの場所に写さない。
 assurance: {
 	level:  "standard"
 	reason: "構造の図の帯の役割と、worktree の見つけ方を変える"
 }
 
-// 目的と背景（任意）。
-// purpose:    "この Epic が実現する価値"
-// background: "解く問題と、関係者"
+purpose: """
+	構造の図と『横断の構造』で、(1) 統括が居る主のワークスペース（main のチェックアウト）がいつも図に出続け、(2) どの Scope にも紐づかない worktree（work start していない作業）にすぐ気づけるようにする。
+	この Epic は Issue iss-00668 の1つだけを持つ（統括の依頼書、2026-11-19）。
+	"""
 
-// 対象と対象外（任意）。
-// includes: ["..."]
-// excludes: ["..."]
-
-// 観測できる要件。番号（R-01、R-02、…）をキーにする。
-// title は必須。acceptance（観測できる受け入れの条件）は standard 以上で必須。
 requirements: {
-	// "R-01": {
-	// 	title: "利用者が〜できる"
-	// 	text:  "詳しい説明"
-	// 	acceptance: ["〜が観測できる"]
-	// }
+	"R-01": {
+		title: "主のチェックアウトが、誰も指揮していなくても、両方の画面にいつも出る"
+		acceptance: ["iss-00668 の R-02・R-07 の受入が満たされる"]
+	}
+	"R-02": {
+		title: "どの Scope にも紐づかない worktree が、git の一覧を土台に、見方ごとの決まりで出る"
+		acceptance: ["iss-00668 の R-01・R-03・R-04・R-05・R-06 の受入が満たされる"]
+	}
+	"R-03": {
+		title: "線の検査と重さが戻らない"
+		acceptance: ["iss-00668 の R-08 の受入が満たされる"]
+	}
 }
 
-// 失敗・境界の条件。番号（F-01、…）をキーにする。
-// title は必須。impact（起きたときの影響）と recovery（回復のしかた）は strict 以上で必須。
 failures: {
-	// "F-01": {
-	// 	title:    "〜のときは、何も書かずに止まる"
-	// 	impact:   "〜"
-	// 	recovery: "〜"
-	// }
+	"F-01": {title: "git の一覧や Orca の要約が読めないときも、画面は今の帯の扱いを下回らない（iss-00668 F-01・F-02）"}
 }
 
-// 制約・前提、合意した判断、未解決事項（任意）。
-// constraints: ["..."]
-// decisions: ["..."]
-// questions: ["..."]
+decisions: [
+	"2026-11-19 本人と統括：決定の正本は iss-00668 の requirement.cue の decisions（行の名前 Unscoped、印 Primary・Unlinked、『これから』で線を引かない、など）",
+]
