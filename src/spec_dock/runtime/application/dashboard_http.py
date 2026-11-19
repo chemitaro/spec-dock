@@ -460,7 +460,7 @@ class DashboardHttp:
                 baseline=baseline,
                 latest=latest,
                 readings=facts.readings,
-                worktrees={"status": facts.worktrees_status, "paths": list(facts.paths)},
+                worktrees={"status": facts.worktrees_status, "paths": list(facts.paths), "items": list(facts.items)},
                 todos=todos,
                 progress=progress,
             )

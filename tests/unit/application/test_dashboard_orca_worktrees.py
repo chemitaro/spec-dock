@@ -44,7 +44,23 @@ def test_structure_and_scope_include_all_matching_worktrees_once(
     http = http_for(DashboardSite(state, now=lambda: NOW, user_config=tmp_path / "config.json"))
     document = json.loads(get(http, "/api/v1/r/github.com/o/r/structure").body)
     assert calls == [catalog]
-    assert document["worktrees"] == {"status": "ok", "paths": list(map(str, paths))}
+    assert document["worktrees"] == {
+        "status": "ok",
+        "paths": list(map(str, paths)),
+        "items": [
+            {
+                "path": str(path),
+                "branch": branch,
+                "head": "a",
+                "main": index == 0,
+                "detached": branch is None,
+                "locked": False,
+            }
+            for index, (path, branch) in enumerate(
+                zip(paths, ("main", "spec-dock/canonical", "topic/iss-00591", "iss-00591-2", None), strict=True)
+            )
+        ],
+    }
     scopes = {item["id"]: item for item in document["scopes"]}
     expected = [{"path": str(paths[2]), "branch": "topic/iss-00591"}, {"path": str(paths[3]), "branch": "iss-00591-2"}]
     assert scopes["iss-00591"]["worktrees"] == expected
@@ -78,7 +94,7 @@ def test_unreadable_inventory_supplies_no_paths_or_scope_records(
     http = http_for(DashboardSite(state, now=lambda: NOW, user_config=tmp_path / "config.json"))
     document = json.loads(get(http, "/api/v1/r/github.com/o/r/structure").body)
     assert document["schema"] == "specdock.dashboard/v1"
-    assert document["worktrees"] == {"status": "unreadable", "paths": []}
+    assert document["worktrees"] == {"status": "unreadable", "paths": [], "items": []}
     (scope,) = document["scopes"]
     assert scope["id"] == "iss-00591" and scope["number"] == 591
     assert scope["branch"] is None and scope["assurance"] is None and scope["worktrees"] == []
