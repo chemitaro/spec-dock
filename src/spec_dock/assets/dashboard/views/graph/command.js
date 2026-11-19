@@ -9,7 +9,8 @@ import { SIZE } from "./layout.js";
 // --- D-01: the pairs and where their ends sit ----------------------------------------------------------------
 
 const isObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
-const refOf = (agent, worktree) => ({
+/** An agent of the summary as a command line's end: its marks and its worktree (the summary's own object). */
+export const agentRef = (agent, worktree) => ({
   id: agent.id,
   mark: agent.mark,
   workingMode: agent.workingMode,
@@ -31,7 +32,7 @@ export function commandPairs(summary) {
     if (!isObject(worktree) || !Array.isArray(worktree.agents)) continue;
     for (const agent of worktree.agents) {
       if (!isObject(agent) || typeof agent.id !== "string" || byId.has(agent.id)) continue;
-      byId.set(agent.id, { raw: agent, ref: refOf(agent, worktree) });
+      byId.set(agent.id, { raw: agent, ref: agentRef(agent, worktree) });
     }
   }
   const pairs = [];
@@ -118,10 +119,16 @@ export function placeAgents(pairs, { structure, summary, layout, ix }) {
   return { pairs: kept, places, own };
 }
 
-/** The band's label of a worktree (R-02, F-03). */
+/**
+ * The band's label of a worktree (iss-00616 R-02, F-03; iss-00668 D-03): this repository's worktree by its branch (the
+ * main checkout too: its Primary badge says what it is), a detached one of git by its HEAD, another repository's with
+ * its project's name.
+ */
 export function bandLabel(worktree, own) {
-  const branch = typeof worktree?.branch === "string" && worktree.branch ? worktree.branch : "ブランチ不明";
-  if (own) return worktree?.main === true ? "main のチェックアウト" : branch;
+  const named = typeof worktree?.branch === "string" && worktree.branch;
+  const head = typeof worktree?.head === "string" && worktree.head ? worktree.head : null;
+  const branch = named ? worktree.branch : head ? `detached @${head.slice(0, 7)}` : "ブランチ不明";
+  if (own) return branch;
   const name = typeof worktree?.project?.name === "string" && worktree.project.name ? worktree.project.name : "ほかのリポジトリ";
   return `${name} · ${branch}`;
 }
@@ -164,7 +171,8 @@ export function bandItems(pairs, places, own, orderOf) {
 
 // The band above the layout, on the negative side of the world's y (decisions): graph.css draws the items with the same
 // border, padding and widths (.gx-band-item, .gx-band-lab, .gx-band-agent): change them together.
-export const BAND = { top: -16, h: 28, left: SIZE.margin, border: 1, pad: 6, gap: 10, labelGap: 6, slot: 52 };
+// iss-00668 D-03: an item's agents wrap after perLine, each further line lineH lower (the item grows; nothing hides).
+export const BAND = { top: -16, h: 28, left: SIZE.margin, border: 1, pad: 6, gap: 10, labelGap: 6, slot: 52, perLine: 4, lineH: 24 };
 const SPREAD = 10; // lines leaving one edge of a group or frame are this far apart
 /**
  * The hops (iss-00648 D-02, D-03): a line's height H = kx·dx + ky·dy within min..max above the higher end; ends closer
@@ -180,8 +188,26 @@ export function labelWidth(text) {
   return Math.min(200, Math.max(24, Math.ceil(w)));
 }
 
-const itemWidth = (it) => 2 * BAND.border + 2 * BAND.pad + labelWidth(it.label) + BAND.labelGap + BAND.slot * it.agents.length;
+// iss-00668 D-03: a badge's or count's small text (graph.css .gx-band-badge, .gx-band-count: 0.8 of the label's size)
+const smallWidth = (text) => Math.ceil(labelWidth(text) * 0.8) + BAND.labelGap;
+const BADGE_TEXT = { primary: "Primary", unlinked: "Unlinked" };
+const badgeWidth = (it) => (it.badge && BADGE_TEXT[it.badge] ? smallWidth(BADGE_TEXT[it.badge]) : 0);
+const countWidth = (it) => (it.count ? smallWidth(String(it.count)) : 0);
+const columns = (it) => Math.min(it.agents.length, BAND.perLine);
+const lines = (it) => Math.max(1, Math.ceil(it.agents.length / BAND.perLine));
+// the left of an item's agents from the item's left: after its label, badge and count
+const agentsLeft = (it) => BAND.border + BAND.pad + labelWidth(it.label) + BAND.labelGap + badgeWidth(it) + countWidth(it);
+const itemWidth = (it) =>
+  it.kind === "fold"
+    ? 2 * BAND.border + 2 * BAND.pad + labelWidth(it.label)
+    : agentsLeft(it) + BAND.border + BAND.pad + BAND.slot * columns(it);
+const itemHeight = (it) => BAND.h + (lines(it) - 1) * BAND.lineH;
 const leadWidth = (lead) => (lead ? labelWidth(lead) + BAND.labelGap : 0);
+
+/** The height of a band's row (iss-00668 D-03): its tallest item (BAND.h without an item). */
+export function bandRowHeight(items) {
+  return (items || []).reduce((h, it) => Math.max(h, itemHeight(it)), BAND.h);
+}
 
 /** The width of a band's row of items (iss-00617 D-01): the items and the gaps between them, after the lead's text. */
 export function bandRowWidth(items, lead = null) {
@@ -197,24 +223,26 @@ function bandModel(rows) {
   for (const row of rows) {
     if (!row.items.length) continue;
     let x = row.left + leadWidth(row.lead);
+    const h = bandRowHeight(row.items);
     const items = row.items.map((it) => {
       const lw = labelWidth(it.label);
       const w = itemWidth(it);
-      const left = x + BAND.border + BAND.pad + lw + BAND.labelGap;
+      const left = x + agentsLeft(it);
+      const at = (i) => ({ x: left + BAND.slot * (i % BAND.perLine), y: row.top + BAND.lineH * Math.floor(i / BAND.perLine) });
       const item = {
         ...it,
-        x, y: row.top, w, h: BAND.h, labelWidth: lw,
-        agents: it.agents.map((ref, i) => ({ id: ref.id, ref, x: left + BAND.slot * i, y: row.top, w: BAND.slot, h: BAND.h })),
+        x, y: row.top, w, h, labelWidth: lw,
+        agents: it.kind === "fold" ? [] : it.agents.map((ref, i) => ({ id: ref.id, ref, ...at(i), w: BAND.slot, h: BAND.h })),
       };
       x += w + BAND.gap;
       return item;
     });
     right = Math.max(right, x - BAND.gap);
     all.push(...items);
-    outRows.push({ key: row.key, left: row.left, top: row.top, lead: row.lead ?? null, leadWidth: row.lead ? labelWidth(row.lead) : 0, items });
+    outRows.push({ key: row.key, left: row.left, top: row.top, h, lead: row.lead ?? null, leadTitle: row.leadTitle ?? null, leadWidth: row.lead ? labelWidth(row.lead) : 0, items });
   }
   if (!all.length) return null;
-  return { top: Math.min(...outRows.map((r) => r.top)), h: BAND.h, items: all, right, rows: outRows };
+  return { top: Math.min(...outRows.map((r) => r.top)), h: Math.max(...outRows.map((r) => r.h)), items: all, right, rows: outRows };
 }
 
 const r1 = (v) => Math.round(v * 10) / 10;

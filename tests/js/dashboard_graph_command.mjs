@@ -10,6 +10,9 @@
 //              -> the pairs, places, band items and commandModel of each (null places: F-01)
 //   key: true                         -> commandKey's answers for the same and for changed inputs
 //   hop: [[P, C, ceiling | null], …]  -> hop of each (iss-00648 D-02)
+//   bandRows: [{rows: [{key, left, top, lead, items: [{key, label, kind, badge, count, agents: [id, …]}]}],
+//              pairs: [[parent, child]]}, …]  -> bandRowHeight of each row and commandModel's band and links, the ends
+//              in the band item holding them (iss-00668 D-03)
 // Prints one JSON object; the Python test asserts on it.
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
@@ -94,6 +97,28 @@ function scenario(sc) {
     },
     routes: routes.map((rt) => rt.pts),
   };
+}
+if (request.bandRows) {
+  out.bandRows = request.bandRows.map((bc) => {
+    const wt = { id: "wt", agents: [] };
+    const ref = (id) => ({ id, mark: "working", worktree: wt });
+    const rows = bc.rows.map((r) => ({ ...r, items: r.items.map((it) => ({ own: true, main: false, worktree: wt, badge: null, count: null, kind: "worktree", ...it, agents: it.agents.map(ref) })) }));
+    const places = new Map();
+    for (const r of rows) for (const it of r.items) for (const a of it.agents) places.set(a.id, { kind: "band", key: it.key });
+    const pairs = (bc.pairs || []).map(([p, c]) => ({ parent: ref(p), child: ref(c) }));
+    const model = C.commandModel({ pairs, places, rows, layout: { nodes: [], groups: [], width: 2000, height: 400 } });
+    return {
+      heights: rows.map((r) => C.bandRowHeight(r.items)),
+      widths: rows.map((r) => C.bandRowWidth(r.items, r.lead)),
+      band: model.band && {
+        top: model.band.top, h: model.band.h, right: model.band.right,
+        rows: model.band.rows.map((r) => ({ key: r.key, top: r.top, h: r.h, lead: r.lead, leadTitle: r.leadTitle ?? null })),
+        items: model.band.items.map((it) => ({ key: it.key, kind: it.kind, badge: it.badge, count: it.count, x: it.x, y: it.y, w: it.w, h: it.h, labelWidth: it.labelWidth, agents: it.agents.map(({ id, x, y, w, h }) => ({ id, x, y, w, h })) })),
+      },
+      links: model.links,
+      audit: model.audit,
+    };
+  });
 }
 if (request.scenarios) out.scenarios = Object.fromEntries(Object.entries(request.scenarios).map(([name, sc]) => [name, scenario(sc)]));
 

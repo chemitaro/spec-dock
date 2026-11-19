@@ -389,7 +389,7 @@ def test_the_band_holds_the_main_checkout_with_both_agents(got: dict[str, Any]) 
     assert got["five"]["items"] == [
         {
             "key": "wt-main",
-            "label": "main のチェックアウト",
+            "label": "main",  # iss-00668 D-03: the branch; the Primary badge says it is the main checkout
             "own": True,
             "main": True,
             "agents": ["a-coord", "a-research"],
@@ -401,7 +401,7 @@ def test_the_band_holds_the_main_checkout_with_both_agents(got: dict[str, Any]) 
 def test_the_band_labels_and_their_order(got: dict[str, Any]) -> None:
     """T-01 / R-02, F-03: main first, this repository by label, then the other repositories by label."""
     assert [(it["key"], it["label"]) for it in got["labels"]["items"]] == [
-        ("wt-main", "main のチェックアウト"),
+        ("wt-main", "main"),
         ("wt-e", "feature-a"),
         ("wt-f", "feature-b"),  # main is null: the branch
         ("wt-nb", "ブランチ不明"),
@@ -488,7 +488,18 @@ def test_the_constants_of_the_marks_and_the_band(spots: dict[str, Any]) -> None:
         "MARK_BOTTOM": {"box": 9},
         "FRAME_TITLE": 22,
         "FRAME_GAP": 4,
-        "BAND": {"top": -16, "h": 28, "left": 24, "border": 1, "pad": 6, "gap": 10, "labelGap": 6, "slot": 52},
+        "BAND": {
+            "top": -16,
+            "h": 28,
+            "left": 24,
+            "border": 1,
+            "pad": 6,
+            "gap": 10,
+            "labelGap": 6,
+            "slot": 52,
+            "perLine": 4,  # iss-00668 D-03: the agents of an item wrap after four
+            "lineH": 24,
+        },
         "HOP": HOP,
     }
 
@@ -558,7 +569,7 @@ def test_the_band_items_size_and_place(got: dict[str, Any]) -> None:
         ]
         x += item["w"] + 10
     assert band["right"] == x - 10
-    assert [it["labelWidth"] for it in band["items"]] == [125, 85]
+    assert [it["labelWidth"] for it in band["items"]] == [27, 85]
     assert got["five"]["model"]["top"] == -16 - 56 - 6  # iss-00648 D-05: the band's highest hop (H 56), 6 above it
     assert got["five"]["model"]["width"] == max(got["five"]["width"], band["right"] + 24)
     labels = got["labels"]["model"]["band"]["items"]
@@ -930,3 +941,103 @@ def test_the_key_is_the_same_for_the_same_inputs(tmp_path: Path) -> None:
         "otherWidth": False,
         "otherIds": False,
     }
+
+
+# --- iss-00668 T-03: the badges, the counts, the fold and the wrapped agents -----------------------------------
+
+
+def _bi(key: str, label: str, agents: int, **extra: Any) -> dict[str, Any]:
+    return {"key": key, "label": label, "agents": [f"{key}-{i}" for i in range(agents)], **extra}
+
+
+BAND_ROWS = [
+    # the main checkout with a badge, an Unlinked worktree with a count, a fold; one row, one line
+    {
+        "rows": [
+            {
+                "key": "",
+                "left": 24,
+                "top": -16,
+                "lead": "Unscoped",
+                "leadTitle": "Worktrees not shown as a Scope box",
+                "items": [
+                    _bi("p", "main", 1, badge="primary"),
+                    _bi("u", "topic", 2, badge="unlinked", count=3),
+                    _bi("f", "+3", 0, kind="fold"),
+                    _bi("n", "plain", 0),
+                ],
+            }
+        ]
+    },
+    # five agents wrap into two lines; the row and its other item take the height; a parent and a child on two lines
+    {
+        "rows": [{"key": "", "left": 24, "top": -40, "lead": None, "items": [_bi("w", "wide", 5), _bi("s", "one", 1)]}],
+        "pairs": [["w-0", "w-4"], ["w-4", "s-0"]],
+    },
+    # no pair: a row is still drawn
+    {"rows": [{"key": "", "left": 24, "top": -16, "lead": None, "items": [_bi("p", "main", 0, badge="primary")]}]},
+    # nine agents: three lines
+    {"rows": [{"key": "", "left": 0, "top": 0, "lead": None, "items": [_bi("w", "wide", 9)]}]},
+]
+
+
+@pytest.fixture(scope="module")
+def rows(tmp_path_factory: pytest.TempPathFactory) -> list[dict[str, Any]]:
+    return _run(tmp_path_factory.mktemp("band-rows"), {"bandRows": BAND_ROWS})["bandRows"]
+
+
+def test_badges_and_counts_widen_an_item_and_a_fold_has_no_agents(rows: list[dict[str, Any]]) -> None:
+    """T-03 / R-02, R-04: the badge and the count add their small text and a gap; the fold is its label alone."""
+    band = rows[0]["band"]
+    p, u, f, n = band["items"]
+    primary = 38 + 6  # ceil(47 × 0.8) + labelGap
+    unlinked = 43 + 6  # ceil(53 × 0.8) + labelGap
+    count = 20 + 6  # ceil(24 × 0.8) + labelGap
+    assert p["w"] == 2 + 12 + p["labelWidth"] + 6 + primary + 52
+    assert u["w"] == 2 + 12 + u["labelWidth"] + 6 + unlinked + count + 52 * 2
+    assert f["w"] == 2 + 12 + f["labelWidth"]
+    assert f["agents"] == [] and f["kind"] == "fold"
+    assert n["w"] == 2 + 12 + n["labelWidth"] + 6
+    # the agents sit after the label, the badge and the count
+    assert u["agents"][0]["x"] == u["x"] + 1 + 6 + u["labelWidth"] + 6 + unlinked + count
+    assert (p["badge"], u["badge"], u["count"]) == ("primary", "unlinked", 3)
+    # the lead's text comes first, the items 10 apart
+    assert p["x"] == 24 + 53 + 6
+    assert rows[0]["widths"][0] == 53 + 6 + sum(it["w"] for it in band["items"]) + 10 * 3
+    assert band["rows"][0]["leadTitle"] == "Worktrees not shown as a Scope box"
+    assert rows[0]["heights"] == [28] and band["h"] == 28
+
+
+def test_five_agents_wrap_and_the_row_takes_the_tallest_item(rows: list[dict[str, Any]]) -> None:
+    """T-03 / R-09: four columns, the item 28 + 24 high, the row and its other item as high."""
+    band = rows[1]["band"]
+    wide, one = band["items"]
+    assert rows[1]["heights"] == [52]
+    assert (wide["h"], one["h"], band["h"], band["rows"][0]["h"]) == (52, 52, 52, 52)
+    assert wide["w"] == 2 + 12 + wide["labelWidth"] + 6 + 52 * 4
+    left = wide["x"] + 1 + 6 + wide["labelWidth"] + 6
+    assert [(a["x"], a["y"], a["w"], a["h"]) for a in wide["agents"]] == [
+        (left + 52 * (i % 4), -40 + 24 * (i // 4), 52, 28) for i in range(5)
+    ]
+    assert rows[3]["heights"] == [28 + 24 * 2]
+
+
+def test_a_wrapped_agents_end_sits_on_the_items_upper_edge(rows: list[dict[str, Any]]) -> None:
+    """T-03 / R-09: the end at the slot's centre on the item's top; parent and child in one item make an arc."""
+    links = {link["id"]: link for link in rows[1]["links"]}
+    wide, one = rows[1]["band"]["items"]
+    arc = links["w-0>w-4"]
+    assert arc["kind"] == "arc"
+    assert arc["from"]["y"] == arc["to"]["y"] == wide["y"]
+    curve = links["w-4>s-0"]
+    assert curve["kind"] == "curve"
+    slot = wide["agents"][4]
+    assert curve["from"] == {"x": slot["x"] + 26, "y": wide["y"]}
+    assert curve["to"] == {"x": one["agents"][0]["x"] + 26, "y": one["y"]}
+
+
+def test_a_row_without_a_pair_still_has_a_band(rows: list[dict[str, Any]]) -> None:
+    """T-03 / R-02: commandModel draws the row's items with no pair."""
+    assert rows[2]["band"] is not None
+    assert [it["key"] for it in rows[2]["band"]["items"]] == ["p"]
+    assert rows[2]["links"] == []
