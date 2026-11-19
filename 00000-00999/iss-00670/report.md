@@ -54,6 +54,7 @@ SpecDock 0.9.9 のリリースの変更を作った（`git diff c2163d912 71384f
   - `make lint`：exit 0。`uv run pytest`：exit 0（4355 passed / 7 skipped、51分36秒）。
   - closure：`.workbench/final-quality-gate/iss-00670-fqg-1/closure.md`（worktree `/Volumes/990p2t/workspace/worktrees/orca/spec-dock/iss-00670`）。
   - 区切りのレビューは、計画どおりなし。記録だけのコミットはない（記録は Git の外）。
+- PR #671（https://github.com/chemitaro/spec-dock/pull/671）：head は 71384fa1e（合格のコミット）。記録のコミットはない。CI は合格。observer の結果は exit 0、observable_ci PASS、merge_readiness READY、mergeStateStatus CLEAN（2026-11-19T09:00Z UTC、`.workbench/coding-task/iss-00670/ci-watch.jsonl`）。マージは統括。
 
 ## 逸脱と判断
 
