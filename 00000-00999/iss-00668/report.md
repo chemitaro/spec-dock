@@ -59,7 +59,7 @@ ID: "iss-00668"
 
 - **最終品質ゲート（2026-11-19、合格）**：合格のコミット `f140ecc24`（base `1cfce6f96`）。レビュー（quality-gate-reviewer opus / medium）P0〜P3 すべて0、網羅は完全。`make lint` exit 0、`uv run pytest` 4352 passed・7 skipped。この worktree の `.workbench/final-quality-gate/iss-00668/closure.md`。テストの1回目は Orca の再起動で途中で止まり、同じコミットで走らせ直した。記録だけのコミットはない（記録は Git の外）。
 
-- **PR**：https://github.com/chemitaro/spec-dock/pull/669（head `f140ecc24`、`Refs #668`）。マージは統括。
+- **PR**：https://github.com/chemitaro/spec-dock/pull/669（head `f140ecc24`、`Refs #668`）。CI（SpecDock check、Commit identity、Provider CI）すべて合格、GitHub の準備 READY（2026-11-19 07:31 UTC、監視の記録は `.workbench/coding-task/iss-00668/ci-watch.jsonl`）。マージは統括。
 
 ## 実機の確かめ（S-05、2026-11-19、`e8926bf5a`、直しは `f140ecc24`）
 
