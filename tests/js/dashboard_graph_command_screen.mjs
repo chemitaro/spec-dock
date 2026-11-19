@@ -163,6 +163,7 @@ function rowSnap(world, panel) {
       head: panel.querySelector(".pn-head b")?.textContent ?? null,
       dd: panel.querySelectorAll(".pn-wt dd").map((d) => d.textContent),
       agents: panel.querySelectorAll("[data-wt-agent]").map((b) => b.dataset.wtAgent),
+      agentTexts: panel.querySelectorAll("[data-wt-agent]").map((b) => b.textContent),
       open: script ? { src: script.src, worktree: script.dataset.worktree, theme: script.dataset.theme } : null,
       list: panel.querySelectorAll(".pn-wt-list li").map((li) => li.textContent),
     },

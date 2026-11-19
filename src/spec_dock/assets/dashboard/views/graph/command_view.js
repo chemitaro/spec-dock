@@ -280,10 +280,12 @@ export function clearAgentPanel(panel) {
  */
 export function renderWorktreePanel(panel, { item, orca, embed = false, hide }) {
   if (!item) return false;
+  // the band's items hold the model's slots ({id, ref, x, y, w, h}): the agent's own fields are in its ref
+  const refs = item.agents.map((a) => a.ref ?? a);
   const theme = currentTheme();
   const worktreeId = typeof item.worktree?.id === "string" ? item.worktree.id : null;
   const open = !!worktreeId && orca?.status?.() === "ok" && !embed;
-  const sig = JSON.stringify([item.key, item.label, item.badge, item.path, item.worktree?.branch ?? null, item.agents.map((a) => [a.id, a.agentType ?? null]), item.folded ?? null, open ? worktreeId : null, theme]);
+  const sig = JSON.stringify([item.key, item.label, item.badge, item.path, item.worktree?.branch ?? null, refs.map((a) => [a.id, a.agentType ?? null]), item.folded ?? null, open ? worktreeId : null, theme]);
   if (panel.dataset.cmdWt === item.key && panel.dataset.cmdWtSig === sig && panel.classList.contains("is-open")) return true;
   hide?.();
   delete panel.dataset.cmdAgent;
@@ -301,7 +303,7 @@ export function renderWorktreePanel(panel, { item, orca, embed = false, hide }) 
     const b = BADGES[item.badge];
     const badge = b ? `<span class="gx-band-badge" data-badge="${esc(item.badge)}" title="${esc(b.title)}">${esc(b.text)}</span> ` : "";
     const branch = typeof item.worktree?.branch === "string" && item.worktree.branch ? item.worktree.branch : item.label;
-    const agents = item.agents
+    const agents = refs
       .map((a) => {
         const type = typeof a.agentType === "string" && a.agentType ? a.agentType : "種類不明";
         return `<li><button type="button" class="pn-wt-agent" data-wt-agent="${esc(a.id)}"><span class="gx-band-slot"></span>${esc(type)}</button></li>`;
@@ -314,7 +316,7 @@ export function renderWorktreePanel(panel, { item, orca, embed = false, hide }) 
       `<div class="pn-wt-open"></div></div>`;
     const module = orca?.marks?.();
     const slots = panel.querySelectorAll(".pn-wt-agent .gx-band-slot");
-    item.agents.forEach((a, i) => {
+    refs.forEach((a, i) => {
       const slot = slots[i];
       try {
         if (slot && module && item.worktree) module.renderAgentMarks(slot, soloWorktree(item.worktree, a.id), { size: "sm", max: 1, now: Date.now() });

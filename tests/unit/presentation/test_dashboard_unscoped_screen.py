@@ -175,6 +175,8 @@ def test_pressing_an_item_opens_its_worktree(runs: dict[str, list[dict[str, Any]
     assert panel["head"] == "Unlinked topic-a"
     assert panel["dd"][:2] == ["topic-a", "/w/u-a"]
     assert panel["agents"] == ["a-1"]
+    # the band's items hold the model's slots ({id, ref, …}): the type comes from the agent's ref (S-05's finding)
+    assert panel["agentTexts"] == ["claude"]
     assert panel["open"] == {"src": "http://192.0.2.1:8791/embed/open-button.js", "worktree": "wt-a", "theme": "light"}
     closed = runs["u-all"][2]
     assert not closed["panel"]["open"] and closed["row"]["panel"]["wt"] is None
