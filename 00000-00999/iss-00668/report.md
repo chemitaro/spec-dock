@@ -27,9 +27,21 @@ ID: "iss-00668"
 - 開始のコミット `1cfce6f96`（origin/main、#666 の後）。
 - 開始のコミットでの基準（impl-sol）：`test_dashboard_structure_facts.py` 14 passed。S-02 の今ある3ファイル（graph_command・allgraph_command・allgraph_compose）84 passed（`test_dashboard_graph_unscoped.py` は新しいので基準なし）。
 - S-01（impl-sol、Codex GPT-6.1 Sol / medium）：T-01 を先に書き、未実装の関数・`items` の属性・API の `items` の欠落で落ちることを確かめてから、D-01（`worktree_items`、`StructureFacts.items`、1回の一覧から items、`dashboard_http` の JSON の `items`）を入れて通した。`test_dashboard_structure_facts.py` 19 passed、`test_dashboard_orca_worktrees.py` 込みで 26 passed、変えた4ファイルの ruff check・ruff format --check・mypy 合格。コミット `794033ceb`（Codex の `66d1b9337` の件名を、タスク担当が日本語に直した amend。内容は同じ）。最初の行が bare のとき次の行を主にしないことも確かめた。
+- S-02（impl-claude、Claude Opus 5.5 / medium）：T-02 を `tests/js/dashboard_graph_unscoped.mjs`・`tests/unit/presentation/test_dashboard_graph_unscoped.py`（新）に先に書き、`views/graph/unscoped.js` がないこと（ERR_MODULE_NOT_FOUND）で落ちることを確かめてから D-02 を入れて通した（17 passed）。T-03 を `dashboard_graph_command`（`bandRows` の要求）と `dashboard_allgraph_command`（`rows`・`wrap` の場面、`range` を渡す、`groups` の出力）に先に書き、`BAND` の定数・`bandRowHeight` の欠落などで落ちることを確かめてから D-03・D-04 を入れて通した。節目：`uv run pytest tests/unit/presentation/test_dashboard_graph_unscoped.py tests/unit/presentation/test_dashboard_graph_command.py tests/unit/presentation/test_dashboard_allgraph_command.py tests/unit/presentation/test_dashboard_allgraph_compose.py` → 107 passed。`make lint` 合格（ruff check・ruff format --check・mypy）。今のテストの期待の直し：札「main のチェックアウト」→「main」（graph_command の2か所と labelWidth の 125→27、allgraph_command の cross）、帯の行の幅に頭の文字 `Unscoped`（allgraph_command の cross の bands の w）、`BAND` の定数に `perLine`・`lineH`。『これから』の線がなくなる分：allgraph_command の keep・childOnly・keepParent を git の一覧つきの構造で『これから』の新しい決まり（組と居場所が空、`commanding` で keep、行の数）に書き直し、sameIds（線の端が別のリポジトリの同じ key に広がらないこと）は『これから』では線がないので、『いま』の畳んだまとまり（両方のリポジトリの `root.f`）で同じ仕組みを確かめる形にした。S-02 の時点で、画面のテスト（`test_dashboard_graph_command_screen.py` の2件・`test_dashboard_allgraph_command_screen.py` の2件）は札の変更と『これから』の keep で落ちる。graph.js・allgraph.js を変える S-03 でまとめて直す（二度直しを避ける）。コミット `3d47ca4fc`。
 
 ## 逸脱と判断
 
 - 2026-11-19 タスク担当：impl-sol（dispatch `ctx_e78d25d6c3ed`、launch.effective gpt-6.1-sol / medium）は、カタログの report.md への書き込み（`OS_ACCESS_DENIED`、Codex の sandbox の writable_roots にカタログがない）と、2回目の Git の書き込み（`.git/worktrees/iss-00668/index.lock` の作成、Operation not permitted）を拒否されて止まった。統括が了承済みの取り決めどおり、設定は変えず、worker を止め、S-02 から Claude Opus 5.5 / medium（impl-claude）が引き継ぐ（`deviation: codex-sandbox-takeover`）。impl-claude は dispatch `ctx_f57065b24d25`、launch.effective claude-opus-5-5 / medium で S-02〜S-04 を担当する。記録の元は `.workbench/implement/iss-00668/start.md`。
+
+- 2026-11-19 impl-claude（S-02、実装の裁量）：
+  - `unscopedItems` は `{items, places}` を返す（round-2 P3 の2）。同じパスの2つ目の要約の worktree のエージェントの band の居場所は、項目の `key` に直した写しの `places` で返し、`crossPlace` は各リポジトリの行のこの `places` を自分の `places` に反映する。項目の `worktree` は `mergedWorktree`（P3 の2）。
+  - `idle`（エージェントが0）は見方に関係なく決め、`count`・`countParts` だけを『これから』で付ける（P3 の1）。
+  - 印と数の幅は `Math.ceil(labelWidth(文字) * 0.8) + BAND.labelGap`（D-03 の式を整数の px に切り上げた）。数の文字も `labelWidth` の下限 24 を通るので、1桁の数は 20 + 6。
+  - `+N`（fold）の幅は `2·border + 2·pad + labelWidth("+N")`（エージェントの欄がないので labelGap も足さない）。
+  - 行の高さ（R-09）：同じ行の項目は、いちばん高い項目の高さにそろえる（受入「同じ行のほかの項目と枠の帯がその高さに合う」）。`bandModel` の行に `h`、帯の `h` は行の最大。行の `leadTitle` を写す（D-07 の頭の文字の title 用）。
+  - `command.js` の `refOf` を `agentRef` として export し、`unscoped.js` が同じ形のエージェントの参照を作る（D-02 の import の範囲の中）。
+  - `bandLabel` は、自分のリポジトリの項目の detached（`branch` がなく `head` がある）を `detached @<先頭7文字>`。git の行から札を作るときは、detached の行だけ `head` を渡す。
+  - `crossPlace` は、全体・いまでは今の keep の決め方のまま、行は見える（`visibleWith(keep)` の後の）リポジトリだけに作る。『これから』では見えないリポジトリの行を先に作り、`commanding` のものを keep にする。
+  - `crossKey` に `range` を足した（D-06。allgraph.js が渡すのは S-03）。
 
 ## Residual Risks / Follow-ups
