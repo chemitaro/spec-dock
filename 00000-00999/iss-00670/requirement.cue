@@ -7,7 +7,7 @@ assurance: {
 	reason: "版と配布資産の版だけを上げ、機能のコードは変えない。誤りは次の版で直せるが、全リポジトリの canonical check と CI の見本に効く"
 }
 
-purpose:    "SpecDock 0.9.9（指揮の帯を `Unscoped` の行に変え、主のチェックアウト（`Primary`）と Scope に紐づかない worktree（`Unlinked`）をいつも並べる #669（iss-00668））を出し、本人の PC に配れるようにする。"
+purpose:    "SpecDock 0.9.9（指揮の帯を `Unscoped` の行に変え、主のチェックアウト（`Primary`）と Scope に紐づかない worktree（`Unlinked`）を並べる #669（iss-00668））を出し、本人の PC に配れるようにする。"
 background: "0.9.8（v0.9.8 = 1cfce6f96、PR #666 のマージのコミット）の後に PR #669 だけが main に入った（`git log --first-parent v0.9.8..origin/main`、origin/main = c2163d912）。変わったのは dashboard の資産（views/_shared/orca_marks.js、views/allgraph*、views/graph*、views/graph/unscoped.js）、構造の API の `worktrees.items`（runtime の dashboard_http.py・dashboard_scope_details.py）とテストで、配る静的資産（`src/spec_dock/assets/spec_dock/`、static-inventory.json）は変わっていない（`git diff --stat v0.9.8 origin/main`）。構造の API は reference_cli.md で契約にしない画面の中の JSON とされている。手順は 0.9.8 のリリース（iss-00663、PR #666）と同じ。マージ、タグ、導入、配布は統括が行う。"
 includes: ["版の番号", "migration.md の 0.9.9 の節（提供側と dogfood の写し）", "static-inventory.json の2行", "0.9.8 の旧資産の fixture（2つ）と統合テスト"]
 excludes: ["機能のコードの変更", "reference_cli.md の変更（『指揮の帯』も構造の図の帯の札も書かれておらず、構造の API の JSON は契約にしないと書かれているので要らない）", "マージ、タグの作成、パッケージの導入、配布（統括）", "`work finish`（統括）"]
