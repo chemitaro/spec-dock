@@ -57,6 +57,10 @@ ID: "iss-00668"
 
 - 2026-11-19 impl-claude（S-05 の実機の指摘の直し）：詳細の欄に渡す項目は `commandModel` の帯の項目で、その `agents` は模型の slot（`{id, ref, x, y, w, h}`）なので、`renderWorktreePanel` はエージェントの種類・署名・印を `a.ref ?? a` から読む（実機で2人とも『種類不明』になった）。T-04 に詳細の欄のエージェントの種類（`claude`）の確かめを足し、直す前に落ちることを確かめた。
 
+- **最終品質ゲート（2026-11-19、合格）**：合格のコミット `f140ecc24`（base `1cfce6f96`）。レビュー（quality-gate-reviewer opus / medium）P0〜P3 すべて0、網羅は完全。`make lint` exit 0、`uv run pytest` 4352 passed・7 skipped。この worktree の `.workbench/final-quality-gate/iss-00668/closure.md`。テストの1回目は Orca の再起動で途中で止まり、同じコミットで走らせ直した。記録だけのコミットはない（記録は Git の外）。
+
+- **PR**：https://github.com/chemitaro/spec-dock/pull/669（head `f140ecc24`、`Refs #668`）。マージは統括。
+
 ## 実機の確かめ（S-05、2026-11-19、`e8926bf5a`、直しは `f140ecc24`）
 
 - 試しのサーバー：この worktree の候補の wheel を隔離した venv（`.workbench/iss-00668/venv`）に入れ、この PC の状態の置き場の写し（`.workbench/iss-00668/state`）と試しの `XDG_CONFIG_HOME`（`orca_web.port` 18868）で、`spec-dock dashboard serve --offline --tailscale --port 18668`。
@@ -81,7 +85,7 @@ ID: "iss-00668"
   | これから | spec-dock の構造の図 | 0.01・0.01・0.01 秒 | 0.02・0.01・0.02 秒 |
 
   どれも 0.05 秒以下で、誤差の範囲（『これから』は線がなくなり、動きの数が 55 → 12、20 → 4 に減った）。見方を固定しない最初の測りで、この Issue の横断の構造に1回だけ 0.71 秒が出たが、同じ条件の6回では出なかった（読み込みの直後の組み立ての重なりと見る）。
-- 本人が見る試しの URL：tailnet の 18668 の `/graph`（横断の構造）と `/r/github.com/chemitaro/spec-dock/graph`（構造の図）。中身は `e8926bf5a` の wheel（詳細の欄の種類の直し `f140ecc24` の前）。最終品質ゲートの後に、合格のコミットの wheel に入れ替える。
+- 本人が見る試しの URL：tailnet の 18668 の `/graph`（横断の構造）と `/r/github.com/chemitaro/spec-dock/graph`（構造の図）。中身は合格のコミット `f140ecc24` の wheel（ゲートの後に入れ替えた）。試しのエージェント A・B は統括が本人の確かめまで残している。
   止め方：`.workbench/iss-00668/state/dashboard/server.json` の pid と、`.workbench/iss-00668/orca-web.pid` の pid を止める。
 
 ## 移行の案内に書く文（次のリリース用）
