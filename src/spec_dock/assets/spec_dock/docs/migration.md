@@ -283,6 +283,21 @@ SpecDock 0.5.0 は、`spec-dock/workspace.json` の `schema_version` が 4 の�
 - 常駐のダッシュボードは、パッケージの版の更新の後に、自動で起動し直します（60秒ごとの版の確認。`dashboard service install` のやり直しは要りません）。前面の `serve` は自分で起動し直します。
 - 戻し方：0.9.8 に問題があれば、パッケージを 0.9.7 に戻します。指揮の線、帯の印から開くチャット、図の操作、Scope の欄の見出しは 0.9.7 の形に戻ります。ブラウザーの保存のキーは変わりません。配布資産を 0.9.8 に上げた後なら、その更新の PR（版のファイル `spec-dock/system/spec-dock-version` を含む）を `git revert` して、配布資産を前のバイトに戻します。版のファイルだけを戻すと、0.9.7 の `canonical check` が 0.9.8 の資産を知らない変更として CI を止めます。
 
+## 0.9.9 への更新
+
+0.9.9 は、ダッシュボードの構造の図と『横断の構造』の『指揮の帯』を `Unscoped` の行に変え、主のチェックアウトと、どの Scope にも紐づかない worktree を並べる版です（#669）。コマンドの数（71）、カタログの形式（format 1）、`workspace.json` の版（4）は変わりません。コマンドの引数、CLI の JSON の契約、ダッシュボードの JSON の版（`specdock.dashboard/v1`）、画面の道、ブラウザーの保存のキーも変わりません。変わる配布資産は、この `docs/migration.md` と、版のファイル `spec-dock/system/spec-dock-version`（0.9.9）の2つです。
+
+- パッケージを 0.9.9 に上げた後、各リポジトリで `spec-dock installation update --target <チェックアウト> --backup-dir <新しい外のディレクトリ> --yes` を実行して配布資産を上げ、通常の PR でコミットします。0.9.8 以前（0.9.0 から）の配布資産のままでも動き、そこから上がります。画面の変更はパッケージが配るので、パッケージを上げるだけで届きます。CI の見本は版のファイルの版の SpecDock を入れて動きます。
+- `Unscoped` の行（#669）：構造の図と『横断の構造』の帯が `Unscoped` の行になりました。行の先頭に、いつも主のチェックアウト（印 `Primary`）が出ます。Orca を使わなくても、誰も指揮していなくても出ます。
+- `Unlinked` の worktree（#669）：`git worktree list` に出る worktree のうち、どの Scope にも紐づかないものが `Unlinked` で並びます。`spec-dock work start` をせずに作業している worktree に、すぐ気づけます。エージェントのいない worktree は薄く出て、2つ以上あれば `+N` に畳まれます（押すと一覧）。仕様の置き場の worktree、bare、prunable の worktree は出ません。
+- 1つの worktree は1つの項目で、そこにいるエージェントの印をすべて並べます（1行4つ、それより多いと項目の中で折り返します）。項目を押すと、ブランチ・パス・エージェントの詳細の欄が出ます（orca-web につながるときは『Orca で開く』も出ます。もう一度押すか Esc で閉じます）。エージェントの印を押すと、今までどおりそのエージェントのチャットが開きます。
+- 『これから』（#669）：『これから』では、指揮の線を引かなくなりました。代わりに、主のチェックアウトと、指揮している `Unlinked` の worktree に、子の数が付きます（title に内訳）。『これから』の行には、主のチェックアウトと指揮している `Unlinked` の worktree だけが出て、指揮していない worktree とエージェントのいない worktree は出ません（全体・いまで出ます）。全体・いまの線は今までどおりです。
+- 今までの札「main のチェックアウト」は、ブランチ名と `Primary` の印に変わりました。
+- 構造の API（`/api/v1/r/<host>/<owner>/<name>/structure`）の `worktrees` に `items`（各 worktree の `path`・`branch`・`head`・`main`・`detached`・`locked`）が加わりました。`status` と `paths` は変わりません。画面の中の JSON なので契約ではありません。
+- エージェントの印と指揮の線を描くには、今までどおり orca-web の要約が要ります。orca-web に届かないときも、`Unscoped` の行と worktree の項目は出ます。
+- 常駐のダッシュボードは、パッケージの版の更新の後に、自動で起動し直します（60秒ごとの版の確認。`dashboard service install` のやり直しは要りません）。前面の `serve` は自分で起動し直します。
+- 戻し方：0.9.9 に問題があれば、パッケージを 0.9.8 に戻します。帯は 0.9.8 の『指揮の帯』の形に戻り、`Unlinked` の worktree と『これから』の数は出なくなります。ブラウザーの保存のキーは変わりません。配布資産を 0.9.9 に上げた後なら、その更新の PR（版のファイル `spec-dock/system/spec-dock-version` を含む）を `git revert` して、配布資産を前のバイトに戻します。版のファイルだけを戻すと、0.9.8 の `canonical check` が 0.9.9 の資産を知らない変更として CI を止めます。
+
 ## 新規導入
 
 ```sh
