@@ -8,7 +8,8 @@
 import * as api from "../core/api.js";
 import { DEFAULTS, index, nodeMarkRows, routeLayout } from "./graph/layout.js";
 import { markSpots } from "./graph/layout.js";
-import { BAND, bandItems, commandKey, commandModel, commandPairs, placeAgents } from "./graph/command.js";
+import { BAND, bandRowHeight, commandKey, commandModel, commandPairs, ownWorktrees, placeAgents } from "./graph/command.js";
+import { UNSCOPED, unscopedItems } from "./graph/unscoped.js";
 import { audit, svg as edgeSvg } from "./graph/router.js";
 import * as M from "./graph/marks.js";
 import { LEGACY_KEYS, PREFS_KEY, restorePrefs } from "./graph/prefs.js";
@@ -67,6 +68,7 @@ const V = {
   cmdModel: null, // the last commandModel drawn, or null without a pair
   cmdSel: null, // the agent whose lines stand out (R-06)
   agentPanel: null, // the band's agent whose chat the panel shows
+  wtPanel: null, // iss-00668: the key of the Unscoped row's item whose worktree the panel shows ("fold" for +N)
 };
 
 // The saved choices (iss-00603 D-04): version 3, with what carries over from versions 2 and 1 (graph/prefs.js).
@@ -201,19 +203,28 @@ function paintCommand() {
   const orca = V.ctx.orca;
   const summary = summaryNow();
   const ids = slotIds(V.el.world);
-  const key = commandKey({ summary, routing: V.EG, marks: V.marks, ids });
+  const range = V.EG.layout.opts?.range ?? V.opts.range;
+  const key = commandKey({ summary, routing: V.EG, marks: V.marks, ids, structure: V.data, range });
   if (key !== V.cmdKey) {
     V.cmdKey = key;
-    const pairs = commandPairs(summary);
-    const placed = pairs.length ? placeAgents(pairs, { structure: V.data, summary, layout: V.EG.layout, ix: V.ix }) : null;
-    if (!placed || !placed.pairs.length) clearCommand();
+    // iss-00668 D-05: "next" draws no line; every pair counts the children of the row's items
+    const all = commandPairs(summary);
+    const drawn = range === "next" ? [] : all;
+    const placed = drawn.length ? placeAgents(drawn, { structure: V.data, summary, layout: V.EG.layout, ix: V.ix }) : null;
+    const own = placed?.own ?? ownWorktrees(V.data, summary) ?? new Set();
+    const row = unscopedItems({ structure: V.data, summary, pairs: all, places: placed?.places ?? new Map(), own, orderOf: CV.orderOf(orca?.marks?.()), range });
+    const pairs = placed?.pairs ?? [];
+    if (!row.items.length && !pairs.length) clearCommand();
     else {
-      const items = bandItems(placed.pairs, placed.places, placed.own, CV.orderOf(orca?.marks?.()));
-      const model = commandModel({ pairs: placed.pairs, places: placed.places, items, layout: V.EG.layout, spotsOf: (n) => spotsFor(n, ids), routes: V.EG.routes });
+      // the row's lower edge stays where one line's is: a taller row rises (R-09)
+      const top = BAND.top - (bandRowHeight(row.items) - BAND.h);
+      const rows = [{ key: "", left: BAND.left, top, lead: UNSCOPED.lead, leadTitle: UNSCOPED.leadTitle, items: row.items }];
+      const model = commandModel({ pairs, places: row.places, rows, layout: V.EG.layout, spotsOf: (n) => spotsFor(n, ids), routes: V.EG.routes });
       drawCommand(model);
     }
     dropGone(summary);
     paintCmdSel();
+    if (V.wtPanel) renderPanel(); // the item's worktree in the panel follows the row (or closes with its item)
   }
   paintBandMarks();
 }
@@ -270,15 +281,38 @@ function pressBandAgent(id) {
   }
   if (V.sel) select(null);
   V.cleanup = false;
+  V.wtPanel = null;
   V.cmdSel = id;
   V.agentPanel = id;
   paintCmdSel();
   renderPanel();
 }
 
+// An Unscoped row's item pressed (its label or "+N", iss-00668 D-05): its worktree in the panel; again closes it.
+function pressBandItem(key) {
+  if (!key) return;
+  if (V.wtPanel === key) {
+    closeWtPanel();
+    return;
+  }
+  if (V.sel) select(null);
+  V.cleanup = false;
+  V.agentPanel = null;
+  V.cmdSel = null;
+  paintCmdSel();
+  V.wtPanel = key;
+  renderPanel();
+}
+
+function closeWtPanel() {
+  V.wtPanel = null;
+  renderPanel();
+}
+
 // The panel's close, whatever it shows: its close button and the phone sheet pulled down (iss-00650 D-03).
 function closePanel() {
-  if (V.agentPanel) closeAgentPanel();
+  if (V.wtPanel) closeWtPanel();
+  else if (V.agentPanel) closeAgentPanel();
   else if (V.cleanup) {
     V.cleanup = false;
     renderPanel();
@@ -297,6 +331,17 @@ function renderAgentPanel(panel) {
   const ok = CV.renderAgentPanel(panel, { id: V.agentPanel, summary: summaryNow(), model: V.cmdModel, orca: V.ctx.orca, hide: () => V.pn.hide() });
   if (!ok) {
     V.agentPanel = null;
+    return false;
+  }
+  V.el.gx.dataset.panel = "open";
+  return true;
+}
+
+// The pressed item's worktree (graph/command_view.js). false: the item left the row.
+function renderWtPanel(panel) {
+  const item = V.cmdModel?.band?.items.find((it) => it.key === V.wtPanel) ?? null;
+  if (!item || !CV.renderWorktreePanel(panel, { item, orca: V.ctx.orca, embed: !!V.ctx.embed, hide: () => V.pn.hide() })) {
+    V.wtPanel = null;
     return false;
   }
   V.el.gx.dataset.panel = "open";
@@ -430,6 +475,7 @@ function dispose() {
   V.cmd = { top: 0, width: 0 };
   V.cmdSel = null;
   V.agentPanel = null;
+  V.wtPanel = null;
   V.token++; // an answer of the scope API that arrives after leaving the screen is dropped
   V.root = null;
   V.el = null;
@@ -601,6 +647,7 @@ async function select(id) {
   V.sel = id;
   V.cmdSel = null; // a mark pressed in the box sets it again after this (onTap)
   V.agentPanel = null;
+  V.wtPanel = null;
   paintCmdSel();
   V.path = null;
   V.docState = "loading";
@@ -686,6 +733,7 @@ function renderPanel() {
   const panel = V.el?.panel;
   if (!panel) return;
   if (V.agentPanel && renderAgentPanel(panel)) return;
+  if (V.wtPanel && renderWtPanel(panel)) return;
   CV.clearAgentPanel(panel); // the band agent's chat closes with its panel
   if (V.cleanup) {
     V.pn.hide();
@@ -729,6 +777,11 @@ function goDetail(id) {
 
 function onClick(event) {
   const t = event.target;
+  const inPanel = t.closest("[data-wt-agent]");
+  if (inPanel && V.el.panel.contains(inPanel)) {
+    pressBandAgent(inPanel.dataset.wtAgent); // iss-00668 D-07: an agent of the worktree's panel opens its chat
+    return;
+  }
   const act = t.closest("[data-act]");
   if (act) {
     const a = act.dataset.act;
@@ -783,6 +836,10 @@ function onClick(event) {
 function onKey(event) {
   if (!V.el) return;
   if (event.key === "Escape") {
+    if (V.wtPanel) {
+      closeWtPanel();
+      return;
+    }
     if (V.agentPanel) {
       closeAgentPanel();
       return;
@@ -805,6 +862,12 @@ function onKey(event) {
   if (band && V.el.view.contains(band) && (event.key === "Enter" || event.key === " ")) {
     event.preventDefault();
     pressBandAgent(band.dataset.cmdAgent);
+    return;
+  }
+  const item = event.target.closest?.("[data-cmd-wt], [data-cmd-fold]");
+  if (item && V.el.view.contains(item) && (event.key === "Enter" || event.key === " ")) {
+    event.preventDefault();
+    pressBandItem(item.dataset.cmdWt ?? item.dataset.cmdFold);
     return;
   }
   const target = event.target.closest?.(".gx-box, .gx-fh");
@@ -840,6 +903,11 @@ function onTap(target) {
     pressBandAgent(band.dataset.cmdAgent);
     return;
   }
+  const item = target.closest("[data-cmd-wt], [data-cmd-fold]");
+  if (item) {
+    pressBandItem(item.dataset.cmdWt ?? item.dataset.cmdFold);
+    return;
+  }
   const clean = target.closest(".gx-clean");
   if (clean) {
     const ids = clean.dataset.ids.split(" ");
@@ -849,6 +917,7 @@ function onTap(target) {
     V.path = null;
     V.cmdSel = null;
     V.agentPanel = null;
+    V.wtPanel = null;
     paintCmdSel();
     V.cleanup = ids.map((id) => all.get(id) || { id, text: "" });
     paint();
@@ -858,6 +927,7 @@ function onTap(target) {
   const hit = target.closest(".gx-box, .gx-fh");
   if (!hit) {
     if (V.sel) select(null);
+    else if (V.wtPanel) closeWtPanel();
     else if (V.agentPanel) closeAgentPanel();
     else if (V.cmdSel) {
       V.cmdSel = null;

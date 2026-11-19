@@ -232,6 +232,9 @@ function bandModel(rows) {
       const item = {
         ...it,
         x, y: row.top, w, h, labelWidth: lw,
+        // iss-00668 D-07: the badge's and the count's widths without their gap (graph.css draws them this wide)
+        badgeWidth: badgeWidth(it) ? badgeWidth(it) - BAND.labelGap : 0,
+        countWidth: countWidth(it) ? countWidth(it) - BAND.labelGap : 0,
         agents: it.kind === "fold" ? [] : it.agents.map((ref, i) => ({ id: ref.id, ref, ...at(i), w: BAND.slot, h: BAND.h })),
       };
       x += w + BAND.gap;
@@ -533,8 +536,9 @@ const idOf = (o) => {
 
 /**
  * The same string for the same inputs: the summary object, the routing object (V.EG), the measured widths and the
- * recorded ids of the marks used, and BAND. The page draws again only when it changes.
+ * recorded ids of the marks used, the structure object and the range (iss-00668 D-05), and BAND. The page draws again
+ * only when it changes.
  */
-export function commandKey({ summary, routing, marks, ids: order }) {
-  return [idOf(summary), idOf(routing), JSON.stringify(marks ?? null), JSON.stringify(order ?? null), JSON.stringify(BAND)].join("|");
+export function commandKey({ summary, routing, marks, ids: order, structure = null, range = null }) {
+  return [idOf(summary), idOf(routing), JSON.stringify(marks ?? null), JSON.stringify(order ?? null), idOf(structure), String(range), JSON.stringify(BAND)].join("|");
 }

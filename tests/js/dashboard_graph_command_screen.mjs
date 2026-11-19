@@ -128,7 +128,44 @@ function snap(root) {
     legend: q(".legend").innerHTML.includes("指揮（親 → 子）"),
     transform: world.style.transform,
     size: [world.style.width, world.style.height],
+    // iss-00668 T-04: the Unscoped row's items, lead and the worktree's panel
+    row: rowSnap(world, panel),
     audit: audit && { links: audit.links, arcs: audit.arcs, boxOverlaps: audit.boxOverlaps, edgeOverlaps: audit.edgeOverlaps, layers: audit.layers, motion: audit.motion ?? null },
+  };
+}
+
+function rowSnap(world, panel) {
+  const lead = world.querySelector(".gx-band-lead");
+  const items = world.querySelectorAll(".gx-band-item").map((it) => {
+    const lab = it.querySelector(".gx-band-lab");
+    const badge = it.querySelector(".gx-band-badge");
+    const count = it.querySelector(".gx-band-count");
+    return {
+      key: lab?.dataset.cmdWt ?? lab?.dataset.cmdFold ?? null,
+      fold: lab?.dataset.cmdFold !== undefined,
+      tag: lab?.tag ?? null,
+      label: lab?.textContent ?? null,
+      title: lab?.getAttribute("title") ?? null,
+      style: it.getAttribute("style"),
+      idle: it.classList.contains("is-idle"),
+      badge: badge ? { kind: badge.dataset.badge, text: badge.textContent, title: badge.getAttribute("title"), aria: badge.getAttribute("aria-label") } : null,
+      count: count ? { text: count.textContent, title: count.getAttribute("title"), aria: count.getAttribute("aria-label") } : null,
+      agents: it.querySelectorAll("[data-cmd-agent]").map((b) => ({ id: b.dataset.cmdAgent, style: b.getAttribute("style") })),
+    };
+  });
+  const script = panel.querySelector(".pn-wt-open script");
+  return {
+    lead: lead ? { text: lead.textContent, title: lead.getAttribute("title") } : null,
+    items,
+    curves: world.querySelectorAll(".gx-cmd .cl").length,
+    panel: {
+      wt: panel.dataset.cmdWt ?? null,
+      head: panel.querySelector(".pn-head b")?.textContent ?? null,
+      dd: panel.querySelectorAll(".pn-wt dd").map((d) => d.textContent),
+      agents: panel.querySelectorAll("[data-wt-agent]").map((b) => b.dataset.wtAgent),
+      open: script ? { src: script.src, worktree: script.dataset.worktree, theme: script.dataset.theme } : null,
+      list: panel.querySelectorAll(".pn-wt-list li").map((li) => li.textContent),
+    },
   };
 }
 
@@ -227,13 +264,15 @@ for (const run of request.runs || []) {
   const root = new Element("main");
   const orca = run.orca === false ? null : fakeOrca({});
   if (orca && run.orca?.summary) orca.set({ summary: run.orca.summary, order: run.orca.order });
+  // iss-00668: a run's own structure (with the git worktree list), range and embedding
+  if (run.range) page.store.set("specdock.graph.v3", JSON.stringify({ mode: "nest", range: run.range }));
   const ctx = {
-    data: request.doc,
+    data: run.doc ?? request.doc,
     route: { params: new URLSearchParams(""), path: "/r/github.com/o/r/" },
     orca,
     repository: "github.com/o/r",
     baseline: null,
-    embed: false,
+    embed: !!run.embed,
     navigate: () => {},
     href: (p) => p,
   };

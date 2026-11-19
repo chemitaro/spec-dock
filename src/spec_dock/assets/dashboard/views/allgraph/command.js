@@ -119,7 +119,8 @@ export function crossPlace(pairs, { repos, summary, visible, visibleWith, orderO
     if (!shown2.has(r.key)) continue;
     const res = early.get(r.key) || rowOf(r.key);
     for (const [id, p] of res.places) if (p.kind === "band" && p.row === r.key) places.set(id, p);
-    if (res.items.length) rows.set(r.key, res.items);
+    // one "+N" per frame: its key names its repository (the band's items are looked up by key across the rows)
+    if (res.items.length) rows.set(r.key, res.items.map((it) => (it.kind === "fold" ? { ...it, key: `fold|${r.key}` } : it)));
   }
   return { pairs: kept, places, rows, keep, of, unknown };
 }

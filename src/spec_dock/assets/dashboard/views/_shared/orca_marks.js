@@ -77,6 +77,21 @@ export function createOpenButton(slot, { doc }) {
   };
 }
 
+// iss-00668 D-07: orca-web's "open in Orca" button of one worktree of the summary (the script createOpenButton uses),
+// in a slot that is drawn anew each time. Nothing without a connected orca-web, inside the embedding or without an id.
+// @returns whether the button's script was put in the slot
+export function openWorktreeButton(slot, { orca, worktreeId, theme, embed, doc }) {
+  slot.replaceChildren();
+  if (!orca || orca.status?.() !== "ok" || embed || typeof worktreeId !== "string" || worktreeId === "") return false;
+  const script = doc.createElement("script");
+  script.src = `${orca.origin}/embed/open-button.js`;
+  script.dataset.worktree = worktreeId;
+  script.dataset.theme = theme;
+  script.dataset.size = "sm";
+  slot.append(script);
+  return true;
+}
+
 // Follow the shell's one reader (iss-00592 D-03): one subscription at a time, moved when the reader changes.
 export function createOrcaWatch(onNews) {
   let reader = null;
