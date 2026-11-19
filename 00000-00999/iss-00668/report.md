@@ -55,4 +55,6 @@ ID: "iss-00668"
   - 項目の角は `border-radius: 14px`（高さ 28px では今の丸と同じ。折り返した高い項目は角の丸い四角）。印と数は 9.2px・太さ 600・余白なしで、幅は模型の推定（`ceil(labelWidth × 0.8)`）を style で渡す。実際の字の幅とのずれは S-05 の実機で確かめる（design の risks）。
   - エージェントのボタンは模型の slot の位置に絶対の位置で置く（`left = slot.x − item.x − 枠 1px`、`top = slot.y − item.y`、高さ 26px）。`cmdAudit` のボタンの中心と slot の中心のずれの測り方（`offsetLeft + clientLeft + offsetLeft`）はそのまま合う。
 
+- 2026-11-19 impl-claude（S-05 の実機の指摘の直し）：詳細の欄に渡す項目は `commandModel` の帯の項目で、その `agents` は模型の slot（`{id, ref, x, y, w, h}`）なので、`renderWorktreePanel` はエージェントの種類・署名・印を `a.ref ?? a` から読む（実機で2人とも『種類不明』になった）。T-04 に詳細の欄のエージェントの種類（`claude`）の確かめを足し、直す前に落ちることを確かめた。
+
 ## Residual Risks / Follow-ups
