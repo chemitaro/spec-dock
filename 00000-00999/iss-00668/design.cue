@@ -47,11 +47,12 @@ design: {
 			  1. `git = gitWorktrees(structure)`。`linked` = `structure.scopes[].worktrees[].path` の `normPath` の集合。
 			  2. 要約の worktree を `normPath(path)` で引く表（最初の1つ、F-04。要約が無効なら空、F-02）。
 			  3. git があれば、主の行（`main`）を `Primary` の項目に、主以外で `linked` にない行を `Unlinked` の項目にする。項目の `worktree` は同じパスの要約の worktree（なければ `{id: null, path, branch, agents: []}`）、`agents` はその worktree の全部のエージェント（`orderOf`＝部品の `orderAgents` の並び、なければ要約の並び）の `refOf`（R-09：1つの worktree ＝ 1つの項目）。
-			  4. `places` で `kind: "band"` の線の端（今の `bandItems(pairs, places, own, orderOf)`）を重ねる。端の worktree のパスが 3 の項目に当たればその項目に（エージェントは足し重ね、重複なし）、当たらなければ今の項目（印なし、今の札）として足す。git がないとき（F-01）は今の `bandItems` の結果だけで、`main` が真の項目に `Primary` の印を付ける。
-			  5. 各項目の `count` = その項目の worktree のエージェントの `childCount` の和（0 なら `null`）、`countParts` = 子のいるエージェントごとの `{id, agentType, index（項目の中の並びの1始まりの番号）, n}`（title の内訳）、`idle` = エージェントが0。
+			  4. 寄せ：同じパスの要約の worktree が2つ以上あるとき（F-04）、2つ目以降のエージェントも最初の worktree の項目に入れ、その居場所（`places` の `key`）を項目の `key` に直す（線の端が項目から引けるように）。
+			  4b. `places` で `kind: "band"` の線の端（今の `bandItems(pairs, places, own, orderOf)`）を重ねる。端の worktree のパスが 3 の項目に当たればその項目に（エージェントは足し重ね、重複なし）、当たらなければ今の項目（印なし、今の札）として足す。git がないとき（F-01）は今の `bandItems` の結果だけで、`main` が真の項目に `Primary` の印を付ける。
+			  5. `range === "next"` のときだけ、各項目の `count` = その項目の worktree のエージェントの `childCount` の和（0 なら `null`。全体・いまでは常に `null`＝数の札を出さない）、`countParts` = 子のいるエージェントごとの `{id, agentType, index（項目の中の並びの1始まりの番号）, n}`（title の内訳）、`idle` = エージェントが0。
 			  6. 見方：`range === "next"` なら、`Primary` の項目と、`count` のある `Unlinked` の項目だけを残す（線の端だけの項目は落とす）。それ以外は全部。
 			  7. 畳み：`idle` な `Unlinked` の項目が `FOLD` 以上なら、それらを外し、`{kind: "fold", key: "fold", label: "+N", folded: [{label, path}], agents: [], idle: true}` を1つ足す。
-			  8. 並び：`Primary`、エージェントのいる `Unlinked`（札の順）、線の端だけの項目（今の順：自分のリポジトリ、ほかのリポジトリ）、薄い `Unlinked`、`+N`。
+			  8. 並び：`Primary`、`Unlinked`（エージェントのいるもの・畳まれない薄いものを合わせて札の順）、線の端だけの項目（今の順：自分のリポジトリ、ほかのリポジトリ）、`+N`。
 			- Item：`{key, kind: "worktree" | "fold", label, badge: "primary" | "unlinked" | null, own, main, worktree, path, agents: [AgentRef], idle, count, countParts, folded}`。
 			- `countTitle(item)`：`"3 agents in progress — claude #1: 2, codex #2: 1"`（1なら agent。種類がなければ `agent`）。`key` は線の端と同じ（要約の worktree の `bandKeys`）、要約のない git の行は `git:<path>`。
 			- `commanding(items)`：`count` のある項目があるか（『横断の構造』の keep に使う）。
@@ -79,7 +80,7 @@ design: {
 			- 各リポジトリの行は、そのリポジトリの `structure` と、そのリポジトリの端（今の `rows.get(key)` に入る場所）から `unscopedItems` で決める（`own` は今の `of` のそのリポジトリの worktree）。項目のないリポジトリは行を持たない。『ほかの場所』（`''`）は今のまま `bandItems`（全体・いまだけ）。
 			- `keep`：見えないリポジトリで、全体・いまは今どおり（親が帯にいる）、これからは `commanding(行)` が真のもの。
 			- `pairs` が0でも `crossPlace` を呼べる（行は git の一覧と要約から決まる）。
-			`bandShape` は行の幅に頭の文字 `Unscoped` の幅を入れ（`bandRowWidth(items, UNSCOPED.lead)`）、行の高さを `REPO.band + bandRowHeight(items) - BAND.h` にする（R-09、`compose` の `bands[key].h` はすでに高さを受け取る）。`crossModel` は各リポジトリの行に `lead: UNSCOPED.lead` を付ける。
+			`bandShape` は行の幅に頭の文字 `Unscoped` の幅を入れ（`bandRowWidth(items, UNSCOPED.lead)`）、行の高さを `REPO.band + bandRowHeight(items) - BAND.h` にする（R-09、`compose` の `bands[key].h` はすでに高さを受け取る）。『ほかの場所』の `other` の高さも同じく `REPO.other + bandRowHeight(items) - BAND.h` にする。`crossModel` は各リポジトリの行に `lead: UNSCOPED.lead` を付ける。
 			"""
 		satisfies: ["R-06", "R-07", "R-09"]
 	}

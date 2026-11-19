@@ -75,7 +75,7 @@ requirements: {
 	"R-03": {
 		title: "どの Scope にも紐づかない worktree を Unlinked で出す"
 		text: """
-			git の一覧の主以外の行で、どの Scope の worktree の記録（`scopes[].worktrees[].path`、`matchWorktrees` のパスの決まり）にも当たらないものを、主の後に、ブランチ名の順で並べる。印は `Unlinked`（title・aria-label「Not linked to any Scope. Link it with `spec-dock work start`.」）。
+			git の一覧の主以外の行で、どの Scope の worktree の記録（`scopes[].worktrees[].path`、`matchWorktrees` のパスの決まり）にも当たらないものを、主の後に、ブランチ名の順で並べる（線の端だけの項目はその後、`+N` は最後）。印は `Unlinked`（title・aria-label「Not linked to any Scope. Link it with `spec-dock work start`.」）。
 			Orca の要約に同じパスの worktree があれば、そのエージェントの印を重ねる（要約の並び、または部品の `orderAgents`）。
 			指揮の線の端になったが行の項目に当たらない worktree（Orca の要約にだけある、同じ project の別の場所の worktree、ほかのリポジトリの worktree、Scope に紐づくが描かれた祖先がない worktree）は、今どおり行の項目になる（印は付けない。ほかのリポジトリは今の札、『横断の構造』では今の『ほかの場所』）。
 			"""
@@ -151,7 +151,7 @@ requirements: {
 	}
 	"R-08": {
 		title: "線の検査と重さが戻らない"
-		text: "`specdockEdgeAudit` の違反0、`specdockCmdAudit` の `boxOverlaps`・`edgeOverlaps`・`heads` 0、iss-00646 の台本（`epic-00615/.workbench/perf-measure.mjs`）の数が今より悪くならない。"
+		text: "`specdockEdgeAudit` の違反0、`specdockCmdAudit` の `boxOverlaps`・`edgeOverlaps`・`heads` 0、iss-00646 の台本（カタログの `epic-00615/.workbench/perf-measure.mjs`。この worktree からは `spec-dock/initiatives/00000-00999/epic-00615/.workbench/perf-measure.mjs`、Git の外）の数が今より悪くならない。"
 		acceptance: [
 			"実機の 1440・390 × 明・暗で違反0、cmdAudit の数が0",
 			"重さの台本の数が、開始のコミットと比べて悪くならない（誤差の範囲）",

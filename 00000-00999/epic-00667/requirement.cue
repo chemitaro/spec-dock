@@ -21,7 +21,7 @@ requirements: {
 	}
 	"R-02": {
 		title: "どの Scope にも紐づかない worktree が、git の一覧を土台に、見方ごとの決まりで出る"
-		acceptance: ["iss-00668 の R-01・R-03・R-04・R-05・R-06 の受入が満たされる"]
+		acceptance: ["iss-00668 の R-01・R-03・R-04・R-05・R-06・R-09 の受入が満たされる"]
 	}
 	"R-03": {
 		title: "線の検査と重さが戻らない"
