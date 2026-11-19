@@ -46,26 +46,30 @@ design: {
 			- `unscopedItems({structure, summary, pairs, places, own, orderOf, range})` → `[Item]`。
 			  1. `git = gitWorktrees(structure)`。`linked` = `structure.scopes[].worktrees[].path` の `normPath` の集合。
 			  2. 要約の worktree を `normPath(path)` で引く表（最初の1つ、F-04。要約が無効なら空、F-02）。
-			  3. git があれば、主の行（`main`）を `Primary` の項目に、主以外で `linked` にない行を `Unlinked` の項目にする。項目の `worktree` は同じパスの要約の worktree（なければ `{id: null, path, branch, agents: []}`）、`agents` はその worktree の全部のエージェント（`orderOf` の並び、なければ要約の並び）の `refOf`。
+			  3. git があれば、主の行（`main`）を `Primary` の項目に、主以外で `linked` にない行を `Unlinked` の項目にする。項目の `worktree` は同じパスの要約の worktree（なければ `{id: null, path, branch, agents: []}`）、`agents` はその worktree の全部のエージェント（`orderOf`＝部品の `orderAgents` の並び、なければ要約の並び）の `refOf`（R-09：1つの worktree ＝ 1つの項目）。
 			  4. `places` で `kind: "band"` の線の端（今の `bandItems(pairs, places, own, orderOf)`）を重ねる。端の worktree のパスが 3 の項目に当たればその項目に（エージェントは足し重ね、重複なし）、当たらなければ今の項目（印なし、今の札）として足す。git がないとき（F-01）は今の `bandItems` の結果だけで、`main` が真の項目に `Primary` の印を付ける。
-			  5. 各項目の `count` = その項目の worktree のエージェントの `childCount` の和（0 なら `null`）、`idle` = エージェントが0。
+			  5. 各項目の `count` = その項目の worktree のエージェントの `childCount` の和（0 なら `null`）、`countParts` = 子のいるエージェントごとの `{id, agentType, index（項目の中の並びの1始まりの番号）, n}`（title の内訳）、`idle` = エージェントが0。
 			  6. 見方：`range === "next"` なら、`Primary` の項目と、`count` のある `Unlinked` の項目だけを残す（線の端だけの項目は落とす）。それ以外は全部。
 			  7. 畳み：`idle` な `Unlinked` の項目が `FOLD` 以上なら、それらを外し、`{kind: "fold", key: "fold", label: "+N", folded: [{label, path}], agents: [], idle: true}` を1つ足す。
 			  8. 並び：`Primary`、エージェントのいる `Unlinked`（札の順）、線の端だけの項目（今の順：自分のリポジトリ、ほかのリポジトリ）、薄い `Unlinked`、`+N`。
-			- Item：`{key, kind: "worktree" | "fold", label, badge: "primary" | "unlinked" | null, own, main, worktree, path, agents: [AgentRef], idle, count, folded}`。`key` は線の端と同じ（要約の worktree の `bandKeys`）、要約のない git の行は `git:<path>`。
+			- Item：`{key, kind: "worktree" | "fold", label, badge: "primary" | "unlinked" | null, own, main, worktree, path, agents: [AgentRef], idle, count, countParts, folded}`。
+			- `countTitle(item)`：`"3 agents in progress — claude #1: 2, codex #2: 1"`（1なら agent。種類がなければ `agent`）。`key` は線の端と同じ（要約の worktree の `bandKeys`）、要約のない git の行は `git:<path>`。
 			- `commanding(items)`：`count` のある項目があるか（『横断の構造』の keep に使う）。
 			"""
-		satisfies: ["R-02", "R-03", "R-04", "R-06", "F-01", "F-02", "F-03", "F-04"]
+		satisfies: ["R-02", "R-03", "R-04", "R-06", "R-09", "F-01", "F-02", "F-03", "F-04"]
 	}
 	"D-03": {
 		title: "帯の模型の広げ（`views/graph/command.js`）"
 		text: """
 			- `bandLabel`：自分のリポジトリの main の札を「main のチェックアウト」からブランチ名に変える（`Primary` の印が代わりに示す）。detached（`branch` がなく `head` がある git の行）は `detached @<head の先頭7文字>`。ほかは今のまま。
-			- `itemWidth(it)`：今の幅に、印（`badge` があれば `labelWidth(印の文字) * 0.8 + BAND.labelGap`、小さい字）と数（`count` があれば同じ式で数の文字）を足す。`kind: "fold"` はエージェントの欄を持たない。`bandModel` は項目の `badge`・`count`・`idle`・`kind`・`folded`・`path` を写す（今の `...it` のまま）。
+			- 折り返し（R-09）：`BAND.perLine = 4`、`BAND.lineH = 24`。項目のエージェントの欄は `min(n, perLine)` 列 × `ceil(n / perLine)` 行。項目の高さは `BAND.h + (lines - 1) * BAND.lineH`（1行なら今の 28）。各エージェントの slot は `{x: 左 + slot × (i % perLine), y: 項目の top + lineH × floor(i / perLine), w: slot, h: BAND.h}`（1行目は今と同じ）。
+			  行（row）の高さは、その行のいちばん高い項目。`bandModel` の行の `h` と `band.h` はその最大。構造の図の行（`BAND.top`）は、下の縁を今の位置（`BAND.top + BAND.h`）に保つよう、高い分だけ上に置く（graph.js が `top: BAND.top - (rowH - BAND.h)` を渡す。`bandRowHeight(items)` を export する）。
+			  線の端（`fixedEnd` の band）は今どおり `{x: slot の中心, y: 項目の top}`（箱の印と同じく、折り返した行の印も項目の上の縁）。同じ項目の弧も今の `sameHop`。
+			- `itemWidth(it)`：今の幅（エージェントは `min(n, perLine)` 列）に、印（`badge` があれば `labelWidth(印の文字) * 0.8 + BAND.labelGap`、小さい字）と数（`count` があれば同じ式で数の文字）を足す。`kind: "fold"` はエージェントの欄を持たない。`bandModel` は項目の `badge`・`count`・`idle`・`kind`・`folded`・`path` を写す（今の `...it` のまま）。
 			- `commandModel` は rows の項目にエージェントがなくても項目を置く（今も置ける）。組が0でも rows があれば `band` を返す（今も同じ。graph.js が呼ばなかっただけ）。
 			- `bandItems` は今のまま（D-02 が中で使う）。
 			"""
-		satisfies: ["R-02", "R-03", "R-04"]
+		satisfies: ["R-02", "R-03", "R-04", "R-09"]
 	}
 	"D-04": {
 		title: "『横断の構造』の行（`views/allgraph/command.js`）"
@@ -75,9 +79,9 @@ design: {
 			- 各リポジトリの行は、そのリポジトリの `structure` と、そのリポジトリの端（今の `rows.get(key)` に入る場所）から `unscopedItems` で決める（`own` は今の `of` のそのリポジトリの worktree）。項目のないリポジトリは行を持たない。『ほかの場所』（`''`）は今のまま `bandItems`（全体・いまだけ）。
 			- `keep`：見えないリポジトリで、全体・いまは今どおり（親が帯にいる）、これからは `commanding(行)` が真のもの。
 			- `pairs` が0でも `crossPlace` を呼べる（行は git の一覧と要約から決まる）。
-			`bandShape` は行の幅に頭の文字 `Unscoped` の幅を入れる（`bandRowWidth(items, UNSCOPED.lead)`）。`crossModel` は各リポジトリの行に `lead: UNSCOPED.lead` を付ける。
+			`bandShape` は行の幅に頭の文字 `Unscoped` の幅を入れ（`bandRowWidth(items, UNSCOPED.lead)`）、行の高さを `REPO.band + bandRowHeight(items) - BAND.h` にする（R-09、`compose` の `bands[key].h` はすでに高さを受け取る）。`crossModel` は各リポジトリの行に `lead: UNSCOPED.lead` を付ける。
 			"""
-		satisfies: ["R-06", "R-07"]
+		satisfies: ["R-06", "R-07", "R-09"]
 	}
 	"D-05": {
 		title: "構造の図の描き方（`views/graph.js`）"
@@ -104,15 +108,16 @@ design: {
 	"D-07": {
 		title: "描画の部品と詳細の欄（`views/graph/command_view.js`、`views/_shared/orca_marks.js`）"
 		text: """
-			- `layersHtml`：項目の札を `<button class="gx-band-lab" data-cmd-wt="<key>">` にし（今の span の位置と幅のまま）、`badge` があれば `<span class="gx-band-badge" data-badge="primary|unlinked" title aria-label>`、`count` があれば `<span class="gx-band-count" title aria-label>`、`idle` なら項目に `is-idle`。`kind: "fold"` は `<button class="gx-band-lab gx-band-fold" data-cmd-fold>+N</button>` だけ。行の頭の文字に title を付ける。
+			- `layersHtml`：項目の札を `<button class="gx-band-lab" data-cmd-wt="<key>">` にし（今の span の位置と幅のまま）、`badge` があれば `<span class="gx-band-badge" data-badge="primary|unlinked" title aria-label>`、`count` があれば `<span class="gx-band-count" title aria-label>`（`countTitle`）、エージェントのボタンは模型の slot の位置（折り返しの行）に置く、`idle` なら項目に `is-idle`。`kind: "fold"` は `<button class="gx-band-lab gx-band-fold" data-cmd-fold>+N</button>` だけ。行の頭の文字に title を付ける。
 			- `renderWorktreePanel(panel, {item, orca, embed, theme, hide})`：見出し（印とブランチ）、パス、エージェントの一覧（種類と、押すとチャットを開く `data-cmd-agent` のボタン）、`item.worktree.id` が文字列で orca が ok で埋め込みでないとき『Orca で開く』（`orca_marks.js` に足す `openWorktreeButton(slot, {orca, worktreeId, theme, embed, doc})`、今の `createOpenButton` と同じ script を差す）。`fold` の項目は畳んだ worktree のブランチとパスの一覧。
 			- `paintCmdSel`・`paintBandMarks` は今のまま（エージェントのボタンの形は同じ）。
 			"""
-		satisfies: ["R-02", "R-03", "R-04", "R-05"]
+		satisfies: ["R-02", "R-03", "R-04", "R-05", "R-09"]
 	}
 	"D-08": {
 		title: "見た目（`views/graph.css`）"
 		text: """
+			項目は高さを模型から受け取り（style の height）、エージェントのボタンは絶対の位置（模型の slot）で置く。札・印・数は1行目の高さの中にそろえる。
 			`.gx-band-badge`・`.gx-band-count`：小さい字の札（今の色の変数だけ。`Primary` は `--ds-accent-soft`、`Unlinked` は警告の地の変数、数は `--ds-surface-3`）。`.gx-band-item.is-idle`：`opacity: .55`。`.gx-band-lab` のボタンは今の span と同じ字・幅（ボタンの既定の枠と地を消す）、`:focus-visible` の輪。
 			幅の推定（D-03）と CSS の字の大きさを合わせる（`graph.css` の注記に書く）。線・波紋・層の z-index は変えない。
 			"""
@@ -121,10 +126,10 @@ design: {
 	"D-09": {
 		title: "実機の確かめと移行の案内"
 		text: """
-			候補の wheel を隔離した venv と一時の状態の置き場に入れ、別のポートで `--tailscale`（常駐の 47800・8791 と道具の環境には触れない）。spec-dock の構造の図と『横断の構造』を 1440・390 × 明・暗で、(a)〜(d)（依頼書の受入）を写し、`specdockEdgeAudit`・`specdockCmdAudit` と iss-00646 の台本を開始のコミットの wheel と比べる。
+			候補の wheel を隔離した venv と一時の状態の置き場に入れ、別のポートで `--tailscale`（常駐の 47800・8791 と道具の環境には触れない）。spec-dock の構造の図と『横断の構造』を 1440・390 × 明・暗で、(a)〜(d)（依頼書の受入）と (e) 1つの worktree に複数のエージェント（指揮の親子を含む）がいる場面を写し、`specdockEdgeAudit`・`specdockCmdAudit` と iss-00646 の台本を開始のコミットの wheel と比べる。
 			移行の案内の文（`Unscoped`・`Primary`・`Unlinked`、薄く・`+N`、『これから』で線がなくなり数が付くこと、API の `items`）を report.md に用意する。
 			"""
-		satisfies: ["R-02", "R-03", "R-04", "R-06", "R-07", "R-08"]
+		satisfies: ["R-02", "R-03", "R-04", "R-06", "R-07", "R-08", "R-09"]
 	}
 }
 

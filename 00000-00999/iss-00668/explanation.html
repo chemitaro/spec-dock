@@ -4,57 +4,63 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<title>説明資料</title>
+<title>Unscoped の行</title>
 <link rel="stylesheet" href="../../../design-system/ds.css">
 <!-- ▼ 説明資料の本文（Markdown）。編集するのはこのブロックだけです。 -->
 <script type="text/markdown" id="ds-source">
 ---
-title: この Scope の説明資料（題名を書き換えます）
-lead: この資料で理解できることを、初めて読む人にも分かるように1〜2文で書きます。
+title: 指揮の帯を Unscoped の行に変え、主のチェックアウトと紐づかない worktree をいつも並べる
+lead: 構造の図と『横断の構造』の上にある帯を「Unscoped」の行に変えます。統括が居る main のチェックアウトがいつも出るようにし、work start せずに作業している worktree（どの Scope にも紐づかない worktree）にすぐ気づけるようにします。
 category: 説明資料
 audience: 本日チームに加わった新メンバー
-status: 下書き
+status: 仕様のレビュー前
 ---
-
-<!-- spec-dock:explanation-skeleton -->
-<!-- 雛形から書き換えたら、上の印の行を消します。印が残っていると、検査は「雛形のまま」と判定します。 -->
 
 ## この資料で分かること
 
 :::summary
-- 読み終えたときに理解できていることを、1文ずつ書きます。
-- 背景、仕組み、失敗時の動き、確認方法のうち、特に伝えたい点を選びます。
-- 短い Scope なら、1〜2項目でかまいません。
+- 帯は「Unscoped」の行になり、先頭にいつも main のチェックアウト（印 `Primary`）が出ます。誰も指揮していなくても、Orca がなくても出ます。
+- どの Scope にも紐づかない worktree は印 `Unlinked` で並びます。エージェントのいないものは薄く、2つ以上あれば `+N` に畳まれます。
+- 1つの worktree は1つの項目で、そこにいるエージェントの印を全部並べます。多ければ項目の中で折り返します。
+- 『これから』では指揮の線を引かず、指揮している項目に子の数を添えます。
 :::
 
 ## 背景と目的
 
-なぜこの Scope に取り組むのか、どの問題を解決するのかを具体的に説明します。
+今の帯には、指揮の線の端になったエージェントの worktree だけが出ます。統括が誰も指揮していないと main のチェックアウトは図から消え、work start していない worktree で作業しているエージェントも見えません。本人のねらいは、(1) 主のワークスペースがいつも図に出続けること、(2) SpecDock を正しく使わずに作業している worktree にすぐ気づけることです。
 
 ## 全体の構成
 
-構成要素の役割と関係を説明します。図は、理解を大きく助ける場合だけ入れます。
-
 ```plantuml id=overview
 @startuml
-title 全体の構成
+title Unscoped の行ができるまで
 top to bottom direction
-actor "利用者" as User
-component "説明対象の仕組み" as System
-database "データ" as Data
-User -> System : 操作する
-System -> Data : 読み書きする
-System --> User : 結果を返す
+component "ダッシュボードのサーバー\n(git worktree list を読む)" as Server
+component "構造の API\nworktrees.items" as Api
+component "orca-web の要約\n(エージェント、任意)" as Orca
+component "unscoped.js\n(行の項目の計算)" as Calc
+component "構造の図 / 横断の構造\n(Unscoped の行)" as View
+Server --> Api
+Api --> Calc
+Orca --> Calc
+Calc --> View
 @enduml
 ```
 
+- サーバーは、今も読んでいる `git worktree list` の結果を、API の `worktrees.items` に出します（bare・prunable・仕様の置き場は除きます）。
+- `views/graph/unscoped.js` が、主・紐づかない worktree・線の端・畳みを決めます。両方の画面がこれを呼びます。
+- Scope に紐づくかどうかは、今の `matchWorktrees` と同じく、Scope の worktree の記録のパスで決めます。
+
+## 見方ごとの出し方
+
+| 見方 | 出すもの | 指揮の線 |
+|---|---|---|
+| 全体・いま | Primary、すべての Unlinked（薄い・+N）、線の端 | 今のまま |
+| これから | Primary と、子のいるエージェントのいる Unlinked（子の数つき） | 引かない |
+
 ## 確認方法
 
-読者が手元で確かめられる手順を書きます。
-
-```sh
-spec-dock active show --json
-```
+試しのダッシュボード（別のポート、`--tailscale`）で、spec-dock の構造の図と『横断の構造』を開き、Primary・Unlinked・+N・『これから』の数を見ます。`specdockEdgeAudit()` と `specdockCmdAudit()` の違反が0であることも確かめます。
 </script>
 <script src="../../../design-system/ds.js"></script>
 </head>
