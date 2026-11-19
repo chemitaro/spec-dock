@@ -57,4 +57,40 @@ ID: "iss-00668"
 
 - 2026-11-19 impl-claude（S-05 の実機の指摘の直し）：詳細の欄に渡す項目は `commandModel` の帯の項目で、その `agents` は模型の slot（`{id, ref, x, y, w, h}`）なので、`renderWorktreePanel` はエージェントの種類・署名・印を `a.ref ?? a` から読む（実機で2人とも『種類不明』になった）。T-04 に詳細の欄のエージェントの種類（`claude`）の確かめを足し、直す前に落ちることを確かめた。
 
+## 実機の確かめ（S-05、2026-11-19、`e8926bf5a`、直しは `f140ecc24`）
+
+- 試しのサーバー：この worktree の候補の wheel を隔離した venv（`.workbench/iss-00668/venv`）に入れ、この PC の状態の置き場の写し（`.workbench/iss-00668/state`）と試しの `XDG_CONFIG_HOME`（`orca_web.port` 18868）で、`spec-dock dashboard serve --offline --tailscale --port 18668`。
+  orca-web は、常駐の `dist` を、別のポート 18868・別の設定ファイルと送信の置き場（`.workbench/iss-00668/orca-web/`）・`ORCA_WEB_READ_ORIGINS` に試しのオリジンだけで、もう1つ起動した（常駐の 8791・47800 の設定、道具の環境には触れていない）。
+  最初は、常駐の orca-web を中継してオリジンの検査と frame-ancestors を外す台本を考えたが、Claude Code の自動の許可の判定が「守りを弱める」として止めたので、この形にした。
+- 試しのエージェント：統括が、spec-dock の Scope に紐づかない worktree `local-macos-vm-ci` に、何もしない haiku の A（統括の子）と、A が立てた B（A の子、同じ worktree）を立てた。
+- 結果（`.workbench/iss-00668/shots/`、`result.json`）：構造の図（spec-dock）と『横断の構造』の 1440・390 × 明・暗 × 全体・いま・これから の24通りで、`specdockEdgeAudit` の違反0、`specdockCmdAudit` の `boxOverlaps`・`edgeOverlaps`・`heads`・`crowded` 0、`spotDrift` 0〜0.5、`spotMissing` 0、ブラウザーのエラー0、横のスクロールなし。
+  - (a) 主のチェックアウト：spec-dock の行の先頭に `main` と `Primary`。『横断の構造』では、ほかのリポジトリの main が、エージェントなし（薄くない Primary の項目、エージェント0）や、誰も指揮していないエージェントつきで `Primary` で出た。
+  - (b)・(e) `chemitaro/local-macos-vm-ci` が `Unlinked` で、A と B の2つの印が1つの項目に並び、統括（main の印）→ A の線と、A → B の同じ項目の弧が出た。
+  - (c) エージェントのいない `codex/schema1-preserving-migration` が薄く（1つなので畳まない）。『横断の構造』の別のリポジトリでは、エージェントのいない4つが `+4` に畳まれ、押すと詳細の欄にブランチとパスの一覧（detached の行は `detached @<7文字>`）、Esc で閉じた。
+  - (d) 『これから』：線は0本。spec-dock の行は `Primary` に数 2（統括の子：タスク担当と A）、`Unlinked`（local-macos-vm-ci）に数 1（A の子 B）。指揮していない・エージェントのいない worktree は出ない。『横断の構造』でも同じ（Scope のない枠は、指揮している項目があるときだけ出た）。
+  - 押し：項目の札で詳細の欄（`Unlinked`、ブランチ、パス、エージェント2人、『Orca で開く』）、もう一度で閉じる。エージェントの印でチャットの iframe、`aria-pressed` 1、線の目立ち。
+  - 見つけた誤り1件：詳細の欄のエージェントが『種類不明』（帯の slot から種類を読んでいなかった）。実装担当が直した（`f140ecc24`、テストを先に足した）。
+  - 写せなかったもの：1つの worktree に5人以上のエージェントがいる折り返し（R-09）。実データにない。node（T-03）と偽の DOM（T-04）のテストで確かめた。
+- 重さ（iss-00646 の台本、1440×900、deviceScaleFactor 2、読み込みの15秒後から10秒の TaskDuration。開始のコミットの wheel を同じ状態の置き場の写しでポート 18669 に立てて比べた。見方は localStorage で固定）：
+
+  | 見方 | 画面 | 開始のコミット（3回） | この Issue（3回） |
+  |---|---|---|---|
+  | 全体 | 横断の構造 | 0.03・0.04・0.04 秒 | 0.05・0.04・0.03 秒 |
+  | 全体 | spec-dock の構造の図 | 0.02・0.02・0.02 秒 | 0.02・0.02・0.02 秒 |
+  | これから | 横断の構造 | 0.01・0.02・0.01 秒 | 0.02・0.04・0.01 秒 |
+  | これから | spec-dock の構造の図 | 0.01・0.01・0.01 秒 | 0.02・0.01・0.02 秒 |
+
+  どれも 0.05 秒以下で、誤差の範囲（『これから』は線がなくなり、動きの数が 55 → 12、20 → 4 に減った）。見方を固定しない最初の測りで、この Issue の横断の構造に1回だけ 0.71 秒が出たが、同じ条件の6回では出なかった（読み込みの直後の組み立ての重なりと見る）。
+- 本人が見る試しの URL：tailnet の 18668 の `/graph`（横断の構造）と `/r/github.com/chemitaro/spec-dock/graph`（構造の図）。中身は `e8926bf5a` の wheel（詳細の欄の種類の直し `f140ecc24` の前）。最終品質ゲートの後に、合格のコミットの wheel に入れ替える。
+  止め方：`.workbench/iss-00668/state/dashboard/server.json` の pid と、`.workbench/iss-00668/orca-web.pid` の pid を止める。
+
+## 移行の案内に書く文（次のリリース用）
+
+- **構造の図と『横断の構造』の帯が `Unscoped` の行になりました。** 行の先頭に、いつも主のチェックアウト（印 `Primary`）が出ます。Orca を使わなくても、誰も指揮していなくても出ます。
+- **どの Scope にも紐づかない worktree が `Unlinked` で並びます。** `spec-dock work start` をせずに作業している worktree に、すぐ気づけます。エージェントのいない worktree は薄く出て、2つ以上あれば `+N` に畳まれます（押すと一覧）。仕様の置き場の worktree、bare、prunable の worktree は出ません。
+- 1つの worktree は1つの項目で、そこにいるエージェントの印をすべて並べます（1行4つ、それより多いと項目の中で折り返します）。項目を押すと、ブランチ・パス・エージェントと『Orca で開く』が出ます。
+- **『これから』では、指揮の線を引かなくなりました。** 代わりに、主のチェックアウトと、指揮している `Unlinked` の worktree に、子の数が付きます（title に内訳）。全体・いまの線は今までどおりです。
+- 今までの札「main のチェックアウト」は、ブランチ名と `Primary` の印に変わりました。
+- 構造の API（`/api/v1/r/<repo>/structure`）の `worktrees` に `items`（各 worktree の `path`・`branch`・`head`・`main`・`detached`・`locked`）が加わりました。`status` と `paths` は変わりません。
+
 ## Residual Risks / Follow-ups
