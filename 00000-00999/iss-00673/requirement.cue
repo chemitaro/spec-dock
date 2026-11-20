@@ -23,7 +23,7 @@ background: """
 	- その回だけの設定 `--settings '{"permissions":{"allow":["read_file(<カタログ>)","write_file(<カタログ>)"]}}'` で、ファイルの道具の読み書きと、端末からの書き込みの両方が通った。カタログの親のディレクトリを書いても通った。`--sandbox` を付けても同じだった。
 	- 保存される設定の場所と形は、公式のスキーマ（https://antigravity.google/schemas/v1/settings.json 。利用者の設定のファイルの `$schema` が指す）が定める：『Settings for Antigravity CLI, stored in ~/.gemini/antigravity-cli/settings.json』。`permissions` は `allow`、`ask`、`deny` の規則の配列で、規則は `action(target)`（`read_file(/var/log)` など）、『A deny rule takes precedence over an ask rule, and an ask rule over an allow rule』。`--settings` の説明は『a JSON object of settings.json keys』で、`agy` のログは、保存された設定の `permissions` も `--settings` の `permissions` も、同じ形（`CLI settings initialized: permissions=&{Allow:[...] ...}`）で読み込む。利用者の設定のファイルを書き換えないため、保存された設定に規則を置いてカタログに書けることは、直接は確かめていない（推定）。
 	- `ANTIGRAVITY_APP_DATA_DIR` を別のディレクトリにして起動しても、`agy` のログの app data directory は `~/.gemini/antigravity-cli` のままで、設定の場所を動かせなかった（入力としては効かない）。作業ディレクトリの `.agents/settings.json`、`.gemini/settings.json`、`.gemini/antigravity-cli/settings.json`、`.antigravity/settings.json` に置いた設定も効かなかった。
-	- `--add-dir <カタログ>`（その回だけ）でも読み書きと端末の書き込みが通った。`allowNonWorkspaceAccess` は、スキーマでは『subject to toolPermission, agentMode, and your permission rules』で、保存された設定が `allowNonWorkspaceAccess: true` を持つ状態でも、ファイルの道具の書き込みは許可を求めて拒まれた（それだけでは足りない）。`additionalDirectories` は `--settings` が『unknown setting』で拒んだ。
+	- `--add-dir <カタログ>`（その回だけ）でも読み書きと端末の書き込みが通った。`allowNonWorkspaceAccess` は、スキーマでは『subject to toolPermission, agentMode, and your permission rules』。利用者の設定が権限の規則を持たなかったときは `--settings` の `allowNonWorkspaceAccess: true` で読み書きが通ったが、利用者の設定に `agentMode`・`ask`・`deny` などが足された後は、保存された `allowNonWorkspaceAccess: true` があっても、ファイルの道具の書き込みは許可を求めて拒まれた（ほかの設定によって結果が変わり、それだけでは当てにできない）。`additionalDirectories` は `--settings` が『unknown setting』で拒んだ。
 	- Antigravity の端末で動くコマンドには、`ANTIGRAVITY_AGENT=1` などが渡る。
 	- `--mode plan` では、許可の規則があっても、ファイルの作成と端末のコマンドが行われなかった（計画のモードは全体の書き込みをしない動き方で、カタログに限った制限ではない）。Claude Code の隔離セッション（`--worktree`）のような、設定を足しても書けない動き方は見つからなかった。
 
@@ -54,11 +54,12 @@ requirements: {
 			`canonical status --json` の `data.tools.antigravity` に、Antigravity の中か（`session`）、設定が要るか（`needed`、linked worktree なら真）、設定があるか（`configured`：真、偽、分からない）、読んだ設定のファイル（`sources`）、示す設定のファイルの名前（`file`、`~/.gemini/antigravity-cli/settings.json`）、足す1行（`line`）を出す。
 			Antigravity の中で、linked worktree で、設定がないときは、警告 `CANONICAL_TOOL_SETTING_MISSING`（`details.tool` は `antigravity`、`next_step` は1行）を出し、`tools.next_step` をその1行にする。判定できないときは `CANONICAL_TOOL_SETTING_UNKNOWN` を出す。
 			1行は `{ "permissions": { "allow": ["read_file(<カタログ>)", "write_file(<カタログ>)"] } }` で、`<カタログ>` は今の Claude Code・Codex の1行と同じカタログの絶対パス。
-			設定があるとは、`permissions.allow` に、カタログかその親を指す `read_file(...)` と `write_file(...)` が両方あり、`permissions.deny` と `permissions.ask` に、カタログかその親を指す `read_file(...)`・`write_file(...)` がないこと（deny と ask が allow より優先するため）。
+			設定があるとは、`permissions.allow` に、カタログかその親を指す `read_file(...)` と `write_file(...)` が両方あり、`permissions.deny` と `permissions.ask` に、カタログかその親を指す `read_file(...)`・`write_file(...)` がないこと（deny と ask が allow より優先するため）。deny か ask がカタログを覆うときは、allow の1行を足しても直らないので、判定できない（`CANONICAL_TOOL_SETTING_UNKNOWN`）とし、`next_step` で deny と ask の規則を確かめるよう示す。
 			"""
 		acceptance: [
 			"`ANTIGRAVITY_AGENT` がある環境で、linked worktree の `canonical status --json` が、設定のファイルがないとき `tools.antigravity.configured` が偽、`line` が上の1行、警告 `CANONICAL_TOOL_SETTING_MISSING`（`details.tool` が `antigravity`）、`tools.next_step` がその1行になる",
-			"設定のファイルの `permissions.allow` に、カタログかその親の `read_file(...)` と `write_file(...)` の両方があれば `configured` が真で、Antigravity の警告が出ない。片方だけ、`~`・相対のパス・`*` の規則だけ、`allowNonWorkspaceAccess` だけ、または `deny`・`ask` にカタログかその親の `read_file`・`write_file` があれば偽",
+			"設定のファイルの `permissions.allow` に、カタログかその親の `read_file(...)` と `write_file(...)` の両方があれば `configured` が真で、Antigravity の警告が出ない。片方だけ、`~`・相対のパス・`*` の規則だけ、`allowNonWorkspaceAccess` だけなら偽",
+			"`deny` か `ask` にカタログかその親の `read_file`・`write_file` があれば、`allow` に両方があっても `configured` が null で、Antigravity の中なら `CANONICAL_TOOL_SETTING_UNKNOWN` の `next_step` が deny と ask の規則を確かめるよう示す",
 			"設定のファイルが壊れている（JSON でない、形が違う、権限や文字の符号で読めない）か、ホームのディレクトリが分からないときは、`configured` が分からない（null）で、Antigravity の中なら `CANONICAL_TOOL_SETTING_UNKNOWN` が出る",
 			"main のチェックアウトでは `needed` が偽で、Antigravity の警告が出ない",
 			"設定のファイルを読むだけで、書き換えない（実行の前後でバイトが同じ）",
@@ -95,7 +96,7 @@ constraints: [
 
 decisions: [
 	"2026-11-20 タスク担当（統括の進め方の2、依頼書）：実物で設定が要ると分かったので、`tools` に `antigravity` の項目と検出と1行と警告を、今の `codex`・`claude_code` と同じ形で足す。",
-	"2026-11-20 タスク担当：勧める1行は、カタログに限る `permissions.allow` の `read_file`・`write_file` にする。`allowNonWorkspaceAccess` は、それだけでは書き込みが通らず、作業ディレクトリの外のすべてに及ぶので、判定にも案内にも使わない。",
+	"2026-11-20 タスク担当：勧める1行は、カタログに限る `permissions.allow` の `read_file`・`write_file` にする。`allowNonWorkspaceAccess` は、ほかの設定によって書き込みが通らないことがあり、作業ディレクトリの外のすべてに及ぶので、判定にも案内にも使わない。",
 	"2026-11-20 タスク担当：設定のファイルは `~/.gemini/antigravity-cli/settings.json` だけを読む。`ANTIGRAVITY_APP_DATA_DIR` は入力として効かなかったので使わない（Claude Code の `CLAUDE_CONFIG_DIR` に当たるものはない）。",
 	"2026-11-20 タスク担当：R-02 は、設定を足しても書けない動き方が見つからなかったので、配るスキルと AGENTS.md を変えない。`--mode plan` は全体の書き込みをしない計画のモードで、カタログに限った決まりは要らない。",
 	"2026-11-20 タスク担当：Antigravity の中では、`tools.next_step` を Antigravity の警告の1行にする（その中のエージェントに要る1行を先に示すため）。Antigravity の外の出力は変えない。",
