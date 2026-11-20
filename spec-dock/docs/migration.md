@@ -292,7 +292,7 @@ SpecDock 0.5.0 は、`spec-dock/workspace.json` の `schema_version` が 4 の�
 - `Unlinked` の worktree（#669）：`git worktree list` に出る worktree のうち、どの Scope にも紐づかないものが `Unlinked` で並びます。`spec-dock work start` をせずに作業している worktree に、すぐ気づけます。エージェントのいない worktree は薄く出て、2つ以上あれば `+N` に畳まれます（押すと一覧）。仕様の置き場の worktree、bare、prunable の worktree は出ません。
 - 1つの worktree は1つの項目で、そこにいるエージェントの印をすべて並べます（1行4つ、それより多いと項目の中で折り返します）。項目を押すと、ブランチ・パス・エージェントの詳細の欄が出ます（orca-web につながるときは『Orca で開く』も出ます。もう一度押すか Esc で閉じます）。エージェントの印を押すと、今までどおりそのエージェントのチャットが開きます。
 - 『これから』（#669）：『これから』では、指揮の線を引かなくなりました。代わりに、主のチェックアウトと、指揮している `Unlinked` の worktree に、子の数が付きます（title に内訳）。『これから』の行には、主のチェックアウトと指揮している `Unlinked` の worktree だけが出て、指揮していない worktree とエージェントのいない worktree は出ません（全体・いまで出ます）。全体・いまの線は今までどおりです。
-- 0.9.10 の注：0.9.10（#679）から、『これから』でも指揮の線が『いま』と同じ規則で出て、上の項目の子の数は出なくなりました（「0.9.10 への更新」）。
+- 0.9.10 の注：0.9.10（#679）から、『これから』でも指揮の線と `Unscoped` の行（並ぶ worktree を含む）が『いま』と同じ規則で出て、上の項目の子の数は出なくなりました（「0.9.10 への更新」）。
 - 今までの札「main のチェックアウト」は、ブランチ名と `Primary` の印に変わりました。
 - 構造の API（`/api/v1/r/<host>/<owner>/<name>/structure`）の `worktrees` に `items`（各 worktree の `path`・`branch`・`head`・`main`・`detached`・`locked`）が加わりました。`status` と `paths` は変わりません。画面の中の JSON なので契約ではありません。
 - エージェントの印と指揮の線を描くには、今までどおり orca-web の要約が要ります。orca-web に届かないときも、`Unscoped` の行と worktree の項目は出ます。
