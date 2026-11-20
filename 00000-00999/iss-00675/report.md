@@ -53,6 +53,7 @@ SpecDock 0.9.10 のリリースの変更を作った（`git diff a6000d8cd 44cad
   - `make lint`：exit 0。`uv run pytest`：exit 0（4444 passed / 7 skipped、56分19秒）。
   - closure：worktree の `.workbench/final-quality-gate/iss-00675-fqg-1/closure.md`（Git の外）。
   - 区切りのレビューは、計画どおりなし。記録だけのコミットはない（記録は Git の外）。
+- PR #680（https://github.com/chemitaro/spec-dock/pull/680）：head は 44cad5e3c（合格のコミット）。記録のコミットはない。CI は合格。observer の結果は exit 0、observable_ci PASS、merge_readiness READY、mergeStateStatus CLEAN（2026-11-20T08:24Z UTC）。マージは統括。
 
 ## 逸脱と判断
 
