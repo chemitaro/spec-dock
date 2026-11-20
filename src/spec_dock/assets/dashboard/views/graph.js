@@ -241,7 +241,7 @@ function drawCommand(model) {
   CV.removeLayers(w);
   V.cmdModel = model;
   V.cmd = { top: model.top, width: model.width };
-  const html = CV.layersHtml(model, V.ctx?.orca?.marks?.() ?? null);
+  const html = CV.layersHtml(model);
   const cmd = CV.element(html.cmd);
   const top = CV.element(html.top);
   const kids = Array.from(w.children);

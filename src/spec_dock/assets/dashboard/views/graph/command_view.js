@@ -58,7 +58,7 @@ export const inBand = (model, r) => !!model.band?.items.some((it) => r.x >= it.x
  * rings (command_motion.js), never one SVG as big as the world. A row with a lead has its text at the row's left
  * (iss-00617: "ほかの場所").
  */
-export function layersHtml(model, marks = null) {
+export function layersHtml(model) {
   const lines = model.links.map(bodyHtml).join("");
   const ends = model.links.map(endsHtml).join("") + model.ripples.filter((r) => !inBand(model, r)).map(rippleHtml).join("");
   let band = "";
@@ -66,7 +66,7 @@ export function layersHtml(model, marks = null) {
     const leads = (model.band.rows || [])
       .filter((r) => r.lead)
       .map((r) => `<span class="gx-band-lead" style="left:${r.left}px;top:${r.top}px"${r.leadTitle ? ` title="${esc(r.leadTitle)}"` : ""}>${esc(r.lead)}</span>`);
-    const items = model.band.items.map((it) => itemHtml(it, marks));
+    const items = model.band.items.map(itemHtml);
     // a band parent's ripples and the band children's rings over its items (the items are opaque and the band lies over
     // .gx-cmd-top)
     const rings = model.links.map(bandMarkHtml).join("") + model.ripples.filter((r) => inBand(model, r)).map(rippleHtml).join("");
@@ -86,7 +86,7 @@ const BADGES = { primary: UNSCOPED.primary, unlinked: UNSCOPED.unlinked };
  * One item of the band (iss-00668 D-07): its label is a button opening the worktree's panel, then its badge,
  * then its agents at the model's slots (wrapped lines too); "+N" is its label alone; an idle item is faint.
  */
-function itemHtml(it, marks) {
+function itemHtml(it) {
   const style = `left:${it.x}px;top:${it.y}px;width:${it.w}px;height:${it.h}px`;
   const cls = `gx-band-item${it.idle ? " is-idle" : ""}${it.kind === "fold" ? " is-fold" : ""}`;
   if (it.kind === "fold") {
