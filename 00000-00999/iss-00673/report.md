@@ -16,7 +16,8 @@ ID: "iss-00673"
 - round-2（同じレビュアー、固定 487276c1b）：合格。P2 1（deny・ask で偽のとき警告が原因を示さない）、P3 1（表の 6 と 16 の食い違い）。両方を直した（9ed97a284）。
 - round-3（同じレビュアー、固定 9ed97a284）：**合格**。P0〜P3 0。結果 `round-3.json`、検査 `round-3.check.json`（valid、status pass）。
 - 2人目（依頼書の指示、chatgpt-spec-review-strict、GPT-6 / Extra High、モデルと推論の選択の証拠 verified=yes、Oracle のセッション `required-strict-github-connector-verificati-1530`）：カタログ c3f468dac（round-1 の版）を GitHub の接続で読み、review_status pass、P0・P1 なし、P2 1（Claude Code の警告は Antigravity の中でも作業用のworktreeで出るので、案内の確かめ方『tools の status が ok』が Antigravity だけの利用者に合わない）。妥当として、案内の文書だけを直した（18cfbbd3e。仕様の .cue は変えていない）。答えは JSON が Markdown の escape（`\`、`&#x20;`）付きで返り、生の JSON の形ではなかったので、材料として扱った。round-2・3 の版は ChatGPT に再び見せていない（standard は2人目を要さない。方針どおり）。
-- 合格した文書の sha256：requirement.cue `bce03aa759d413bf390248f3d6591079a9172c733dc8704a06fd6d22e8d3dcd7`、design.cue `51ffd44324d7d744e894f53d1bb545297535c80316ac71c52ed0dbddffa8adb1`、plan.cue `ebbe6b3c7bd537f46351c23c95caf6d9afdc8ed89563c355e8634b50f3e49aab`（以後 plan.cue は手順の status だけを書き換える）。
+- 仕様の変更（2026-11-20、統括の決定：最終品質ゲート iss-00673-fqg-1 の2人目の P2 を今の PR で直す）：deny・ask の `*`・絶対でない規則で判定できないとし、S-03、T-07、T-08 を足した。round-4（同じレビュアー、固定 c90831c5a）：合格、P2 1（next_step が原因を示さない、直した）。round-5（固定 c90831c5a）：**合格**、P0〜P3 0（`round-5.json`、`round-5.check.json`）。今の合格の sha256：requirement.cue `1f18187952719fc59bebe3ae4392607a5abc4fa7fd5a065e282713be003943c1`、design.cue `5992654111a040bd9cbcba418ee232a2138f1b92ab5f8ea6f333c8009e0237a2`、plan.cue `5949103e899c747e12d689ddb7d5320b6d24d19cad86984884ad875059c0efd8`。前の合格の記録は下に残す。
+- （前の合格）合格した文書の sha256：requirement.cue `bce03aa759d413bf390248f3d6591079a9172c733dc8704a06fd6d22e8d3dcd7`、design.cue `51ffd44324d7d744e894f53d1bb545297535c80316ac71c52ed0dbddffa8adb1`、plan.cue `ebbe6b3c7bd537f46351c23c95caf6d9afdc8ed89563c355e8634b50f3e49aab`（以後 plan.cue は手順の status だけを書き換える）。
 
 ## 実物での確かめ
 
