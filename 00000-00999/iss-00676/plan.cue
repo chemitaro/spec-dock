@@ -5,10 +5,10 @@ package spec
 goal: "『これから』でも両方の画面で指揮の線・弧・行・帯を『いま』と同じ規則で出し、子の数の札をやめる"
 
 steps: {
-	"S-01": {title: "T-01・T-02 を先に書いて今の実装で落ちることを確かめ、D-02（allgraph/command.js の crossPlace）・D-03（unscoped.js・command.js・command_view.js・graph.css の子の数）を入れて通す。iss-00668 の『これから』の node のテストの期待をこの決定に合わせて直し、直したテストの名前を控える", realizes: ["R-01", "R-02", "R-03", "F-01", "F-02"], status: "todo", session: "impl"}
-	"S-02": {title: "T-03 を先に書いて落ちることを確かめ、D-01（graph.js の paintCommand）と allgraph.js の crossPlace・unscopedItems の呼び方を直して通す。iss-00668・iss-00617 の『これから』の画面のテストの期待を直し、直したテストの名前を控える", realizes: ["R-01", "R-02", "R-03", "R-04"], status: "todo", after: ["S-01"], session: "impl"}
-	"S-03": {title: "make lint と全体の uv run pytest を通す（static-inventory.json に載る資産の sha256 が変われば直す）。直したテストの一覧を report.md に書く", realizes: ["R-04"], status: "todo", after: ["S-02"], session: "impl"}
-	"S-04": {title: "D-05 の実機の確かめ（T-04）を report.md に残し、移行の案内の文を書く。写しで直しが要れば実装担当に返す", realizes: ["R-01", "R-02", "R-03", "R-04"], status: "todo", after: ["S-03"], session: "owner"}
+	"S-01": {title: "T-01・T-02 を先に書いて今の実装で落ちることを確かめ、D-02（allgraph/command.js の crossPlace）・D-03（unscoped.js・command.js・command_view.js・graph.css の子の数）を入れて通す。iss-00668 の『これから』の node のテストの期待をこの決定に合わせて直し、直したテストの名前を控える", realizes: ["R-01", "R-02", "R-03", "F-01", "F-02"], status: "done", session: "impl"}
+	"S-02": {title: "T-03 を先に書いて落ちることを確かめ、D-01（graph.js の paintCommand）と allgraph.js の crossPlace・unscopedItems の呼び方を直して通す。iss-00668・iss-00617 の『これから』の画面のテストの期待を直し、直したテストの名前を控える", realizes: ["R-01", "R-02", "R-03", "R-04"], status: "done", after: ["S-01"], session: "impl"}
+	"S-03": {title: "make lint と全体の uv run pytest を通す（static-inventory.json に載る資産の sha256 が変われば直す）。直したテストの一覧を report.md に書く", realizes: ["R-04"], status: "done", after: ["S-02"], session: "impl"}
+	"S-04": {title: "D-05 の実機の確かめ（T-04）を report.md に残し、移行の案内の文を書く。写しで直しが要れば実装担当に返す", realizes: ["R-01", "R-02", "R-03", "R-04"], status: "done", after: ["S-03"], session: "owner"}
 }
 
 tests: {

@@ -102,6 +102,42 @@ ID: "iss-00676"
 - 仕様からの逸脱はない。
 - 範囲の外：`src/spec_dock/assets/spec_dock/docs/migration.md` の 0.9.9 の節（294 行）に『これから』では線を引かない旨がある。0.9.10 の節の移行の案内は S-04（タスク担当）の範囲なので変えていない。
 
+## 実機の確かめ（S-04、タスク担当、HEAD 136ad1c8c）
+
+- 立て方：`uv build --wheel` で作った wheel（136ad1c8c）を、一時の venv に入れた。本人の PC の uv tool には入れていない。状態の置き場は写しを使い、ポート 47812 で `spec-dock dashboard serve` を立てた。orca-web は常駐の 8791 の要約を読んだ。常駐は Origin 47800 だけを許すので、ヘッドレスの Chrome の CDP の Fetch で中継した。常駐のダッシュボードと orca-web は、止めておらず、設定も変えていない。
+- 数（2026-11-20 12:4x、1440 × 明、同じ1回の読み込みで範囲を切り替えた）：
+
+| 画面 | 範囲 | links | arcs | boxOverlaps | edgeOverlaps | heads | motion（phases・ripples） | `.gx-band-count` | specdockEdgeAudit の違反 |
+|---|---|---|---|---|---|---|---|---|---|
+| `/graph` | これから（既定） | 9 | 3 | 0 | 0 | 0 | 72・5 | 0 | 0 |
+| `/graph` | いま | 9 | 3 | 0 | 0 | 0 | 72・5 | 0 | 0 |
+| `/graph` | 全体 | 9 | 3 | 0 | 0 | 0 | 72・5 | 0 | 0 |
+| `/r/github.com/chemitaro/spec-dock/` | いま（既定） | 4 | 1 | 0 | 0 | 0 | 36・2 | 0 | — |
+| `/r/github.com/chemitaro/spec-dock/` | これから | 4 | 1 | 0 | 0 | 0 | 36・2 | 0 | — |
+
+  - 直す前（0.9.9 と同じソース、診断の節）の `/graph` の『これから』は links 0・arcs 0 だった。
+  - 組の数は、生きた要約の変化（エージェントの増減）で、測った時刻ごとに 7〜9 の間で変わった。どの回でも、『これから』と『いま』は同じ値だった。
+  - 全部の回で、ブラウザーのエラーは0、横のスクロールはなし。
+  - この要約では、『これから』で隠れた Scope の worktree の子がなかった。そのため、『これから』と『いま』の本数が同じになった（祖先の枠に落ちる場合は、画面のテスト T-03 で確かめている）。
+- 写しの数（1440・390 × 明・暗、どれも『これから』）：
+  - `/graph`：links 8・arcs 2、heads 0、boxOverlaps 0、edgeOverlaps 0、エラー0。
+  - `/r/spec-dock/`：links 3・arcs 0、heads 0、エラー0。
+- 動きを減らす設定（`prefers-reduced-motion: reduce`、`/graph` の『これから』）：`.cl-ph` の `animation-name` が none になり、止まった点線で出る。設定がないときは `sd-cmd-phase` で動く。links は 8、arcs は 2。
+- 写し（この Scope の `artifacts/`）。`/graph` は、既定の『これから』のまま、線のある枠まで動かして写した：
+  - `20261120t035148z--graph-next-lines-1440-light.png`
+  - `20261120t035148z-01--graph-next-lines-1440-dark.png`
+  - `20261120t035149z--graph-next-lines-390-light.png`
+  - `20261120t035149z-01--graph-next-lines-390-dark.png`
+  - `20261120t035149z-02--repo-next-1440-light.png`
+  - `20261120t035149z-03--repo-next-1440-dark.png`
+  - `20261120t035150z--repo-next-390-light.png`
+  - `20261120t035150z-01--repo-next-390-dark.png`
+- 気づいたこと：`/graph` の『全体』では、motion の `still` が true になった回があった。これは図が大きいときの止め方（iss-00646 D-03）によるもので、この Issue の変更とは関わらない。
+
+## 移行の案内の文（0.9.10 の節）
+
+- 『これから』でも指揮の線が出ます（#676）。リポジトリの構造の図と『横断の構造』のどちらでも、『これから』の指揮の黄色い点線、同じ箱の親子の弧、動き、波紋、Unscoped の行は、『いま』と同じ規則で出ます。『これから』で隠れた Scope の worktree のエージェントの線は、いちばん近い見える祖先の枠に落ちます。『これから』だけにあった子の数の札はなくなり、『いま』と同じ見え方になります。そのため、既定が『これから』の『横断の構造』を開いたときにも、線が出ます。
+
 ## Outcome
 
 ## Verification
