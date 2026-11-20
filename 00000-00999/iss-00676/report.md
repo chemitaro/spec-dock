@@ -61,6 +61,47 @@ ID: "iss-00676"
 - 偽の DOM の heads は、CSS がないため 0 にならない（範囲ごとの枠の数で変わる）。T-03 では『これから』と『いま』が同じ値であることだけを見て、heads 0 は実機（S-04）で見る。
 - 検証：`uv run pytest tests/unit/presentation/ tests/unit/infra/ -k dashboard` 598 passed、657 deselected。`uv run ruff check tests/unit/presentation/`・`ruff format` 合格。
 
+- コミット `136ad1c8c`。
+
+### S-03（全体の検査）
+
+- `make lint`（HEAD 136ad1c8c）：合格（ruff check、ruff format check、mypy）。
+- `uv run pytest`（HEAD 136ad1c8c、全体）：4372 passed、7 skipped、終了コード 0（45分00秒）。基準より 17 件多い（足したテストの分）。
+- `src/spec_dock/assets/static-inventory.json`：`assets/dashboard/` の資産は載っていない（`dashboard`・`graph`・`unscoped` の語が0件）。sha256 の直しは要らず、変えていない。
+- S-03 はコードを変えていないので、コミットはない（report.md は Git で扱わない）。
+
+### 直したテストの一覧（iss-00668・iss-00617 のテストと、その理由）
+
+理由はどれも、この Issue の決定（『これから』でも線・弧・行・帯を『いま』と同じ規則で出し、子の数の札をやめる。Scope のないリポジトリの枠は iss-00617 R-03 の規則に戻す）。
+
+- `tests/unit/presentation/test_dashboard_allgraph_command.py`（iss-00617 T-01 を iss-00668 が改めたもの）
+  - `test_a_repository_with_nothing_shown_is_kept_for_its_coordinator`：『これから』で e の枠が残る理由を、行に数がある項目から、帯に組の親がいることへ戻した。組・居場所・線が出ること、数がないことを見る。
+  - `test_a_repository_with_nothing_shown_and_only_a_child_is_not_kept`：子だけのとき、子の端が『ほかの場所』の帯にあり、線が出ることを見る（iss-00617 R-03 のまま）。
+  - `test_the_parent_repository_of_a_kept_frame_keeps_its_childs_end`：数の期待を消し、線が出ることを見る。
+  - シナリオ `keep`・`childOnly`・`sameIds` の説明の文。node の道具 `tests/js/dashboard_allgraph_command.mjs` は、allgraph.js と同じく `crossPlace` に `range` を渡さない。
+- `tests/unit/presentation/test_dashboard_graph_unscoped.py`（iss-00668 T-02）
+  - `test_the_words_and_the_fold`：`UNSCOPED.count` がないこと、`childCount`・`countTitle`・`commanding` が書き出されていないことを見る。
+  - `test_primary_is_there_without_agents_summary_or_pairs`、`test_unlinked_worktrees_and_a_thin_idle_one`：項目に `count`・`countParts` の欄がないことを見る。
+  - `test_next_keeps_primary_and_the_commanding_unlinked_with_counts` → `test_next_has_the_items_and_the_places_of_all_and_now` に置き換えた。
+  - `test_all_and_now_show_every_unlinked_without_counts` → `test_every_range_shows_every_unlinked_without_counts`（next を足した）。
+  - `test_a_primary_without_children_has_no_count_in_next` → `test_next_keeps_the_unlinked_worktree_directing_nobody`。
+  - `test_child_count_counts_each_child_once`、`test_count_title`：関数がなくなったので消した。
+  - node の道具 `tests/js/dashboard_graph_unscoped.mjs`：どの範囲でも組を置く。`range` を渡しても結果が変わらないことを確かめるため、わざと渡したままにした。
+- `tests/unit/presentation/test_dashboard_graph_command.py`（iss-00668 T-03）
+  - `test_badges_and_counts_widen_an_item_and_a_fold_has_no_agents` → `test_badges_widen_an_item_a_count_does_not_and_a_fold_has_no_agents`：古い `count` の欄があっても、項目の幅に数が足されないことを見る。
+- `tests/unit/presentation/test_dashboard_unscoped_screen.py`（iss-00668 T-04）
+  - `test_the_row_css_uses_only_the_variables`：`.gx-band-count` の規則がないことを見る。
+  - `test_next_draws_no_line_and_counts_the_children` → `test_next_draws_the_row_and_the_lines_of_all`。
+  - `test_the_cross_next_counts_and_draws_no_line` → `test_the_cross_next_has_the_rows_and_the_lines_of_all`。
+- `tests/unit/presentation/test_dashboard_allgraph_command_screen.py`（iss-00617 T-05 を iss-00668 が改めたもの）
+  - `test_a_repository_with_nothing_in_next_is_kept_for_its_coordinator`：数の期待を消し、`e-coord>c-own` の線が出ることを見る。runs の既定の範囲の説明の文も直した。
+- 足したテスト：`test_dashboard_next_command_screen.py`（T-03、9件）、`test_dashboard_allgraph_command.py` の `real-*` シナリオの4つのテスト（T-01）。画面の道具 `tests/js/dashboard_graph_command_screen.mjs` は audit に heads を足した。
+
+### 逸脱と気づいたこと（実装）
+
+- 仕様からの逸脱はない。
+- 範囲の外：`src/spec_dock/assets/spec_dock/docs/migration.md` の 0.9.9 の節（294 行）に『これから』では線を引かない旨がある。0.9.10 の節の移行の案内は S-04（タスク担当）の範囲なので変えていない。
+
 ## Outcome
 
 ## Verification
