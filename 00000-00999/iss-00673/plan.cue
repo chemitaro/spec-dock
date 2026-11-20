@@ -8,7 +8,7 @@ steps: {
 	"S-01": {title: "canonical.md・reference_cli.md の Antigravity の案内（提供側と dogfood）と static-inventory.json の2行（タスク担当）", realizes: ["R-02"], status: "done", session: "owner"}
 	"S-02": {title: "検出（D-01）、domain の関数（D-02）、`tools.antigravity` と警告（D-03）と、そのテスト・案内の検査のテスト", realizes: ["R-01", "R-02", "F-01"], status: "done", after: ["S-01"], session: "impl"}
 	"S-03": {title: "deny・ask の `*`・絶対でない規則を判定できないとし（統括の決定）、T-07・T-08 のテストを足す", realizes: ["R-01", "F-01"], status: "done", after: ["S-02"], session: "impl"}
-	"S-04": {title: "deny・ask の空の対象（`read_file()`）と括弧のない形（`write_file`）も判定できないとし（統括の決定）、T-09 のテストを足す", realizes: ["R-01"], status: "todo", after: ["S-03"], session: "impl"}
+	"S-04": {title: "deny・ask の空の対象（`read_file()`）と括弧のない形（`write_file`）も判定できないとし（統括の決定）、T-09 のテストを足す", realizes: ["R-01"], status: "done", after: ["S-03"], session: "impl"}
 }
 
 tests: {
