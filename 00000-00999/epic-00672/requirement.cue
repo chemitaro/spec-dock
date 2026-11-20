@@ -79,6 +79,18 @@ requirements: {
 	}
 }
 
+requirements: "R-04": {
+	title: "両方を入れた版が出て、この PC に入る"
+	text: """
+		iss-00673 と iss-00674 を入れた SpecDock の版（0.9.10）を、今までのリリースと同じ形（版の番号、移行の案内の節、配る資産の一覧、前の版からの `installation update` の統合テスト）で出す。
+		統括がタグを付け、そのタグの wheel をこの PC に入れる。
+		"""
+	acceptance: [
+		"`spec-dock --version` が 0.9.10 を返し、移行の案内に 0.9.10 の節（Antigravity の案内と種類の名前）がある",
+		"0.9.9 の配布資産からの `installation update` の統合テストが通る",
+	]
+}
+
 failures: {
 	"F-01": {
 		title: "Antigravity の中か分からないときは、Antigravity の警告を出さない"
