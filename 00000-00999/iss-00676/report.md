@@ -102,6 +102,12 @@ ID: "iss-00676"
   - もとのテスト（0955a17bc のもの）は、そのコミットの実装で5件落ちる（`countTitle` がない、数の札がない）。直した後は6件が通る。
 - 足したテスト：`test_dashboard_next_command_screen.py`（T-03、9件）、`test_dashboard_allgraph_command.py` の `real-*` シナリオの4つのテスト（T-01）。画面の道具 `tests/js/dashboard_graph_command_screen.mjs` は audit に heads を足した。
 
+### origin/main（6de140261）の取り込みの後の直し（実装担当）
+
+- `3afb47f24`：`views/graph/command_view.js` の `layersHtml(model, marks)`・`itemHtml(it, marks)` から、使われなくなった `marks` を外した。`views/graph.js`・`views/allgraph.js` の呼び方も直した（振る舞いは変わらない）。
+- `a9cbf75f5`：`test_dashboard_agent_type_names.py` を直した（上の一覧）。
+- HEAD a9cbf75f5 で `make lint` 合格、`uv run pytest`（全体）4381 passed・7 skipped・終了コード 0（47分30秒）。
+
 ### 逸脱と気づいたこと（実装）
 
 - 仕様からの逸脱はない。
