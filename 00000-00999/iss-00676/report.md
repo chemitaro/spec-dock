@@ -95,6 +95,11 @@ ID: "iss-00676"
   - `test_the_cross_next_counts_and_draws_no_line` → `test_the_cross_next_has_the_rows_and_the_lines_of_all`。
 - `tests/unit/presentation/test_dashboard_allgraph_command_screen.py`（iss-00617 T-05 を iss-00668 が改めたもの）
   - `test_a_repository_with_nothing_in_next_is_kept_for_its_coordinator`：数の期待を消し、`e-coord>c-own` の線が出ることを見る。runs の既定の範囲の説明の文も直した。
+- `tests/unit/presentation/test_dashboard_agent_type_names.py`（iss-00674 T-02、origin/main 6de140261 の取り込みの後、マージのコミット 0955a17bc に対して直した）
+  - `test_count_title_names_each_part_from_the_component`：消した。`countTitle` がこの Issue の決定でなくなったため。`agentTypeLabel` そのものの確かめは `tests/unit/infra/test_dashboard_agents_logic_js.py`（iss-00674）に残っている。
+  - `test_the_graph_count_title_names_the_kind` → 消して、`test_the_graph_panels_name_the_kind` に『これから』（`named-next`・`plain-next`）を足した。『これから』での名前の表示の確かめが帯の数の札にしかなかったので、worktree の詳細の欄のエージェントの一覧とチャットの見出し・題で確かめる形にした。行に数がないことも見る。
+  - `test_the_cross_count_title_names_the_kind` → `test_the_cross_panels_name_the_kind`：横断の構造の『これから』で、帯に数がないこと、worktree の詳細の欄のエージェントの一覧（道具 `tests/js/dashboard_allgraph_command_screen.mjs` の panel に `agentTexts` を足した）とチャットの見出しが表示名になることを見る。
+  - もとのテスト（0955a17bc のもの）は、そのコミットの実装で5件落ちる（`countTitle` がない、数の札がない）。直した後は6件が通る。
 - 足したテスト：`test_dashboard_next_command_screen.py`（T-03、9件）、`test_dashboard_allgraph_command.py` の `real-*` シナリオの4つのテスト（T-01）。画面の道具 `tests/js/dashboard_graph_command_screen.mjs` は audit に heads を足した。
 
 ### 逸脱と気づいたこと（実装）
