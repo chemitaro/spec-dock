@@ -3,7 +3,8 @@
 `views/graph.js` and `views/allgraph.js` draw each repository's row of worktrees not shown as a Scope box with the fake
 DOM and the fake orca (`tests/js/dashboard_graph_command_screen.mjs`, `tests/js/dashboard_allgraph_command_screen.mjs`):
 the main checkout (Primary) with no pair and no summary, the Unlinked worktrees, the faint idle one and "+N", the
-worktree's panel, "next" with counts and no line. The CSS's own rules are read here. Every value is synthetic.
+worktree's panel, "next" with the row and the lines of "all" (iss-00676). The CSS's own rules are read here. Every value
+is synthetic.
 """
 
 from __future__ import annotations
@@ -73,7 +74,7 @@ RUNS: list[dict[str, Any]] = [
         ],
     },
     {"name": "u-one", "orca": {"summary": SUMMARY}, "doc": ONE_IDLE, "range": "all"},
-    # R-06: "next": the main checkout and the directing Unlinked worktree with counts; no line
+    # iss-00676 R-01, R-02: "next": the row and the lines of "all", no count
     {"name": "u-next", "orca": {"summary": SUMMARY}, "doc": DOC, "range": "next"},
     # the embedding has no "open in Orca"
     {
@@ -208,15 +209,21 @@ def test_the_same_input_draws_the_row_again_never(runs: dict[str, list[dict[str,
     assert (before["band"], before["cmd"]) == (after["band"], after["cmd"])
 
 
-def test_next_draws_no_line_and_counts_the_children(runs: dict[str, list[dict[str, Any]]]) -> None:
-    """T-04 / R-06, R-09: the main checkout always, the directing Unlinked worktree; the counts in English."""
-    shot = runs["u-next"][0]
-    assert _items(shot) == [("main", "primary", "1"), ("big", "unlinked", "1")]
-    assert shot["row"]["items"][0]["count"]["title"] == "1 agent in progress — claude #1: 1"
-    assert shot["row"]["items"][0]["count"]["aria"] == shot["row"]["items"][0]["count"]["title"]
-    assert shot["row"]["curves"] == 0 and shot["lines"] == {}
-    # all: no count
-    assert all(it["count"] is None for it in runs["u-all"][0]["row"]["items"])
+def test_next_draws_the_row_and_the_lines_of_all(runs: dict[str, list[dict[str, Any]]]) -> None:
+    """iss-00676 T-03 / R-01, R-02: the items, the fold and the lines of "all"; no count in any range."""
+    shot, every = runs["u-next"][0], runs["u-all"][0]
+    assert (
+        _items(shot)
+        == _items(every)
+        == [
+            ("main", "primary", None),
+            ("big", "unlinked", None),
+            ("topic-a", "unlinked", None),
+            ("+2", None, None),
+        ]
+    )
+    assert shot["lines"] == every["lines"] and set(shot["lines"]) == {"a-coord>a-1", "b-0>b-4"}
+    assert shot["row"]["curves"] == every["row"]["curves"]
 
 
 def test_the_embedding_has_no_open_button(runs: dict[str, list[dict[str, Any]]]) -> None:
@@ -316,11 +323,11 @@ def test_the_cross_rows_and_their_panels(cross: dict[str, Any]) -> None:
     assert not closed["panel"]["open"]
 
 
-def test_the_cross_next_counts_and_draws_no_line(cross: dict[str, Any]) -> None:
-    """T-04 / R-06, R-07."""
-    shot = cross["x-next"][0]
-    assert shot["lines"] == {}
-    assert _labels(shot) == [("main", "primary", "2"), ("main", "primary", None)]
+def test_the_cross_next_has_the_rows_and_the_lines_of_all(cross: dict[str, Any]) -> None:
+    """iss-00676 T-03 / R-01, R-02: no count; the Unlinked worktree and the folds as in "all"."""
+    shot, every = cross["x-next"][0], cross["x-all"][0]
+    assert _labels(shot) == _labels(every)
+    assert shot["lines"] == every["lines"] and set(shot["lines"]) == {"a-coord>x-1", "a-coord>c-own"}
 
 
 # --- the CSS ----------------------------------------------------------------------------------------------------

@@ -323,7 +323,7 @@ RUNS += [
 ]
 
 
-# iss-00668 R-06: "next" (the screen's default) draws no command line; the runs about the lines draw "all"
+# the runs about the lines draw "all" (iss-00668); "next" draws them by the same rule (iss-00676, its own tests)
 for _run_def in RUNS:
     _run_def.setdefault("range", "all")
 
@@ -457,16 +457,15 @@ def test_a_new_band_shape_keeps_the_top_most_frame_on_the_screen_after_a_move(ru
 
 
 def test_a_repository_with_nothing_in_next_is_kept_for_its_coordinator(runs: dict[str, Any]) -> None:
-    """iss-00617 R-03 by iss-00668 R-06, R-07: "next" keeps the frame whose row directs, with a count and no line."""
+    """iss-00617 R-03 (iss-00676 R-03): "next" keeps the frame whose band has a pair's parent, and draws its line."""
     before, kept, gone = runs["keep"]
     assert key("e") not in {s["key"] for s in before["sections"]}
     e = _sec(kept, "e")
     assert e["kind"] in {"quiet", "empty"} and e["body"] is None
     assert e["h"] == 40 + BAND_H + 16
     (item,) = [it for it in kept["bandItems"] if it["y"] == e["y"] + 40 + BAND_TOP]
-    assert (item["label"], item["badge"], item["count"]) == ("main", "primary", "1")
-    assert item["countTitle"] == "1 agent in progress — claude #1: 1"
-    assert kept["lines"] == {} and kept["layers"] == ["gx-cmd", "gx-cmd-top", "gx-band"]
+    assert (item["label"], item["badge"], item["count"], item["countTitle"]) == ("main", "primary", None, None)
+    assert kept["lines"] == {"e-coord>c-own": ""} and kept["layers"][-3:] == ["gx-cmd", "gx-cmd-top", "gx-band"]
     # the shown frames keep their rows (their main checkouts, Primary and idle) without a count
     assert {(it["label"], it["badge"], it["count"], it["idle"]) for it in before["bandItems"]} == {
         ("main", "primary", None, True)

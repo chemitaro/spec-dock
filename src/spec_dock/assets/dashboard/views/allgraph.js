@@ -259,9 +259,10 @@ function paintCommand() {
     paintBandMarks();
     return;
   }
-  // iss-00668 D-06: each frame's Unscoped row comes from git and the summary, with no pair too; "next" draws no line
+  // iss-00668 D-06: each frame's Unscoped row comes from git and the summary, with no pair too; every range draws its
+  // lines by one rule (iss-00676 D-02)
   const pairs = commandPairs(summary);
-  const placed = crossPlace(pairs, { repos, summary, visible: new Set(visible), visibleWith, orderOf: CV.orderOf(A.ctx.orca?.marks?.()), range });
+  const placed = crossPlace(pairs, { repos, summary, visible: new Set(visible), visibleWith, orderOf: CV.orderOf(A.ctx.orca?.marks?.()) });
   if (!placed.pairs.length && !placed.rows.size) {
     if (A.shape) {
       // F-01: no pair and no row: the frames as they are without a band
