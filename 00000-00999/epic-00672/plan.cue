@@ -37,7 +37,7 @@ slices: {
 		covers: ["R-04"]
 		text: """
 			リリース（0.9.10）：手本は 0.9.9 の iss-00670（PR #671）。`pyproject.toml`、`uv.lock`、`spec-dock-version`、`docs/migration.md` の節、`static-inventory.json`、利用側の写し、0.9.9 からの `installation update` の統合テスト。
-			iss-00673 と iss-00674 のマージの後に始める（依存 `iss-00675 → iss-00673`、`iss-00675 → iss-00674`、登録済み）。マージの後、統括がタグを付けて wheel を入れる。
+			iss-00673 と iss-00674 と、epic-00080 の iss-00676（横断の構造に指揮の線が出ない不具合の直し、本人の指摘 2026-11-20）のマージの後に始める（依存 `iss-00675 → iss-00673`、`iss-00675 → iss-00674`、`iss-00675 → iss-00676`、登録済み。iss-00676 は別の Epic なので `after` に書かない）。マージの後、統括がタグを付けて wheel を入れる。
 			"""
 		after: ["iss-00673", "iss-00674"]
 		session: "owner"
