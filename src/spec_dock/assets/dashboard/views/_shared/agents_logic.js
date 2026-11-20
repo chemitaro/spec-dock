@@ -85,12 +85,31 @@ export function stripForm(agents, selected, gone) {
   return agents.length === 1 && !gone && selected != null && selected.id === agents[0].id ? "label" : "switch";
 }
 
-// The frame's address and title (R-03). The detail is used as given: the id is never encoded again.
-export function agentFrame(origin, agent, theme) {
+// The name of an agent's kind (iss-00674 D-01): the label orca-web's marks component gives the kind (its AGENT_ICONS
+// under iconKey, never "other" or "none"), else the kind as given, else the fallback when there is no kind. The table
+// stays orca-web's; a missing, old or broken component only means the raw text. The caller escapes the result.
+export function agentTypeLabel(marks, agentType, fallback) {
+  if (!filled(agentType)) return fallback;
+  if (!marks || typeof marks !== "object") return agentType;
+  try {
+    const icons = marks.AGENT_ICONS;
+    if (typeof marks.iconKey !== "function" || !icons || typeof icons !== "object") return agentType;
+    const key = marks.iconKey(agentType);
+    if (typeof key !== "string" || key === "other" || key === "none" || !Object.prototype.hasOwnProperty.call(icons, key)) return agentType;
+    const label = icons[key]?.label;
+    return filled(label) ? label : agentType;
+  } catch {
+    return agentType;
+  }
+}
+
+// The frame's address and title (R-03). The detail is used as given: the id is never encoded again. The title names
+// the kind from orca-web's marks component when one is given (iss-00674).
+export function agentFrame(origin, agent, theme, marks = null) {
   if (typeof origin !== "string" || !agent || (theme !== "light" && theme !== "dark")) return null;
   return {
     src: origin + agent.detail + "&theme=" + theme,
-    title: "エージェント：" + (agent.agentType ?? "種類不明") + "・" + (agent.branch ?? "ブランチ不明"),
+    title: "エージェント：" + agentTypeLabel(marks, agent.agentType, "種類不明") + "・" + (agent.branch ?? "ブランチ不明"),
   };
 }
 

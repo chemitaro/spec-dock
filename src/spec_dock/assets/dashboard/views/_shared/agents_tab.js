@@ -2,7 +2,7 @@
 // The choice itself is agents_logic.js; this module gathers its inputs from an env, draws the tab's contents as a
 // string that depends only on the Scope, the chosen agent, the theme and the reason (so a redraw leaves the frame
 // alone), and paints the strip into its slot afterwards. It never calls orca-web's write endpoints.
-import { AGENT_SANDBOX, agentFrame, agentsVisibility, createAgentMemory, forgetGone, memoryFor, noteDrift, noteGone, noteShown, pickAgent, scopeAgents, stripForm } from "./agents_logic.js";
+import { AGENT_SANDBOX, agentFrame, agentTypeLabel, agentsVisibility, createAgentMemory, forgetGone, memoryFor, noteDrift, noteGone, noteShown, pickAgent, scopeAgents, stripForm } from "./agents_logic.js";
 import { withoutEmbed } from "./logic.js";
 import { esc, icon } from "./parts.js";
 import { frameBar } from "./scope_tabs.js";
@@ -113,7 +113,7 @@ export function agentsTab(env) {
       `<a data-agent-pick="${esc(selected.id)}" ${env.paramLink("agent", selected.id)}>選んだエージェントに戻す</a>`,
     ]);
   } else if (selected) {
-    const frame = agentFrame(ctx.orca?.origin, selected, currentTheme());
+    const frame = agentFrame(ctx.orca?.origin, selected, currentTheme(), ctx.orca?.marks?.() ?? null);
     if (frame) noteShown(mem, selected.id);
     main = frame ? `<iframe class="sd-agent" src="${esc(frame.src)}" sandbox="${AGENT_SANDBOX}" referrerpolicy="no-referrer" title="${esc(frame.title)}"></iframe>` : "";
   } else if (pick.gone) {
@@ -126,8 +126,9 @@ export function agentsTab(env) {
 
 function stripHtml(env, state, pick) {
   const form = stripForm(state.agents, pick.selected, pick.gone);
+  const marks = env.ctx.orca?.marks?.() ?? null;
   const inner = (agent) =>
-    `<span class="sd-agentpick__mark" data-orca-agent="${esc(agent.id)}"></span><span>${esc(agent.agentType ?? "種類不明")}</span><span class="sd-mono">${esc(agent.branch ?? "ブランチ不明")}</span>`;
+    `<span class="sd-agentpick__mark" data-orca-agent="${esc(agent.id)}"></span><span>${esc(agentTypeLabel(marks, agent.agentType, "種類不明"))}</span><span class="sd-mono">${esc(agent.branch ?? "ブランチ不明")}</span>`;
   let html =
     form === "label"
       ? `<span class="sd-agentpick" aria-current="true">${inner(state.agents[0])}</span>`

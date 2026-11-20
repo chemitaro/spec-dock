@@ -1325,3 +1325,33 @@ def test_the_panel_foot_links_mark_the_map_choice_gone_on_another_tab(
     assert out["summary"] == [f"{base}?agent=a&amp;tab=summary"] * 2
     assert out["gone"] == [f"{base}?agent=gone%3Aa&amp;tab=summary"] * 2
     assert out["back"] == [f"{base}?agent=gone%3Aa&amp;tab=summary"] * 2
+
+
+@node
+def test_the_strip_and_the_frame_name_the_kind_from_the_component(tmp_path: Path) -> None:  # iss-00674 T-02
+    out = _run(
+        """
+        reset();
+        const draw = (params) => { const env = panel(params); const html = at.agentsTab(env); const root = fakeRoot(html); at.paintAgentList(root, env); return {html, strip: root.strip.innerHTML}; };
+        const shape = {viewBox: "0 0 16 16", paths: []};
+        const names = {
+          buildMarks: () => [], renderAgentMarks: () => {},
+          AGENT_ICONS: {claude: {label: "Claude", ...shape}, antigravity: {label: "Antigravity", ...shape}, other: {label: "ほかの種類", ...shape}},
+          iconKey: (t) => (t === "claude" || t === "antigravity" ? t : t ? "other" : "none"),
+        };
+        world.trees[sid] = [tree("w1", "one", [raw("a", {agentType: "antigravity"}), raw("b"), raw("c", {agentType: "cursor"}), raw("d", {agentType: ""}), raw("e", {agentType: 5})])];
+        world.marks = names; out.named = draw(new Map([["agent", "a"]]));
+        world.marks = null; out.plain = draw(new Map([["agent", "a"]]));
+        world.marks = {buildMarks: () => [], renderAgentMarks: () => {}, AGENT_ICONS: names.AGENT_ICONS, iconKey: () => { throw new Error("broken"); }};
+        out.broken = draw(new Map([["agent", "a"]]));
+        world.marks = null;
+        world.trees[sid] = [tree("w1", "one", [raw("a")])];
+        """,
+        tmp_path,
+    )
+    kinds = lambda html: re.findall(r'<span class="sd-agentpick__mark"[^>]*></span><span>([^<]*)</span>', html)  # noqa: E731
+    assert kinds(out["named"]["strip"]) == ["Antigravity", "Claude", "cursor", "種類不明", "種類不明"]
+    assert 'title="エージェント：Antigravity・one"' in out["named"]["html"]
+    for key in ("plain", "broken"):
+        assert kinds(out[key]["strip"]) == ["antigravity", "claude", "cursor", "種類不明", "種類不明"], key
+        assert 'title="エージェント：antigravity・one"' in out[key]["html"], key
