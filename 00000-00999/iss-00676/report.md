@@ -156,8 +156,22 @@ ID: "iss-00676"
 
 - 『これから』でも指揮の線が出ます（#676）。リポジトリの構造の図と『横断の構造』のどちらでも、『これから』の指揮の黄色い点線、同じ箱の親子の弧、動き、波紋、Unscoped の行は、『いま』と同じ規則で出ます。『これから』で隠れた Scope の worktree のエージェントの線は、いちばん近い見える祖先の枠に落ちます。『これから』だけにあった子の数の札はなくなり、『いま』と同じ見え方になります。そのため、既定が『これから』の『横断の構造』を開いたときにも、線が出ます。
 
+## 最終品質ゲート
+
+- キャンペーン：iss-00676-fqg3。合格したコミットは `5fe0059e060c80e15233c21fbc92c501c88a7c71`、開始は `0eee53b94`（origin/main）。
+- レビューの担当は合格した（quality-gate-reviewer opus / medium、P0〜P3 はすべて 0）。2人目の意見（ChatGPT の chatgpt-code-review-strict、GPT-6 / Extra High）も合格した（指摘は 0）。テストの担当も合格した（`make lint` 0、`uv run pytest` 4440 passed・7 skipped）。
+- closure.md は、worktree の `.workbench/final-quality-gate/iss-00676-fqg3/closure.md`（Git で扱わない場所）にある。
+- 前の2つのキャンペーン（fqg1：136ad1c8c、fqg2：a9cbf75f5）は、origin/main の取り込み（#678、#677）で候補が古くなったので、合否に使わなかった。この2つでも、レビューの担当と ChatGPT はどちらも合格していた。
+
 ## Outcome
+
+- `/graph`（既定は『これから』）で、指揮の線と弧が出るようになった。どの範囲でも、線・弧・Unscoped の行・帯は1つの規則で決まる。子の数の札はなくなった。
 
 ## Verification
 
+- node と画面のテストは、直す前の実装で落ちることを確かめた（T-01〜T-03）。全体の pytest と lint も通った。実機の確かめは、上の『実機の確かめ』の節にある。
+
 ## Residual Risks / Follow-ups
+
+- 『これから』で隠れた Scope の子の線が祖先の枠に集まる見え方を、実機の写しで見られていない（今の要約に、その場面がなかった）。画面のテスト T-03 では確かめている。
+- 移行の案内（`src/spec_dock/assets/spec_dock/docs/migration.md` の 0.9.10 の節）には、この Issue の範囲の外なので、まだ書いていない。上の文を、0.9.10 のリリースの Issue で使う。
