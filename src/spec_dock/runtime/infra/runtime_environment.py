@@ -61,6 +61,10 @@ class RuntimeEnvironment:
         return "CLAUDECODE" in self.environ
 
     @property
+    def antigravity(self) -> bool:
+        return "ANTIGRAVITY_AGENT" in self.environ
+
+    @property
     def home(self) -> Path | None:
         home = self.environ.get("HOME", "")
         return Path(home) if home and Path(home).is_absolute() else None
