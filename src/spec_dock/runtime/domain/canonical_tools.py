@@ -16,7 +16,7 @@ CODEX_SECTION: Final = "[sandbox_workspace_write]"
 CLAUDE_USER_SETTINGS_FILE: Final = "~/.claude/settings.json"
 CLAUDE_CONFIG_DIR: Final = "CLAUDE_CONFIG_DIR"
 ANTIGRAVITY_USER_SETTINGS_FILE: Final = "~/.gemini/antigravity-cli/settings.json"
-_ANTIGRAVITY_FILE_RULE: Final = re.compile(r"(read_file|write_file)\((.+)\)")
+_ANTIGRAVITY_FILE_RULE: Final = re.compile(r"(read_file|write_file)(?:\((.*)\))?")
 
 
 def claude_user_settings(environ: Mapping[str, str], home: Path | None) -> tuple[Path | None, str]:
@@ -134,7 +134,7 @@ def _antigravity_covered_actions(
         if match is None:
             continue
         action, target = match.groups()
-        if not Path(target).is_absolute() or "*" in target:
+        if not target or not Path(target).is_absolute() or "*" in target:
             if reject_ambiguous_targets:
                 return None
             continue

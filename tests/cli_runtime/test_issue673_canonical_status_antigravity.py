@@ -121,6 +121,9 @@ def test_allow_rules_cover_the_catalog_without_rewriting_settings(
         ("ask", "write_file(/some/*)"),
         ("deny", "read_file(~/x)"),
         ("ask", "write_file(relative/path)"),
+        ("deny", "read_file()"),
+        ("ask", "write_file"),
+        ("deny", "read_file(relative/path)"),
     ],
 )
 def test_covering_or_ambiguous_deny_or_ask_requires_checking_the_rules(
@@ -146,7 +149,7 @@ def test_covering_or_ambiguous_deny_or_ask_requires_checking_the_rules(
     step = (
         f"Check that {SETTINGS_FILE} allows read_file({catalog}) and write_file({catalog}) in permissions.allow, "
         "and that no permissions.deny or permissions.ask rule covers the catalog "
-        "or names a read_file or write_file target with * or a path that is not absolute."
+        "or names a read_file or write_file rule with an empty or missing target, *, or a path that is not absolute."
     )
     assert tools["next_step"] == step
     assert result["warnings"][-1] == {
@@ -156,7 +159,10 @@ def test_covering_or_ambiguous_deny_or_ask_requires_checking_the_rules(
     }
 
 
-@pytest.mark.parametrize("config", ["read-only", "unverified-rules", "wildcard-only", "broad-setting", "invalid-path"])
+@pytest.mark.parametrize(
+    "config",
+    ["read-only", "unverified-rules", "wildcard-only", "empty-or-missing-target", "broad-setting", "invalid-path"],
+)
 def test_settings_without_both_supported_allow_rules_are_missing(
     capsys: pytest.CaptureFixture[str],
     linked_clone: tuple[Path, Path],
@@ -170,6 +176,7 @@ def test_settings_without_both_supported_allow_rules_are_missing(
         "read-only": {"permissions": {"allow": [f"read_file({catalog})"]}},
         "unverified-rules": {"permissions": {"allow": ["read_file(~/)", "read_file(spec-dock)", "write_file(/*)"]}},
         "wildcard-only": {"permissions": {"allow": ["read_file(*)", "write_file(*)"]}},
+        "empty-or-missing-target": {"permissions": {"allow": ["read_file()", "write_file"]}},
         "broad-setting": {"allowNonWorkspaceAccess": True},
         "invalid-path": {"permissions": {"allow": [f"read_file({catalog})", "write_file(/\ud800)"]}},
     }

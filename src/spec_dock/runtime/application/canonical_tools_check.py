@@ -190,7 +190,7 @@ def _antigravity_findings(
         step = (
             f"Check that {file} allows read_file({layout.catalog}) and write_file({layout.catalog}) "
             "in permissions.allow, and that no permissions.deny or permissions.ask rule covers the catalog "
-            "or names a read_file or write_file target with * or a path that is not absolute."
+            "or names a read_file or write_file rule with an empty or missing target, *, or a path that is not absolute."
         )
         return item, Diagnostic(
             CANONICAL_TOOL_SETTING_UNKNOWN,
