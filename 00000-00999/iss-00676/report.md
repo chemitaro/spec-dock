@@ -40,6 +40,20 @@ ID: "iss-00676"
 - P2（F-02 の番号）：この Issue の F-02（F-05 の組み直しの上限を『これから』でも守る）は、『これから』での画面のテストで確かめる。同じ入力のとき描き直さないこと、組み直しが2回までであることを見る。iss-00617 の F-02（unknown のときの見送り）は今のまま確かめる。
 - P3（R-04 の『合う』）：`/graph` は全部のリポジトリの組を描く。そのため `/graph` の『いま』の links は、各 `/r/<repo>/` の組を重なりを除いて合わせた数と比べる。実機では、`/graph` の『これから』の links が 0 より多いことと、『いま』と『これから』の差が隠れた Scope の分で説明できることを確かめる。
 
+## 実装の記録（実装担当、claude-opus-5-5 / medium）
+
+### 基準（開始のコミット 83b8ee95f）
+
+- `make lint`：合格（ruff check、ruff format check、mypy）。この worktree で実行。
+- `uv run pytest`：開始のコミットの別の複製（スクラッチの `base`、HEAD 83b8ee95f、きれい）で実行中。結果は S-03 の節に書く。
+
+### S-01（横断の居場所と行の項目）
+
+- 先に書いたテスト（T-01・T-02）が、今の実装で落ちることを確かめた：`test_dashboard_allgraph_command.py` 10件、`test_dashboard_graph_unscoped.py` 8件、`test_dashboard_graph_command.py` 1件。落ちた理由は、『これから』で pairs が空、行に子の数がある、指揮していない Unlinked がない、項目の幅に数の足しがある、の4つ（意図どおり）。
+- 実装：D-02（`views/allgraph/command.js` の `crossPlace` から `range`・`next` の分岐・`early`・`commanding` を取り除いた）、D-03（`views/graph/unscoped.js` の `range`・`count`・`countParts`・`childCount`・`countTitle`・`commanding`・`UNSCOPED.count`、`views/graph/command.js` の `countWidth`、`views/graph/command_view.js` の `.gx-band-count` の札、`views/graph.css` の `.gx-band-count` の規則を消した）。
+- 検証：`uv run pytest tests/unit/presentation/test_dashboard_allgraph_command.py tests/unit/presentation/test_dashboard_graph_unscoped.py tests/unit/presentation/test_dashboard_graph_command.py` 95 passed。`uv run ruff check tests/unit/presentation/`・`ruff format --check` 合格。
+- 画面のテスト（`views/graph.js`・`views/allgraph.js` を通すもの）の『これから』の期待は S-02 で直す。S-01 のコミットの時点では、それらの一部が落ちる（S-02 で通す）。
+
 ## Outcome
 
 ## Verification
