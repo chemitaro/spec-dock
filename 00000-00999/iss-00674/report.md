@@ -60,4 +60,9 @@ ID: "iss-00674"
 
 ## Verification
 
+- PR：https://github.com/chemitaro/spec-dock/pull/678（head `dfcec8db5` が合格のコミット）。CI（観測、one-shot）：observable_ci PASS、merge_readiness READY（provider-tests、Provider distribution parity の ubuntu・macos、check、route、spec-dock-check の全部が pass）。最初の `--watch` は、変化のない時間の上限（600秒）で exit 4 で止まり、その後の1回の観測で PASS だった。
+
 ## Residual Risks / Follow-ups
+
+- 実データでは、エージェントのタブの選びと、未対応の行の数の札は見られなかった（テストで確かめた）。両方を入れた版の確かめは統括が行う。
+- 移行の案内の文（次の版の migration.md の節に）：「ダッシュボードは、エージェントの種類を orca-web の部品の名前（Claude、Codex、Antigravity、Gemini など）で出すようになりました。orca-web の部品が知らない種類は、今までどおり種類の文字列で出ます。Antigravity と Gemini の名前を出すには、iss-00066 を入れた orca-web（main `4ad7471` 以降）が要ります。利用者がすることはありません。」
