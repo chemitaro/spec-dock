@@ -30,13 +30,16 @@ tests: {
 			エージェントのタブの選びの文字（`test_dashboard_agents_tab_js.py` の `world.marks`）、
 			`countTitle` の部分の種類（`tests/js/dashboard_graph_unscoped.mjs` か直接の node のテスト）、
 			指揮の帯のエージェントの詳細の欄の見出しと worktree の詳細の欄の一覧（`command_view.js` を今のテストの偽の DOM で読む所。実装担当が今のテストから選ぶ）、
-			`layersHtml(model, marks)` の数の札の title。部品を渡さない今のテストは変えずに通ること。
+			`layersHtml(model, marks)` の数の札の title。
+			さらに、構造の図（`views/graph.js`）と全体の図（`views/allgraph.js`）の画面のテスト（`tests/js/dashboard_graph_command_screen.mjs`・`dashboard_allgraph_command_screen.mjs` などの、偽の orca を使う今のテスト）で、
+			偽の部品に `AGENT_ICONS`（`antigravity` あり）と `iconKey` を持たせたとき、画面が描いた未対応の行の数の札の title に『Antigravity』が出ること（`drawCommand` が部品を渡すことの確かめ。spec-review round-1 の P2 の2）。
+			部品を渡さない今のテストは変えずに通ること。
 			"""
 	}
 	"T-03": {
 		title: "実データでの確かめ（S-04）"
 		verifies: ["R-01"]
-		text: "常駐の orca-web が iss-00066 を入れた版で立て直された後、ダッシュボードの5か所の見える所（タブの選び、指揮の帯の詳細の欄など）で Antigravity のエージェントが『Antigravity』と出ることを、版（spec-dock のコミット、orca-web のコミット）つきで report.md に残す。"
+		text: "常駐の orca-web が iss-00066 を入れた版で立て直された後、ダッシュボードの5か所の見える所（タブの選び、指揮の帯の詳細の欄、未対応の行の数の札の title が実データに出ていればそれも）で Antigravity のエージェントが『Antigravity』と出ることを、版（spec-dock のコミット、orca-web のコミット）つきで report.md に残す。"
 	}
 }
 

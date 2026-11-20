@@ -74,12 +74,12 @@ failures: {
 constraints: [
 	"名前の正本は orca-web の `AGENT_ICONS`（`web/embed/agent-marks-icons.js`）の1か所。SpecDock は部品の書き出しを読むだけで、表を写さない（epic-00672 の constraints）",
 	"名前の関数は純粋（import なし、DOM・window・fetch を使わない）。純粋な部品（`agents_logic.js`、`unscoped.js` など）には、呼ぶ側から部品を渡す",
-	"今の関数の呼び方を壊さない：部品の引数は省けて、省けば今の表示になる",
+	"今の関数の呼び方を壊さない：部品の引数は省ける。省けば、`agentType` が空でない文字列のときは今の表示、そうでないときは各所の既定の文字（R-02）",
 	"環境に固有の名前で規則を分けない。公開の文書とテストに、この PC の実際のパスやセッションの id を書かない",
 ]
 
 decisions: [
 	"2026-11-20 統括（依頼書）：名前の正本は orca-web の `AGENT_ICONS`。`views/_shared/` に純粋な関数を1つ（例 `agentTypeLabel(marks, agentType, fallback)`）置き、5か所がそれを通す。知らない種類・部品なし・表なしは今の文字。",
 	"2026-11-20 統括（依頼書）：作るのは orca-web の iss-00066 を待たずに始め、node のテストは合成の部品で確かめる。実データの確かめは統括の知らせの後。",
-	"2026-11-20 タスク担当：『`agentType` がない』は、null・undefined・空の文字列・文字列でない値とする。今の5か所のうち、`agents_tab.js`・`agents_logic.js` は `scopeAgents` の `text()` で空を null にした値を受けるので、表示は変わらない。",
+	"2026-11-20 タスク担当：『`agentType` がない』は、null・undefined・空の文字列・文字列でない値とする。今の `agents_tab.js` の選びと `agentFrame` の title は `??` だけで既定に倒すので、空の文字列は空、数などはその値のまま出ている（`scopeAgents` の `text()` は空の文字列を残し、`renderAgentPanel` は値をそのまま `agentFrame` に渡す）。これらが既定の文字（『種類不明』）に変わるのは、5か所をそろえる意図した小さな変化とする（spec-review round-1 の P2 の1）。",
 ]

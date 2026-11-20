@@ -50,7 +50,7 @@ design: {
 }
 
 compatibility: """
-	新しい引数はすべて省けて、省けば今の表示。今の orca-web（表に `claude`・`codex` だけ）では Claude・Codex の名前が『Claude』『Codex』になり、ほかは今どおり生の文字列。
+	新しい引数はすべて省けて、省けば、`agentType` が空でない文字列のときは今の表示（空の文字列や文字列でない値は既定の文字に変わる。requirement の decisions）。今の orca-web（表に `claude`・`codex` だけ）では Claude・Codex の名前が『Claude』『Codex』になり、ほかは今どおり生の文字列。
 	部品の書き出しを読まない古い SpecDock と、新しい orca-web の組み合わせは、今どおり生の文字列。
 	"""
 
