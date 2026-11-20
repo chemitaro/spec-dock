@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import re
 from typing import TYPE_CHECKING, Final
 
 if TYPE_CHECKING:
@@ -14,6 +15,8 @@ CODEX_CONFIG_FILE: Final = "~/.codex/config.toml"
 CODEX_SECTION: Final = "[sandbox_workspace_write]"
 CLAUDE_USER_SETTINGS_FILE: Final = "~/.claude/settings.json"
 CLAUDE_CONFIG_DIR: Final = "CLAUDE_CONFIG_DIR"
+ANTIGRAVITY_USER_SETTINGS_FILE: Final = "~/.gemini/antigravity-cli/settings.json"
+_ANTIGRAVITY_FILE_RULE: Final = re.compile(r"(read_file|write_file)(?:\((.*)\))?")
 
 
 def claude_user_settings(environ: Mapping[str, str], home: Path | None) -> tuple[Path | None, str]:
@@ -87,3 +90,60 @@ def _entry_path(entry: str, source: Path, home: Path | None) -> Path | None:
     else:
         text = str(source.parent.parent / entry)
     return Path(os.path.normpath(text))
+
+
+def antigravity_user_settings(home: Path | None) -> Path | None:
+    return home / ".gemini/antigravity-cli/settings.json" if home is not None else None
+
+
+def antigravity_setting_line(catalog: Path) -> str:
+    read = json.dumps(f"read_file({catalog})", ensure_ascii=False)
+    write = json.dumps(f"write_file({catalog})", ensure_ascii=False)
+    return f'{{ "permissions": {{ "allow": [{read}, {write}] }} }}'
+
+
+def antigravity_allows(
+    payload: object, catalog: Path, *, resolve: Callable[[Path], Path] = lambda path: path
+) -> bool | None:
+    """Judge whether user settings allow reading and writing the real catalog path."""
+    if not isinstance(payload, dict):
+        return None
+    permissions = payload.get("permissions", {})
+    if not isinstance(permissions, dict):
+        return None
+    actions: dict[str, set[str]] = {}
+    for policy in ("deny", "ask", "allow"):
+        rules = permissions.get(policy, [])
+        if not isinstance(rules, list) or not all(isinstance(rule, str) for rule in rules):
+            return None
+        covered = _antigravity_covered_actions(rules, catalog, resolve, reject_ambiguous_targets=policy != "allow")
+        if covered is None:
+            return None
+        actions[policy] = covered
+    if actions["deny"] or actions["ask"]:
+        return None
+    return actions["allow"] == {"read_file", "write_file"}
+
+
+def _antigravity_covered_actions(
+    rules: list[str], catalog: Path, resolve: Callable[[Path], Path], *, reject_ambiguous_targets: bool
+) -> set[str] | None:
+    actions: set[str] = set()
+    for rule in rules:
+        match = _ANTIGRAVITY_FILE_RULE.fullmatch(rule)
+        if match is None:
+            continue
+        action, target = match.groups()
+        if not target or not Path(target).is_absolute() or "*" in target:
+            if reject_ambiguous_targets:
+                return None
+            continue
+        if "\0" in target:
+            continue
+        try:
+            path = resolve(Path(os.path.normpath(target)))
+        except UnicodeEncodeError:
+            continue  # JSON can contain escapes that do not represent a filesystem path.
+        if catalog == path or path in catalog.parents:
+            actions.add(action)
+    return actions

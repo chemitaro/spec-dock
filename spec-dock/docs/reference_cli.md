@@ -64,7 +64,7 @@ SpecDock 0.5.0 は宣言の版4（canonical モード）だけを扱います（
 | C42 | `completion` | `{bash,zsh,fish}` | 補完をstdoutへ返し、shell設定を変更しません。 | 出力のみ |
 | C43 | `canonical check` | `[--commit REV]` | 指定commit（既定HEAD）のtreeに仕様のpath・`.meta.json`がなく、版4の宣言・static資産・ignore規則が揃うかをCI向けに検査します。問題はpathと次の1手付きでexit7です。workflow見本は `docs/ci/spec-dock-check.yml` です。 | 読取りのみ |
 | C44 | `canonical link` | `[--no-schedule]` | このcloneのカタログ（mainの`spec-dock/.canonical`）を探すか作ってlockし、除外の3行を足し、mainとこのチェックアウトの`spec-dock/initiatives`をカタログへのリンクにし、定期の同期に登録します（登録簿、定期の実行、基準）。`--no-schedule` は登録せず基準だけを記録します。何度実行しても同じ結果です。 | カタログのworktree、`info/exclude`、リンク、状態の置き場、定期の実行 |
-| C45 | `canonical status` | 共通optionのみ | カタログ、リンク、除外、読み書きの可否、ツールの設定の1行、定期の同期、未保存と保留、形式、git、構造のスナップショットを示し、問題ごとに次の1手を示します。GitHubに問い合わせません。 | 読取りのみ |
+| C45 | `canonical status` | 共通optionのみ | カタログ、リンク、除外、読み書きの可否、ツールの設定の1行（Codex、Claude Code、Antigravity）、定期の同期、未保存と保留、形式、git、構造のスナップショットを示し、問題ごとに次の1手を示します。GitHubに問い合わせません。 | 読取りのみ |
 | C46 | `canonical sync` | `[--registered] [--state-root PATH] [--loop [--detach]]` | カタログの保存、取り込み、pushを1回行います（強制pushしません）。`--registered` は登録簿のすべてのカタログを処理し、`--loop` はsystemdのない環境の常駐のプロセスとして60秒ごとに動きます。日常は定期の実行が動かします。 | カタログのcommit、push、状態の置き場 |
 | C47 | `canonical accept` | `[PATH...] [--deletions]` | 保留した変更（秘密情報らしいもの、大きすぎるファイル、大量の削除）を、次の同期で保存してよいと記録します。中身が変われば効きません。 | `.runtime/accepted.json` |
 | C48 | `canonical restore` | `[PATH...]` | 保留中のパス（パスなしは保留中の削除）を、カタログのHEADの内容に戻します。commitしません。 | カタログの作業ツリー |
