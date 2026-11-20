@@ -58,7 +58,7 @@ design: {
 			`configured` が False なら `line` に1行を入れる（Antigravity の外でも入れる。情報なので）。
 			警告は `environment.antigravity` が真のときだけ足す（F-01）：
 			- False：`CANONICAL_TOOL_SETTING_MISSING`、message `Antigravity reads and writes the specs of this linked worktree only with an allow rule; add this to <名前>: <1行>`、details `{item: "tools", tool: "antigravity", file, line, next_step: line}`。
-			- None：`CANONICAL_TOOL_SETTING_UNKNOWN`、message `Could not judge whether Antigravity allows the catalog. <next_step>`、next_step `Check that <名前> allows read_file(<カタログ>) and write_file(<カタログ>) in permissions.allow, and that no permissions.deny or permissions.ask rule covers the catalog.`、details `{item: "tools", tool: "antigravity", sources, next_step}`。
+			- None：`CANONICAL_TOOL_SETTING_UNKNOWN`、message `Could not judge whether Antigravity allows the catalog. <next_step>`、next_step `Check that <名前> allows read_file(<カタログ>) and write_file(<カタログ>) in permissions.allow, and that no permissions.deny or permissions.ask rule covers the catalog or names a read_file or write_file target with * or a path that is not absolute.`、details `{item: "tools", tool: "antigravity", sources, next_step}`。
 			警告は今の Codex・Claude Code の後に並べる。`tools.status` は今どおり警告があれば `problem`。`tools.next_step` は、Antigravity の警告があればその `next_step`、なければ今どおり最初の警告の `next_step`。
 			`canonical link` は同じ `tool_findings` を使うので、同じ警告が出る（追加の作業はない）。
 			"""

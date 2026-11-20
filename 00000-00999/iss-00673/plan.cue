@@ -17,7 +17,7 @@ tests: {
 	"T-04": {title: "`ANTIGRAVITY_AGENT` なしでは、設定がなくても Antigravity の警告が出ず、`tools` の `status`・`next_step` と警告の列が今と同じ。main のチェックアウトでは `needed` 偽で警告なし（cli_runtime）", verifies: ["F-01", "R-01"]}
 	"T-05": {title: "設定のファイルのバイトが実行の前後で同じ。今の `test_issue429_canonical_status.py` などの Codex・Claude Code のテストがそのまま通る", verifies: ["R-01"]}
 	"T-06": {title: "提供側の canonical.md に Antigravity の項（`~/.gemini/antigravity-cli/settings.json`、`read_file(`、`write_file(`、`1.5.12`）があり、reference_cli.md の C45 に Antigravity があり、両方が dogfood の写しとバイトが同じ。今の資産の検査のテストが通る", verifies: ["R-02"]}
-	"T-07": {title: "`deny` の `read_file(*)`、`ask` の `write_file(/some/*)` があると、`allow` に両方があっても null と `CANONICAL_TOOL_SETTING_UNKNOWN`。`deny` に `*` を含まない、カタログを覆わない別のフォルダーの規則は影響しない（真のまま）。`allow` の `read_file(*)` と `write_file(*)` だけでは偽（cli_runtime と domain の単体）", verifies: ["R-01"]}
+	"T-07": {title: "`deny` の `read_file(*)`、`ask` の `write_file(/some/*)` があると、`allow` に両方があっても null と `CANONICAL_TOOL_SETTING_UNKNOWN`（next_step が `*` と絶対でないパスの deny・ask の規則を名指す）。`deny` に `*` を含まない、カタログを覆わない別のフォルダーの規則は影響しない（真のまま）。`allow` の `read_file(*)` と `write_file(*)` だけでは偽（cli_runtime と domain の単体）", verifies: ["R-01"]}
 	"T-08": {title: "`ANTIGRAVITY_AGENT` なしで判定が null（壊れた設定）のとき、Antigravity の警告が出ず、`tools` の `status`・`next_step` は Codex・Claude Code の警告だけで決まる（cli_runtime）", verifies: ["F-01"]}
 }
 
