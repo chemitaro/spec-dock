@@ -292,11 +292,24 @@ SpecDock 0.5.0 は、`spec-dock/workspace.json` の `schema_version` が 4 の�
 - `Unlinked` の worktree（#669）：`git worktree list` に出る worktree のうち、どの Scope にも紐づかないものが `Unlinked` で並びます。`spec-dock work start` をせずに作業している worktree に、すぐ気づけます。エージェントのいない worktree は薄く出て、2つ以上あれば `+N` に畳まれます（押すと一覧）。仕様の置き場の worktree、bare、prunable の worktree は出ません。
 - 1つの worktree は1つの項目で、そこにいるエージェントの印をすべて並べます（1行4つ、それより多いと項目の中で折り返します）。項目を押すと、ブランチ・パス・エージェントの詳細の欄が出ます（orca-web につながるときは『Orca で開く』も出ます。もう一度押すか Esc で閉じます）。エージェントの印を押すと、今までどおりそのエージェントのチャットが開きます。
 - 『これから』（#669）：『これから』では、指揮の線を引かなくなりました。代わりに、主のチェックアウトと、指揮している `Unlinked` の worktree に、子の数が付きます（title に内訳）。『これから』の行には、主のチェックアウトと指揮している `Unlinked` の worktree だけが出て、指揮していない worktree とエージェントのいない worktree は出ません（全体・いまで出ます）。全体・いまの線は今までどおりです。
+- 0.9.10 の注：0.9.10（#679）から、『これから』でも指揮の線と `Unscoped` の行（並ぶ worktree を含む）が『いま』と同じ規則で出て、上の項目の子の数は出なくなりました（「0.9.10 への更新」）。
 - 今までの札「main のチェックアウト」は、ブランチ名と `Primary` の印に変わりました。
 - 構造の API（`/api/v1/r/<host>/<owner>/<name>/structure`）の `worktrees` に `items`（各 worktree の `path`・`branch`・`head`・`main`・`detached`・`locked`）が加わりました。`status` と `paths` は変わりません。画面の中の JSON なので契約ではありません。
 - エージェントの印と指揮の線を描くには、今までどおり orca-web の要約が要ります。orca-web に届かないときも、`Unscoped` の行と worktree の項目は出ます。
 - 常駐のダッシュボードは、パッケージの版の更新の後に、自動で起動し直します（60秒ごとの版の確認。`dashboard service install` のやり直しは要りません）。前面の `serve` は自分で起動し直します。
 - 戻し方：0.9.9 に問題があれば、パッケージを 0.9.8 に戻します。帯は 0.9.8 の『指揮の帯』の形に戻り、`Unlinked` の worktree と『これから』の数は出なくなります。ブラウザーの保存のキーは変わりません。配布資産を 0.9.9 に上げた後なら、その更新の PR（版のファイル `spec-dock/system/spec-dock-version` を含む）を `git revert` して、配布資産を前のバイトに戻します。版のファイルだけを戻すと、0.9.8 の `canonical check` が 0.9.9 の資産を知らない変更として CI を止めます。
+
+## 0.9.10 への更新
+
+0.9.10 は、作業用のworktreeの Antigravity（`agy`）がカタログに読み書きするための設定を確かめて案内し（#677）、ダッシュボードがエージェントの種類を名前で出し（#678）、『これから』でも指揮の線を出す（#679）版です。コマンドの数（71）、カタログの形式（format 1）、`workspace.json` の版（4）は変わりません。コマンドの引数、ダッシュボードの JSON の版（`specdock.dashboard/v1`）、画面の道、ブラウザーの保存のキーも変わりません。CLI の JSON の契約は、`canonical status` の `data.tools` に `antigravity` の項目が増えるだけです（項目の追加）。変わる配布資産は、`docs/canonical.md`（Antigravity の項）、`docs/reference_cli.md`（C45）、この `docs/migration.md`、版のファイル `spec-dock/system/spec-dock-version`（0.9.10）の4つです。
+
+- パッケージを 0.9.10 に上げた後、各リポジトリで `spec-dock installation update --target <チェックアウト> --backup-dir <新しい外のディレクトリ> --yes` を実行して配布資産を上げ、通常の PR でコミットします。0.9.9 以前（0.9.0 から）の配布資産のままでも動き、そこから上がります。画面の変更はパッケージが配るので、パッケージを上げるだけで届きます。CI の見本は版のファイルの版の SpecDock を入れて動きます。
+- Antigravity の設定（#677）：作業用のworktreeで動く Antigravity は、作業ディレクトリの外にあるカタログに書くために、ユーザーの設定 `~/.gemini/antigravity-cli/settings.json` の `permissions.allow` に、`read_file(<カタログ>)` と `write_file(<カタログ>)` の2つの規則を1回だけ足します。足す1行は、作業用のworktreeで `spec-dock canonical status` が示します（`docs/canonical.md` の『ツールの設定』）。mainのチェックアウトの中で動くときは要りません。SpecDock はツールの設定のファイルを書き換えません。
+- `canonical status --json` の `data.tools` に `antigravity` の項目（`session`、`needed`、`configured`、`sources`、`file`、`line`）が増えました。Antigravity の中（環境変数 `ANTIGRAVITY_AGENT`）の作業用のworktreeで規則がないと、警告 `CANONICAL_TOOL_SETTING_MISSING`（`details.tool` は `antigravity`）と足す1行を示します。`permissions.deny`・`permissions.ask` がカタログを覆うかを確かめられないときは `CANONICAL_TOOL_SETTING_UNKNOWN` を示します。Antigravity の外では、警告と `tools.status`・`tools.next_step` は前と同じです。配るスキルと `AGENTS.md` の『仕様の扱い』は変わりません。
+- エージェントの種類の名前（#678）：ダッシュボードは、エージェントの種類を orca-web の部品の名前（Claude、Codex、Antigravity、Gemini など）で出すようになりました。orca-web の部品が知らない種類は、今までどおり種類の文字列で出ます。Antigravity と Gemini の名前を出すには、orca-web の main `4ad7471` 以降が要ります。利用者がすることはありません。
+- 『これから』の指揮の線（#679）：リポジトリの構造の図と『横断の構造』のどちらでも、『これから』で、指揮の黄色い点線、同じ箱の親子の弧、動き、波紋、`Unscoped` の行が『いま』と同じ規則で出ます。『これから』で隠れた Scope の worktree のエージェントの線は、いちばん近い見える祖先の枠に落ちます。0.9.9 で『これから』だけにあった子の数の札はなくなり、『いま』と同じ見え方になります。既定が『これから』の『横断の構造』を開いたときにも、線が出ます。
+- 常駐のダッシュボードは、パッケージの版の更新の後に、自動で起動し直します（60秒ごとの版の確認。`dashboard service install` のやり直しは要りません）。前面の `serve` は自分で起動し直します。
+- 戻し方：0.9.10 に問題があれば、パッケージを 0.9.9 に戻します。`canonical status` の `tools.antigravity` と Antigravity の警告はなくなり、エージェントの種類は種類の文字列に、『これから』は線のない子の数の形に戻ります。ユーザーの設定に足した Antigravity の規則は、残しても害はありません。ブラウザーの保存のキーは変わりません。配布資産を 0.9.10 に上げた後なら、その更新の PR（版のファイル `spec-dock/system/spec-dock-version` を含む）を `git revert` して、配布資産を前のバイトに戻します。版のファイルだけを戻すと、0.9.9 の `canonical check` が 0.9.10 の資産を知らない変更として CI を止めます。
 
 ## 新規導入
 
