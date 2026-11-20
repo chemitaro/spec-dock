@@ -1,33 +1,51 @@
 package spec
 
 // 計画（Epic）。型 specdock/v1。
-// Epic の計画は、子の Scope への切り分けを持つ。実装の手順とテストは子の Scope が持つので、
-// steps と tests は書かない。
 
-// 目標（任意）。
-// goal: "..."
+goal: "Antigravity のエージェントが作業用の worktree で仕様を読み書きでき、ダッシュボードで種類の名前とアイコンが Claude・Codex と同じ扱いで見える版を出す。"
 
-// 子の Scope への切り分け。子の ID（iss-00001 など）をキーにする。covers（子に任せる要件・失敗の条件の番号）が必須。
-// すべての要件を、いずれかの子に任せる。standard 以上では、それが「確かめるテストがある」にも当たり、
-// strict 以上では、すべての失敗の条件を任せ、どの子にも、任せる番号を書く。
-// 子の題名は GitHub に、子の保証レベルは子の requirement.cue にあるので、ここには書かない。
-slices: {
-	// "iss-00001": {
-	// 	covers: ["R-01", "F-01"]
-	// 	text:   "この Issue に任せること"
-	// 	after: ["iss-00002"]
-	// 	session: "coord"
-	// }
+// この Epic の外の前提（型にない項目）。別のリポジトリの Issue なので、slices の鍵にも、
+// SpecDock の依存（リポジトリをまたいで登録できない）にもできない。
+prerequisites: {
+	"gh:chemitaro/orca-web#66": {
+		title: "orca-web の iss-00066（epic-00065）：稼働の印と送信欄に、Antigravity と Gemini のアイコンと名前を出す"
+		needed_by: ["iss-00674"]
+		needed_for: "iss-00674 の実データでの確かめ（Antigravity の名前とアイコンが出ること）。作るのは待たずに始めてよい"
+	}
 }
 
-// 検証のしかた、戻し方、終わりの条件（任意）。critical では、切り分けがあれば rollback が要る。
-// verification: "..."
-// rollback:     "..."
-// exit:         "..."
+slices: {
+	"iss-00673": {
+		covers: ["R-01", "R-02", "F-01"]
+		text: """
+			Antigravity でのカタログの読み書き（D-01）：実物の `agy` での確かめ、要れば `canonical status` の `tools` の Antigravity の項目と検出と1行、`docs/canonical.md`・`docs/reference_cli.md` の案内、
+			要れば配るスキルの『仕様の扱い』の制限のモードの決まりと `static-inventory.json`。書く範囲：`src/spec_dock/runtime/{domain/canonical_tools.py,infra/runtime_environment.py,application/canonical_tools_check.py,application/canonical_status.py}`、`presentation` の該当部分、`src/spec_dock/assets/spec_dock/docs/`、`src/spec_dock/assets/install_root/`、`src/spec_dock/assets/static-inventory.json`、`tests/`。
+			"""
+		session: "owner"
+	}
+	"iss-00674": {
+		covers: ["R-03", "F-02"]
+		text: """
+			ダッシュボードの種類の名前（D-02）：`src/spec_dock/assets/dashboard/views/` の5か所と新しい小さな関数、node のテスト。orca-web の iss-00066 の後の常駐の orca-web で、Antigravity のエージェントの名前を実データで確かめる。
+			iss-00673 と書く範囲が重ならないので並べて進める。
+			"""
+		session: "owner"
+	}
+}
 
-// 実行の割り当て（任意）。切り分けの session は、ここのセッションの名前を指す。
-// レビューの after は、どの切り分けの後かを指す。モデルと推論の名前は、どんな文字列でもよい。
-// execution: {
-// 	sessions: coord: {task: "統括", model: "...", effort: "...", rationale: "..."}
-// 	reviews: gate: {role: "最終の確かめ", after: "iss-00001", model: "...", effort: "..."}
-// }
+verification: """
+	iss-00673：`canonical status` の `tools` の単体テスト（Antigravity の中・外、設定あり・なし・読めない）、今の Codex・Claude Code のテストがそのまま通ること、配る資産の検査、`make lint` と全テスト。実物の `agy` で確かめた結果を報告書に残す。
+	iss-00674：名前の関数の node のテスト（知る種類、知らない種類、種類なし、部品なし、表なし）、今のダッシュボードのテストがそのまま通ること、`make lint` と全テスト。
+	最後に統括が、両方を入れた版を出して入れ、実際の Orca の Antigravity のエージェントで、ダッシュボードの名前とアイコンと、作業用の worktree での `canonical status` を確かめる。
+	"""
+
+rollback: "各 Issue の PR を戻す。iss-00673 を戻すと Antigravity の項目と案内がなくなり、iss-00674 を戻すと種類は今どおり生の文字列で出る。"
+
+exit: "iss-00673 と iss-00674 が閉じ、両方を入れた版が出て、この PC で Antigravity のエージェントの名前とアイコンがダッシュボードに出る。"
+
+execution: {
+	sessions: {
+		plan: {task: "Epic の仕様と切り分け（この記録）", model: "Opus 5.5", effort: "medium", rationale: "統括（方針の第2節、standard の統括）が自分で書いた"}
+		owner: {task: "各 Issue のタスク担当（Issue の仕様、実装担当の起動、関門、PR）", model: "Opus 5.5", effort: "medium", rationale: "方針の第2節、standard のタスク担当。実装担当は Issue の計画で選ぶ（iss-00673 はテストで確かめられる実行時の変更なので GPT-6.2 Sol / medium、文書はタスク担当が書く。iss-00674 は画面の JS なので Opus 5.5 / medium を推す）"}
+	}
+}
