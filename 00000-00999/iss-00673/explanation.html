@@ -9,51 +9,46 @@
 <!-- ▼ 説明資料の本文（Markdown）。編集するのはこのブロックだけです。 -->
 <script type="text/markdown" id="ds-source">
 ---
-title: この Scope の説明資料（題名を書き換えます）
-lead: この資料で理解できることを、初めて読む人にも分かるように1〜2文で書きます。
+title: Antigravity で仕様のカタログを読み書きする
+lead: 作業用の worktree で動く Antigravity（`agy`）のエージェントが、作業ディレクトリの外にある仕様のカタログを読み書きできるように、`canonical status` が要る設定の1行を示し、配る案内に Antigravity の設定を書く作業の説明です。
 category: 説明資料
 audience: 本日チームに加わった新メンバー
-status: 下書き
+status: 作業中
 ---
-
-<!-- spec-dock:explanation-skeleton -->
-<!-- 雛形から書き換えたら、上の印の行を消します。印が残っていると、検査は「雛形のまま」と判定します。 -->
 
 ## この資料で分かること
 
 :::summary
-- 読み終えたときに理解できていることを、1文ずつ書きます。
-- 背景、仕組み、失敗時の動き、確認方法のうち、特に伝えたい点を選びます。
-- 短い Scope なら、1〜2項目でかまいません。
+- `agy` 1.5.12 は、作業ディレクトリの外のファイルを、既定では読み書きしません。linked worktree のカタログ（`<main のチェックアウト>/spec-dock/.canonical`）は外にあるので、設定が要ります。main のチェックアウトでは要りません。
+- 要る設定は、ユーザーの設定 `~/.gemini/antigravity-cli/settings.json` の `permissions.allow` に `read_file(<カタログ>)` と `write_file(<カタログ>)` を加える1行です。SpecDock は書き換えず、`canonical status` が1行を示します。
+- Antigravity の中は、端末のコマンドに渡る `ANTIGRAVITY_AGENT` で見分けます。ないときは警告を出しません。
 :::
 
 ## 背景と目的
 
-なぜこの Scope に取り組むのか、どの問題を解決するのかを具体的に説明します。
+Orca に Antigravity CLI が入り、Gemini などのモデルのエージェントが SpecDock の作業者として動くようになりました。Claude Code と Codex には、カタログに書くための設定の1行と、その確かめ（`canonical status` の `tools`）がすでにあります。Antigravity にも同じものを用意します（epic-00672）。
 
-## 全体の構成
+## 実物で確かめたこと
 
-構成要素の役割と関係を説明します。図は、理解を大きく助ける場合だけ入れます。
+一時のリポジトリ（main と linked worktree）で `agy -p` を動かして確かめました（表の全体は report.md）。
 
-```plantuml id=overview
-@startuml
-title 全体の構成
-top to bottom direction
-actor "利用者" as User
-component "説明対象の仕組み" as System
-database "データ" as Data
-User -> System : 操作する
-System -> Data : 読み書きする
-System --> User : 結果を返す
-@enduml
-```
+- 設定がないと、ファイルの道具は許可を求め、print のモードでは自動で拒まれます。端末も既定で制限され、外への書き込みは `Operation not permitted` です。
+- `permissions.allow` の2つの規則で、ファイルの道具も端末も通ります。カタログの親を書いても通ります。
+- その回だけなら `agy --add-dir <カタログ>` でも通りますが、SpecDock からは見えません。
+- Claude Code の隔離セッションのような、設定を足しても書けない動き方は見つかりませんでした。
+
+## 変えるもの
+
+- `canonical status` の `data.tools.antigravity`：`session`、`needed`、`configured`、`sources`、`file`、`line`。Antigravity の中の linked worktree で設定がないと、警告 `CANONICAL_TOOL_SETTING_MISSING` と1行を示します。
+- 配る案内 `docs/canonical.md` のツールの設定の節と、`docs/reference_cli.md` の C45。
+- Codex と Claude Code の項目と警告は変えません。
 
 ## 確認方法
 
-読者が手元で確かめられる手順を書きます。
-
 ```sh
-spec-dock active show --json
+spec-dock canonical status --json   # Antigravity の中の linked worktree で tools.antigravity を見る
+uv run pytest tests/cli_runtime/test_issue429_canonical_status.py
+make lint
 ```
 </script>
 <script src="../../../design-system/ds.js"></script>
