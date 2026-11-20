@@ -5,10 +5,10 @@ package spec
 goal: "ダッシュボードの5か所で、種類が orca-web の部品の名前で出て、名前を引けないときは今の文字が出る。"
 
 steps: {
-	"S-01": {title: "`agents_logic.js` に `agentTypeLabel` を足し、node のテスト（T-01）で確かめる", realizes: ["R-01", "R-02", "F-01"], status: "todo", session: "impl"}
-	"S-02": {title: "5か所が `agentTypeLabel` を通し、呼ぶ側が部品を渡す。各所のテスト（T-02）を足す", realizes: ["R-01", "R-02", "F-01"], status: "todo", after: ["S-01"], session: "impl"}
-	"S-03": {title: "`make lint` と全体の `uv run pytest` を通す", realizes: ["R-02"], status: "todo", after: ["S-02"], session: "impl"}
-	"S-04": {title: "orca-web の iss-00066 の後の常駐の orca-web で、実際の Antigravity のエージェントの名前を確かめて report.md に残す（T-03）", realizes: ["R-01"], status: "todo", after: ["S-03"], session: "owner"}
+	"S-01": {title: "`agents_logic.js` に `agentTypeLabel` を足し、node のテスト（T-01）で確かめる", realizes: ["R-01", "R-02", "F-01"], status: "done", session: "impl"}
+	"S-02": {title: "5か所が `agentTypeLabel` を通し、呼ぶ側が部品を渡す。各所のテスト（T-02）を足す", realizes: ["R-01", "R-02", "F-01"], status: "done", after: ["S-01"], session: "impl"}
+	"S-03": {title: "`make lint` と全体の `uv run pytest` を通す", realizes: ["R-02"], status: "done", after: ["S-02"], session: "impl"}
+	"S-04": {title: "orca-web の iss-00066 の後の常駐の orca-web で、実際の Antigravity のエージェントの名前を確かめて report.md に残す（T-03）", realizes: ["R-01"], status: "done", after: ["S-03"], session: "owner"}
 }
 
 tests: {
