@@ -317,7 +317,7 @@ function drawCommand(model) {
   const w = A.el.world;
   CV.removeLayers(w);
   A.cmdModel = model;
-  const html = CV.layersHtml(model);
+  const html = CV.layersHtml(model, A.ctx?.orca?.marks?.() ?? null);
   // the layers stack by their z-index (graph.css) over the frames and under the boxes; the DOM's order is free
   w.appendChild(CV.element(html.cmd));
   w.appendChild(CV.element(html.top));

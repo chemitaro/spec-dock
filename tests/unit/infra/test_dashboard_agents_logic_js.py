@@ -310,3 +310,84 @@ def test_agent_frame_and_sandbox(tmp_path: Path) -> None:  # T-03
         """,
         tmp_path,
     )
+
+
+# Synthetic orca-web components (iss-00674): today's table (claude and codex) and one that also knows antigravity.
+MARKS = """
+const shape = {viewBox: "0 0 16 16", paths: []};
+const todayKey = (t) => (t === null || t === undefined || t === "" ? "none" : t === "claude" || t === "claude-agent-teams" ? "claude" : t === "codex" ? "codex" : "other");
+const today = {
+  AGENT_ICONS: {claude: {label: "Claude", ...shape}, codex: {label: "Codex", ...shape}, other: {label: "ほかの種類", ...shape}, none: {label: "エージェント", ...shape}},
+  iconKey: todayKey,
+};
+const next = {
+  AGENT_ICONS: {...today.AGENT_ICONS, antigravity: {label: "Antigravity", ...shape}, gemini: {label: "Gemini", ...shape}},
+  iconKey: (t) => (t === "antigravity" || t === "gemini" ? t : todayKey(t)),
+};
+"""
+
+
+@node
+def test_agent_type_label(tmp_path: Path) -> None:  # iss-00674 T-01
+    run_node(
+        MARKS
+        + """
+        const L = logic.agentTypeLabel;
+        // known kinds take the component's label (R-01)
+        assert.equal(L(next, "antigravity", "種類不明"), "Antigravity");
+        assert.equal(L(next, "gemini", "種類不明"), "Gemini");
+        assert.equal(L(today, "claude", "種類不明"), "Claude");
+        assert.equal(L(today, "claude-agent-teams", "種類不明"), "Claude");
+        assert.equal(L(today, "codex", "agent"), "Codex");
+        // kinds the component does not know keep the raw text (R-02)
+        assert.equal(L(today, "antigravity", "種類不明"), "antigravity");
+        assert.equal(L(next, "cursor", "種類不明"), "cursor");
+        // no kind: the fallback, whatever the component
+        for (const marks of [today, next, null]) {
+          for (const t of [null, undefined, "", 5, {}, true]) {
+            assert.equal(L(marks, t, "種類不明"), "種類不明", String(t));
+            assert.equal(L(marks, t, "agent"), "agent", String(t));
+          }
+        }
+        // no component, an old one, a broken one: the raw text, never an error (F-01)
+        const broken = [
+          null, undefined, 5, "marks",
+          {iconKey: next.iconKey},
+          {AGENT_ICONS: next.AGENT_ICONS},
+          {AGENT_ICONS: next.AGENT_ICONS, iconKey: "antigravity"},
+          {AGENT_ICONS: null, iconKey: next.iconKey},
+          {AGENT_ICONS: next.AGENT_ICONS, iconKey: () => { throw new Error("boom"); }},
+          {AGENT_ICONS: next.AGENT_ICONS, iconKey: () => "missing"},
+          {AGENT_ICONS: next.AGENT_ICONS, iconKey: () => null},
+          {AGENT_ICONS: next.AGENT_ICONS, iconKey: () => "other"},
+          {AGENT_ICONS: next.AGENT_ICONS, iconKey: () => "none"},
+          {AGENT_ICONS: {antigravity: {label: ""}}, iconKey: () => "antigravity"},
+          {AGENT_ICONS: {antigravity: {label: 5}}, iconKey: () => "antigravity"},
+          {AGENT_ICONS: {antigravity: null}, iconKey: () => "antigravity"},
+          {AGENT_ICONS: {}, iconKey: () => "toString"},
+          {AGENT_ICONS: {}, iconKey: () => "__proto__"},
+        ];
+        for (const marks of broken) assert.equal(L(marks, "antigravity", "種類不明"), "antigravity");
+        // the other and none entries have labels, but they are never used for a name
+        assert.equal(L({AGENT_ICONS: next.AGENT_ICONS, iconKey: () => "other"}, "x", "f"), "x");
+        """,
+        tmp_path,
+    )
+
+
+@node
+def test_agent_frame_names_the_kind_from_the_component(tmp_path: Path) -> None:  # iss-00674 T-02 agentFrame
+    run_node(
+        MARKS
+        + """
+        const item = {id: "a", agentType: "antigravity", branch: "b", detail: "/embed/agent?id=a"};
+        const o = "http://127.0.0.1:8791";
+        assert.equal(logic.agentFrame(o, item, "dark", next).title, "エージェント：Antigravity・b");
+        assert.equal(logic.agentFrame(o, item, "dark", today).title, "エージェント：antigravity・b");
+        assert.equal(logic.agentFrame(o, item, "dark", null).title, "エージェント：antigravity・b");
+        assert.equal(logic.agentFrame(o, item, "dark").title, "エージェント：antigravity・b");
+        assert.equal(logic.agentFrame(o, {...item, agentType: "claude"}, "dark", today).title, "エージェント：Claude・b");
+        for (const t of [null, undefined, "", 5]) assert.equal(logic.agentFrame(o, {...item, agentType: t}, "dark", next).title, "エージェント：種類不明・b");
+        """,
+        tmp_path,
+    )

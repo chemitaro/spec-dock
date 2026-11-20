@@ -16,7 +16,7 @@
 // leaving the screen}, legend: the legend's HTML by renderLegend's options (legend: true)}.
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
-import { Element, fakeOrca, hooks, install, json, settle } from "./fake_dom.mjs";
+import { Element, fakeOrca, giveAgentNames, hooks, install, json, settle } from "./fake_dom.mjs";
 import { installMotion } from "./fake_motion.mjs";
 
 const [assets, requestPath] = process.argv.slice(2);
@@ -114,7 +114,7 @@ function snap(root) {
     panel: {
       open: panel.classList.contains("is-open"),
       agent: panel.dataset.cmdAgent ?? null,
-      iframe: iframe ? { id: idOf(iframe), src: iframe.getAttribute("src"), sandbox: iframe.getAttribute("sandbox"), referrer: iframe.getAttribute("referrerpolicy") } : null,
+      iframe: iframe ? { id: idOf(iframe), src: iframe.getAttribute("src"), sandbox: iframe.getAttribute("sandbox"), referrer: iframe.getAttribute("referrerpolicy"), title: iframe.getAttribute("title") } : null,
       text: panel.querySelector(".pn-head")?.textContent ?? null,
       tab: panel.querySelector('[aria-selected="true"]')?.dataset?.pnTab ?? null,
       agentPicked: panel.querySelector(".sd-agent")?.getAttribute("src") ?? null,
@@ -265,6 +265,7 @@ for (const run of request.runs || []) {
   const root = new Element("main");
   const orca = run.orca === false ? null : fakeOrca({});
   if (orca && run.orca?.summary) orca.set({ summary: run.orca.summary, order: run.orca.order });
+  if (orca && run.orca?.names) giveAgentNames(orca); // iss-00674
   // iss-00668: a run's own structure (with the git worktree list), range and embedding
   if (run.range) page.store.set("specdock.graph.v3", JSON.stringify({ mode: "nest", range: run.range }));
   const ctx = {

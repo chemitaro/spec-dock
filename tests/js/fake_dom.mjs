@@ -478,6 +478,24 @@ export const settle = async (rounds = 20) => {
 // iss-00616: set({summary}) gives a summary document instead (agents with ids, parents and widths w): summary() returns it,
 // forScope gives the summary's worktrees at the paths the structure records for the Scope, and an agent with an id is
 // drawn with data-agent-id. orderAgents gives the agents in their order (or `order`, a list of ids, when set).
+// iss-00674: orca-web's table of the agents' kinds and its key, as a component that knows antigravity exports them
+// (a run's orca.names); without it the fake component exports neither, as the screens' other runs expect.
+export function giveAgentNames(orca) {
+  const shape = { viewBox: "0 0 16 16", paths: [] };
+  const known = { claude: "claude", "claude-agent-teams": "claude", codex: "codex", antigravity: "antigravity", gemini: "gemini" };
+  Object.assign(orca.marks(), {
+    AGENT_ICONS: {
+      claude: { label: "Claude", ...shape },
+      codex: { label: "Codex", ...shape },
+      antigravity: { label: "Antigravity", ...shape },
+      gemini: { label: "Gemini", ...shape },
+      other: { label: "ほかの種類", ...shape },
+      none: { label: "エージェント", ...shape },
+    },
+    iconKey: (t) => (t === null || t === undefined || t === "" ? "none" : (known[t] ?? "other")),
+  });
+}
+
 export function fakeOrca(byRepo) {
   const subs = new Set();
   let doc = null;
