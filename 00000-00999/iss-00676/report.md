@@ -52,7 +52,14 @@ ID: "iss-00676"
 - 先に書いたテスト（T-01・T-02）が、今の実装で落ちることを確かめた：`test_dashboard_allgraph_command.py` 10件、`test_dashboard_graph_unscoped.py` 8件、`test_dashboard_graph_command.py` 1件。落ちた理由は、『これから』で pairs が空、行に子の数がある、指揮していない Unlinked がない、項目の幅に数の足しがある、の4つ（意図どおり）。
 - 実装：D-02（`views/allgraph/command.js` の `crossPlace` から `range`・`next` の分岐・`early`・`commanding` を取り除いた）、D-03（`views/graph/unscoped.js` の `range`・`count`・`countParts`・`childCount`・`countTitle`・`commanding`・`UNSCOPED.count`、`views/graph/command.js` の `countWidth`、`views/graph/command_view.js` の `.gx-band-count` の札、`views/graph.css` の `.gx-band-count` の規則を消した）。
 - 検証：`uv run pytest tests/unit/presentation/test_dashboard_allgraph_command.py tests/unit/presentation/test_dashboard_graph_unscoped.py tests/unit/presentation/test_dashboard_graph_command.py` 95 passed。`uv run ruff check tests/unit/presentation/`・`ruff format --check` 合格。
-- 画面のテスト（`views/graph.js`・`views/allgraph.js` を通すもの）の『これから』の期待は S-02 で直す。S-01 のコミットの時点では、それらの一部が落ちる（S-02 で通す）。
+- 画面のテスト（`views/graph.js`・`views/allgraph.js` を通すもの）の『これから』の期待は S-02 で直す。S-01 のコミットの時点では、それらの一部が落ちる（S-02 で通す）。コミット `d8ba5e625`。
+
+### S-02（両方の画面）
+
+- T-03 を新しいファイル `tests/unit/presentation/test_dashboard_next_command_screen.py` に書いた（9件）。開始のコミットの別の複製（スクラッチの `red`、HEAD 83b8ee95f）に、このファイルと画面のテストの道具（`tests/js/dashboard_graph_command_screen.mjs`、audit に heads を足しただけ）を写して走らせ、8件が落ちることを確かめた（残りの1件は、動きを減らす設定の CSS が範囲を名指ししないことの静的な検査で、前後とも通る）。この worktree では、S-01 の後に構造の図の4件だけが落ちた（横断の構造の4件は、S-01 の `crossPlace` の直しで先に通っていた）。
+- 実装：D-01（`views/graph.js` の `paintCommand` から `drawn` をやめ、全部の組を `placeAgents` に渡す。`unscopedItems` に `range` を渡さない）。`views/allgraph.js` の `crossPlace` の呼び方から `range` を外した。`commandKey`・`crossKey` の `range` は残した。
+- 偽の DOM の heads は、CSS がないため 0 にならない（範囲ごとの枠の数で変わる）。T-03 では『これから』と『いま』が同じ値であることだけを見て、heads 0 は実機（S-04）で見る。
+- 検証：`uv run pytest tests/unit/presentation/ tests/unit/infra/ -k dashboard` 598 passed、657 deselected。`uv run ruff check tests/unit/presentation/`・`ruff format` 合格。
 
 ## Outcome
 
