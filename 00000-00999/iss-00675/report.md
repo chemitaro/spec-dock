@@ -32,7 +32,7 @@ SpecDock 0.9.10 のリリースの変更を作った（`git diff a6000d8cd 44cad
 
 ### マージの後の配布の手順（統括）
 
-0.9.9 の実際の手順から書いた。根拠：v0.9.9 は PR #671 のマージのコミット 83b8ee95f を指す軽量タグ（`git for-each-ref refs/tags/v0.9.9` が commit 型）で、`.github/workflows/release-tag.yml` の run 44492637365（2026-11-19T09:01Z、success）が自動で作った。uv tool の receipt の wheel は `/private/tmp/spec-dock-v0.9.9-dist/spec_dock-0.9.9-py3-none-any.whl`（iss-00670 の report.md の手順どおり）。
+0.9.9 の実際の手順から書いた。根拠：v0.9.9 は PR #671 のマージのコミット 83b8ee95f を指す軽量タグ（`git for-each-ref refs/tags/v0.9.9` が commit 型）で、`.github/workflows/release-tag.yml` の run 44492637365（2026-11-19T09:01Z、success）が自動で作った。uv tool の receipt の wheel は、iss-00670 の report.md の手順で v0.9.9 から作った `spec_dock-0.9.9-py3-none-any.whl`。
 
 1. タグ：この PR をマージすると、`release-tag.yml`（main への push で `pyproject.toml` の版の変化を見る）が `v0.9.10` を**自動で**そのマージのコミットに作る。手でタグを作らない。`git fetch --tags origin` の後に `git rev-parse v0.9.10^{commit}` がマージのコミットと一致することを確かめる。ワークフローが失敗したときだけ、`git tag v0.9.10 <マージのコミット>` と `git push origin refs/tags/v0.9.10`。
 2. wheel：タグのきれいな取り出しから作る。`mkdir -p /private/tmp/spec-dock-v0.9.10-src && git archive --prefix=src/ v0.9.10 | tar -x -C /private/tmp/spec-dock-v0.9.10-src`、続けて `cd /private/tmp/spec-dock-v0.9.10-src/src && uv build --wheel --out-dir /private/tmp/spec-dock-v0.9.10-dist`。
@@ -48,4 +48,18 @@ SpecDock 0.9.10 のリリースの変更を作った（`git diff a6000d8cd 44cad
 
 ## Verification
 
+- 最終品質ゲート iss-00675-fqg-1 attempt 1（44cad5e3c）：**合格**。
+  - レビュー（quality-gate-reviewer opus / medium、second opinion なし）：P0〜P3 0、coverage complete。範囲は `a6000d8cd..44cad5e3c`。
+  - `make lint`：exit 0。`uv run pytest`：exit 0（4444 passed / 7 skipped、56分19秒）。
+  - closure：worktree の `.workbench/final-quality-gate/iss-00675-fqg-1/closure.md`（Git の外）。
+  - 区切りのレビューは、計画どおりなし。記録だけのコミットはない（記録は Git の外）。
+
+## 逸脱と判断
+
+- 仕様のレビューの P3（round-1）も、配るバイトの説明の欠けなので、直してから合格させた。
+- 逸脱なし（実装担当は計画どおり Codex GPT-6.2 Sol / medium）。
+
 ## Residual Risks / Follow-ups
+
+- `work finish iss-00675` は実行していない（マージの後に統括が行う）。
+- マージの後のタグの確かめ、wheel、導入、必要なら配布資産の更新は、統括が行う（上の手順）。
