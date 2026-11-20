@@ -54,7 +54,7 @@ spec-dock canonical status --structure   # 上に加えて、Scope のディレ�
   writable_roots = ["<カタログ>"]
   ```
 
-- **Antigravity**（`agy`）：ユーザーの設定 `~/.gemini/antigravity-cli/settings.json` の `permissions.allow` に、カタログの読み書きの2つの規則を加えます。すでに `permissions.allow` があれば、置き換えずに加えます。`permissions.deny` と `permissions.ask` の規則は `allow` より優先するので、カタログ（かその親）を指す `read_file` と `write_file` を、そこに置きません（置いてあると、`canonical status` は判定できないとして `CANONICAL_TOOL_SETTING_UNKNOWN` を示します）。
+- **Antigravity**（`agy`）：ユーザーの設定 `~/.gemini/antigravity-cli/settings.json` の `permissions.allow` に、カタログの読み書きの2つの規則を加えます。すでに `permissions.allow` があれば、置き換えずに加えます。`permissions.deny` と `permissions.ask` の規則は `allow` より優先するので、カタログ（かその親）を指す `read_file` と `write_file` を、そこに置きません（置いてあると、`canonical status` は判定できないとして `CANONICAL_TOOL_SETTING_UNKNOWN` を示します。`deny`・`ask` に `read_file(*)` のような `*` を含む規則や、絶対のパスでない規則があるときも、カタログを覆うかを確かめられないので、同じく判定できないとします）。
 
   ```json
   { "permissions": { "allow": ["read_file(<カタログ>)", "write_file(<カタログ>)"] } }
