@@ -9,51 +9,47 @@
 <!-- ▼ 説明資料の本文（Markdown）。編集するのはこのブロックだけです。 -->
 <script type="text/markdown" id="ds-source">
 ---
-title: この Scope の説明資料（題名を書き換えます）
-lead: この資料で理解できることを、初めて読む人にも分かるように1〜2文で書きます。
+title: ダッシュボードのエージェントの種類を、orca-web の名前で出す
+lead: ダッシュボードが、エージェントの種類（agentType）の生の文字列ではなく、orca-web の部品が持つ名前（Claude、Codex、Antigravity、Gemini）を出す仕組みを説明します。
 category: 説明資料
 audience: 本日チームに加わった新メンバー
 status: 下書き
 ---
 
-<!-- spec-dock:explanation-skeleton -->
-<!-- 雛形から書き換えたら、上の印の行を消します。印が残っていると、検査は「雛形のまま」と判定します。 -->
-
 ## この資料で分かること
 
 :::summary
-- 読み終えたときに理解できていることを、1文ずつ書きます。
-- 背景、仕組み、失敗時の動き、確認方法のうち、特に伝えたい点を選びます。
-- 短い Scope なら、1〜2項目でかまいません。
+- 種類の名前の正本は orca-web の `AGENT_ICONS` の1か所で、SpecDock は部品の書き出しを読むだけです。
+- 名前を引く決まりは `agents_logic.js` の `agentTypeLabel` の1つに閉じ、画面の5か所がそれを通します。
+- 部品がない、表がない、知らない種類のときは、今までどおりの文字が出ます。
 :::
 
 ## 背景と目的
 
-なぜこの Scope に取り組むのか、どの問題を解決するのかを具体的に説明します。
+Orca に Antigravity CLI が入り、`agentType` が `antigravity` のエージェントが動くようになりました。ダッシュボードは種類を `antigravity` のような生の文字列で出していたので、orca-web の印や送信の欄と同じ名前（『Antigravity』）で出すようにします。
 
 ## 全体の構成
 
-構成要素の役割と関係を説明します。図は、理解を大きく助ける場合だけ入れます。
-
 ```plantuml id=overview
 @startuml
-title 全体の構成
-top to bottom direction
-actor "利用者" as User
-component "説明対象の仕組み" as System
-database "データ" as Data
-User -> System : 操作する
-System -> Data : 読み書きする
-System --> User : 結果を返す
+title 種類の名前の引き方
+component "orca-web の部品\n/embed/agent-marks.js\n(AGENT_ICONS, iconKey)" as Marks
+component "core/orca.js\norca.marks()" as Orca
+component "agentTypeLabel\n(agents_logic.js)" as Label
+component "5か所の表示\nタブの選び・iframe の title・\n詳細の欄2つ・数の札" as Views
+Marks --> Orca : 読み込む
+Orca --> Views : 部品を渡す
+Views --> Label : 部品と agentType
+Label --> Views : 名前、または今の文字
 @enduml
 ```
 
+`iconKey(agentType)` が `other`・`none` でない鍵を返し、その項目に名前があれば名前を、そうでなければ `agentType`（なければ『種類不明』など、各所の今の文字）を返します。
+
 ## 確認方法
 
-読者が手元で確かめられる手順を書きます。
-
 ```sh
-spec-dock active show --json
+uv run pytest tests/unit/infra/test_dashboard_agents_logic_js.py
 ```
 </script>
 <script src="../../../design-system/ds.js"></script>
