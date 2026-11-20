@@ -48,7 +48,15 @@ ID: "iss-00674"
   - 比べ：常駐のダッシュボード（0.9.9、47800）でも同じ worktree に2つのエージェントが出る（部品の読み込みが合っていることの対照）。
 - 実データで見られなかった所：エージェントのタブの選び（Antigravity のエージェントが、Scope を選んだ worktree にいない）と、未対応の行の数の札の title（指揮の組がなく、数の札が出ていない）。この2つは node のテスト（T-01・T-02、合成の部品）で確かめる。
 
+## 最終品質ゲート
+
+- **合格**（attempt 1）：合格のコミット `dfcec8db537f33fd92b300bfef9a32cece4e4ae8`（開始のコミット `83b8ee95f` から）。quality-gate-reviewer opus / medium で P0 0・P1 0・P2 0・P3 0、網羅は完全。`make lint` exit 0、`uv run pytest` exit 0（4365 passed、7 skipped）。2人目は standard の既定でなし。
+- closure.md：この worktree の `.workbench/final-quality-gate/iss-00674-fqg/closure.md`。記録のコミットはない（記録はこのカタログの Scope だけで、Git の外）。
+- PR の直前に `origin/main` を取り込み直す確かめ：`git fetch` の後、`HEAD..origin/main` は空で、取り込むものはなかった。
+
 ## Outcome
+
+ダッシュボードの5か所（タブの選び、iframe の title、指揮の帯のエージェントの詳細の欄の見出し、worktree の詳細の欄のエージェントの一覧、未対応の行の数の札の title）で、種類が orca-web の部品の名前（Claude、Codex、Antigravity、Gemini など）で出る。名前を引けないときは今の文字。
 
 ## Verification
 
