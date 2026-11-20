@@ -103,12 +103,13 @@ export function agentTypeLabel(marks, agentType, fallback) {
   }
 }
 
-// The frame's address and title (R-03). The detail is used as given: the id is never encoded again.
-export function agentFrame(origin, agent, theme) {
+// The frame's address and title (R-03). The detail is used as given: the id is never encoded again. The title names
+// the kind from orca-web's marks component when one is given (iss-00674).
+export function agentFrame(origin, agent, theme, marks = null) {
   if (typeof origin !== "string" || !agent || (theme !== "light" && theme !== "dark")) return null;
   return {
     src: origin + agent.detail + "&theme=" + theme,
-    title: "エージェント：" + (agent.agentType ?? "種類不明") + "・" + (agent.branch ?? "ブランチ不明"),
+    title: "エージェント：" + agentTypeLabel(marks, agent.agentType, "種類不明") + "・" + (agent.branch ?? "ブランチ不明"),
   };
 }
 

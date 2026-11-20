@@ -16,7 +16,7 @@
 // Prints {runs: {name: [snapshot after the first render, after each step]}}.
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
-import { Element, fakeOrca, hooks, install, json, settle } from "./fake_dom.mjs";
+import { Element, fakeOrca, giveAgentNames, hooks, install, json, settle } from "./fake_dom.mjs";
 import { installMotion } from "./fake_motion.mjs";
 
 const [assets, requestPath] = process.argv.slice(2);
@@ -250,6 +250,7 @@ for (const r of request.runs) {
     orca = fakeOrca({});
     orca.plainSummary = orca.summary;
     if (run.orca?.summary) orca.set({ summary: run.orca.summary, order: run.orca.order });
+    if (run.orca?.names) giveAgentNames(orca); // iss-00674
   }
   const ctx = {
     repository: null,

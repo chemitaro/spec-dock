@@ -373,3 +373,21 @@ def test_agent_type_label(tmp_path: Path) -> None:  # iss-00674 T-01
         """,
         tmp_path,
     )
+
+
+@node
+def test_agent_frame_names_the_kind_from_the_component(tmp_path: Path) -> None:  # iss-00674 T-02 agentFrame
+    run_node(
+        MARKS
+        + """
+        const item = {id: "a", agentType: "antigravity", branch: "b", detail: "/embed/agent?id=a"};
+        const o = "http://127.0.0.1:8791";
+        assert.equal(logic.agentFrame(o, item, "dark", next).title, "エージェント：Antigravity・b");
+        assert.equal(logic.agentFrame(o, item, "dark", today).title, "エージェント：antigravity・b");
+        assert.equal(logic.agentFrame(o, item, "dark", null).title, "エージェント：antigravity・b");
+        assert.equal(logic.agentFrame(o, item, "dark").title, "エージェント：antigravity・b");
+        assert.equal(logic.agentFrame(o, {...item, agentType: "claude"}, "dark", today).title, "エージェント：Claude・b");
+        for (const t of [null, undefined, "", 5]) assert.equal(logic.agentFrame(o, {...item, agentType: t}, "dark", next).title, "エージェント：種類不明・b");
+        """,
+        tmp_path,
+    )

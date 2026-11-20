@@ -4,7 +4,7 @@
 // screens; these parts take what they draw from their arguments.
 import { esc, ic } from "./marks.js";
 import { bandMarkHtml, bodyHtml, endsHtml, rippleHtml } from "./command_motion.js";
-import { AGENT_SANDBOX, agentFrame } from "../_shared/agents_logic.js";
+import { AGENT_SANDBOX, agentFrame, agentTypeLabel } from "../_shared/agents_logic.js";
 import { currentTheme } from "../_shared/agents_tab.js";
 import { SHEET_GRAB } from "../_shared/panel.js";
 import { openWorktreeButton } from "../_shared/orca_marks.js";
@@ -58,7 +58,7 @@ export const inBand = (model, r) => !!model.band?.items.some((it) => r.x >= it.x
  * rings (command_motion.js), never one SVG as big as the world. A row with a lead has its text at the row's left
  * (iss-00617: "ほかの場所").
  */
-export function layersHtml(model) {
+export function layersHtml(model, marks = null) {
   const lines = model.links.map(bodyHtml).join("");
   const ends = model.links.map(endsHtml).join("") + model.ripples.filter((r) => !inBand(model, r)).map(rippleHtml).join("");
   let band = "";
@@ -66,7 +66,7 @@ export function layersHtml(model) {
     const leads = (model.band.rows || [])
       .filter((r) => r.lead)
       .map((r) => `<span class="gx-band-lead" style="left:${r.left}px;top:${r.top}px"${r.leadTitle ? ` title="${esc(r.leadTitle)}"` : ""}>${esc(r.lead)}</span>`);
-    const items = model.band.items.map(itemHtml);
+    const items = model.band.items.map((it) => itemHtml(it, marks));
     // a band parent's ripples and the band children's rings over its items (the items are opaque and the band lies over
     // .gx-cmd-top)
     const rings = model.links.map(bandMarkHtml).join("") + model.ripples.filter((r) => inBand(model, r)).map(rippleHtml).join("");
@@ -86,7 +86,7 @@ const BADGES = { primary: UNSCOPED.primary, unlinked: UNSCOPED.unlinked };
  * One item of the band (iss-00668 D-07): its label is a button opening the worktree's panel, then its badge and count,
  * then its agents at the model's slots (wrapped lines too); "+N" is its label alone; an idle item is faint.
  */
-function itemHtml(it) {
+function itemHtml(it, marks) {
   const style = `left:${it.x}px;top:${it.y}px;width:${it.w}px;height:${it.h}px`;
   const cls = `gx-band-item${it.idle ? " is-idle" : ""}${it.kind === "fold" ? " is-fold" : ""}`;
   if (it.kind === "fold") {
@@ -96,7 +96,7 @@ function itemHtml(it) {
   const lab = `<button type="button" class="gx-band-lab" data-cmd-wt="${esc(it.key)}" style="width:${it.labelWidth}px" title="${esc(it.label)}">${esc(it.label)}</button>`;
   const b = BADGES[it.badge];
   const badge = b ? `<span class="gx-band-badge" data-badge="${esc(it.badge)}" style="width:${it.badgeWidth}px" title="${esc(b.title)}" aria-label="${esc(b.title)}">${esc(b.text)}</span>` : "";
-  const ct = countTitle(it);
+  const ct = countTitle(it, marks);
   const count = ct ? `<span class="gx-band-count" style="width:${it.countWidth}px" title="${esc(ct)}" aria-label="${esc(ct)}">${esc(String(it.count))}</span>` : "";
   const agents = it.agents
     .map((a) => `<button type="button" class="gx-band-agent" style="left:${a.x - it.x - 1}px;top:${a.y - it.y}px" data-cmd-agent="${esc(a.id)}" data-cmd-item="${esc(it.key)}" aria-pressed="false" aria-label="${esc(`${it.label}：${a.id}`)}"><span class="gx-band-slot"></span></button>`)
@@ -240,8 +240,9 @@ export function renderAgentPanel(panel, { id, summary, model, orca, hide }) {
   const { agent, worktree } = found;
   const item = model?.band?.items.find((it) => it.agents.some((a) => a.id === id));
   const label = item?.label ?? (typeof worktree.branch === "string" && worktree.branch ? worktree.branch : "ブランチ不明");
-  const type = typeof agent.agentType === "string" && agent.agentType ? agent.agentType : "種類不明";
-  const frame = typeof agent.detail === "string" ? agentFrame(orca?.origin, { detail: agent.detail, agentType: agent.agentType ?? null, branch: worktree.branch ?? null }, theme) : null;
+  const marks = orca?.marks?.() ?? null;
+  const type = agentTypeLabel(marks, agent.agentType, "種類不明");
+  const frame = typeof agent.detail === "string" ? agentFrame(orca?.origin, { detail: agent.detail, agentType: agent.agentType ?? null, branch: worktree.branch ?? null }, theme, marks) : null;
   panel.dataset.st = "unknown";
   delete panel.dataset.cmdWt; // iss-00668: a worktree's panel gives way to the chat
   delete panel.dataset.cmdWtSig;
@@ -303,9 +304,10 @@ export function renderWorktreePanel(panel, { item, orca, embed = false, hide }) 
     const b = BADGES[item.badge];
     const badge = b ? `<span class="gx-band-badge" data-badge="${esc(item.badge)}" title="${esc(b.title)}">${esc(b.text)}</span> ` : "";
     const branch = typeof item.worktree?.branch === "string" && item.worktree.branch ? item.worktree.branch : item.label;
+    const marks = orca?.marks?.() ?? null;
     const agents = refs
       .map((a) => {
-        const type = typeof a.agentType === "string" && a.agentType ? a.agentType : "種類不明";
+        const type = agentTypeLabel(marks, a.agentType, "種類不明");
         return `<li><button type="button" class="pn-wt-agent" data-wt-agent="${esc(a.id)}"><span class="gx-band-slot"></span>${esc(type)}</button></li>`;
       })
       .join("");
