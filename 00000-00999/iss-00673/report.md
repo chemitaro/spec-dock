@@ -48,6 +48,10 @@ ID: "iss-00673"
 | 16 | linked | 15 と同じ（読みだけ） | 読みは通った。読みの規則がないので、利用者の設定の `allowNonWorkspaceAccess: true` によると考える（15 の書き込みは同じ状態で拒まれたので、それだけでは書き込みが通らない） |
 | 17 | linked | 利用者の設定（10:49 以後）に、`--settings` で 5 の規則 | ファイルの道具の書き込みが成功。ログは `--settings` の規則を `CLI settings initialized: permissions=&{Allow:[read_file(...) write_file(...)] ...}` と読み込む（保存された設定の `permissions` も同じ行で読み込まれる） |
 | 18 | — | 公式のスキーマ `https://antigravity.google/schemas/v1/settings.json`（利用者の設定の `$schema`） | 『stored in ~/.gemini/antigravity-cli/settings.json』。`permissions` は `allow`・`ask`・`deny`、規則は `^(command\|read_file\|write_file\|read_url\|execute_url\|mcp\|unsandboxed)\(.*\)$`、『A deny rule takes precedence over an ask rule, and an ask rule over an allow rule』。`allowNonWorkspaceAccess` は『subject to toolPermission, agentMode, and your permission rules』。`enableTerminalSandbox` は『Runs the agent's terminal commands in the terminal sandbox ... --sandbox turns it on for one session』 |
+| 19 | linked（一時のリポジトリを、利用者の `trustedWorkspaces` の中のフォルダー（この worktree の Git の外の `.workbench` の下）に作った） | なし（利用者の設定：`allowNonWorkspaceAccess: true`、`trustedWorkspaces` にその親、`permissions` はコマンドの規則だけ） | ファイルの道具の書き込みが拒まれた（『a tool required the "write_file" permission ... auto-denied』） |
+| 20 | 19 と同じ | 19 に、`--settings` で 5 の規則と `command(touch)` | 読み、ファイルの道具の作成、端末の `touch` とも成功 |
+
+既定の状態（1〜14、利用者の設定に権限の項目がなく、一時のリポジトリは信頼済みのフォルダーの外）でも、利用者が設定した後の状態（15〜20、`allowNonWorkspaceAccess: true`、信頼済みの親のフォルダー）でも、linked worktree でカタログに書くには `read_file`・`write_file` の規則が要り、規則があれば通った。案内の結論は、利用者のこれらの設定に依らない。`allowNonWorkspaceAccess: true` は、権限の規則がない状態では（6）読み書きを通したが、利用者の設定が `agentMode`・`ask`・`deny` を持つ状態では（15、19）書き込みを通さなかった。`trustedWorkspaces` は、カタログへの書き込みの可否を変えなかった（19）。
 
 まとめ：
 
