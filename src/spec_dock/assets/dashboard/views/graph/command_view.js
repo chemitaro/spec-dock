@@ -8,7 +8,7 @@ import { AGENT_SANDBOX, agentFrame } from "../_shared/agents_logic.js";
 import { currentTheme } from "../_shared/agents_tab.js";
 import { SHEET_GRAB } from "../_shared/panel.js";
 import { openWorktreeButton } from "../_shared/orca_marks.js";
-import { UNSCOPED, countTitle } from "./unscoped.js";
+import { UNSCOPED } from "./unscoped.js";
 
 export const LAYERS = ["gx-cmd", "gx-cmd-top", "gx-band"];
 
@@ -83,7 +83,7 @@ export function layersHtml(model) {
 const BADGES = { primary: UNSCOPED.primary, unlinked: UNSCOPED.unlinked };
 
 /**
- * One item of the band (iss-00668 D-07): its label is a button opening the worktree's panel, then its badge and count,
+ * One item of the band (iss-00668 D-07): its label is a button opening the worktree's panel, then its badge,
  * then its agents at the model's slots (wrapped lines too); "+N" is its label alone; an idle item is faint.
  */
 function itemHtml(it) {
@@ -96,12 +96,10 @@ function itemHtml(it) {
   const lab = `<button type="button" class="gx-band-lab" data-cmd-wt="${esc(it.key)}" style="width:${it.labelWidth}px" title="${esc(it.label)}">${esc(it.label)}</button>`;
   const b = BADGES[it.badge];
   const badge = b ? `<span class="gx-band-badge" data-badge="${esc(it.badge)}" style="width:${it.badgeWidth}px" title="${esc(b.title)}" aria-label="${esc(b.title)}">${esc(b.text)}</span>` : "";
-  const ct = countTitle(it);
-  const count = ct ? `<span class="gx-band-count" style="width:${it.countWidth}px" title="${esc(ct)}" aria-label="${esc(ct)}">${esc(String(it.count))}</span>` : "";
   const agents = it.agents
     .map((a) => `<button type="button" class="gx-band-agent" style="left:${a.x - it.x - 1}px;top:${a.y - it.y}px" data-cmd-agent="${esc(a.id)}" data-cmd-item="${esc(it.key)}" aria-pressed="false" aria-label="${esc(`${it.label}：${a.id}`)}"><span class="gx-band-slot"></span></button>`)
     .join("");
-  return `<div class="${cls}" style="${style}">${lab}${badge}${count}${agents}</div>`;
+  return `<div class="${cls}" style="${style}">${lab}${badge}${agents}</div>`;
 }
 
 /**

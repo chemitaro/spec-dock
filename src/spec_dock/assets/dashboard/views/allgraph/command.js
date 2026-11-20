@@ -6,7 +6,7 @@
 // frames shown are needed, and the measured marks of each repository as spotsOf.
 import { normPath, summaryValid } from "../../core/orca_match.js";
 import { BAND, bandItems, bandKeys, bandRowHeight, bandRowWidth, commandModel, placer } from "../graph/command.js";
-import { UNSCOPED, commanding, unscopedItems } from "../graph/unscoped.js";
+import { UNSCOPED, unscopedItems } from "../graph/unscoped.js";
 import { REPO } from "./compose.js";
 
 /** The text at the head of the band above every frame (R-02). */
@@ -46,22 +46,20 @@ export function repoOfWorktrees(repos, summary) {
 
 /**
  * Where each end of the pairs sits in the cross-repository structure (iss-00617 R-01, R-03, F-02) and each repository's
- * Unscoped row (iss-00668 D-04).
+ * Unscoped row (iss-00668 D-04), by one rule in every range (iss-00676 D-02): the range only shapes the layouts.
  * Place: graph/command.js's Place with `repo` (the worktree's repository or null), and `row` for a band's end (the
  * repository's key, "" for "ほかの場所").
- * @param pairs       commandPairs(summary), all of them (the rows' counts use them in "next")
+ * @param pairs       commandPairs(summary), all of them
  * @param repos       [{key, structure, layout, ix, graph}] in the list's order; graph: the frame's body is a graph
  * @param visible     the keys compose() shows without a band
  * @param visibleWith (keep) => the keys compose() shows with `keep`
  * @param orderOf     worktree -> its agents in the component's order (orderAgents), or null
- * @param range       "all" | "now" | "next": "next" draws no line (its pairs and places are empty)
  * @returns {pairs, places: Map<agent id, Place>, rows: Map<row, items>, keep: Set<key>, of, unknown}
  */
-export function crossPlace(pairs, { repos, summary, visible, visibleWith, orderOf, range = "all" }) {
+export function crossPlace(pairs, { repos, summary, visible, visibleWith, orderOf }) {
   const { of, unknown } = repoOfWorktrees(repos, summary);
   const keys = summaryValid(summary) ? bandKeys(summary) : new Map();
   const byKey = new Map(repos.map((r) => [r.key, r]));
-  const next = range === "next";
   const placers = new Map();
   const placeIn = (k, ref) => {
     const r = byKey.get(k);
@@ -72,7 +70,7 @@ export function crossPlace(pairs, { repos, summary, visible, visibleWith, orderO
   };
   const places = new Map();
   const kept = [];
-  for (const pair of next ? [] : pairs) {
+  for (const pair of pairs) {
     const ends = [pair.parent, pair.child];
     // F-02: a worktree in no repository may be one not known yet: no guess of "ほかの場所"
     if (unknown && ends.some((ref) => !of.has(ref.worktree))) continue;
@@ -83,41 +81,29 @@ export function crossPlace(pairs, { repos, summary, visible, visibleWith, orderO
     }
     kept.push(pair);
   }
-  // R-03: a repository not shown keeps its frame for the band when a pair's parent is in it ("next": a commanding item)
+  // R-03: a repository not shown keeps its frame for the band when a pair's parent is in it
   const shown = visible instanceof Set ? visible : new Set(visible || []);
   const ownOf = (k) => new Set([...of].filter(([, key]) => key === k).map(([w]) => w));
   const rowOf = (k) => {
     const mine = new Map([...places].filter(([, p]) => p.kind === "band" && p.row === k));
-    return unscopedItems({ structure: byKey.get(k)?.structure, summary, pairs, places: mine, own: ownOf(k), orderOf, range });
+    return unscopedItems({ structure: byKey.get(k)?.structure, summary, pairs, places: mine, own: ownOf(k), orderOf });
   };
   const keep = new Set();
-  const early = new Map();
-  if (next) {
-    for (const r of repos) {
-      if (shown.has(r.key)) continue;
-      const res = rowOf(r.key);
-      early.set(r.key, res);
-      if (commanding(res.items)) keep.add(r.key);
-    }
-  } else {
-    for (const pair of kept) {
-      const p = places.get(pair.parent.id);
-      if (p.kind === "band" && p.row && !shown.has(p.row)) keep.add(p.row);
-    }
+  for (const pair of kept) {
+    const p = places.get(pair.parent.id);
+    if (p.kind === "band" && p.row && !shown.has(p.row)) keep.add(p.row);
   }
   const shown2 = keep.size && typeof visibleWith === "function" ? new Set(visibleWith(keep)) : shown;
   for (const [id, p] of places) {
     if (p.repo && !shown2.has(p.repo)) places.set(id, { kind: "band", key: keys.get(refOf(kept, id)?.worktree) ?? p.key, repo: p.repo, row: "" });
   }
-  // the rows: "ほかの場所" first (all and now: today's band items), then each shown repository's Unscoped row
+  // the rows: "ほかの場所" first (today's band items), then each shown repository's Unscoped row
   const rows = new Map();
-  if (!next) {
-    const mine = new Map([...places].filter(([, p]) => p.kind === "band" && p.row === ""));
-    if (mine.size) rows.set("", bandItems(kept, mine, new Set(), orderOf));
-  }
+  const other = new Map([...places].filter(([, p]) => p.kind === "band" && p.row === ""));
+  if (other.size) rows.set("", bandItems(kept, other, new Set(), orderOf));
   for (const r of repos) {
     if (!shown2.has(r.key)) continue;
-    const res = early.get(r.key) || rowOf(r.key);
+    const res = rowOf(r.key);
     for (const [id, p] of res.places) if (p.kind === "band" && p.row === r.key) places.set(id, p);
     // one "+N" per frame: its key names its repository (the band's items are looked up by key across the rows)
     if (res.items.length) rows.set(r.key, res.items.map((it) => (it.kind === "fold" ? { ...it, key: `fold|${r.key}` } : it)));

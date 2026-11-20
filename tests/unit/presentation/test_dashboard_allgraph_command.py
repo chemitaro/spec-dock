@@ -183,6 +183,17 @@ CROSS = summary(
 )
 CROSS_MARKS = {key("c"): {"iss-00002": mark("a-own", "a-impl")}}
 
+# iss-00676 T-01: the real shape (three repositories, one coordinator in p's main checkout)
+REAL_C = structure("/w/c", {"iss-00002": "/w/c-2", "iss-00005": "/w/c-5"}, git=(("/w/c-x", "topic-x"),))
+REAL = summary(
+    wt("wt-p", "/w/p", "main", [ag("a-coord")], PROJ_P, main=True),
+    wt("wt-c2", "/w/c-2", "iss-00002", [ag("c-own", parent="a-coord"), ag("c-impl", "waiting", "c-own")], PROJ_C),
+    wt("wt-c5", "/w/c-5", "iss-00005", [ag("c-five", parent="a-coord")], PROJ_C),
+    wt("wt-cx", "/w/c-x", "topic-x", [ag("x-free")], PROJ_C),
+    wt("wt-d", "/w/d", "main", [ag("d-one", parent="a-coord")], ("p-d", "repo-d"), main=True),
+)
+REAL_PAIRS = [["c-own", "c-impl"], ["a-coord", "c-own"], ["a-coord", "c-five"], ["a-coord", "d-one"]]
+
 
 def _sc(**kw: Any) -> dict[str, Any]:
     base: dict[str, Any] = {"repos": [REPO_C, REPO_P], "range": "all", "width": 1400}
@@ -217,8 +228,8 @@ SCENARIOS: dict[str, dict[str, Any]] = {
             wt("wt-p", "/w/p", "main", [ag("p-a", parent="x-coord")], PROJ_P, main=True),
         ),
     ),
-    # R-03, iss-00668 R-07: e has nothing to show in "next"; its main checkout's coordinator (Primary, a child) keeps
-    # its frame for its row
+    # R-03 (iss-00676 R-03): e has nothing to show in "next"; its main checkout's coordinator (Primary, a pair's parent)
+    # keeps its frame for its row
     "keep": _sc(
         range="next",
         repos=[
@@ -231,7 +242,7 @@ SCENARIOS: dict[str, dict[str, Any]] = {
         ),
         marks={key("c"): {"iss-00002": mark("c-own")}},
     ),
-    # R-03: only a child in e: no frame for e, and no "ほかの場所" in "next"
+    # R-03: only a child in e: no frame for e; the child's end goes to "ほかの場所" (iss-00676 R-03)
     "childOnly": _sc(
         range="next",
         repos=[
@@ -258,7 +269,7 @@ SCENARIOS: dict[str, dict[str, Any]] = {
         ),
     ),
     # two repositories with the same ids: their groups' ends on one edge are not spread as one edge's ("now" folds the
-    # done Issue 9 of the open Epic 8 into the group root.f in both; "next" draws no line, iss-00668 R-06)
+    # done Issue 9 of the open Epic 8 into the group root.f in both)
     "sameIds": _sc(
         range="now",
         repos=[
@@ -288,6 +299,22 @@ SCENARIOS: dict[str, dict[str, Any]] = {
             wt("wt-x", "/x/one", "topic-x", [ag("x-0"), *(ag(f"x-{i}", parent="x-0") for i in range(1, 5))], PROJ_X),
         ),
     ),
+    # iss-00676 T-01: the real shape in each range (one rule for the lines, R-01): p's main checkout directs c's Issue 2
+    # worktree (whose agents direct each other: an arc), c's done Issue 5 (hidden in "next": Epic 1's frame) and d's
+    # main checkout; c's Unscoped row has an Unlinked worktree whose agent directs nobody (R-02)
+    **{
+        f"real-{rng}": _sc(
+            range=rng,
+            repos=[
+                {**REPO_C, "structure": REAL_C},
+                {**REPO_P, "structure": structure("/w/p", git=())},
+                {"key": key("d"), "parent": None, "structure": structure("/w/d", git=())},
+            ],
+            summary=REAL,
+            marks={key("c"): {"iss-00002": mark("c-own", "c-impl")}},
+        )
+        for rng in ("next", "now", "all")
+    },
     # iss-00648 F-02: "ほかの場所" at the world's top directs an agent in a box far below (and one beside the band)
     "deep": _sc(
         repos=[{"key": key("t"), "parent": None, "structure": tall("/w/t", 60, "/w/t-60")}],
@@ -455,24 +482,19 @@ def test_while_a_repository_is_unknown_no_end_goes_to_the_other_places(got: dict
 
 
 def test_a_repository_with_nothing_shown_is_kept_for_its_coordinator(got: dict[str, Any]) -> None:
-    """iss-00617 R-03 by iss-00668 R-07: "next" keeps the frame whose row has a commanding item; no line is drawn."""
+    """iss-00617 R-03 (iss-00676 R-03): "next" keeps the frame whose band has a pair's parent; its line is drawn."""
     sc = _sc_of(got, "keep")
     assert key("e") not in sc["visible"]
     assert sc["keep"] == [key("e")] and sc["shape"]["keep"] == [key("e")]
     f = sc["comp"]["frames"][key("e")]
     assert f["body"]["kind"] in {"quiet", "empty"} and f["body"]["h"] == 0
     assert f["band"]["y2"] - f["band"]["y1"] == REPO_BAND
-    assert sc["pairs"] == [] and sc["places"] == {} and sc["model"]["links"] == []
+    assert sc["pairs"] == [["e-coord", "c-own"]]
+    assert sc["places"]["e-coord"] == {"kind": "band", "repo": key("e"), "row": key("e"), "key": "wt-e"}
+    assert sc["places"]["c-own"]["kind"] == "mark"
+    assert [link["id"] for link in sc["model"]["links"]] == ["e-coord>c-own"]
     assert sc["rows"][key("e")] == [
-        {
-            "key": "wt-e",
-            "label": "main",
-            "own": True,
-            "main": True,
-            "agents": ["e-coord"],
-            "badge": "primary",
-            "count": 1,
-        }
+        {"key": "wt-e", "label": "main", "own": True, "main": True, "agents": ["e-coord"], "badge": "primary"}
     ]
     assert sc["rows"][key("c")] == [
         {"key": "git:/w/c", "label": "main", "own": True, "main": True, "agents": [], "badge": "primary", "idle": True}
@@ -482,21 +504,79 @@ def test_a_repository_with_nothing_shown_is_kept_for_its_coordinator(got: dict[s
 
 
 def test_a_repository_with_nothing_shown_and_only_a_child_is_not_kept(got: dict[str, Any]) -> None:
+    """iss-00617 R-03 (iss-00676 R-03): the child's end sits in "ほかの場所"; the line is drawn."""
     sc = _sc_of(got, "childOnly")
     assert sc["keep"] == [] and key("e") not in sc["comp"]["frames"]
-    assert sc["places"] == {} and "" not in sc["rows"] and sc["comp"]["other"] is None
-    assert list(sc["rows"]) == [key("c")]
+    assert sc["places"]["e-child"] == {"kind": "band", "repo": key("e"), "row": "", "key": "wt-e"}
+    assert [it["agents"] for it in sc["rows"][""]] == [["e-child"]]
+    assert sc["comp"]["other"] is not None
+    assert list(sc["rows"]) == ["", key("c")]
+    assert [link["id"] for link in sc["model"]["links"]] == ["c-own>e-child"]
 
 
 def test_the_parent_repository_of_a_kept_frame_keeps_its_childs_end(got: dict[str, Any]) -> None:
     sc = _sc_of(got, "keepParent")
     assert sc["keep"] == [key("e")]
     assert set(sc["comp"]["order"]) >= {key("m"), key("e")}
-    assert sc["rows"][key("e")][0]["count"] == 1
-    assert sc["rows"][key("m")][0]["agents"] == ["m-child"] and "count" not in sc["rows"][key("m")][0]
+    assert sc["rows"][key("e")][0]["agents"] == ["e-coord"]
+    assert sc["rows"][key("m")][0]["agents"] == ["m-child"]
+    assert all("count" not in it for items in sc["rows"].values() for it in items)
     assert sc["comp"]["other"] is None
     assert {r["key"] for r in sc["model"]["band"]["rows"]} == {key("e"), key("m")}
-    assert sc["model"]["links"] == []
+    assert [link["id"] for link in sc["model"]["links"]] == ["e-coord>m-child"]
+
+
+@pytest.mark.parametrize("rng", ["next", "now", "all"])
+def test_every_range_keeps_every_pair_of_the_real_shape(got: dict[str, Any], rng: str) -> None:
+    """iss-00676 T-01 / R-01: one rule for the lines in every range; only the boxes and frames differ."""
+    sc = _sc_of(got, f"real-{rng}")
+    assert sc["unknown"] is False and sc["keep"] == []
+    assert sorted(sc["pairs"]) == sorted(sc["allPairs"]) == sorted(REAL_PAIRS)
+    assert sc["places"]["a-coord"] == {"kind": "band", "repo": key("p"), "row": key("p"), "key": "wt-p"}
+    assert sc["places"]["d-one"] == {"kind": "band", "repo": key("d"), "row": key("d"), "key": "wt-d"}
+    for agent in ("c-own", "c-impl"):
+        assert sc["places"][agent] == {
+            "kind": "mark",
+            "repo": key("c"),
+            "row": None,
+            "id": "iss-00002",
+            "scope": "iss-00002",
+        }
+    kinds = [link["kind"] for link in sc["model"]["links"]]
+    assert len(kinds) == 4 and kinds.count("arc") == 1
+    assert {link["id"] for link in sc["model"]["links"]} == {f"{p}>{c}" for p, c in REAL_PAIRS}
+    assert sc["model"]["audit"]["links"] == 4 and sc["model"]["audit"]["arcs"] == 1
+
+
+def test_next_puts_the_hidden_scopes_end_on_its_nearest_shown_ancestors_frame(got: dict[str, Any]) -> None:
+    """iss-00676 T-01 / R-01: c's done Issue 5 is hidden in "next": its agent's end is Epic 1's frame."""
+    assert "iss-00005" not in _sc_of(got, "real-next")["nodes"][key("c")]
+    assert _sc_of(got, "real-next")["places"]["c-five"] == {
+        "kind": "frame",
+        "repo": key("c"),
+        "row": None,
+        "id": "epic-00001",
+    }
+    assert _sc_of(got, "real-all")["places"]["c-five"]["kind"] == "mark"
+
+
+def test_every_range_has_the_same_unscoped_rows(got: dict[str, Any]) -> None:
+    """iss-00676 T-01 / R-02: the rows of "next" are those of "now" and "all", with no count."""
+    rows = [_sc_of(got, f"real-{rng}")["rows"] for rng in ("next", "now", "all")]
+    assert rows[0] == rows[1] == rows[2]
+    assert [(it["label"], it.get("badge"), it["agents"]) for it in rows[0][key("c")]] == [
+        ("main", "primary", []),
+        ("topic-x", "unlinked", ["x-free"]),
+    ]
+    assert rows[0][key("p")][0]["agents"] == ["a-coord"] and rows[0][key("d")][0]["agents"] == ["d-one"]
+    assert all("count" not in it for items in rows[0].values() for it in items)
+
+
+@pytest.mark.parametrize("name", ["keep", "childOnly", "keepParent", "real-next"])
+def test_next_draws_its_lines_through_the_bands_shape(got: dict[str, Any], name: str) -> None:
+    """iss-00676 T-01 / R-01, F-02: the frames composed with the bands' shape draw every placed pair."""
+    sc = _sc_of(got, name)
+    assert len(sc["model"]["links"]) == len(sc["pairs"]) > 0
 
 
 def test_groups_of_the_same_key_in_two_repositories_are_not_one_edge(got: dict[str, Any]) -> None:

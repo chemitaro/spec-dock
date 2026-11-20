@@ -327,13 +327,13 @@ def test_the_cross_next_counts_and_draws_no_line(cross: dict[str, Any]) -> None:
 
 
 def test_the_row_css_uses_only_the_variables() -> None:
-    """T-04 / R-02..R-04: the badge, the count and the faint item; colours only from the design system's variables."""
+    """T-04 / R-02..R-04: the badge and the faint item; colours only from the design system's variables.
+    iss-00676 T-03 / R-02: no rule of the count."""
     rules = dict(GS._rules(GRAPH_CSS))
     for sel in (
-        ".gx .gx-band-badge, .gx .gx-band-count",
+        ".gx .gx-band-badge",
         '.gx .gx-band-badge[data-badge="primary"]',
         '.gx .gx-band-badge[data-badge="unlinked"]',
-        ".gx .gx-band-count",
         ".gx .gx-band-item.is-idle",
         ".gx .gx-band-lab:focus-visible",
     ):
@@ -341,7 +341,8 @@ def test_the_row_css_uses_only_the_variables() -> None:
     assert "opacity: .55" in rules[".gx .gx-band-item.is-idle"]
     assert "var(--ds-accent-soft)" in rules['.gx .gx-band-badge[data-badge="primary"]']
     assert "var(--ds-warn-bg)" in rules['.gx .gx-band-badge[data-badge="unlinked"]']
-    assert "var(--ds-surface-3)" in rules[".gx .gx-band-count"]
+    assert not any("gx-band-count" in sel for sel, _ in GS._rules(GRAPH_CSS))
+    assert "gx-band-count" not in GRAPH_CSS
     colours = re.compile(r"#[0-9a-fA-F]{3,8}\b|rgb\(|hsl\(")
     band = [body for sel, body in GS._rules(GRAPH_CSS) if ".gx-band" in sel or ".pn-wt" in sel]
     assert band and not any(colours.search(body) for body in band)

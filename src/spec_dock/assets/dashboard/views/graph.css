@@ -354,8 +354,8 @@
    行の頭の文字（『横断の構造』の『ほかの場所』、iss-00617）の高さ 28 は BAND.h、文字の大きさは labelWidth の見積もりの写し */
 .gx .gx-world > .gx-band { position: absolute; left: 0; top: 0; z-index: 6; }
 /* iss-00668 D-08: the Unscoped row. An item takes its height from the model (a wrapped line of agents is 24px lower);
-   its label, badge and count sit in the first line (26px inside the border), its agents at the model's slots. The
-   widths are graph/command.js's estimates (labelWidth: 11.5px text; the badge and the count at 0.8 of it, 9.2px):
+   its label and badge sit in the first line (26px inside the border), its agents at the model's slots. The
+   widths are graph/command.js's estimates (labelWidth: 11.5px text; the badge at 0.8 of it, 9.2px):
    change them together. Idle items are faint. */
 .gx .gx-band-item { position: absolute; display: flex; align-items: flex-start; box-sizing: border-box; padding: 0 6px; border: 1px solid var(--ds-border); border-radius: 14px; background: var(--ds-surface); box-shadow: var(--ds-shadow-s); white-space: nowrap; }
 .gx .gx-band-item.is-idle { opacity: .55; }
@@ -363,10 +363,9 @@
 .gx .gx-band-lab { flex: none; margin: 0; margin-right: 6px; padding: 0; border: 0; background: none; height: 26px; line-height: 26px; overflow: hidden; text-overflow: ellipsis; text-align: left; font: inherit; font-size: 11.5px; color: var(--ds-text-2); cursor: pointer; }
 .gx .gx-band-lab:focus-visible { outline: 2px solid var(--ds-focus); outline-offset: 1px; border-radius: 4px; }
 .gx .gx-band-fold { margin-right: 0; text-align: center; }
-.gx .gx-band-badge, .gx .gx-band-count { flex: none; box-sizing: border-box; margin: 6px 6px 0 0; height: 14px; line-height: 14px; padding: 0; border-radius: 7px; overflow: hidden; text-align: center; font-size: 9.2px; font-weight: 600; color: var(--ds-text-2); }
+.gx .gx-band-badge { flex: none; box-sizing: border-box; margin: 6px 6px 0 0; height: 14px; line-height: 14px; padding: 0; border-radius: 7px; overflow: hidden; text-align: center; font-size: 9.2px; font-weight: 600; color: var(--ds-text-2); }
 .gx .gx-band-badge[data-badge="primary"] { background: var(--ds-accent-soft); color: var(--ds-accent-strong); }
 .gx .gx-band-badge[data-badge="unlinked"] { background: var(--ds-warn-bg); color: var(--ds-warn-ink); }
-.gx .gx-band-count { background: var(--ds-surface-3); color: var(--ds-text); }
 .gx .gx-band-agent { position: absolute; width: 52px; height: 26px; display: flex; justify-content: center; align-items: center; background: none; border: 0; padding: 0; cursor: pointer; }
 .gx .gx-band-agent[aria-pressed="true"] { box-shadow: inset 0 -2px 0 var(--sd-cmd); }
 /* 帯に置かれた親の波紋は帯の中の最後の層（不透明な項目の上）。中心はそのエージェントの枠の中央（D-03） */

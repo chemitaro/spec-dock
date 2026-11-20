@@ -943,7 +943,7 @@ def test_the_key_is_the_same_for_the_same_inputs(tmp_path: Path) -> None:
     }
 
 
-# --- iss-00668 T-03: the badges, the counts, the fold and the wrapped agents -----------------------------------
+# --- iss-00668 T-03: the badges, the fold and the wrapped agents (iss-00676 D-03: no count) ----------------------
 
 
 def _bi(key: str, label: str, agents: int, **extra: Any) -> dict[str, Any]:
@@ -951,7 +951,8 @@ def _bi(key: str, label: str, agents: int, **extra: Any) -> dict[str, Any]:
 
 
 BAND_ROWS = [
-    # the main checkout with a badge, an Unlinked worktree with a count, a fold; one row, one line
+    # the main checkout with a badge, an Unlinked worktree with a stale count (iss-00676: it adds nothing), a fold; one
+    # row, one line
     {
         "rows": [
             {
@@ -986,21 +987,21 @@ def rows(tmp_path_factory: pytest.TempPathFactory) -> list[dict[str, Any]]:
     return _run(tmp_path_factory.mktemp("band-rows"), {"bandRows": BAND_ROWS})["bandRows"]
 
 
-def test_badges_and_counts_widen_an_item_and_a_fold_has_no_agents(rows: list[dict[str, Any]]) -> None:
-    """T-03 / R-02, R-04: the badge and the count add their small text and a gap; the fold is its label alone."""
+def test_badges_widen_an_item_a_count_does_not_and_a_fold_has_no_agents(rows: list[dict[str, Any]]) -> None:
+    """T-03 / R-02, R-04: the badge adds its small text and a gap; a count adds nothing (iss-00676 T-02 / R-02);
+    the fold is its label alone."""
     band = rows[0]["band"]
     p, u, f, n = band["items"]
     primary = 38 + 6  # ceil(47 × 0.8) + labelGap
     unlinked = 43 + 6  # ceil(53 × 0.8) + labelGap
-    count = 20 + 6  # ceil(24 × 0.8) + labelGap
     assert p["w"] == 2 + 12 + p["labelWidth"] + 6 + primary + 52
-    assert u["w"] == 2 + 12 + u["labelWidth"] + 6 + unlinked + count + 52 * 2
+    assert u["w"] == 2 + 12 + u["labelWidth"] + 6 + unlinked + 52 * 2
     assert f["w"] == 2 + 12 + f["labelWidth"]
     assert f["agents"] == [] and f["kind"] == "fold"
     assert n["w"] == 2 + 12 + n["labelWidth"] + 6
-    # the agents sit after the label, the badge and the count
-    assert u["agents"][0]["x"] == u["x"] + 1 + 6 + u["labelWidth"] + 6 + unlinked + count
-    assert (p["badge"], u["badge"], u["count"]) == ("primary", "unlinked", 3)
+    # the agents sit after the label and the badge
+    assert u["agents"][0]["x"] == u["x"] + 1 + 6 + u["labelWidth"] + 6 + unlinked
+    assert (p["badge"], u["badge"]) == ("primary", "unlinked")
     # the lead's text comes first, the items 10 apart
     assert p["x"] == 24 + 53 + 6
     assert rows[0]["widths"][0] == 53 + 6 + sum(it["w"] for it in band["items"]) + 10 * 3
