@@ -1,41 +1,55 @@
 package spec
 
 // 計画（Issue）。型 specdock/v1。
-// 作業しながら、手順の追加、変更、status の更新を、このファイルに直接書く。
 
-// 目標（任意）。
-// goal: "..."
+goal: "マージできる PR（CI 合格、最終品質ゲートの closure.md あり）。Antigravity の中の linked worktree で `canonical status` が1行を示し、配る案内に Antigravity がある。"
 
-// 実装の手順。番号（S-01、…）をキーにし、番号の順に並べる。
-// title と realizes（満たす要件・失敗の条件の番号）が必須。
-// status は todo（既定）、doing、done、dropped。after は先に済ませる手順の番号。
-// 1手順を1行に書き、status は title と realizes のすぐ後に置く。status の位置がそろうので一括で書き換えやすく、
-// 同じ手順に status を2つ書く誤りも防げる（同じ値の2つは CUE が黙ってまとめ、違う値なら誤りになる）。
-// すべての要件に、それを満たす手順が要る（dropped の手順は数えない）。
-// strict 以上では、dropped でない手順のすべてが、いずれかの番号に結び付く。
 steps: {
-	// "S-01": {title: "〜を作る", realizes: ["R-01"], status: "todo", after: ["..."], session: "impl"}
+	"S-01": {title: "canonical.md・reference_cli.md の Antigravity の案内（提供側と dogfood）と static-inventory.json の2行（タスク担当）", realizes: ["R-02"], status: "todo", session: "owner"}
+	"S-02": {title: "検出（D-01）、domain の関数（D-02）、`tools.antigravity` と警告（D-03）と、そのテスト・案内の検査のテスト", realizes: ["R-01", "R-02", "F-01"], status: "todo", after: ["S-01"], session: "impl"}
 }
 
-// テスト。番号（T-01、…）をキーにする。title と verifies（確かめる要件・失敗の条件の番号）が必須。
-// standard 以上では、すべての要件に、strict 以上では、すべての失敗の条件に、確かめるテストが要る。
 tests: {
-	// "T-01": {title: "〜を確かめる", verifies: ["R-01"]}
+	"T-01": {title: "`ANTIGRAVITY_AGENT` ありの linked worktree で、設定のファイルがないと `configured` 偽、1行、`CANONICAL_TOOL_SETTING_MISSING`（tool antigravity）、`tools.next_step` がその1行（cli_runtime）", verifies: ["R-01"]}
+	"T-02": {title: "`permissions.allow` にカタログか親の `read_file`・`write_file` の両方、または `allowNonWorkspaceAccess` 真で `configured` 真・警告なし。片方だけ、`~`・相対・`*` の規則では偽（cli_runtime と domain の単体）", verifies: ["R-01"]}
+	"T-03": {title: "`ANTIGRAVITY_APP_DATA_DIR` でファイルが移る。相対の値、JSON でない、形が違う設定は `configured` null と `CANONICAL_TOOL_SETTING_UNKNOWN`（cli_runtime）", verifies: ["R-01"]}
+	"T-04": {title: "`ANTIGRAVITY_AGENT` なしでは、設定がなくても Antigravity の警告が出ず、`tools` の `status`・`next_step` と警告の列が今と同じ。main のチェックアウトでは `needed` 偽で警告なし（cli_runtime）", verifies: ["F-01", "R-01"]}
+	"T-05": {title: "設定のファイルのバイトが実行の前後で同じ。今の `test_issue429_canonical_status.py` などの Codex・Claude Code のテストがそのまま通る", verifies: ["R-01"]}
+	"T-06": {title: "提供側の canonical.md に Antigravity の項（`~/.gemini/antigravity-cli/settings.json`、`read_file(`、`write_file(`、`1.5.12`）があり、reference_cli.md の C45 に Antigravity があり、両方が dogfood の写しとバイトが同じ。今の資産の検査のテストが通る", verifies: ["R-02"]}
 }
 
-// 検証のしかた、戻し方、終わりの条件（任意）。critical では、手順があれば rollback が要る。
-// verification: "..."
-// rollback:     "..."
-// exit:         "..."
+verification: """
+	S-02 の後：`uv run pytest tests/cli_runtime/test_issue429_canonical_status.py tests/unit/infra/test_runtime_environment.py` と、新しいテストのファイル、資産の検査のテスト（`uv run pytest tests/unit/infra -k inventory` など、実装担当が名前を確かめる）。
+	最後に `make lint`、`uv run pytest`（全体）。
+	"""
 
-// 実行の割り当て（任意）。手順の session は、実装のセッション（impl）を指す。
-// セッションのモデルと推論は起動のときに決まるので、計画で選べるのは、計画の後に起動するセッション（実装担当）の値。
-// 計画を書いたセッション（spec）の値は、事実として記録する。
-// レビューの after は、どの手順の後かを指す。モデルと推論の名前は、どんな文字列でもよい。
-// execution: {
-// 	sessions: {
-// 		spec: {task: "仕様化（起動した側が選んだ値の記録）", model: "...", effort: "...", rationale: "<起動した側と根拠>"}
-// 		impl: {task: "実装", model: "...", effort: "...", rationale: "..."}
-// 	}
-// 	reviews: code: {role: "コードのレビュー", after: "S-01", model: "...", effort: "..."}
-// }
+rollback: "PR を戻す。Antigravity の項目と案内がなくなるだけで、Codex・Claude Code の動きは変わらない。"
+
+exit: "PR がマージできる状態で、CI が通り、最終品質ゲートの closure.md があり、report.md に実物での確かめがある。マージ、`work finish`、版の公開は統括が行う。"
+
+gates: {
+	checkpoints: {}
+	checkpoints_note: "なし。実装の手順は1つで、最終品質ゲートで足りる"
+	final_quality_gate: {
+		scope:          "この Issue の変更：開始のコミット 83b8ee95f から S-02 の終わりまで"
+		perspectives:   ["requirements-closure", "test-adequacy", "compatibility"]
+		test_commands:  ["make lint", "uv run pytest"]
+		record_paths:   []
+		second_opinion: "chatgpt"
+		second_opinion_note: "依頼書の指示で、2人目は ChatGPT Use の系列（chatgpt-final-quality-gate-strict）を先に使う。取れなければ方針どおり（standard は2人目なし）にし、逸脱として記録する"
+		reviewer:       "quality-gate-reviewer opus / medium"
+	}
+	merge:      "owner"
+	merge_note: "本人が統括にマージを委任した（依頼書）。タスク担当はマージしない"
+}
+
+execution: {
+	sessions: {
+		owner: {task: "仕様化と案内の文書（S-01）", model: "opus", effort: "medium", rationale: "統括が方針の「タスク担当 × standard」から選んだ（依頼書）。文書は依頼書と方針の第2節でタスク担当が書く（同じセッションの例外：文書を書く手順）"}
+		impl: {task: "実行時の Python とテスト（S-02）", provider: "codex", model: "gpt-6.2-sol", effort: "medium", rationale: "方針の第2節、standard のテストで確かめられる実装。依頼書も GPT-6.2 Sol / medium を推す。Sol で失敗や見落としが記録されたときだけ GPT-6.2 Astra / high に上げる。確認の画面や chat-scratch の symlink の拒否で止まったら、worker-stop して Claude Opus 5.5 / medium に切り替える（統括が了承済み）"}
+	}
+	reviews: {
+		spec: {role: "仕様のレビュー", after: "S-01", model: "opus", effort: "high"}
+		gate: {role: "最終品質ゲート", after: "S-02", model: "opus", effort: "medium"}
+	}
+}
