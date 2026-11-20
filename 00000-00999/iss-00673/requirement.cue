@@ -54,13 +54,13 @@ requirements: {
 			`canonical status --json` の `data.tools.antigravity` に、Antigravity の中か（`session`）、設定が要るか（`needed`、linked worktree なら真）、設定があるか（`configured`：真、偽、分からない）、読んだ設定のファイル（`sources`）、示す設定のファイルの名前（`file`、`~/.gemini/antigravity-cli/settings.json`）、足す1行（`line`）を出す。
 			Antigravity の中で、linked worktree で、設定がないときは、警告 `CANONICAL_TOOL_SETTING_MISSING`（`details.tool` は `antigravity`、`next_step` は1行）を出し、`tools.next_step` をその1行にする。判定できないときは `CANONICAL_TOOL_SETTING_UNKNOWN` を出す。
 			1行は `{ "permissions": { "allow": ["read_file(<カタログ>)", "write_file(<カタログ>)"] } }` で、`<カタログ>` は今の Claude Code・Codex の1行と同じカタログの絶対パス。
-			設定があるとは、`permissions.allow` に、カタログかその親を指す `read_file(...)` と `write_file(...)` が両方あり、`permissions.deny` と `permissions.ask` に、カタログかその親を指す `read_file(...)`・`write_file(...)` がないこと（deny と ask が allow より優先するため）。deny か ask がカタログを覆うときは、allow の1行を足しても直らないので、判定できない（`CANONICAL_TOOL_SETTING_UNKNOWN`）とし、`next_step` で deny と ask の規則を確かめるよう示す。deny か ask に、対象に `*` を含むか絶対のパスでない `read_file(...)`・`write_file(...)` が1つでもあれば、カタログを覆うかを確かめられないので、同じく判定できないとし、`next_step` でその形の規則も確かめるよう示す（公式の資料は `read_file(*)` などを全体に当たる規則とする。誤って『設定あり』と答えないため）。allow のそうした規則は、今どおり許す側に数えない。
+			設定があるとは、`permissions.allow` に、カタログかその親を指す `read_file(...)` と `write_file(...)` が両方あり、`permissions.deny` と `permissions.ask` に、カタログかその親を指す `read_file(...)`・`write_file(...)` がないこと（deny と ask が allow より優先するため）。deny か ask がカタログを覆うときは、allow の1行を足しても直らないので、判定できない（`CANONICAL_TOOL_SETTING_UNKNOWN`）とし、`next_step` で deny と ask の規則を確かめるよう示す。deny か ask に、対象が空（`read_file()`）、括弧のない形（`read_file` だけ）、`*` を含む、絶対のパスでない、のどれかに当たる `read_file`・`write_file` の規則が1つでもあれば、カタログを覆うかを確かめられないので、同じく判定できないとし、`next_step` でその形の規則も確かめるよう示す（公式の資料は `read_file(*)` などを全体に当たる規則とする。誤って『設定あり』と答えないため）。allow のそうした規則は、今どおり許す側に数えない。
 			"""
 		acceptance: [
 			"`ANTIGRAVITY_AGENT` がある環境で、linked worktree の `canonical status --json` が、設定のファイルがないとき `tools.antigravity.configured` が偽、`line` が上の1行、警告 `CANONICAL_TOOL_SETTING_MISSING`（`details.tool` が `antigravity`）、`tools.next_step` がその1行になる",
 			"設定のファイルの `permissions.allow` に、カタログかその親の `read_file(...)` と `write_file(...)` の両方があれば `configured` が真で、Antigravity の警告が出ない。片方だけ、`~`・相対のパス・`*` の規則だけ、`allowNonWorkspaceAccess` だけなら偽",
 			"`deny` か `ask` にカタログかその親の `read_file`・`write_file` があれば、`allow` に両方があっても `configured` が null で、Antigravity の中なら `CANONICAL_TOOL_SETTING_UNKNOWN` の `next_step` が deny と ask の規則を確かめるよう示す",
-			"`deny` か `ask` に、対象に `*` を含むか絶対のパスでない `read_file`・`write_file` の規則（`read_file(*)`、`write_file(/some/*)`、`read_file(~/x)` など）があれば、`allow` に両方があっても `configured` が null になる。`*` を含まない、カタログを覆わない絶対のパスの deny・ask の規則は判定に影響しない",
+			"`deny` か `ask` に、対象が空、括弧のない形、`*` を含む、絶対のパスでない、のどれかの `read_file`・`write_file` の規則（`read_file()`、`write_file`、`read_file(*)`、`write_file(/some/*)`、`read_file(~/x)`、`read_file(relative/path)` など）があれば、`allow` に両方があっても `configured` が null になる。`*` を含まない、カタログを覆わない絶対のパスの deny・ask の規則は判定に影響しない",
 			"設定のファイルが壊れている（JSON でない、形が違う、権限や文字の符号で読めない）か、ホームのディレクトリが分からないときは、`configured` が分からない（null）で、Antigravity の中なら `CANONICAL_TOOL_SETTING_UNKNOWN` が出る",
 			"main のチェックアウトでは `needed` が偽で、Antigravity の警告が出ない",
 			"設定のファイルを読むだけで、書き換えない（実行の前後でバイトが同じ）",
@@ -101,5 +101,6 @@ decisions: [
 	"2026-11-20 タスク担当：設定のファイルは `~/.gemini/antigravity-cli/settings.json` だけを読む。`ANTIGRAVITY_APP_DATA_DIR` は入力として効かなかったので使わない（Claude Code の `CLAUDE_CONFIG_DIR` に当たるものはない）。",
 	"2026-11-20 タスク担当：R-02 は、設定を足しても書けない動き方が見つからなかったので、配るスキルと AGENTS.md を変えない。`--mode plan` は全体の書き込みをしない計画のモードで、カタログに限った決まりは要らない。",
 	"2026-11-20 統括（最終品質ゲートの2人目の P2 を受けて、今の PR で直すと決定）：deny か ask に、対象に `*` を含むか絶対のパスでない `read_file`・`write_file` の規則が1つでもあれば、判定できない（null、`CANONICAL_TOOL_SETTING_UNKNOWN`）とする。allow のそうした規則は今どおり数えない（偽、1行を示す）。",
+	"2026-11-20 統括（最終品質ゲート iss-00673-fqg-2 の2人目の P2 を受けて、今の PR で直すと決定）：前の決定の範囲に、deny・ask の対象が空の規則（`read_file()`）と括弧のない形（`read_file` だけ）も入れる。allow の側は今どおり数えない。",
 	"2026-11-20 タスク担当：Antigravity の中では、`tools.next_step` を Antigravity の警告の1行にする（その中のエージェントに要る1行を先に示すため）。Antigravity の外の出力は変えない。",
 ]

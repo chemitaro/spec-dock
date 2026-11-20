@@ -38,7 +38,7 @@ design: {
 			  1. dict でなければ None。`permissions` の既定は `{}`、dict でなければ None。`allow`・`ask`・`deny` の既定は `[]`、どれかが文字列のリストでなければ None。
 			  2. 規則を `^(read_file|write_file)\\((.+)\\)$` で読み、中が絶対のパスのものだけを、`os.path.normpath` してから `resolve` して数える。`~`、相対のパス、`*`、ほかの道具の規則は数えない（確かめていない形）。`allowNonWorkspaceAccess` などほかの鍵は見ない。
 			  3. 規則がカタログを覆うとは、解いたパスがカタログ（`catalog` は実のパス）と等しいか、その親であること。
-			  4. `deny` か `ask` に、カタログを覆う `read_file` か `write_file` があれば None（deny と ask が allow より優先し、allow の1行では直らない）。`deny` か `ask` に、`read_file` か `write_file` の規則で、対象に `*` を含むか絶対のパスでない（`~`、相対）ものが1つでもあっても None（カタログを覆うかを確かめられない。公式の資料は `read_file(*)` などを全体に当たる規則とする）。手順2の、数えない形の扱いは `allow` だけに当てる。
+			  4. `deny` か `ask` に、カタログを覆う `read_file` か `write_file` があれば None（deny と ask が allow より優先し、allow の1行では直らない）。`deny` か `ask` に、`read_file` か `write_file` の規則で、対象が空（`read_file()`）、括弧のない形（`read_file` だけ、規則の全体が `read_file` か `write_file`）、`*` を含む、絶対のパスでない（`~`、相対）、のどれかに当たるものが1つでもあっても None（カタログを覆うかを確かめられない。公式の資料は `read_file(*)` などを全体に当たる規則とする）。手順2の、数えない形の扱いは `allow` だけに当てる。
 			  5. そうでなく、`allow` に、カタログを覆う `read_file` と `write_file` が両方あれば True、なければ False。
 			"""
 		satisfies: ["R-01"]
@@ -58,7 +58,7 @@ design: {
 			`configured` が False なら `line` に1行を入れる（Antigravity の外でも入れる。情報なので）。
 			警告は `environment.antigravity` が真のときだけ足す（F-01）：
 			- False：`CANONICAL_TOOL_SETTING_MISSING`、message `Antigravity reads and writes the specs of this linked worktree only with an allow rule; add this to <名前>: <1行>`、details `{item: "tools", tool: "antigravity", file, line, next_step: line}`。
-			- None：`CANONICAL_TOOL_SETTING_UNKNOWN`、message `Could not judge whether Antigravity allows the catalog. <next_step>`、next_step `Check that <名前> allows read_file(<カタログ>) and write_file(<カタログ>) in permissions.allow, and that no permissions.deny or permissions.ask rule covers the catalog or names a read_file or write_file target with * or a path that is not absolute.`、details `{item: "tools", tool: "antigravity", sources, next_step}`。
+			- None：`CANONICAL_TOOL_SETTING_UNKNOWN`、message `Could not judge whether Antigravity allows the catalog. <next_step>`、next_step `Check that <名前> allows read_file(<カタログ>) and write_file(<カタログ>) in permissions.allow, and that no permissions.deny or permissions.ask rule covers the catalog or names a read_file or write_file rule with an empty or missing target, *, or a path that is not absolute.`、details `{item: "tools", tool: "antigravity", sources, next_step}`。
 			警告は今の Codex・Claude Code の後に並べる。`tools.status` は今どおり警告があれば `problem`。`tools.next_step` は、Antigravity の警告があればその `next_step`、なければ今どおり最初の警告の `next_step`。
 			`canonical link` は同じ `tool_findings` を使うので、同じ警告が出る（追加の作業はない）。
 			"""
