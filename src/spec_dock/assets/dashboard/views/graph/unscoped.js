@@ -5,6 +5,7 @@
 // Pure computation like command.js: no DOM, no clock, no network.
 import { mergedWorktree, normPath, summaryValid } from "../../core/orca_match.js";
 import { agentRef, bandItems, bandKeys, bandLabel } from "./command.js";
+import { agentTypeLabel } from "../_shared/agents_logic.js";
 
 /** The English words of the row and their explanations, in one place (the Issue's decisions). */
 export const UNSCOPED = {
@@ -50,10 +51,13 @@ export function childCount(pairs) {
   return new Map([...kids].map(([id, set]) => [id, set.size]));
 }
 
-/** The count's title and aria-label (R-09): the total and each commanding agent's part; null without a count. */
-export function countTitle(item) {
+/**
+ * The count's title and aria-label (R-09): the total and each commanding agent's part; null without a count. Each
+ * part's kind is named from orca-web's marks component when one is given (iss-00674).
+ */
+export function countTitle(item, marks = null) {
   if (!item?.count) return null;
-  const parts = (item.countParts || []).map((p) => `${typeof p.agentType === "string" && p.agentType ? p.agentType : "agent"} #${p.index}: ${p.n}`);
+  const parts = (item.countParts || []).map((p) => `${agentTypeLabel(marks, p.agentType, "agent")} #${p.index}: ${p.n}`);
   return parts.length ? `${UNSCOPED.count(item.count)} — ${parts.join(", ")}` : UNSCOPED.count(item.count);
 }
 
