@@ -65,8 +65,44 @@ ID: "iss-00673"
 
 ## Outcome
 
+Antigravity の中の linked worktree で、`canonical status`（と `canonical link` の警告）が `data.tools.antigravity` の1行と警告を示し、配る案内に Antigravity の設定を書いた（`git diff 83b8ee95f 5248c23b8`）。
+
+- S-01（タスク担当）：`canonical.md`（Antigravity の項、1行、deny・ask の優先、足さないときの症状、`--add-dir`、確かめた版と方法、信頼したフォルダーや `allowNonWorkspaceAccess` があっても規則が要ること、確かめ方）と `reference_cli.md` の C45。提供側と dogfood はバイト一致。`static-inventory.json` の2行の `sha256` を今のバイトにし、0.9.9 のバイト（canonical.md `dd91f171…`、reference_cli.md `9375d7fd…`）を `known_old_sha256` に足した。コミット 1618ab797、487276c1b、9ed97a284、18cfbbd3e、5248c23b8。
+- S-02（実装担当、64f571e32）：`RuntimeEnvironment.antigravity`（`ANTIGRAVITY_AGENT`）、domain の `antigravity_user_settings`・`antigravity_setting_line`・`antigravity_allows`、application の `tools.antigravity` と警告、`isolate_user_state` が `ANTIGRAVITY_AGENT` を消す。テスト `tests/cli_runtime/test_issue673_canonical_status_antigravity.py`、`tests/unit/domain/test_canonical_tools_antigravity.py`、`tests/unit/infra/test_issue436_docs.py` の T-06。
+- R-02：配るスキルと AGENTS.md の『仕様の扱い』は変えていない（設定を足しても書けない動き方がない）。
+- presentation は変えていない（`CanonicalStatusData.tools` は `dict[str, object]`）。
+
+### 実装担当
+
+- Codex GPT-6.2 Sol / medium（dispatch ctx_378bdfc6e67b、launch.effective：codex・gpt-6.2-sol・medium）。確認の画面で止まらず、S-02 を1回で終えた。記録 `.workbench/implement/iss-00673/report.md`。
+
+### 次の版の migration.md の節に書く文（案）
+
+- `spec-dock canonical status --json` の `data.tools` に `antigravity` の項目（`session`、`needed`、`configured`、`sources`、`file`、`line`）が増えた。Antigravity の中（環境変数 `ANTIGRAVITY_AGENT`）の作業用のworktreeで、`~/.gemini/antigravity-cli/settings.json` の `permissions.allow` にカタログの `read_file(...)` と `write_file(...)` がないと、警告 `CANONICAL_TOOL_SETTING_MISSING`（`details.tool` は `antigravity`）と足す1行を示す。Antigravity の外では、警告と `tools.status`・`tools.next_step` は前と同じ。
+- Antigravity を使う人は、作業用のworktreeで `spec-dock canonical status` が示す1行を、ユーザーの設定に1回だけ足す（`docs/canonical.md` の『ツールの設定』）。
+- 配布資産では `docs/canonical.md` と `docs/reference_cli.md` が変わる。0.9.9 のバイトは既知の古い版として `installation update` で上書きできる。
+
 ## Verification
+
+- 最終品質ゲート iss-00673-fqg-1 attempt 1（5248c23b8）：**合格**。
+  - 主のレビュー（quality-gate-reviewer opus / medium）：P0〜P2 0、P3 1、coverage complete。
+  - 2人目（chatgpt-code-review-strict、GPT-6 / Extra High）：P0・P1 なし、P2 1。review_status は、仕様のブランチを読めなかった証拠不足による fail（ゲートの条件ではない）。
+  - `make lint`：exit 0。`uv run pytest`：exit 0（4392 passed / 7 skipped、43分10秒）。
+  - closure：`.workbench/final-quality-gate/iss-00673-fqg-1/closure.md`（この worktree）。区切りのレビューは計画どおりなし。記録だけのコミットはない（記録は Git の外）。
 
 ## 逸脱と判断
 
+- 2人目のレビュー：standard の方針は2人目なしだが、依頼書の指示で ChatGPT（仕様のレビューは chatgpt-spec-review-strict、ゲートは chatgpt-code-review-strict）を使った。仕様のレビューの ChatGPT は round-1 の版だけを見た。
+- 仕様のレビューの P2・P3 も、確かめの範囲の書き方と判定の欠けなので、直してから合格させた（round-3 で P0〜P3 0）。
+- ChatGPT の仕様のレビューの P2 は、案内の文書だけで直した（18cfbbd3e）。
+- 確かめの途中で、利用者の Antigravity の設定が本人によって変わった（10:49、統括が本人の設定と判断）。表の 15〜20 は変わった後の状態で行い、結論が利用者の設定に依らないことを 19・20 で確かめた。
+- 統括の確認（2026-11-20）：`trustedWorkspaces` に足された2件は、この確かめによるものではない（作業ディレクトリは scratchpad の下で、`trustedWorkspaces` を渡していない）。
+
 ## Residual Risks / Follow-ups
+
+- 保存された設定に規則を置いて書けることは、直接は確かめていない（『確かめられなかったこと』）。版を出した後、統括が実際の Orca の Antigravity のエージェントで `canonical status` と読み書きを確かめる（Epic の verification）。
+- ゲートの P2（ChatGPT）：`deny`・`ask` の `read_file(*)` などを数えないので、誤って「設定あり」になる場合がある。公式の資料（https://antigravity.google/docs/permissions の global wildcard）を確かめたうえで、`*` を deny・ask では判定できない、allow では許すとして扱う小さな Issue を提案する。
+- ゲートの P3：Antigravity の外で判定が null のときのテストを足すとよい。
+- Antigravity の中の linked worktree では、今の Claude Code の警告も出る（Claude Code を使わない人には要らない警告）。Claude Code の警告を `CLAUDECODE` で絞るかは、別の判断（この Issue の対象外）。
+- Antigravity の端末から linked worktree の Git を操作するとき（Git の情報が作業ディレクトリの外にある）の扱いは、確かめていない。
+- `work finish iss-00673` は実行していない（マージの後に統括が行う）。
