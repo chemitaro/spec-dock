@@ -54,7 +54,7 @@ spec-dock canonical status --structure   # 上に加えて、Scope のディレ�
   writable_roots = ["<カタログ>"]
   ```
 
-- **Antigravity**（`agy`）：ユーザーの設定 `~/.gemini/antigravity-cli/settings.json` の `permissions.allow` に、カタログの読み書きの2つの規則を加えます。すでに `permissions.allow` があれば、置き換えずに加えます。`permissions.deny` と `permissions.ask` の規則は `allow` より優先するので、カタログ（かその親）を指す `read_file` と `write_file` を、そこに置きません。
+- **Antigravity**（`agy`）：ユーザーの設定 `~/.gemini/antigravity-cli/settings.json` の `permissions.allow` に、カタログの読み書きの2つの規則を加えます。すでに `permissions.allow` があれば、置き換えずに加えます。`permissions.deny` と `permissions.ask` の規則は `allow` より優先するので、カタログ（かその親）を指す `read_file` と `write_file` を、そこに置きません（置いてあると、`canonical status` は判定できないとして `CANONICAL_TOOL_SETTING_UNKNOWN` を示します）。
 
   ```json
   { "permissions": { "allow": ["read_file(<カタログ>)", "write_file(<カタログ>)"] } }
@@ -77,7 +77,7 @@ spec-dock canonical status --structure   # 上に加えて、Scope のディレ�
 
 - 足さないと：Claude Code は作業ディレクトリの外のファイルの読み書きの許可を求めるか拒みます（「outside the allowed working directories」などの文言）。Codex のサンドボックスでは書き込みが `Operation not permitted` で拒まれます。Antigravity は、ファイルの道具が許可を求めるか拒み（`agy -p` の print のモードでは、問えずに自動で拒みます）、端末からの書き込みも `Operation not permitted` で拒まれます（Antigravity の端末は、既定で作業ディレクトリの外に書けません）。どれも、エージェントは自分で設定を変えず、`canonical status` の1行を利用者に伝えます。
 - 要らない場合：mainのチェックアウトの中で動くセッション（カタログが作業ディレクトリの中にある）。
-- Antigravity のその回だけの方法：`agy --add-dir <カタログ>` で起動しても読み書きできます。保存されず、SpecDock からは見えないので、`canonical status` は警告を出したままです。`allowNonWorkspaceAccess` は、それだけでは書き込みが許可を求めて止まり、作業ディレクトリの外のすべてに及ぶので使いません。
+- Antigravity のその回だけの方法：`agy --add-dir <カタログ>` で起動しても読み書きできます。保存されず、SpecDock からは見えないので、`canonical status` は警告を出したままです。`allowNonWorkspaceAccess` は、ほかの設定（`agentMode` や `ask` の規則など）によっては書き込みが許可を求めて止まり、作業ディレクトリの外のすべてに及ぶので使いません。
 - Antigravity は、`agy` 1.5.12（2026-11-20）で、規則をその回だけの `--settings` で与えて確かめました。保存の場所と規則の形は、Antigravity の公式の設定のスキーマ（`https://antigravity.google/schemas/v1/settings.json`）によります。作業ディレクトリの中の設定のファイルは効きませんでした。設定の場所と規則の書き方は版で変わりうるので、版を上げたら、作業用のworktreeの Antigravity で、カタログのファイルを読み書きできるかを確かめます。
 - 書けない場合：Claude Code の隔離セッション（`--worktree`）は、設定を足しても書けません。仕様を読むだけにします。
 - 確かめ方：作業用のworktreeで `spec-dock canonical status` を実行し、`tools` の `status` が `ok` で、警告 `CANONICAL_TOOL_SETTING_MISSING` がないこと。Claude Code の設定は、ユーザーの設定、`<チェックアウト>/.claude/settings.json`、`<チェックアウト>/.claude/settings.local.json` を読むだけ読んで判定します（Claude Code の中の判定は SpecDock から見えないので、判定できないときは `CANONICAL_TOOL_SETTING_UNKNOWN`）。Codex は環境変数 `CODEX_SANDBOX` があるときに、書けるかを確かめます。Antigravity は、ユーザーの設定のファイルを読むだけ読んで判定し、環境変数 `ANTIGRAVITY_AGENT`（Antigravity の端末で動くコマンドに渡る）があるときに警告を出します（`ANTIGRAVITY_AGENT` がなければ、`tools.antigravity` に判定を示すだけです）。
