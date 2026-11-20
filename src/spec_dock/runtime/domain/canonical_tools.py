@@ -116,20 +116,29 @@ def antigravity_allows(
         rules = permissions.get(policy, [])
         if not isinstance(rules, list) or not all(isinstance(rule, str) for rule in rules):
             return None
-        actions[policy] = _antigravity_covered_actions(rules, catalog, resolve)
+        covered = _antigravity_covered_actions(rules, catalog, resolve, reject_ambiguous_targets=policy != "allow")
+        if covered is None:
+            return None
+        actions[policy] = covered
     if actions["deny"] or actions["ask"]:
         return None
     return actions["allow"] == {"read_file", "write_file"}
 
 
-def _antigravity_covered_actions(rules: list[str], catalog: Path, resolve: Callable[[Path], Path]) -> set[str]:
+def _antigravity_covered_actions(
+    rules: list[str], catalog: Path, resolve: Callable[[Path], Path], *, reject_ambiguous_targets: bool
+) -> set[str] | None:
     actions: set[str] = set()
     for rule in rules:
         match = _ANTIGRAVITY_FILE_RULE.fullmatch(rule)
         if match is None:
             continue
         action, target = match.groups()
-        if not Path(target).is_absolute() or "*" in target or "\0" in target:
+        if not Path(target).is_absolute() or "*" in target:
+            if reject_ambiguous_targets:
+                return None
+            continue
+        if "\0" in target:
             continue
         try:
             path = resolve(Path(os.path.normpath(target)))

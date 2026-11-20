@@ -23,6 +23,7 @@ CATALOG = Path("/repo/spec-dock/.canonical")
         (["read_file(/repo)", "write_file(~/repo)"], False),
         (["read_file(/repo)", "write_file(repo)"], False),
         (["read_file(/repo)", "write_file(/*)"], False),
+        (["read_file(*)", "write_file(*)"], False),
         (["read_file(/repo)", "command(/repo)"], False),
     ],
 )
@@ -38,7 +39,24 @@ def test_paths_are_normalized_and_aliases_are_resolved() -> None:
             "ask": ["write_file(/repo/spec-dock/.canonical/child)"],
         },
     }
-    assert antigravity_allows(payload, CATALOG, resolve=lambda path: Path("/repo") if path == Path("/alias") else path)
+    assert (
+        antigravity_allows(payload, CATALOG, resolve=lambda path: Path("/repo") if path == Path("/alias") else path)
+        is True
+    )
+
+
+@pytest.mark.parametrize(
+    ("policy", "rule"),
+    [
+        ("deny", "read_file(*)"),
+        ("ask", "write_file(/some/*)"),
+        ("deny", "read_file(~/x)"),
+        ("ask", "write_file(relative/path)"),
+    ],
+)
+def test_deny_or_ask_with_an_ambiguous_file_target_is_unknown(policy: str, rule: str) -> None:
+    payload = {"permissions": {"allow": ["read_file(/repo)", "write_file(/repo)"], policy: [rule]}}
+    assert antigravity_allows(payload, CATALOG) is None
 
 
 @pytest.mark.parametrize(

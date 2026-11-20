@@ -80,18 +80,25 @@ def test_missing_settings_show_the_line_and_give_it_priority(
     assert run(capsys, linked, "link")["warnings"] == result["warnings"]
 
 
-@pytest.mark.parametrize("use_parent", [False, True])
+@pytest.mark.parametrize(
+    ("use_parent", "deny"),
+    [(False, []), (True, []), (False, ["read_file(/some/other/folder)"])],
+    ids=["catalog", "parent", "unrelated-deny"],
+)
 def test_allow_rules_cover_the_catalog_without_rewriting_settings(
     capsys: pytest.CaptureFixture[str],
     linked_clone: tuple[Path, Path],
     settings: Path,
     monkeypatch: pytest.MonkeyPatch,
     use_parent: bool,
+    deny: list[str],
 ) -> None:
     checkout, linked = linked_clone
     catalog = checkout / "spec-dock/.canonical"
     target = checkout if use_parent else catalog
-    content = json.dumps({"permissions": {"allow": [f"read_file({target})", f"write_file({target})"]}}, indent=2)
+    content = json.dumps(
+        {"permissions": {"allow": [f"read_file({target})", f"write_file({target})"], "deny": deny}}, indent=2
+    )
     settings.write_text(content, encoding="utf-8")
     monkeypatch.setenv("ANTIGRAVITY_AGENT", "1")
     result = run(capsys, linked)
@@ -105,20 +112,30 @@ def test_allow_rules_cover_the_catalog_without_rewriting_settings(
     assert settings.read_bytes() == content.encode("utf-8")
 
 
-@pytest.mark.parametrize(("policy", "action"), [("deny", "read_file"), ("ask", "write_file")])
-def test_covering_deny_or_ask_requires_checking_the_rules(
+@pytest.mark.parametrize(
+    ("policy", "rule"),
+    [
+        ("deny", "read_file({checkout})"),
+        ("ask", "write_file({checkout})"),
+        ("deny", "read_file(*)"),
+        ("ask", "write_file(/some/*)"),
+        ("deny", "read_file(~/x)"),
+        ("ask", "write_file(relative/path)"),
+    ],
+)
+def test_covering_or_ambiguous_deny_or_ask_requires_checking_the_rules(
     capsys: pytest.CaptureFixture[str],
     linked_clone: tuple[Path, Path],
     settings: Path,
     monkeypatch: pytest.MonkeyPatch,
     policy: str,
-    action: str,
+    rule: str,
 ) -> None:
     checkout, linked = linked_clone
     catalog = checkout / "spec-dock/.canonical"
     permissions = {
         "allow": [f"read_file({catalog})", f"write_file({catalog})"],
-        policy: [f"{action}({checkout})"],
+        policy: [rule.format(checkout=checkout)],
     }
     settings.write_text(json.dumps({"permissions": permissions}), encoding="utf-8")
     monkeypatch.setenv("ANTIGRAVITY_AGENT", "1")
@@ -128,7 +145,8 @@ def test_covering_deny_or_ask_requires_checking_the_rules(
     assert tools["antigravity"]["line"] is None
     step = (
         f"Check that {SETTINGS_FILE} allows read_file({catalog}) and write_file({catalog}) in permissions.allow, "
-        "and that no permissions.deny or permissions.ask rule covers the catalog."
+        "and that no permissions.deny or permissions.ask rule covers the catalog "
+        "or names a read_file or write_file target with * or a path that is not absolute."
     )
     assert tools["next_step"] == step
     assert result["warnings"][-1] == {
@@ -138,7 +156,7 @@ def test_covering_deny_or_ask_requires_checking_the_rules(
     }
 
 
-@pytest.mark.parametrize("config", ["read-only", "unverified-rules", "broad-setting", "invalid-path"])
+@pytest.mark.parametrize("config", ["read-only", "unverified-rules", "wildcard-only", "broad-setting", "invalid-path"])
 def test_settings_without_both_supported_allow_rules_are_missing(
     capsys: pytest.CaptureFixture[str],
     linked_clone: tuple[Path, Path],
@@ -151,6 +169,7 @@ def test_settings_without_both_supported_allow_rules_are_missing(
     payloads = {
         "read-only": {"permissions": {"allow": [f"read_file({catalog})"]}},
         "unverified-rules": {"permissions": {"allow": ["read_file(~/)", "read_file(spec-dock)", "write_file(/*)"]}},
+        "wildcard-only": {"permissions": {"allow": ["read_file(*)", "write_file(*)"]}},
         "broad-setting": {"allowNonWorkspaceAccess": True},
         "invalid-path": {"permissions": {"allow": [f"read_file({catalog})", "write_file(/\ud800)"]}},
     }
@@ -249,6 +268,49 @@ def test_outside_antigravity_missing_settings_do_not_affect_claude_warning(
     assert warning["details"]["tool"] == "claude_code"
     assert tools["status"] == "problem" and tools["next_step"] == tools["claude_code"]["line"]
     assert tools["next_step"] == warning["details"]["next_step"]
+
+
+@pytest.mark.parametrize(
+    ("warning_tools", "status"),
+    [
+        ([], "ok"),
+        (["claude_code"], "problem"),
+        pytest.param(["codex", "claude_code"], "problem", marks=needs_permissions),
+    ],
+    ids=["no-warnings", "claude-warning", "codex-and-claude-warnings"],
+)
+def test_outside_antigravity_invalid_settings_do_not_affect_tools_warnings(
+    capsys: pytest.CaptureFixture[str],
+    linked_clone: tuple[Path, Path],
+    isolated: Path,
+    settings: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    warning_tools: list[str],
+    status: str,
+) -> None:
+    checkout, linked = linked_clone
+    catalog = checkout / "spec-dock/.canonical"
+    if not warning_tools:
+        claude_settings = isolated / ".claude/settings.json"
+        claude_settings.parent.mkdir()
+        claude_settings.write_text(
+            json.dumps({"permissions": {"additionalDirectories": [str(catalog)]}}), encoding="utf-8"
+        )
+    if "codex" in warning_tools:
+        monkeypatch.setenv("CODEX_SANDBOX", "seatbelt")
+        catalog.chmod(0o555)
+    try:
+        settings.write_bytes(b"{ not JSON")
+        result = run(capsys, linked)
+    finally:
+        if "codex" in warning_tools:
+            catalog.chmod(0o755)
+    tools = result["data"]["tools"]
+    assert tools["antigravity"]["session"] is False and tools["antigravity"]["configured"] is None
+    warnings = [warning for warning in result["warnings"] if warning["details"]["item"] == "tools"]
+    assert [warning["details"]["tool"] for warning in warnings] == warning_tools
+    assert tools["status"] == status
+    assert tools["next_step"] == (warnings[0]["details"]["next_step"] if warnings else None)
 
 
 def test_main_checkout_needs_no_settings(
