@@ -45,7 +45,7 @@ ID: "iss-00676"
 ### 基準（開始のコミット 83b8ee95f）
 
 - `make lint`：合格（ruff check、ruff format check、mypy）。この worktree で実行。
-- `uv run pytest`：開始のコミットの別の複製（スクラッチの `base`、HEAD 83b8ee95f、きれい）で実行中。結果は S-03 の節に書く。
+- `uv run pytest`：開始のコミットの別の複製（スクラッチの `base`、HEAD 83b8ee95f、きれい）で実行。4355 passed、7 skipped、終了コード 0（47分44秒）。既存の失敗はない。
 
 ### S-01（横断の居場所と行の項目）
 
