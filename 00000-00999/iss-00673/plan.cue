@@ -11,8 +11,8 @@ steps: {
 
 tests: {
 	"T-01": {title: "`ANTIGRAVITY_AGENT` ありの linked worktree で、設定のファイルがないと `configured` 偽、1行、`CANONICAL_TOOL_SETTING_MISSING`（tool antigravity）、`tools.next_step` がその1行（cli_runtime）", verifies: ["R-01"]}
-	"T-02": {title: "`permissions.allow` にカタログか親の `read_file`・`write_file` の両方、または `allowNonWorkspaceAccess` 真で `configured` 真・警告なし。片方だけ、`~`・相対・`*` の規則では偽（cli_runtime と domain の単体）", verifies: ["R-01"]}
-	"T-03": {title: "`ANTIGRAVITY_APP_DATA_DIR` でファイルが移る。相対の値、JSON でない、形が違う設定は `configured` null と `CANONICAL_TOOL_SETTING_UNKNOWN`（cli_runtime）", verifies: ["R-01"]}
+	"T-02": {title: "`permissions.allow` にカタログか親の `read_file`・`write_file` の両方で `configured` 真・警告なし。片方だけ、`~`・相対・`*` の規則だけ、`allowNonWorkspaceAccess` 真だけ、`deny`・`ask` にカタログを覆う `read_file`・`write_file` があると偽（cli_runtime と domain の単体）", verifies: ["R-01"]}
+	"T-03": {title: "JSON でない、形が違う（`permissions`・`allow`・`ask`・`deny` の型）、権限で読めない、UTF-8 でない設定と、ホームが分からないときは `configured` null と `CANONICAL_TOOL_SETTING_UNKNOWN`（Antigravity の中、cli_runtime と domain の単体）", verifies: ["R-01"]}
 	"T-04": {title: "`ANTIGRAVITY_AGENT` なしでは、設定がなくても Antigravity の警告が出ず、`tools` の `status`・`next_step` と警告の列が今と同じ。main のチェックアウトでは `needed` 偽で警告なし（cli_runtime）", verifies: ["F-01", "R-01"]}
 	"T-05": {title: "設定のファイルのバイトが実行の前後で同じ。今の `test_issue429_canonical_status.py` などの Codex・Claude Code のテストがそのまま通る", verifies: ["R-01"]}
 	"T-06": {title: "提供側の canonical.md に Antigravity の項（`~/.gemini/antigravity-cli/settings.json`、`read_file(`、`write_file(`、`1.5.12`）があり、reference_cli.md の C45 に Antigravity があり、両方が dogfood の写しとバイトが同じ。今の資産の検査のテストが通る", verifies: ["R-02"]}

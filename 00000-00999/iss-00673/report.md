@@ -20,7 +20,8 @@ ID: "iss-00673"
 
 - 版：`agy --version` が `1.5.12`（Homebrew の cask `antigravity-cli`、macOS、arm64）。既定のモデル（利用者の設定）は Gemini 3.8 Flash。
 - 場所：一時のディレクトリ（Claude Code の scratchpad の下。利用者のホームと、`trustedWorkspaces` の外）に、`git init` の main のチェックアウトと、`git worktree add` の linked worktree を作った。main の `spec-dock/.canonical/note.txt` に印の文字列を置き、main の `spec-dock/initiatives` は `.canonical` への相対のリンク、linked の `spec-dock/initiatives` は main の `spec-dock/.canonical` への絶対のリンク（`tests/support/canonical_repo.py` と同じ形）。本物のカタログには書いていない。
-- 方法：その worktree を作業ディレクトリにして `agy -p "<指示>" --print-timeout 200s`。設定は、その回だけの `--settings '<JSON>'` か `--add-dir` で与えた。利用者の `~/.gemini/` の設定のファイルは読むだけで、書き換えていない（中身：`antigravity-cli/settings.json` は `model` と `trustedWorkspaces` だけ、`config/config.json` は plugins だけで、権限の設定はない）。
+- 方法：その worktree を作業ディレクトリにして `agy -p "<指示>" --print-timeout 200s`。設定は、その回だけの `--settings '<JSON>'` か `--add-dir` で与えた。利用者の `~/.gemini/` の設定のファイルは読むだけで、書き換えていない。
+- 利用者の設定の変化：1〜14 の時点（10:30〜10:40 ごろ）の `~/.gemini/antigravity-cli/settings.json` は `model` と `trustedWorkspaces` だけだった。10:49 に、この作業の外で（タスク担当は書いていない）`$schema`、`agentMode`、`allowNonWorkspaceAccess: true`、`permissions`（`allow` は `command(git status)` などのコマンドだけ、`deny`、`ask`）が足された。15〜18 はこの後の状態で行った。
 - 設定の項目の名前は、実行ファイルの文字列（`json:"..."` の鍵、案内の文言）から候補を拾い、実行で確かめた。
 
 | # | 作業ディレクトリ | 与えた設定 | 結果 |
@@ -39,12 +40,19 @@ ID: "iss-00673"
 | 12 | linked | 5 の規則を、カタログの親（main のチェックアウト）で | ファイルの道具の作成、端末の `touch` とも成功 |
 | 13 | linked | 5 と `--mode plan` | ファイルは作られず、端末のコマンドも許可の規則があるのに拒まれた（計画のモードは全体として書かない） |
 | 14 | linked | `command(env)` など | 端末のコマンドに `ANTIGRAVITY_AGENT=1`、`ANTIGRAVITY_APP_DATA_DIR=<ホーム>/.gemini/antigravity-cli`、`ANTIGRAVITY_LS_VERSION=cli-1.5.12`、`ANTIGRAVITY_CONVERSATION_ID` などが渡る |
+| 15 | linked | 環境変数 `ANTIGRAVITY_APP_DATA_DIR=<一時のディレクトリ>`（5 の規則の `settings.json` を置いた） | ファイルの道具の書き込みが拒まれた。`--log-file` のログでは `CLI app data directory: <ホーム>/.gemini/antigravity-cli` のままで、読み込んだ `permissions` は利用者の設定のもの（環境変数は入力として効かない） |
+| 16 | linked | 15 と同じ（読みだけ） | 読みは通った。読みの規則がないので、利用者の設定の `allowNonWorkspaceAccess: true` によると考える（15 の書き込みは同じ状態で拒まれたので、それだけでは書き込みが通らない） |
+| 17 | linked | 利用者の設定（10:49 以後）に、`--settings` で 5 の規則 | ファイルの道具の書き込みが成功。ログは `--settings` の規則を `CLI settings initialized: permissions=&{Allow:[read_file(...) write_file(...)] ...}` と読み込む（保存された設定の `permissions` も同じ行で読み込まれる） |
+| 18 | — | 公式のスキーマ `https://antigravity.google/schemas/v1/settings.json`（利用者の設定の `$schema`） | 『stored in ~/.gemini/antigravity-cli/settings.json』。`permissions` は `allow`・`ask`・`deny`、規則は `^(command\|read_file\|write_file\|read_url\|execute_url\|mcp\|unsandboxed)\(.*\)$`、『A deny rule takes precedence over an ask rule, and an ask rule over an allow rule』。`allowNonWorkspaceAccess` は『subject to toolPermission, agentMode, and your permission rules』。`enableTerminalSandbox` は『Runs the agent's terminal commands in the terminal sandbox ... --sandbox turns it on for one session』 |
 
 まとめ：
 
-- R-01：linked worktree では設定が要る。保存される設定は、ユーザーの設定 `~/.gemini/antigravity-cli/settings.json`（`ANTIGRAVITY_APP_DATA_DIR` のディレクトリ）の `permissions.allow` の `read_file(<カタログ>)` と `write_file(<カタログ>)`。この2つで、ファイルの道具も端末の書き込みも通る。プロジェクトの設定の置き場は見つからなかった。Antigravity の中は `ANTIGRAVITY_AGENT` で見分けられる。
+- R-01：linked worktree では設定が要る。`permissions.allow` の `read_file(<カタログ>)` と `write_file(<カタログ>)` で、ファイルの道具も端末の書き込みも通る（その回だけの `--settings` で確かめた）。保存の場所は、公式のスキーマのとおりユーザーの設定 `~/.gemini/antigravity-cli/settings.json` で、環境変数でもプロジェクトの設定でも動かせない。Antigravity の中は `ANTIGRAVITY_AGENT` で見分けられる。
 - R-02：Claude Code の隔離セッション（`--worktree`）のような、設定を足しても書けない動き方は見つからなかった。`--sandbox` は、既定で有効な端末の制限と区別できる違いがなかった。`--mode plan` は全体として書かない計画のモードで、カタログに限った決まりは要らない。配るスキルと AGENTS.md の『仕様の扱い』は変えない。
-- 確かめられなかったこと：対話のモード（Orca が起動するふつうの `agy`）での確かめの画面の文言。print のモードは確かめの画面を出さず、自動で拒む（上の 1 の文言）ので、対話のモードでは許可を問う画面が出ると推定する（推定）。
+- 確かめられなかったこと（推定で書いたこと）：
+  - 保存された設定 `~/.gemini/antigravity-cli/settings.json` に規則を置いて、カタログに書けること。利用者の設定を書き換えない約束のため、直接は試していない。根拠は、スキーマ（18）、`--settings` の説明『a JSON object of settings.json keys』、ログが両方の `permissions` を同じ形で読み込むこと（17）。
+  - 対話のモード（Orca が起動するふつうの `agy`）での確かめの画面の文言。print のモードは確かめの画面を出さず、自動で拒む（上の 1 の文言）ので、対話のモードでは許可を問う画面が出ると推定する。
+  - `--sandbox` が、既定の端末の制限（8、9）と別に何かを変えるか。スキーマは `enableTerminalSandbox` を1回だけ有効にするものと書き、8 の結果は `--sandbox` の有無で同じだった。
 - AGENTS.md の『仕様の扱い』は、配るスキルの同じ節とバイトが同じだが、生成するコードはなく、手で写したもの（`git log -- AGENTS.md`、ランタイムに AGENTS.md を書くコードはない）。
 
 ## Outcome
