@@ -89,6 +89,7 @@ Antigravity の中の linked worktree で、`canonical status`（と `canonical 
   - 2人目（chatgpt-code-review-strict、GPT-6 / Extra High）：P0・P1 なし、P2 1。review_status は、仕様のブランチを読めなかった証拠不足による fail（ゲートの条件ではない）。
   - `make lint`：exit 0。`uv run pytest`：exit 0（4392 passed / 7 skipped、43分10秒）。
   - closure：`.workbench/final-quality-gate/iss-00673-fqg-1/closure.md`（この worktree）。区切りのレビューは計画どおりなし。記録だけのコミットはない（記録は Git の外）。
+- PR #677（https://github.com/chemitaro/spec-dock/pull/677）：head は 5248c23b8（合格のコミット）。CI はすべて合格（provider-tests 14分51秒、distribution parity の macOS・Ubuntu、check、spec-dock-check、route）。observer の結果は observable_ci PASS、merge_readiness READY、mergeStateStatus CLEAN（`.workbench/coding-task/iss-00673/ci-watch-2.jsonl`。1本目は provider-tests の途中で idle timeout になったので、上限を延ばして1本だけ走らせ直した）。マージは統括。
 
 ## 逸脱と判断
 
