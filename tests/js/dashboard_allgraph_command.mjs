@@ -132,7 +132,7 @@ function scenario(sc) {
   const pairs = C.commandPairs(summary);
   const order = sc.order || {};
   const orderOf = (w) => order[w.id] || null;
-  const placed = X.crossPlace(pairs, { repos, summary, visible, visibleWith, orderOf, range });
+  const placed = X.crossPlace(pairs, { repos, summary, visible, visibleWith, orderOf });
   const shape = X.bandShape(placed.rows, placed.keep);
   const comp = P.compose(listed, sizes, { range, width, bands: shape.bands, keep: shape.keep, other: shape.other });
   const spots = {};

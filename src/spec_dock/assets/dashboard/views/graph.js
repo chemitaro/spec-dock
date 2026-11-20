@@ -207,12 +207,11 @@ function paintCommand() {
   const key = commandKey({ summary, routing: V.EG, marks: V.marks, ids, structure: V.data, range });
   if (key !== V.cmdKey) {
     V.cmdKey = key;
-    // iss-00668 D-05: "next" draws no line; every pair counts the children of the row's items
+    // iss-00676 D-01: every range places every pair; the range only shapes the layout (its boxes and frames)
     const all = commandPairs(summary);
-    const drawn = range === "next" ? [] : all;
-    const placed = drawn.length ? placeAgents(drawn, { structure: V.data, summary, layout: V.EG.layout, ix: V.ix }) : null;
+    const placed = all.length ? placeAgents(all, { structure: V.data, summary, layout: V.EG.layout, ix: V.ix }) : null;
     const own = placed?.own ?? ownWorktrees(V.data, summary) ?? new Set();
-    const row = unscopedItems({ structure: V.data, summary, pairs: all, places: placed?.places ?? new Map(), own, orderOf: CV.orderOf(orca?.marks?.()), range });
+    const row = unscopedItems({ structure: V.data, summary, pairs: all, places: placed?.places ?? new Map(), own, orderOf: CV.orderOf(orca?.marks?.()) });
     const pairs = placed?.pairs ?? [];
     if (!row.items.length && !pairs.length) clearCommand();
     else {
@@ -242,7 +241,7 @@ function drawCommand(model) {
   CV.removeLayers(w);
   V.cmdModel = model;
   V.cmd = { top: model.top, width: model.width };
-  const html = CV.layersHtml(model, V.ctx?.orca?.marks?.() ?? null);
+  const html = CV.layersHtml(model);
   const cmd = CV.element(html.cmd);
   const top = CV.element(html.top);
   const kids = Array.from(w.children);

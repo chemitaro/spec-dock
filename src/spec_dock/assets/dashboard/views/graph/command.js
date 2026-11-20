@@ -188,15 +188,14 @@ export function labelWidth(text) {
   return Math.min(200, Math.max(24, Math.ceil(w)));
 }
 
-// iss-00668 D-03: a badge's or count's small text (graph.css .gx-band-badge, .gx-band-count: 0.8 of the label's size)
+// iss-00668 D-03: a badge's small text (graph.css .gx-band-badge: 0.8 of the label's size)
 const smallWidth = (text) => Math.ceil(labelWidth(text) * 0.8) + BAND.labelGap;
 const BADGE_TEXT = { primary: "Primary", unlinked: "Unlinked" };
 const badgeWidth = (it) => (it.badge && BADGE_TEXT[it.badge] ? smallWidth(BADGE_TEXT[it.badge]) : 0);
-const countWidth = (it) => (it.count ? smallWidth(String(it.count)) : 0);
 const columns = (it) => Math.min(it.agents.length, BAND.perLine);
 const lines = (it) => Math.max(1, Math.ceil(it.agents.length / BAND.perLine));
-// the left of an item's agents from the item's left: after its label, badge and count
-const agentsLeft = (it) => BAND.border + BAND.pad + labelWidth(it.label) + BAND.labelGap + badgeWidth(it) + countWidth(it);
+// the left of an item's agents from the item's left: after its label and badge
+const agentsLeft = (it) => BAND.border + BAND.pad + labelWidth(it.label) + BAND.labelGap + badgeWidth(it);
 const itemWidth = (it) =>
   it.kind === "fold"
     ? 2 * BAND.border + 2 * BAND.pad + labelWidth(it.label)
@@ -232,9 +231,8 @@ function bandModel(rows) {
       const item = {
         ...it,
         x, y: row.top, w, h, labelWidth: lw,
-        // iss-00668 D-07: the badge's and the count's widths without their gap (graph.css draws them this wide)
+        // iss-00668 D-07: the badge's width without its gap (graph.css draws it this wide)
         badgeWidth: badgeWidth(it) ? badgeWidth(it) - BAND.labelGap : 0,
-        countWidth: countWidth(it) ? countWidth(it) - BAND.labelGap : 0,
         agents: it.kind === "fold" ? [] : it.agents.map((ref, i) => ({ id: ref.id, ref, ...at(i), w: BAND.slot, h: BAND.h })),
       };
       x += w + BAND.gap;

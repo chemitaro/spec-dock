@@ -151,6 +151,7 @@ function snap(root) {
       dd: panel.querySelectorAll(".pn-wt dd").map((d) => d.textContent),
       openBtn: panel.querySelector(".pn-wt-open script")?.dataset.worktree ?? null,
       list: panel.querySelectorAll(".pn-wt-list li").map((li) => li.textContent),
+      agentTexts: panel.querySelectorAll("[data-wt-agent]").map((b) => b.textContent), // iss-00676: the kinds by name
     },
     rowKeys: world.querySelectorAll(".gx-band-lab").map((b) => b.dataset.cmdWt ?? b.dataset.cmdFold ?? null),
     leadTexts: world.querySelectorAll(".gx-band-lead").map((el) => [el.textContent, el.getAttribute("title")]),

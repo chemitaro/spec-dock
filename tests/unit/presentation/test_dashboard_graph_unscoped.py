@@ -99,7 +99,7 @@ CASES: dict[str, dict[str, Any]] = {
             wt("wt-o", "/x/other", "main", [ag("o-1", parent="a-coord")], project=OTHER, main=True),
         ),
     },
-    # R-06, R-09: the counts of the children per item; idle and non-commanding Unlinked worktrees
+    # iss-00676 R-02: the same items in every range; idle and non-commanding Unlinked worktrees, no count
     **{
         name: {
             "range": rng,
@@ -128,7 +128,7 @@ CASES: dict[str, dict[str, Any]] = {
         "structure": git(row("/w/u", "topic")),
         "summary": summary(MAIN),
     },
-    # R-06: "next" keeps the main checkout that directs nobody, without a count
+    # iss-00676 R-02: "next" keeps the Unlinked worktree whose agent directs nobody
     "next-idle": {
         "range": "next",
         "structure": git(row("/w/u", "topic")),
@@ -154,12 +154,6 @@ def out(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
         tmp_path_factory.mktemp("unscoped"),
         {
             "cases": CASES,
-            "childCount": [[["p", "c1"], ["p", "c2"], ["p", "c1"], ["q", "c3"]], []],
-            "countTitle": [
-                {"count": 1, "countParts": [{"id": "x", "agentType": "claude", "index": 1, "n": 1}]},
-                {"count": 2, "countParts": [{"id": "x", "agentType": None, "index": 2, "n": 2}]},
-                {"count": None, "countParts": []},
-            ],
             "labels": [
                 [{"branch": "main", "main": True}, True],
                 [{"branch": None, "head": "abcdef0123456789", "main": False}, True],
@@ -189,8 +183,9 @@ def test_the_words_and_the_fold(out: dict[str, Any]) -> None:
         "text": "Unlinked",
         "title": "Not linked to any Scope. Link it with `spec-dock work start`.",
     }
-    assert words["count"] == ["1 agent in progress", "3 agents in progress"]
+    assert words["count"] is None  # iss-00676 D-03: no count's words
     assert out["consts"]["FOLD"] == 2
+    assert {"childCount", "countTitle", "commanding"}.isdisjoint(out["exports"])
 
 
 def test_primary_is_there_without_agents_summary_or_pairs(got: dict[str, Any]) -> None:
@@ -208,9 +203,8 @@ def test_primary_is_there_without_agents_summary_or_pairs(got: dict[str, Any]) -
             "agentWorktrees": [],
             "worktree": {"id": None, "agents": []},
             "idle": True,
-            "count": None,
-            "countParts": [],
             "folded": None,
+            "fields": ["agents", "badge", "folded", "idle", "key", "kind", "label", "main", "own", "path", "worktree"],
         }
     ]
     assert got["bare"]["git"][0] == row("/w/r", "main", main=True)
@@ -236,7 +230,7 @@ def test_unlinked_worktrees_and_a_thin_idle_one(got: dict[str, Any]) -> None:
     assert [it["idle"] for it in entry["items"]] == [False, True, False, False]
     assert [it["key"] for it in entry["items"]] == ["wt-main", "git:/w/old-1", "wt-a", "wt-b"]
     assert entry["items"][2]["path"] == "/w/u-a"  # the trailing / is the same worktree
-    assert all(it["count"] is None for it in entry["items"])
+    assert all("count" not in it["fields"] for it in entry["items"])
 
 
 def test_two_or_more_idle_unlinked_worktrees_fold_into_plus_n(got: dict[str, Any]) -> None:
@@ -287,26 +281,9 @@ def test_ends_outside_git_stay_as_todays_items(got: dict[str, Any]) -> None:
     assert [it["own"] for it in entry["items"]] == [True, True, True, False]
 
 
-def test_next_keeps_primary_and_the_commanding_unlinked_with_counts(got: dict[str, Any]) -> None:
-    """T-02 / R-06, R-09: the counts per item, their parts and titles; nothing else in "next"."""
-    entry = got["next"]
-    assert _items(entry) == [("main", "primary", ["a-coord"]), ("u1", "unlinked", ["a-1", "a-3", "a-4", "a-5"])]
-    assert [it["count"] for it in entry["items"]] == [2, 3]
-    assert entry["items"][1]["countParts"] == [
-        {"id": "a-1", "agentType": "claude", "index": 1, "n": 2},
-        {"id": "a-3", "agentType": "codex", "index": 2, "n": 1},
-    ]
-    assert entry["titles"] == [
-        "2 agents in progress — claude #1: 2",
-        "3 agents in progress — claude #1: 2, codex #2: 1",
-    ]
-    assert entry["places"] == {}
-    assert entry["commanding"] is True
-
-
-@pytest.mark.parametrize("name", ["all", "now"])
-def test_all_and_now_show_every_unlinked_without_counts(got: dict[str, Any], name: str) -> None:
-    """T-02 / R-04, R-06: no count; the idle ones fold; the non-commanding one stays."""
+@pytest.mark.parametrize("name", ["next", "all", "now"])
+def test_every_range_shows_every_unlinked_without_counts(got: dict[str, Any], name: str) -> None:
+    """iss-00676 T-02 / R-02: no count in any range; the idle ones fold; the non-commanding one stays."""
     entry = got[name]
     assert [(it["kind"], it["label"]) for it in entry["items"]] == [
         ("worktree", "main"),
@@ -314,16 +291,20 @@ def test_all_and_now_show_every_unlinked_without_counts(got: dict[str, Any], nam
         ("worktree", "u2"),
         ("fold", "+2"),
     ]
-    assert all(it["count"] is None and it["countParts"] == [] for it in entry["items"])
-    assert entry["titles"] == [None, None, None, None]
-    assert entry["commanding"] is False
+    assert all("count" not in it["fields"] and "countParts" not in it["fields"] for it in entry["items"])
 
 
-def test_a_primary_without_children_has_no_count_in_next(got: dict[str, Any]) -> None:
-    """T-02 / R-06: the main checkout stays in "next" even when it directs nobody."""
+def test_next_has_the_items_and_the_places_of_all_and_now(got: dict[str, Any]) -> None:
+    """iss-00676 T-02 / R-01, R-02: the range given to unscopedItems changes nothing; "next" places its ends."""
+    assert got["next"]["items"] == got["all"]["items"] == got["now"]["items"]
+    assert got["next"]["places"] == got["all"]["places"]
+    assert got["next"]["places"]["a-coord"] == {"kind": "band", "key": "wt-main"}
+
+
+def test_next_keeps_the_unlinked_worktree_directing_nobody(got: dict[str, Any]) -> None:
+    """iss-00676 T-02 / R-02: the main checkout and the Unlinked worktree of an agent directing nobody."""
     entry = got["next-idle"]
-    assert [(it["badge"], it["count"]) for it in entry["items"]] == [("primary", None)]
-    assert entry["commanding"] is False
+    assert _items(entry) == [("main", "primary", ["a-coord"]), ("topic", "unlinked", ["u-1"])]
 
 
 def test_without_a_main_row_there_is_no_primary(got: dict[str, Any]) -> None:
@@ -337,16 +318,6 @@ def test_without_the_git_list_the_band_items_mark_main_primary(got: dict[str, An
         assert got[name]["git"] is None
     assert _items(got["old"]) == [("main", "primary", ["a-coord"]), ("other · main", None, ["o-1"])]
     assert got["unreadable"]["items"] == []
-
-
-def test_child_count_counts_each_child_once(out: dict[str, Any]) -> None:
-    """T-02 / R-06."""
-    assert out["childCount"] == [{"p": 2, "q": 1}, {}]
-
-
-def test_count_title(out: dict[str, Any]) -> None:
-    """T-02 / R-09: one agent, a missing type, no count."""
-    assert out["countTitle"] == ["1 agent in progress — claude #1: 1", "2 agents in progress — agent #2: 2", None]
 
 
 def test_band_labels(out: dict[str, Any]) -> None:

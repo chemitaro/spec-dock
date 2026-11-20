@@ -130,7 +130,7 @@ function snap(root) {
     size: [world.style.width, world.style.height],
     // iss-00668 T-04: the Unscoped row's items, lead and the worktree's panel
     row: rowSnap(world, panel),
-    audit: audit && { links: audit.links, arcs: audit.arcs, boxOverlaps: audit.boxOverlaps, edgeOverlaps: audit.edgeOverlaps, layers: audit.layers, motion: audit.motion ?? null },
+    audit: audit && { links: audit.links, arcs: audit.arcs, boxOverlaps: audit.boxOverlaps, edgeOverlaps: audit.edgeOverlaps, layers: audit.layers, motion: audit.motion ?? null, heads: audit.heads ?? null },
   };
 }
 

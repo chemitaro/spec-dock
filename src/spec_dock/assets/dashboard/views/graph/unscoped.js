@@ -5,7 +5,6 @@
 // Pure computation like command.js: no DOM, no clock, no network.
 import { mergedWorktree, normPath, summaryValid } from "../../core/orca_match.js";
 import { agentRef, bandItems, bandKeys, bandLabel } from "./command.js";
-import { agentTypeLabel } from "../_shared/agents_logic.js";
 
 /** The English words of the row and their explanations, in one place (the Issue's decisions). */
 export const UNSCOPED = {
@@ -13,7 +12,6 @@ export const UNSCOPED = {
   leadTitle: "Worktrees not shown as a Scope box",
   primary: { text: "Primary", title: "The main checkout of this repository" },
   unlinked: { text: "Unlinked", title: "Not linked to any Scope. Link it with `spec-dock work start`." },
-  count: (n) => `${n} ${n === 1 ? "agent" : "agents"} in progress`,
 };
 
 /** This many idle Unlinked items or more fold into one "+N" (R-04). */
@@ -41,29 +39,6 @@ export function gitWorktrees(structure) {
     }));
 }
 
-/** The number of children of each parent agent: Map<parent id, n> (each child once). */
-export function childCount(pairs) {
-  const kids = new Map();
-  for (const p of pairs || []) {
-    if (!kids.has(p.parent.id)) kids.set(p.parent.id, new Set());
-    kids.get(p.parent.id).add(p.child.id);
-  }
-  return new Map([...kids].map(([id, set]) => [id, set.size]));
-}
-
-/**
- * The count's title and aria-label (R-09): the total and each commanding agent's part; null without a count. Each
- * part's kind is named from orca-web's marks component when one is given (iss-00674).
- */
-export function countTitle(item, marks = null) {
-  if (!item?.count) return null;
-  const parts = (item.countParts || []).map((p) => `${agentTypeLabel(marks, p.agentType, "agent")} #${p.index}: ${p.n}`);
-  return parts.length ? `${UNSCOPED.count(item.count)} — ${parts.join(", ")}` : UNSCOPED.count(item.count);
-}
-
-/** Whether a row has an item with a count (a frame kept for its row in "next", R-07). */
-export const commanding = (items) => (items || []).some((it) => !!it.count);
-
 // the agents of a group of summary worktrees in the component's order, each with its own worktree
 function agentsOf(list, orderOf) {
   const merged = mergedWorktree(list);
@@ -76,20 +51,19 @@ function agentsOf(list, orderOf) {
   return { worktree: merged, agents: [...new Set(ids)].map((id) => agentRef(owner.get(id).a, owner.get(id).w)) };
 }
 
-const blank = { badge: null, idle: false, count: null, countParts: [], folded: null };
+const blank = { badge: null, idle: false, folded: null };
 
 /**
- * The items of one repository's row (R-02..R-04, R-06, R-09, F-01..F-04).
+ * The items of one repository's row (R-02..R-04, R-09, F-01..F-04), the same in every range (iss-00676 D-03).
  * @param structure the repository's structure (worktrees.items, scopes[].worktrees)
  * @param summary   orca-web's summary (invalid: git alone, F-02)
- * @param pairs     commandPairs(summary), all of them (the counts)
- * @param places    the places of the drawn pairs' ends (empty in "next"): only their band ends make items
+ * @param pairs     the drawn pairs
+ * @param places    the places of the drawn pairs' ends: only their band ends make items
  * @param own       this repository's worktrees of the summary
  * @param orderOf   worktree -> its agents in the component's order, or null
- * @param range     "all" | "now" | "next"
  * @returns {items: [Item], places: the places with the ends of a merged worktree on its item's key}
  */
-export function unscopedItems({ structure, summary, pairs = [], places = new Map(), own = new Set(), orderOf = null, range = "all" }) {
+export function unscopedItems({ structure, summary, pairs = [], places = new Map(), own = new Set(), orderOf = null }) {
   const git = gitWorktrees(structure);
   const valid = summaryValid(summary);
   const keys = valid ? bandKeys(summary) : new Map();
@@ -151,22 +125,10 @@ export function unscopedItems({ structure, summary, pairs = [], places = new Map
     for (const end of ends) extra.push({ ...blank, ...end, kind: "worktree", badge: end.main ? "primary" : null, path: normPath(end.worktree?.path) });
   }
   const all = [...items, ...extra];
-  const kids = childCount(pairs);
-  for (const it of all) {
-    it.idle = it.agents.length === 0;
-    if (range !== "next") continue;
-    const parts = it.agents.map((a, i) => ({ id: a.id, agentType: a.agentType ?? null, index: i + 1, n: kids.get(a.id) || 0 })).filter((p) => p.n > 0);
-    const n = parts.reduce((s, p) => s + p.n, 0);
-    it.count = n || null;
-    it.countParts = parts;
-  }
+  for (const it of all) it.idle = it.agents.length === 0;
   const primary = all.filter((it) => it.badge === "primary");
-  let unlinked = all.filter((it) => it.badge === "unlinked");
-  let others = all.filter((it) => it.badge === null);
-  if (range === "next") {
-    unlinked = unlinked.filter((it) => it.count);
-    others = [];
-  }
+  const unlinked = all.filter((it) => it.badge === "unlinked");
+  const others = all.filter((it) => it.badge === null);
   unlinked.sort((a, b) => byText(a.label, b.label) || byText(a.key, b.key));
   const idle = unlinked.filter((it) => it.idle);
   const out = [...primary];
