@@ -86,6 +86,18 @@ def test_canonical_md_shows_the_exact_tool_lines_canonical_status_prints() -> No
     assert tools.count("/spec-dock/.canonical") >= 10  # the five catalogs listed in one array, for both tools
 
 
+def test_antigravity_docs_describe_the_settings_and_match_dogfood() -> None:
+    tools = _section(CANONICAL.read_text(encoding="utf-8"), "## ツールの設定")
+    for phrase in ("~/.gemini/antigravity-cli/settings.json", "read_file(", "write_file(", "1.5.12"):
+        assert phrase in tools, phrase
+
+    reference = DOCS / "reference_cli.md"
+    (status_row,) = [line for line in reference.read_text(encoding="utf-8").splitlines() if line.startswith("| C45 |")]
+    assert "Antigravity" in status_row
+    for provider in (CANONICAL, reference):
+        assert provider.read_bytes() == (ROOT / "spec-dock/docs" / provider.name).read_bytes()
+
+
 def test_canonical_md_covers_the_handed_over_constraints() -> None:
     text = CANONICAL.read_text(encoding="utf-8")
     for phrase in (
