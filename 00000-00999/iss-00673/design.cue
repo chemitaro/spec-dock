@@ -38,7 +38,7 @@ design: {
 			  1. dict でなければ None。`permissions` の既定は `{}`、dict でなければ None。`allow`・`ask`・`deny` の既定は `[]`、どれかが文字列のリストでなければ None。
 			  2. 規則を `^(read_file|write_file)\\((.+)\\)$` で読み、中が絶対のパスのものだけを、`os.path.normpath` してから `resolve` して数える。`~`、相対のパス、`*`、ほかの道具の規則は数えない（確かめていない形）。`allowNonWorkspaceAccess` などほかの鍵は見ない。
 			  3. 規則がカタログを覆うとは、解いたパスがカタログ（`catalog` は実のパス）と等しいか、その親であること。
-			  4. `deny` か `ask` に、カタログを覆う `read_file` か `write_file` があれば None（deny と ask が allow より優先し、allow の1行では直らない）。
+			  4. `deny` か `ask` に、カタログを覆う `read_file` か `write_file` があれば None（deny と ask が allow より優先し、allow の1行では直らない）。`deny` か `ask` に、`read_file` か `write_file` の規則で、対象に `*` を含むか絶対のパスでない（`~`、相対）ものが1つでもあっても None（カタログを覆うかを確かめられない。公式の資料は `read_file(*)` などを全体に当たる規則とする）。手順2の、数えない形の扱いは `allow` だけに当てる。
 			  5. そうでなく、`allow` に、カタログを覆う `read_file` と `write_file` が両方あれば True、なければ False。
 			"""
 		satisfies: ["R-01"]
@@ -69,7 +69,7 @@ design: {
 		text: """
 			`src/spec_dock/assets/spec_dock/docs/canonical.md` の『## ツールの設定』：
 			- 冒頭の文の対象を『Claude Code、Codex、Antigravity』にする。
-			- **Antigravity** の項：ユーザーの設定 `~/.gemini/antigravity-cli/settings.json` の `permissions.allow` に `read_file(<カタログ>)` と `write_file(<カタログ>)` を加える1行の例。複数のクローンを並べる例。既にある `permissions.allow` には加える（置き換えない）。`deny`・`ask` にカタログを覆う規則があると、そちらが優先する。
+			- **Antigravity** の項：ユーザーの設定 `~/.gemini/antigravity-cli/settings.json` の `permissions.allow` に `read_file(<カタログ>)` と `write_file(<カタログ>)` を加える1行の例。複数のクローンを並べる例。既にある `permissions.allow` には加える（置き換えない）。`deny`・`ask` にカタログを覆う規則があると、そちらが優先する（`*` を含むか絶対のパスでない deny・ask の規則があると、`canonical status` は判定できないとする）。
 			- 足さないと：ファイルの道具は許可を求めるか拒まれ（print のモードでは自動で拒まれる）、端末の書き込みは `Operation not permitted`。
 			- その回だけなら `agy --add-dir <カタログ>` でも通るが、SpecDock からは見えないので `canonical status` は警告を出す。`allowNonWorkspaceAccess` は、ほかの設定によって書き込みが通らないことがあり、作業ディレクトリの外のすべてに及ぶので使わない。
 			- 確かめた版と方法：`agy` 1.5.12（2026-11-20）で、規則をその回だけの `--settings` で与えて確かめた。保存の場所と規則の形は公式のスキーマによる。設定の場所と名前は版で変わりうる。

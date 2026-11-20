@@ -7,6 +7,7 @@ goal: "マージできる PR（CI 合格、最終品質ゲートの closure.md �
 steps: {
 	"S-01": {title: "canonical.md・reference_cli.md の Antigravity の案内（提供側と dogfood）と static-inventory.json の2行（タスク担当）", realizes: ["R-02"], status: "done", session: "owner"}
 	"S-02": {title: "検出（D-01）、domain の関数（D-02）、`tools.antigravity` と警告（D-03）と、そのテスト・案内の検査のテスト", realizes: ["R-01", "R-02", "F-01"], status: "done", after: ["S-01"], session: "impl"}
+	"S-03": {title: "deny・ask の `*`・絶対でない規則を判定できないとし（統括の決定）、T-07・T-08 のテストを足す", realizes: ["R-01", "F-01"], status: "todo", after: ["S-02"], session: "impl"}
 }
 
 tests: {
@@ -16,6 +17,8 @@ tests: {
 	"T-04": {title: "`ANTIGRAVITY_AGENT` なしでは、設定がなくても Antigravity の警告が出ず、`tools` の `status`・`next_step` と警告の列が今と同じ。main のチェックアウトでは `needed` 偽で警告なし（cli_runtime）", verifies: ["F-01", "R-01"]}
 	"T-05": {title: "設定のファイルのバイトが実行の前後で同じ。今の `test_issue429_canonical_status.py` などの Codex・Claude Code のテストがそのまま通る", verifies: ["R-01"]}
 	"T-06": {title: "提供側の canonical.md に Antigravity の項（`~/.gemini/antigravity-cli/settings.json`、`read_file(`、`write_file(`、`1.5.12`）があり、reference_cli.md の C45 に Antigravity があり、両方が dogfood の写しとバイトが同じ。今の資産の検査のテストが通る", verifies: ["R-02"]}
+	"T-07": {title: "`deny` の `read_file(*)`、`ask` の `write_file(/some/*)` があると、`allow` に両方があっても null と `CANONICAL_TOOL_SETTING_UNKNOWN`。`deny` に `*` を含まない、カタログを覆わない別のフォルダーの規則は影響しない（真のまま）。`allow` の `read_file(*)` と `write_file(*)` だけでは偽（cli_runtime と domain の単体）", verifies: ["R-01"]}
+	"T-08": {title: "`ANTIGRAVITY_AGENT` なしで判定が null（壊れた設定）のとき、Antigravity の警告が出ず、`tools` の `status`・`next_step` は Codex・Claude Code の警告だけで決まる（cli_runtime）", verifies: ["F-01"]}
 }
 
 verification: """
@@ -31,7 +34,7 @@ gates: {
 	checkpoints: {}
 	checkpoints_note: "なし。実装の手順は1つで、最終品質ゲートで足りる"
 	final_quality_gate: {
-		scope:          "この Issue の変更：開始のコミット 83b8ee95f から S-02 の終わりまで"
+		scope:          "この Issue の変更：開始のコミット 83b8ee95f から S-03 の終わりまで（キャンペーン iss-00673-fqg-1 は S-02 で合格。S-03 の後に新しいキャンペーン iss-00673-fqg-2 でやり直す）"
 		perspectives:   ["requirements-closure", "test-adequacy", "compatibility"]
 		test_commands:  ["make lint", "uv run pytest"]
 		record_paths:   []
@@ -50,6 +53,6 @@ execution: {
 	}
 	reviews: {
 		spec: {role: "仕様のレビュー", after: "S-01", model: "opus", effort: "high"}
-		gate: {role: "最終品質ゲート", after: "S-02", model: "opus", effort: "medium"}
+		gate: {role: "最終品質ゲート", after: "S-03", model: "opus", effort: "medium"}
 	}
 }
