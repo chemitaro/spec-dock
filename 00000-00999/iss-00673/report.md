@@ -86,6 +86,15 @@ Antigravity の中の linked worktree で、`canonical status`（と `canonical 
 
 ## Verification
 
+- **最終（今の PR の head）**：統括の決定 1・2 の直し（S-03 0e60c0481、S-04 4a304deab）と origin/main（6de140261、iss-00674）の取り込み（fb0e14cd6）の後、新しいキャンペーン iss-00673-fqg-4 で、合格のコミット 4a304deab（開始のコミット 6de140261）。
+  - 主のレビュー：P0〜P3 0。
+  - 2人目（ChatGPT GPT-6 / Extra High、仕様の要点を prompt に書いた）：pass、P0・P1 なし、P2 1（改行を含む deny・ask の規則を正規表現が拾わない）。
+  - `make lint` exit 0、`uv run pytest` exit 0（4424 passed / 7 skipped）。
+  - closure：`.workbench/final-quality-gate/iss-00673-fqg-4/closure.md`。記録だけのコミットはない。
+  - PR #677 の head 4a304deab で CI 全合格、observer は observable_ci PASS、merge_readiness READY、mergeStateStatus CLEAN（`ci-watch-3.jsonl`）。
+  - 実装担当：S-03 は dispatch ctx_246ada125023、S-04 は ctx_2bd41c70bb53（どちらも codex・gpt-6.2-sol・medium、launch.effective 一致）。
+- 以下は前のキャンペーン（記録として残す。合格の根拠は上の fqg-4）。
+
 - 最終品質ゲート iss-00673-fqg-1 attempt 1（5248c23b8）：**合格**。
   - 主のレビュー（quality-gate-reviewer opus / medium）：P0〜P2 0、P3 1、coverage complete。
   - 2人目（chatgpt-code-review-strict、GPT-6 / Extra High）：P0・P1 なし、P2 1。review_status は、仕様のブランチを読めなかった証拠不足による fail（ゲートの条件ではない）。
@@ -109,3 +118,9 @@ Antigravity の中の linked worktree で、`canonical status`（と `canonical 
 - Antigravity の中の linked worktree では、今の Claude Code の警告も出る（Claude Code を使わない人には要らない警告）。Claude Code の警告を `CLAUDECODE` で絞るかは、別の判断（この Issue の対象外）。
 - Antigravity の端末から linked worktree の Git を操作するとき（Git の情報が作業ディレクトリの外にある）の扱いは、確かめていない。
 - `work finish iss-00673` は実行していない（マージの後に統括が行う）。
+
+
+## 統括の締め（2026-11-20）
+
+- PR #677 を合格のコミット 4a304deab でマージした。
+- fqg-4 の2人目の P2（改行を含む deny・ask の read_file・write_file の規則を正規表現が拾わず、判定できないにならない。re.DOTALL で直せる）は直さない。実際の設定で規則の文字列に改行が入ることはまずなく、影響は「設定済み」の誤判定に限られる。必要になれば新しい Issue にする。
